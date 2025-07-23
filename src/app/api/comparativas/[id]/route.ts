@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/comparativas/[id]
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  const comparativaId = parseInt(params.id);
+export async function GET(request: NextRequest) {
+  const id = request.nextUrl.pathname.split('/').pop();
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
+  const comparativaId = parseInt(id);
 
   try {
     const comparativa = await prisma.comparativa.findUnique({
@@ -15,8 +18,8 @@ export async function GET(
         cliente: true,
         datosFactura: true,
         resultados: true,
-        agente: true,         // 👈 Añadir
-        lugar: true           // 👈 Añadir
+        agente: true,
+        lugar: true,
       },
     });
 
