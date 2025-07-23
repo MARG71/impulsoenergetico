@@ -135,12 +135,17 @@ model Lead {
 }
 
 model DatosFactura {
-  id              Int         @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   tipoCliente     String
   tipoTarifa      String
+  nombreTarifa    String // ← Añadir esto
+  cups            String // ← Añadir esto
+  fechaInicio     String // ← O DateTime si usas fechas reales
+  fechaFin        String // ← O DateTime
   consumoAnualKWh Float
   consumoMensual  Float?
-  comparativaId   Int         @unique
-  comparativa     Comparativa @relation(fields: [comparativaId], references: [id])
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime @default(now())
+
+  comparativa   Comparativa @relation(fields: [comparativaId], references: [id])
+  comparativaId Int         @unique
 }
