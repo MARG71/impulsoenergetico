@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         potencias: datosFactura.potencias,
         consumoAnualKWh: parseFloat(datosFactura.consumoAnual),
 
-        importeFactura: parseFloat(datosFactura.importeFactura),
+        
         iva: parseFloat(datosFactura.iva),
         impuestoElectricidad: parseFloat(datosFactura.impuestoElectricidad),
         territorio: datosFactura.territorio,
