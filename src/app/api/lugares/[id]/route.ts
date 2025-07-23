@@ -1,26 +1,42 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+// GET: obtener lugar por ID
+export async function GET(req: NextRequest) {
+  const id = req.nextUrl.pathname.split('/').pop();
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
   const lugar = await prisma.lugar.findUnique({
-    where: { id: parseInt(params.id) },
+    where: { id: parseInt(id) },
     include: {
       agente: true,
     },
   });
 
-  if (!lugar) return NextResponse.json({ error: 'Lugar no encontrado' }, { status: 404 });
+  if (!lugar) {
+    return NextResponse.json({ error: 'Lugar no encontrado' }, { status: 404 });
+  }
 
   return NextResponse.json(lugar);
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+// PUT: actualizar lugar por ID
+export async function PUT(req: NextRequest) {
+  const id = req.nextUrl.pathname.split('/').pop();
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
   try {
     const body = await req.json();
     const { nombre, direccion, qrCode, agenteId } = body;
 
     const lugarActualizado = await prisma.lugar.update({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) },
       data: {
         nombre,
         direccion,
@@ -36,10 +52,17 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+// DELETE: eliminar lugar por ID
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.pathname.split('/').pop();
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
   try {
     await prisma.lugar.delete({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) },
     });
 
     return NextResponse.json({ mensaje: 'Lugar eliminado' });
