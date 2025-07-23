@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  ADMIN
+  AGENTE
+  LUGAR
+}
+
+model Cliente {
+  id           Int           @id @default(autoincrement())
+  nombre       String
+  direccion    String
+  email        String?       @unique
+  telefono     String?
+  comparativas Comparativa[]
+  contratos    Contrato[]
+}
+
+model Comparativa {
+  id             Int       @id @default(autoincrement())
+  clienteId      Int
+  tipoServicio   String
+  tipoTarifa     String
+  nombreTarifa   String
+  consumoAnual   Float
+  importeFactura Float
+  ahorro         Float      @default(0)
+  comision       Float      @default(0)
+  fecha          DateTime   @default(now())
+  agenteId       Int
+  lugarId        Int
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+  agente  Agente  @relation(fields: [agenteId], references: [id])
+  lugar   Lugar   @relation(fields: [lugarId], references: [id])
+}
+
+model Contrato {
+  id        Int      @id @default(autoincrement())
+  clienteId Int
+  servicio  String
+  compañia  String
+  tarifa    String
+  fechaAlta DateTime @default(now())
+  comision  Float
+  agenteId  Int?
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+  agente  Agente? @relation(fields: [agenteId], references: [id])
+}
+
+model Agente {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  email     String    @unique
+  telefono  String?
+  contratos Contrato[]
+  lugares   Lugar[]
+  comparativas Comparativa[]
+  qrs       QR[]
+  leads     Lead[]
+  usuarios  Usuario[]
+}
+
+model Lugar {
+  id           Int       @id @default(autoincrement())
+  nombre       String
+  direccion    String
+  qrCode       String    @unique
+  agenteId     Int
+
+  agente       Agente    @relation(fields: [agenteId], references: [id])
+  comparativas Comparativa[]
+  qrs          QR[]
+  leads        Lead[]
+  usuarios     Usuario[]
+}
+
+model QR {
+  id        Int     @id @default(autoincrement())
+  codigo    String  @unique
+  lugarId   Int
+  agenteId  Int?
+
+  lugar     Lugar   @relation(fields: [lugarId], references: [id])
+  agente    Agente? @relation(fields: [agenteId], references: [id])
+}
+
+model Usuario {
+  id        Int    @id @default(autoincrement())
+  nombre    String
+  email     String @unique
+  password  String
+  rol       Rol    @default(LUGAR)
+  agenteId  Int?
+  lugarId   Int?
+
+  agente    Agente? @relation(fields: [agenteId], references: [id])
+  lugar     Lugar?  @relation(fields: [lugarId], references: [id])
+}
+
+model Lead {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  email     String
+  telefono  String
+  estado    String   @default("pendiente")
+  creadoEn  DateTime @default(now())
+
+  lugarId   Int?
+  lugar     Lugar?   @relation(fields: [lugarId], references: [id])
+
+  agenteId  Int?
+  agente    Agente?  @relation(fields: [agenteId], references: [id])
+}
+
