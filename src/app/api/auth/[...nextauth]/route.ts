@@ -30,7 +30,7 @@ const handler = NextAuth({
         if (!passwordOk) return null;
 
         return {
-          id: user.id,
+          id: user.id.toString(), // 🔧 ← esta línea es la corrección
           email: user.email,
           name: user.nombre,
           role: user.rol,
