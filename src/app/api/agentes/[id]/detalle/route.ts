@@ -1,8 +1,7 @@
-import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server'; // Import correcto
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const agenteId = parseInt(params.id);
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
+  const agenteId = parseInt(context.params.id);
 
   try {
     const agente = await prisma.agente.findUnique({
@@ -23,7 +22,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
     }
 
-    // Agregamos campos nombreLugar y direccionLugar manualmente para cada comparativa
     const comparativasConLugar = agente.comparativas.map((comp) => ({
       ...comp,
       nombreLugar: comp.lugar?.nombre || null,
