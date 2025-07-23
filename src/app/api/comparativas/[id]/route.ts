@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
       where: { id: comparativaId },
       include: {
         cliente: true,
-        datosFactura: true,
         resultados: true,
         agente: true,
         lugar: true,
