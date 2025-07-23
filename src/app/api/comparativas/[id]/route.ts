@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
         cliente: true,
         agente: true,
         lugar: true,
+        datosFactura: true,   // ✅ Restaurado
+        resultados: true      // ✅ Restaurado
       },
     });
 
