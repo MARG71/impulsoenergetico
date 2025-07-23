@@ -1,7 +1,9 @@
-import { NextRequest } from 'next/server'; // Import correcto
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest, context: { params: { id: string } }) {
-  const agenteId = parseInt(context.params.id);
+  const { id } = context.params;
+  const agenteId = parseInt(id);
 
   try {
     const agente = await prisma.agente.findUnique({
@@ -12,8 +14,8 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         comparativas: {
           include: {
             cliente: true,
-            lugar: true
-          }
+            lugar: true,
+          },
         },
       },
     });
