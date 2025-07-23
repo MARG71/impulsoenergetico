@@ -30,7 +30,7 @@ const handler = NextAuth({
         if (!passwordOk) return null;
 
         return {
-          id: user.id.toString(), // 🔧 ← esta línea es la corrección
+          id: user.id.toString(), // ✅ convertimos id a string
           email: user.email,
           name: user.nombre,
           role: user.rol,
@@ -50,10 +50,12 @@ const handler = NextAuth({
     },
     async session({ session, token }) {
       if (session.user && token) {
-        session.user.role = token.role;
-        session.user.id = token.id;
-        session.user.name = token.name;
-        session.user.email = token.email;
+        const t = token as any; // ✅ forzamos el tipo para evitar error TS
+
+        session.user.role = t.role;
+        session.user.id = t.id;
+        session.user.name = t.name;
+        session.user.email = t.email;
       }
       return session;
     },
