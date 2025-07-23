@@ -138,10 +138,12 @@ model DatosFactura {
   id              Int      @id @default(autoincrement())
   tipoCliente     String
   tipoTarifa      String
-  nombreTarifa    String // ← Añadir esto
-  cups            String // ← Añadir esto
-  fechaInicio     String // ← O DateTime si usas fechas reales
-  fechaFin        String // ← O DateTime
+  nombreTarifa    String
+  cups            String
+  fechaInicio     String
+  fechaFin        String
+  consumoPeriodos String
+  potencias       String
   consumoAnualKWh Float
   consumoMensual  Float?
   createdAt       DateTime @default(now())
