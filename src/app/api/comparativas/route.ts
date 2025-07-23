@@ -40,7 +40,8 @@ export async function POST(request: Request) {
         fechaFin: datosFactura.fechaFin || '',
         consumoPeriodos: datosFactura.consumoPeriodos,
         potencias: datosFactura.potencias,
-        consumoAnual: parseFloat(datosFactura.consumoAnual),
+        consumoAnualKWh: parseFloat(datosFactura.consumoAnual),
+
         importeFactura: parseFloat(datosFactura.importeFactura),
         iva: parseFloat(datosFactura.iva),
         impuestoElectricidad: parseFloat(datosFactura.impuestoElectricidad),
