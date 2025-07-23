@@ -1,10 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // GET: obtener agente por ID
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest) {
+  const id = request.nextUrl.pathname.split('/').pop();
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
   const agente = await prisma.agente.findUnique({
-    where: { id: parseInt(params.id) },
+    where: { id: parseInt(id) },
   });
 
   if (!agente) {
@@ -14,18 +20,24 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(agente);
 }
 
-// PUT: actualizar agente (✅ ahora incluye 'telefono')
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+// PUT: actualizar agente (incluye 'telefono')
+export async function PUT(request: NextRequest) {
+  const id = request.nextUrl.pathname.split('/').pop();
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
   const body = await request.json();
   const { nombre, email, telefono } = body;
 
   try {
     const actualizado = await prisma.agente.update({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) },
       data: {
         nombre,
         email,
-        telefono, // ✅ añadimos teléfono
+        telefono,
       },
     });
 
