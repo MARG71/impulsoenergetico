@@ -1,9 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+// src/app/api/agentes/[id]/detalle/route.ts
 
-export async function GET(request: NextRequest, context: { params: { id: string } }) {
-  const { id } = context.params;
-  const agenteId = parseInt(id);
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+// ✅ Obtener agente por ID desde URL
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const id = url.pathname.split('/').filter(Boolean).pop(); // obtener el último segmento: el ID
+
+  const agenteId = parseInt(id || '', 10);
+
+  if (isNaN(agenteId)) {
+    return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+  }
 
   try {
     const agente = await prisma.agente.findUnique({
