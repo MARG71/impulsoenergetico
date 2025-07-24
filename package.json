@@ -5,7 +5,7 @@
   "scripts": {
     "predev": "powershell -Command \"$port=3000; $p=Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue; if ($p) { Stop-Process -Id $p.OwningProcess -Force; Write-Host '✅ Puerto $port liberado.' } else { Write-Host '✅ Puerto $port libre.' }\"",
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
