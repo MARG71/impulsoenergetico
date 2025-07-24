@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "DatosFactura" ADD COLUMN     "alquiler" DOUBLE PRECISION,
+ADD COLUMN     "exceso" DOUBLE PRECISION,
+ADD COLUMN     "otros" DOUBLE PRECISION,
+ALTER COLUMN "consumoPeriodos" SET DATA TYPE TEXT,
+ALTER COLUMN "potencias" SET DATA TYPE TEXT;

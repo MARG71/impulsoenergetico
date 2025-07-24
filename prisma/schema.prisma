@@ -135,22 +135,24 @@ model Lead {
 }
 
 model DatosFactura {
-  id                   Int        @id @default(autoincrement())
-  tipoCliente          String?
-  tipoTarifa           String?
-  nombreTarifa         String?
-  cups                 String?
-  fechaInicio          String?
-  fechaFin             String?
-  consumoPeriodos      Json?
-  potencias            Json?
-  consumoAnualKWh      Float?
-  importeFactura       Float?
-  iva                  Float?
-  impuestoElectricidad Float?
-  territorio           String?
-  reactiva             Float?
-
-  comparativa          Comparativa @relation(fields: [comparativaId], references: [id])
-  comparativaId        Int @unique
+  id                    Int           @id @default(autoincrement())
+  tipoCliente           String?
+  tipoTarifa            String?
+  nombreTarifa          String?
+  cups                  String?
+  fechaInicio           String?
+  fechaFin              String?
+  consumoPeriodos       String?
+  potencias             String?
+  consumoAnualKWh       Float?
+  importeFactura        Float?
+  iva                   Float?
+  impuestoElectricidad  Float?
+  territorio            String?
+  reactiva              Float?
+  exceso                Float?
+  alquiler              Float?
+  otros                 Float?
+  comparativaId         Int           @unique // ✅ Esto es lo que faltaba
+  comparativa           Comparativa   @relation(fields: [comparativaId], references: [id])
 }
