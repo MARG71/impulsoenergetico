@@ -130,7 +130,9 @@ export default function CrearUsuarioPage() {
           </div>
           <div>
             <Label className="text-black">Rol</Label>
-            <Select value={rol} onValueChange={setRol}>
+
+            <Select value={rol} onValueChange={(value) => setRol(value as 'ADMIN' | 'AGENTE' | 'LUGAR')}>
+  
               <SelectTrigger className="bg-white text-black">
                 <SelectValue placeholder="Selecciona un rol" />
               </SelectTrigger>
