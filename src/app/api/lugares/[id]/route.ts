@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest) {
         nombre,
         direccion,
         qrCode,
-        agenteId: agenteId ? Number(agenteId) : null,
+        ...(agenteId ? { agenteId: Number(agenteId) } : {}),
       },
     });
 
