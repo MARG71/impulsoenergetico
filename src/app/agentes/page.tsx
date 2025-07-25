@@ -1,4 +1,3 @@
-// Nuevo diseño de Agentes con estilo Impulso Energético
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -26,7 +25,20 @@ export default function AgentesPage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch('/api/agentes').then(res => res.json()).then(setAgentes);
+    fetch('/api/agentes')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAgentes(data);
+        } else {
+          console.error('La respuesta no es un array:', data);
+          toast.error('Error al cargar agentes');
+        }
+      })
+      .catch(err => {
+        console.error('Error en fetch agentes:', err);
+        toast.error('Error de conexión al cargar agentes');
+      });
   }, []);
 
   const crearAgente = async () => {
@@ -115,49 +127,55 @@ export default function AgentesPage() {
               </tr>
             </thead>
             <tbody>
-              {agentes.map(a => (
-                <tr key={a.id} className="text-black text-center">
-                  <td className="border px-4 py-2">{a.id}</td>
-                  <td className="border px-4 py-2">{a.nombre}</td>
-                  <td className="border px-4 py-2">{a.email}</td>
-                  <td className="border px-4 py-2">{a.telefono || '-'}</td>
-                  <td className="border px-4 py-2 space-x-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button className="bg-blue-600 text-white hover:bg-blue-800" onClick={() => setAgenteEditando(a)}>Editar</Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl bg-[#F3F8F1] rounded-xl shadow-lg p-6">
-                        <DialogHeader>
-                          <DialogTitle className="text-[#1F1F1F] text-xl font-bold">Editar Agente</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                          <div>
-                            <Label className="text-[#1F1F1F]">Nombre</Label>
-                            <Input value={agenteEditando?.nombre || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, nombre: e.target.value } : null)} />
+              {Array.isArray(agentes) && agentes.length > 0 ? (
+                agentes.map(a => (
+                  <tr key={a.id} className="text-black text-center">
+                    <td className="border px-4 py-2">{a.id}</td>
+                    <td className="border px-4 py-2">{a.nombre}</td>
+                    <td className="border px-4 py-2">{a.email}</td>
+                    <td className="border px-4 py-2">{a.telefono || '-'}</td>
+                    <td className="border px-4 py-2 space-x-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button className="bg-blue-600 text-white hover:bg-blue-800" onClick={() => setAgenteEditando(a)}>Editar</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl bg-[#F3F8F1] rounded-xl shadow-lg p-6">
+                          <DialogHeader>
+                            <DialogTitle className="text-[#1F1F1F] text-xl font-bold">Editar Agente</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <div>
+                              <Label className="text-[#1F1F1F]">Nombre</Label>
+                              <Input value={agenteEditando?.nombre || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, nombre: e.target.value } : null)} />
+                            </div>
+                            <div>
+                              <Label className="text-[#1F1F1F]">Email</Label>
+                              <Input value={agenteEditando?.email || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, email: e.target.value } : null)} />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label className="text-[#1F1F1F]">Teléfono</Label>
+                              <Input value={agenteEditando?.telefono || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, telefono: e.target.value } : null)} />
+                            </div>
                           </div>
-                          <div>
-                            <Label className="text-[#1F1F1F]">Email</Label>
-                            <Input value={agenteEditando?.email || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, email: e.target.value } : null)} />
+                          <div className="mt-6 flex justify-end">
+                            <Button className="bg-[#28a745] text-white hover:bg-[#218838] px-6 py-2 rounded-lg" onClick={guardarCambios}>
+                              Guardar cambios
+                            </Button>
                           </div>
-                          <div className="md:col-span-2">
-                            <Label className="text-[#1F1F1F]">Teléfono</Label>
-                            <Input value={agenteEditando?.telefono || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, telefono: e.target.value } : null)} />
-                          </div>
-                        </div>
-                        <div className="mt-6 flex justify-end">
-                          <Button className="bg-[#28a745] text-white hover:bg-[#218838] px-6 py-2 rounded-lg" onClick={guardarCambios}>
-                            Guardar cambios
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    <Link href={`/agentes/${a.id}/detalle`}>
-                      <Button className="bg-yellow-500 text-white hover:bg-yellow-600">Ver Detalle</Button>
-                    </Link>
-                    <Button className="bg-red-500 text-white hover:bg-red-700" onClick={() => eliminarAgente(a.id)}>Eliminar</Button>
-                  </td>
+                        </DialogContent>
+                      </Dialog>
+                      <Link href={`/agentes/${a.id}/detalle`}>
+                        <Button className="bg-yellow-500 text-white hover:bg-yellow-600">Ver Detalle</Button>
+                      </Link>
+                      <Button className="bg-red-500 text-white hover:bg-red-700" onClick={() => eliminarAgente(a.id)}>Eliminar</Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-center text-gray-600 py-4">No hay agentes registrados.</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
