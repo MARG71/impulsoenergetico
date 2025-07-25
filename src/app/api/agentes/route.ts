@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma'; // ✅ sin destructurar (asegúrate de export default en prisma.ts)
 
 // POST: Crear un nuevo agente
 export async function POST(request: Request) {
-  const body = await request.json();
-
   try {
+    const body = await request.json();
+
     const nuevoAgente = await prisma.agente.create({
       data: {
         nombre: body.nombre,
         email: body.email,
-        telefono: body.telefono, // ✅ Incluido
+        telefono: body.telefono || null,
       },
     });
 
@@ -29,9 +29,10 @@ export async function GET() {
         id: true,
         nombre: true,
         email: true,
-        telefono: true, // ✅ Incluido
+        telefono: true,
       },
     });
+
     return NextResponse.json(agentes);
   } catch (error) {
     console.error('Error al obtener agentes:', error);
