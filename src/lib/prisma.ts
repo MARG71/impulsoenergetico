@@ -1,19 +1,16 @@
-// lib/prisma.ts
-
+// src/lib/prisma.ts
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const prisma =
+export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['query'], // Puedes quitar esto si no quieres ver las queries
+    log: ['query'], // Puedes quitar esta línea si no quieres ver las queries en consola
   });
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
-
-export default prisma; // ✅ Exportación por defecto necesaria para route.ts

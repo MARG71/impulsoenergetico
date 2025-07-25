@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // ✅ sin destructurar (asegúrate de export default en prisma.ts)
+import { prisma } from '@/lib/prisma'; // ✅ sin destructurar (asegúrate de export default en prisma.ts)
 
 // POST: Crear un nuevo agente
 export async function POST(request: Request) {

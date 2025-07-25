@@ -1,6 +1,7 @@
 // src/app/api/agentes/[id]/detalle/route.ts
-
 import { prisma } from '@/lib/prisma';
+
+
 import { NextResponse } from 'next/server';
 
 // ✅ Obtener agente por ID desde URL
