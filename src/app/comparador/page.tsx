@@ -1,11 +1,11 @@
-'use client';
-
 import { Suspense } from 'react';
 import ComparadorContenido from './ComparadorContenido';
 
-export default function Page() {
+export const dynamic = 'force-dynamic';
+
+export default function ComparadorPage() {
   return (
-    <Suspense fallback={<div>Cargando comparador...</div>}>
+    <Suspense fallback={<div className="p-6 text-center">Cargando comparador...</div>}>
       <ComparadorContenido />
     </Suspense>
   );
