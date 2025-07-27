@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function RegistroFormulario() {
   const searchParams = useSearchParams();
@@ -14,6 +14,12 @@ export default function RegistroFormulario() {
   const [telefono, setTelefono] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (!agenteId || !lugarId) {
+      setMensaje('El código QR está incompleto o no es válido.');
+    }
+  }, [agenteId, lugarId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +39,11 @@ export default function RegistroFormulario() {
       });
 
       if (res.ok) {
-        // Redirigir al comparador con agenteId y lugarId
-        router.push(`/comparador?agenteId=${agenteId}&lugarId=${lugarId}`);
+        // Guardar en localStorage para mantener ID en el comparador
+        localStorage.setItem('agenteId', agenteId);
+        localStorage.setItem('lugarId', lugarId);
+
+        router.push('/registro/gracias');
       } else {
         const data = await res.json();
         setMensaje(data.error || 'Error al registrar.');
