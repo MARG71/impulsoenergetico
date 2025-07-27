@@ -1,10 +1,11 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function RegistroFormulario() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const agenteId = searchParams.get('agenteId');
   const lugarId = searchParams.get('lugarId');
 
@@ -12,7 +13,7 @@ export default function RegistroFormulario() {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [mensaje, setMensaje] = useState('');
-  const [registroExitoso, setRegistroExitoso] = useState(false);
+  const [cargando, setCargando] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +23,8 @@ export default function RegistroFormulario() {
       return;
     }
 
+    setCargando(true);
+
     try {
       const res = await fetch('/api/leads', {
         method: 'POST',
@@ -30,34 +33,31 @@ export default function RegistroFormulario() {
       });
 
       if (res.ok) {
-        setRegistroExitoso(true);
+        // Redirigir al comparador con agenteId y lugarId
+        router.push(`/comparador?agenteId=${agenteId}&lugarId=${lugarId}`);
       } else {
         const data = await res.json();
         setMensaje(data.error || 'Error al registrar.');
+        setCargando(false);
       }
     } catch (error) {
       setMensaje('Error de red al registrar.');
+      setCargando(false);
     }
   };
 
-  if (registroExitoso) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-green-100">
-        <div className="bg-white p-6 rounded shadow text-center">
-          <h1 className="text-2xl font-bold text-green-700 mb-2">✅ ¡Gracias por registrarte!</h1>
-          <p className="text-gray-600">En breve un asesor de Impulso Energético se pondrá en contacto contigo.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-yellow-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-100 to-green-100 p-6">
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-6 rounded shadow-md w-full max-w-md space-y-4"
+        className="bg-white w-full max-w-xl p-8 rounded-xl shadow-lg space-y-6"
       >
-        <h1 className="text-xl font-bold text-gray-800 text-center">📋 Registro de Contacto</h1>
+        <h1 className="text-2xl font-bold text-center text-green-800">
+          🚀 ¡Ahorra y gana con tus suministros!
+        </h1>
+        <p className="text-center text-gray-600 text-sm">
+          Completa tus datos para comenzar a comparar ofertas y ganar comisiones.
+        </p>
 
         {mensaje && <p className="text-red-500 text-sm text-center">{mensaje}</p>}
 
@@ -66,36 +66,38 @@ export default function RegistroFormulario() {
           placeholder="Nombre completo"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-3 border rounded text-gray-800"
           required
         />
 
         <input
           type="email"
-          placeholder="Correo electrónico (opcional)"
+          placeholder="Correo electrónico"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-3 border rounded text-gray-800"
+          required
         />
 
         <input
           type="tel"
-          placeholder="Teléfono de contacto"
+          placeholder="Teléfono"
           value={telefono}
           onChange={(e) => setTelefono(e.target.value)}
-          className="w-full p-2 border rounded"
+          className="w-full p-3 border rounded text-gray-800"
           required
         />
 
         <button
           type="submit"
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full"
+          disabled={cargando}
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded transition duration-300"
         >
-          Enviar
+          {cargando ? 'Enviando...' : 'Comenzar'}
         </button>
 
-        <p className="text-xs text-center text-gray-400">
-          Al enviar aceptas ser contactado por un asesor de Impulso Energético.
+        <p className="text-xs text-center text-gray-500">
+          Al enviar aceptas recibir comunicaciones comerciales sobre nuestras ofertas y servicios.
         </p>
       </form>
     </div>
