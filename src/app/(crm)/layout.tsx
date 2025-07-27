@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Toaster } from "sonner";
 import "../globals.css";
 
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -29,7 +28,9 @@ export default function CRMLayout({
 }) {
   return (
     <html lang="es">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-gray-900`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-gray-900`}
+      >
         <div className="flex min-h-screen">
           {/* MENÚ LATERAL AZUL */}
           <aside className="w-64 bg-[#004e89] text-white p-4 shadow-lg flex flex-col items-center">
@@ -45,28 +46,41 @@ export default function CRMLayout({
 
             {/* MENÚ DE NAVEGACIÓN */}
             <nav className="flex flex-col gap-6 text-md font-semibold w-full px-4">
-              <Link href="/crm/dashboard" className="hover:text-yellow-300 flex items-center gap-2">
+              <Link
+                href="/crm/dashboard"
+                className="hover:text-yellow-300 flex items-center gap-2"
+              >
                 📊 Dashboard
               </Link>
-              <Link href="/crm/agentes" className="hover:text-yellow-300 flex items-center gap-2">
+              <Link
+                href="/crm/agentes"
+                className="hover:text-yellow-300 flex items-center gap-2"
+              >
                 👤 Agentes
               </Link>
-              <Link href="/crm/lugares" className="hover:text-yellow-300 flex items-center gap-2">
+              <Link
+                href="/crm/lugares"
+                className="hover:text-yellow-300 flex items-center gap-2"
+              >
                 📍 Lugares
               </Link>
-              <Link href="/crm/dashboard/historial" className="hover:text-yellow-300 flex items-center gap-2">
+              <Link
+                href="/crm/dashboard/historial"
+                className="hover:text-yellow-300 flex items-center gap-2"
+              >
                 📂 Historial Comparativas
               </Link>
-              <Link href="/crm/crear-usuario" className="text-white hover:text-gray-300 px-4 py-2 block">
-                Crear Acceso Usuario
+              <Link
+                href="/crm/crear-usuario"
+                className="text-white hover:text-gray-300 px-4 py-2 block"
+              >
+                ➕ Crear Acceso Usuario
               </Link>
             </nav>
           </aside>
 
           {/* CONTENIDO PRINCIPAL */}
-          <main className="flex-1 p-6">
-            {children}
-          </main>
+          <main className="flex-1 p-6">{children}</main>
         </div>
 
         <Toaster richColors position="top-center" />
