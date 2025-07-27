@@ -6,8 +6,6 @@ import { useState, useEffect } from 'react';
 export default function RegistroFormulario() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const agenteId = searchParams.get('agenteId');
-  const lugarId = searchParams.get('lugarId');
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -15,14 +13,30 @@ export default function RegistroFormulario() {
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(false);
 
+  const [agenteId, setAgenteId] = useState<string | null>(null);
+  const [lugarId, setLugarId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!agenteId || !lugarId) {
-      setMensaje('El código QR está incompleto o no es válido.');
+    const urlAgente = searchParams.get('agenteId');
+    const urlLugar = searchParams.get('lugarId');
+
+    if (urlAgente && urlLugar) {
+      setAgenteId(urlAgente);
+      setLugarId(urlLugar);
+      localStorage.setItem('agenteId', urlAgente);
+      localStorage.setItem('lugarId', urlLugar);
+    } else {
+      const storedAgenteId = localStorage.getItem('agenteId');
+      const storedLugarId = localStorage.getItem('lugarId');
+      setAgenteId(storedAgenteId);
+      setLugarId(storedLugarId);
     }
-  }, [agenteId, lugarId]);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    setMensaje('');
 
     if (!agenteId || !lugarId) {
       setMensaje('El código QR está incompleto o no es válido.');
@@ -39,18 +53,14 @@ export default function RegistroFormulario() {
       });
 
       if (res.ok) {
-        // Guardar en localStorage para mantener ID en el comparador
-        localStorage.setItem('agenteId', agenteId);
-        localStorage.setItem('lugarId', lugarId);
-
         router.push('/registro/gracias');
       } else {
         const data = await res.json();
         setMensaje(data.error || 'Error al registrar.');
-        setCargando(false);
       }
     } catch (error) {
       setMensaje('Error de red al registrar.');
+    } finally {
       setCargando(false);
     }
   };
@@ -108,6 +118,13 @@ export default function RegistroFormulario() {
         <p className="text-xs text-center text-gray-500">
           Al enviar aceptas recibir comunicaciones comerciales sobre nuestras ofertas y servicios.
         </p>
+
+        {/* Debug opcional */}
+        {agenteId && lugarId && (
+          <p className="text-[10px] text-center text-gray-400">
+            ID Agente: {agenteId} | ID Lugar: {lugarId}
+          </p>
+        )}
       </form>
     </div>
   );
