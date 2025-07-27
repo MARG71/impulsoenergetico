@@ -26,11 +26,12 @@ export default function Home() {
 
       {/* BOTÓN ACCESO AL CRM */}
       <Link
-        href="/crm/login"
+        href="/login"
         className="bg-[#004e89] hover:bg-[#003a66] text-white px-6 py-3 rounded-full font-semibold transition"
       >
         Acceder al CRM
       </Link>
+
     </div>
   );
 }
