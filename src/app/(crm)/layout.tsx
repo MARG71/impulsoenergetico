@@ -46,35 +46,20 @@ export default function CRMLayout({
 
             {/* MENÚ DE NAVEGACIÓN */}
             <nav className="flex flex-col gap-6 text-md font-semibold w-full px-4">
-              <Link
-                href="/crm/dashboard"
-                className="hover:text-yellow-300 flex items-center gap-2"
-              >
+              <Link href="/dashboard" className="hover:text-yellow-300 flex items-center gap-2">
                 📊 Dashboard
               </Link>
-              <Link
-                href="/crm/agentes"
-                className="hover:text-yellow-300 flex items-center gap-2"
-              >
+              <Link href="/agentes" className="hover:text-yellow-300 flex items-center gap-2">
                 👤 Agentes
               </Link>
-              <Link
-                href="/crm/lugares"
-                className="hover:text-yellow-300 flex items-center gap-2"
-              >
+              <Link href="/lugares" className="hover:text-yellow-300 flex items-center gap-2">
                 📍 Lugares
               </Link>
-              <Link
-                href="/crm/dashboard/historial"
-                className="hover:text-yellow-300 flex items-center gap-2"
-              >
+              <Link href="/dashboard/historial" className="hover:text-yellow-300 flex items-center gap-2">
                 📂 Historial Comparativas
               </Link>
-              <Link
-                href="/crm/crear-usuario"
-                className="text-white hover:text-gray-300 px-4 py-2 block"
-              >
-                ➕ Crear Acceso Usuario
+              <Link href="/crear-usuario" className="text-white hover:text-gray-300 px-4 py-2 block">
+                Crear Acceso Usuario
               </Link>
             </nav>
           </aside>
