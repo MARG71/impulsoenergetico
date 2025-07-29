@@ -4,21 +4,31 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import es from 'date-fns/locale/es';
+
+type Fondo = {
+  id: number;
+  nombre: string;
+  url: string;
+  creadoEn: string;
+};
 
 export default function GestionFondosCartel() {
-  const [fondos, setFondos] = useState<string[]>([]);
+  const [fondos, setFondos] = useState<Fondo[]>([]);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [filtro, setFiltro] = useState<'todos' | 'ultimos7'>('todos');
 
   const fetchFondos = async () => {
-    const res = await fetch('/api/fondos');
+    const res = await fetch(`/api/fondos?filtro=${filtro}`);
     const data = await res.json();
     setFondos(data);
   };
 
   useEffect(() => {
     fetchFondos();
-  }, []);
+  }, [filtro]);
 
   const handleSubirFondo = async () => {
     if (!archivo) return toast.error('Selecciona un archivo');
@@ -26,7 +36,7 @@ export default function GestionFondosCartel() {
 
     const formData = new FormData();
     formData.append('file', archivo);
-    formData.append('upload_preset', 'impulso_carteles'); // tu preset Cloudinary
+    formData.append('upload_preset', 'impulso_carteles');
 
     try {
       const cloudinaryRes = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', {
@@ -62,6 +72,27 @@ export default function GestionFondosCartel() {
     }
   };
 
+  const handleEliminar = async (id: number) => {
+    const confirmar = confirm('¿Estás seguro de eliminar este fondo?');
+    if (!confirmar) return;
+
+    try {
+      const res = await fetch('/api/fondos', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!res.ok) throw new Error('Error al eliminar');
+
+      toast.success('Fondo eliminado');
+      fetchFondos();
+    } catch (error) {
+      console.error(error);
+      toast.error('No se pudo eliminar el fondo');
+    }
+  };
+
   return (
     <div className="p-8 bg-[#F6FFEC] min-h-screen">
       <h1 className="text-3xl font-bold text-[#004AAD] mb-10">🎨 Gestión de Fondos para Carteles</h1>
@@ -85,23 +116,43 @@ export default function GestionFondosCartel() {
         </Button>
       </div>
 
-      <h2 className="text-2xl font-bold text-[#004AAD] mb-6">🖼️ Fondos disponibles</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-[#004AAD]">🖼️ Fondos disponibles</h2>
+        <select
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value as 'todos' | 'ultimos7')}
+          className="border border-gray-300 rounded-lg px-3 py-1 text-sm text-[#004AAD] font-semibold"
+        >
+          <option value="todos">Todos</option>
+          <option value="ultimos7">Últimos 7 días</option>
+        </select>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {fondos.map((url, index) => (
+        {fondos.map((fondo) => (
           <div
-            key={index}
+            key={fondo.id}
             className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition duration-300"
           >
             <Image
-              src={url}
-              alt={`Fondo ${index + 1}`}
+              src={fondo.url}
+              alt={fondo.nombre}
               width={600}
               height={400}
               className="w-full h-64 object-cover"
             />
-            <div className="p-3 text-center bg-[#F9FAFB]">
-              <p className="text-xs text-gray-600 break-words">{url}</p>
+            <div className="p-4 bg-[#F9FAFB] text-center">
+              <p className="text-sm font-semibold text-gray-800 truncate">{fondo.nombre}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Subido el {format(new Date(fondo.creadoEn), "dd MMMM yyyy", { locale: es })}
+              </p>
+              <Button
+                variant="destructive"
+                onClick={() => handleEliminar(fondo.id)}
+                className="mt-3 w-full"
+              >
+                Eliminar
+              </Button>
             </div>
           </div>
         ))}

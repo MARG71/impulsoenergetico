@@ -1,6 +1,36 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const filtro = searchParams.get('filtro');
+
+  try {
+    let fondos;
+
+    if (filtro === 'ultimos7') {
+      const fecha7dias = new Date();
+      fecha7dias.setDate(fecha7dias.getDate() - 7);
+
+      fondos = await prisma.fondoCartel.findMany({
+        where: {
+          creadoEn: { gte: fecha7dias },
+        },
+        orderBy: { creadoEn: 'desc' },
+      });
+    } else {
+      fondos = await prisma.fondoCartel.findMany({
+        orderBy: { creadoEn: 'desc' },
+      });
+    }
+
+    return NextResponse.json(fondos);
+  } catch (error) {
+    console.error('❌ Error al obtener fondos:', error);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -11,10 +41,7 @@ export async function POST(req: Request) {
     }
 
     const fondo = await prisma.fondoCartel.create({
-      data: {
-        nombre,
-        url,
-      },
+      data: { nombre, url },
     });
 
     return NextResponse.json(fondo);
@@ -24,17 +51,19 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function DELETE(req: Request) {
   try {
-    const fondos = await prisma.fondoCartel.findMany({
-      orderBy: { creadoEn: 'desc' },
-    });
+    const { id } = await req.json();
 
-    const urls = fondos.map((f) => f.url);
+    if (!id) {
+      return NextResponse.json({ error: 'Falta ID de fondo' }, { status: 400 });
+    }
 
-    return NextResponse.json(urls);
+    await prisma.fondoCartel.delete({ where: { id } });
+
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('❌ Error obteniendo fondos:', error);
-    return NextResponse.json({ error: 'Error al obtener los fondos' }, { status: 500 });
+    console.error('❌ Error al eliminar fondo:', error);
+    return NextResponse.json({ error: 'Error interno al eliminar' }, { status: 500 });
   }
 }

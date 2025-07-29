@@ -164,3 +164,4 @@ model FondoCartel {
   creadoEn  DateTime @default(now())
 }
 
+
