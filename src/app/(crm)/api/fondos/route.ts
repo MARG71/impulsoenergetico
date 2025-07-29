@@ -1,43 +1,26 @@
-import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
-  api_key: process.env.CLOUDINARY_API_KEY!,
-  api_secret: process.env.CLOUDINARY_API_SECRET!,
-});
-
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const body = await req.json();
+    const { nombre, url } = body;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 });
+    if (!nombre || !url) {
+      return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
     }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const uploadResponse = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload_stream({ folder: 'fondos' }, (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }).end(buffer);
-    });
 
     const fondo = await prisma.fondoCartel.create({
       data: {
-        nombre: file.name,
-        url: uploadResponse.secure_url,
+        nombre,
+        url,
       },
     });
 
     return NextResponse.json(fondo);
   } catch (error) {
-    console.error('❌ Error al subir a Cloudinary:', error);
-    return NextResponse.json({ error: 'Error interno al subir el fondo' }, { status: 500 });
+    console.error('❌ Error al guardar en base de datos:', error);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
 
