@@ -26,7 +26,7 @@ export default function GestionFondosCartel() {
 
     const formData = new FormData();
     formData.append('file', archivo);
-    formData.append('upload_preset', 'impulso_carteles'); // tu preset de Cloudinary
+    formData.append('upload_preset', 'impulso_carteles'); // tu preset Cloudinary
 
     try {
       const cloudinaryRes = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', {
@@ -64,27 +64,45 @@ export default function GestionFondosCartel() {
 
   return (
     <div className="p-8 bg-[#F6FFEC] min-h-screen">
-      <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Gestión de Fondos para Carteles</h1>
+      <h1 className="text-3xl font-bold text-[#004AAD] mb-10">🎨 Gestión de Fondos para Carteles</h1>
 
-      <div className="bg-white p-6 rounded-xl shadow-md mb-8">
-        <label className="block text-gray-700 font-semibold mb-2">Selecciona un fondo nuevo (.jpg, .png):</label>
+      <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 mb-10 max-w-xl mx-auto">
+        <h2 className="text-xl font-semibold text-[#1F1F1F] mb-4">Subir nuevo fondo</h2>
+
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Selecciona un fondo (.jpg, .png):
+        </label>
+
         <input
           type="file"
           accept="image/*"
           onChange={(e) => setArchivo(e.target.files?.[0] || null)}
-          className="mb-4 text-black" // <-- Soluciona el texto blanco sobre blanco
+          className="block w-full text-sm text-black file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#004AAD] file:text-white hover:file:bg-[#00368A] mb-4"
         />
-        <Button onClick={handleSubirFondo} disabled={subiendo}>
+
+        <Button onClick={handleSubirFondo} disabled={subiendo} className="w-full">
           {subiendo ? 'Subiendo...' : 'Subir Fondo'}
         </Button>
       </div>
 
-      <h2 className="text-2xl font-bold text-[#1F1F1F] mb-4">Fondos disponibles</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <h2 className="text-2xl font-bold text-[#004AAD] mb-6">🖼️ Fondos disponibles</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {fondos.map((url, index) => (
-          <div key={index} className="bg-white shadow rounded p-2">
-            <Image src={url} alt={`Fondo ${index + 1}`} width={400} height={200} className="rounded" />
-            <p className="text-center text-sm mt-2 break-all">{url}</p>
+          <div
+            key={index}
+            className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition duration-300"
+          >
+            <Image
+              src={url}
+              alt={`Fondo ${index + 1}`}
+              width={600}
+              height={400}
+              className="w-full h-64 object-cover"
+            />
+            <div className="p-3 text-center bg-[#F9FAFB]">
+              <p className="text-xs text-gray-600 break-words">{url}</p>
+            </div>
           </div>
         ))}
       </div>
