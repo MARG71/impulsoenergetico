@@ -52,12 +52,23 @@ export default function CRMLayout({
               <Link href="/agentes" className="hover:text-yellow-300 flex items-center gap-2">
                 👤 Agentes
               </Link>
+
               <Link href="/lugares" className="hover:text-yellow-300 flex items-center gap-2">
                 📍 Lugares
+                </Link>
+                <Link href="/lugares/fondos" className="hover:text-yellow-300 flex items-center gap-2">
+                🖼️ Fondos Carteles
               </Link>
+
               <Link href="/dashboard/historial" className="hover:text-yellow-300 flex items-center gap-2">
                 📂 Historial Comparativas
               </Link>
+
+              <Link href="/comparador" className="hover:text-yellow-300 flex items-center gap-2">
+                🧮 Comparador
+              </Link>
+
+
               <Link href="/crear-usuario" className="text-white hover:text-gray-300 px-4 py-2 block">
                 Crear Acceso Usuario
               </Link>
