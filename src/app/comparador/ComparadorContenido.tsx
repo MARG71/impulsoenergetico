@@ -3,11 +3,6 @@
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-const searchParams = useSearchParams();
-const [agenteId, setAgenteId] = useState<string | null>(null);
-const [lugarId, setLugarId] = useState<string | null>(null);
-
-
 import Image from 'next/image';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer
@@ -15,6 +10,10 @@ import {
 
 export default function ComparadorContenido() {
   const searchParams = useSearchParams();
+  const [agenteId, setAgenteId] = useState<string | null>(null);
+  const [lugarId, setLugarId] = useState<string | null>(null);
+
+
   const comparativaId = searchParams.get('id');
   const idAgenteQR = searchParams.get('idAgente');
   const idLugarQR = searchParams.get('idLugar');
