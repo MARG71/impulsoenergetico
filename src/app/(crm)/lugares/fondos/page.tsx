@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale'; // ✅ Correcto
-
+import { es } from 'date-fns/locale';
 
 type Fondo = {
   id: number;
@@ -129,28 +128,28 @@ export default function GestionFondosCartel() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {fondos.map((fondo) => (
           <div
             key={fondo.id}
-            className="bg-white border border-gray-200 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition duration-300"
+            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition duration-300"
           >
             <Image
               src={fondo.url}
               alt={fondo.nombre}
-              width={600}
-              height={400}
-              className="w-full h-64 object-cover"
+              width={400}
+              height={200}
+              className="w-full h-48 object-cover rounded-t-xl"
             />
-            <div className="p-4 bg-[#F9FAFB] text-center">
+            <div className="p-3 text-center bg-[#F9FAFB]">
               <p className="text-sm font-semibold text-gray-800 truncate">{fondo.nombre}</p>
               <p className="text-xs text-gray-500 mt-1">
-                Subido el {format(new Date(fondo.creadoEn), "dd MMMM yyyy", { locale: es })}
+                Subido el {format(new Date(fondo.creadoEn), 'dd MMMM yyyy', { locale: es })}
               </p>
               <Button
                 variant="destructive"
                 onClick={() => handleEliminar(fondo.id)}
-                className="mt-3 w-full"
+                className="mt-2 w-full text-sm"
               >
                 Eliminar
               </Button>
