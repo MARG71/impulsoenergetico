@@ -35,7 +35,6 @@ export default function RegistroFormulario() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setMensaje('');
 
     if (!agenteId || !lugarId) {
@@ -49,11 +48,17 @@ export default function RegistroFormulario() {
       const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, email, telefono, agenteId, lugarId }),
+        body: JSON.stringify({
+          nombre,
+          email,
+          telefono,
+          agenteId: parseInt(agenteId),
+          lugarId: parseInt(lugarId),
+        }),
       });
 
       if (res.ok) {
-        router.push('/registro/gracias');
+        router.push(`/comparador?agenteId=${agenteId}&lugarId=${lugarId}`);
       } else {
         const data = await res.json();
         setMensaje(data.error || 'Error al registrar.');
@@ -119,7 +124,6 @@ export default function RegistroFormulario() {
           Al enviar aceptas recibir comunicaciones comerciales sobre nuestras ofertas y servicios.
         </p>
 
-        {/* Debug opcional */}
         {agenteId && lugarId && (
           <p className="text-[10px] text-center text-gray-400">
             ID Agente: {agenteId} | ID Lugar: {lugarId}

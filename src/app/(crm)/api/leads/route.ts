@@ -35,12 +35,13 @@ export async function GET() {
 }
 
 // Crear un nuevo lead
+// Crear un nuevo lead
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { nombre, email, telefono, lugarId, agenteId } = body;
 
-    if (!nombre || !email || !telefono) {
+    if (!nombre || !email || !telefono || !lugarId || !agenteId) {
       return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 });
     }
 
