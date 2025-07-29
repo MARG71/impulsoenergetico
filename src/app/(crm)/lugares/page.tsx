@@ -101,13 +101,13 @@ export default function RegistrarLugar() {
             placeholder="Nombre del lugar"
             value={nuevoLugar.nombre}
             onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })}
-            className="bg-white"
+            className="bg-white text-black"
           />
           <Input
             placeholder="Dirección"
             value={nuevoLugar.direccion}
             onChange={(e) => setNuevoLugar({ ...nuevoLugar, direccion: e.target.value })}
-            className="bg-white"
+            className="bg-white text-black"
           />
         </div>
         <div className="flex items-center gap-4">
@@ -117,7 +117,7 @@ export default function RegistrarLugar() {
           {codigoQR && <QRCode value={`https://tu-dominio.com/comparador?qr=${codigoQR}`} size={64} />}
         </div>
         <select
-          className="w-full border px-4 py-2 rounded bg-white"
+          className="w-full border px-4 py-2 rounded bg-white text-black"
           value={nuevoLugar.agenteId}
           onChange={(e) => setNuevoLugar({ ...nuevoLugar, agenteId: e.target.value })}
         >
@@ -139,7 +139,7 @@ export default function RegistrarLugar() {
           placeholder="Buscar por cualquier campo..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="mb-4 bg-white"
+          className="mb-4 bg-white text-black"
         />
 
         <div className="overflow-x-auto bg-white rounded-xl shadow-md">
@@ -157,11 +157,11 @@ export default function RegistrarLugar() {
             <tbody>
               {lugaresFiltrados.map((lugar) => (
                 <tr key={lugar.id} className="border-b hover:bg-[#f9f9f9]">
-                  <td className="p-2 font-semibold">#{lugar.id}</td>
-                  <td className="p-2">{lugar.nombre}</td>
-                  <td className="p-2">{lugar.direccion}</td>
-                  <td className="p-2">{lugar.agente?.nombre || '-'}</td>
-                  <td className="p-2 text-xs break-all">{lugar.qrCode}</td>
+                  <td className="p-2 font-semibold text-black">#{lugar.id}</td>
+                  <td className="p-2 text-black">{lugar.nombre}</td>
+                  <td className="p-2 text-black">{lugar.direccion}</td>
+                  <td className="p-2 text-black">{lugar.agente?.nombre || '-'}</td>
+                  <td className="p-2 text-xs break-all text-black">{lugar.qrCode}</td>
                   <td className="p-2 space-y-1 flex flex-col md:flex-row md:space-x-2 md:space-y-0">
                     <Button
                       className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -203,11 +203,13 @@ export default function RegistrarLugar() {
                 placeholder="Nombre"
                 value={lugarEditando.nombre}
                 onChange={(e) => setLugarEditando({ ...lugarEditando, nombre: e.target.value })}
+                className="text-black"
               />
               <Input
                 placeholder="Dirección"
                 value={lugarEditando.direccion}
                 onChange={(e) => setLugarEditando({ ...lugarEditando, direccion: e.target.value })}
+                className="text-black"
               />
               <div className="flex items-center gap-4">
                 <Button onClick={generarQRModal} className="bg-blue-600 text-white">
@@ -218,7 +220,7 @@ export default function RegistrarLugar() {
                 )}
               </div>
               <select
-                className="w-full border px-4 py-2 rounded"
+                className="w-full border px-4 py-2 rounded bg-white text-black"
                 value={lugarEditando.agenteId}
                 onChange={(e) => setLugarEditando({ ...lugarEditando, agenteId: e.target.value })}
               >
