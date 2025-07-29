@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import es from 'date-fns/locale/es';
+import { es } from 'date-fns/locale'; // ✅ Correcto
+
 
 type Fondo = {
   id: number;
