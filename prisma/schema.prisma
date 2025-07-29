@@ -156,3 +156,11 @@ model DatosFactura {
   comparativaId         Int           @unique // ✅ Esto es lo que faltaba
   comparativa           Comparativa   @relation(fields: [comparativaId], references: [id])
 }
+
+model FondoCartel {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  url       String
+  creadoEn  DateTime @default(now())
+}
+

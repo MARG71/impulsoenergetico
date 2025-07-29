@@ -1,4 +1,3 @@
-// src/app/lugares/cartel/[id]/page.tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -7,16 +6,11 @@ import QRCode from 'react-qr-code';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 
-const fondos = [
-  '/energia-fondo.jpg',
-  '/fondo-comisiones.jpg',
-  '/fondo-eco.jpg',
-];
-
 export default function CartelLugar() {
   const params = useParams();
   const id = params?.id;
   const [lugar, setLugar] = useState<any | null>(null);
+  const [fondos, setFondos] = useState<string[]>([]);
   const [fondoActual, setFondoActual] = useState(0);
   const cartelRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +23,14 @@ export default function CartelLugar() {
       setLugar(data);
     };
 
+    const fetchFondos = async () => {
+      const res = await fetch('/api/fondos');
+      const data = await res.json();
+      setFondos(data);
+    };
+
     fetchLugar();
+    fetchFondos();
   }, [id]);
 
   const descargarPDF = async () => {
@@ -70,13 +71,15 @@ export default function CartelLugar() {
     setFondoActual(index);
   };
 
-  if (!lugar) return <div className="p-10 text-center">Cargando cartel...</div>;
+  if (!lugar || fondos.length === 0) {
+    return <div className="p-10 text-center">Cargando cartel...</div>;
+  }
 
-  // ✅ URL QR con dominio dinámico y parámetros agenteId + lugarId
   const qrUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white p-10">
+    <div className="min-h-screen flex flex-col items-center bg-white p-6">
+      {/* Cartel A4 */}
       <div
         ref={cartelRef}
         className="bg-white w-[210mm] h-[297mm] p-12 border border-gray-300 shadow-xl flex flex-col justify-between"
@@ -89,10 +92,8 @@ export default function CartelLugar() {
             height={120}
           />
           <div className="text-right text-sm text-gray-600">
-            www.impulsoenergetico.com
-            <br />
-            contacto@impulsoenergetico.com
-            <br />
+            www.impulsoenergetico.com<br />
+            contacto@impulsoenergetico.com<br />
             Tel: 900 123 456
           </div>
         </div>
@@ -100,17 +101,15 @@ export default function CartelLugar() {
         <div className="flex-1 grid grid-cols-2 gap-8 items-center">
           <div>
             <h1 className="text-4xl font-bold text-[#1F1F1F] mb-4 leading-snug">
-              ¿Quieres ahorrar <br />
-              en tu factura de luz, gas o teléfono?
+              ¿Quieres ahorrar <br />en tu factura de luz, gas o teléfono?
             </h1>
             <p className="text-lg text-gray-800 mb-6">
-              Escanea este código QR, accede al comparador y descubre las mejores
-              tarifas. Si contratas, ¡ganas una comisión! Comparte el QR con tus
-              amigos y gana por cada contrato.
+              Escanea este código QR y accede al comparador. Si contratas, ¡ganas una comisión!
+              Comparte este cartel con tus amigos y gana por cada contrato.
             </p>
-            <div className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500">
               Hecho con ❤️ por Impulso Energético — Smart Idea
-            </div>
+            </p>
           </div>
           <div className="flex flex-col items-center">
             <QRCode value={qrUrl} size={200} />
@@ -121,7 +120,7 @@ export default function CartelLugar() {
         <div className="mt-10 w-full">
           <Image
             src={fondos[fondoActual]}
-            alt="Fondo energía"
+            alt="Fondo cartel"
             width={1000}
             height={200}
             className="w-full object-cover rounded-md"
@@ -129,6 +128,7 @@ export default function CartelLugar() {
         </div>
       </div>
 
+      {/* Botones */}
       <div className="mt-6 flex flex-wrap gap-4 justify-center">
         <Button onClick={descargarPDF} className="bg-blue-600 text-white hover:bg-blue-700">
           Descargar cartel en PDF
@@ -138,13 +138,16 @@ export default function CartelLugar() {
         </Button>
       </div>
 
-      <div className="mt-8">
+      {/* Galería de fondos */}
+      <div className="mt-8 w-full max-w-4xl">
         <h3 className="text-center mb-4 text-lg font-semibold">Elige fondo para el cartel:</h3>
         <div className="flex gap-4 flex-wrap justify-center">
           {fondos.map((fondo, index) => (
             <div
               key={fondo}
-              className="cursor-pointer border rounded hover:ring-2 ring-green-500"
+              className={`cursor-pointer border-2 rounded-md p-1 ${
+                fondoActual === index ? 'ring-4 ring-green-500' : ''
+              }`}
               onClick={() => cambiarFondo(index)}
             >
               <Image

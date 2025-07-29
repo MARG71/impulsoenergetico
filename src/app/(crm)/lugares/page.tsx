@@ -95,6 +95,8 @@ export default function RegistrarLugar() {
   return (
     <div className="p-8 bg-[#B3E58C] min-h-screen">
       <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Registrar Lugar</h1>
+
+      {/* ✅ Formulario registrar lugar */}
       <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <Input
@@ -114,7 +116,7 @@ export default function RegistrarLugar() {
           <Button type="button" onClick={generarQR} className="bg-blue-600 hover:bg-blue-700 text-white">
             Generar QR
           </Button>
-          {codigoQR && <QRCode value={`https://tu-dominio.com/comparador?qr=${codigoQR}`} size={64} />}
+          {codigoQR && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${codigoQR}`} size={64} />}
         </div>
         <select
           className="w-full border px-4 py-2 rounded bg-white text-black"
@@ -133,6 +135,43 @@ export default function RegistrarLugar() {
         </Button>
       </form>
 
+      {/* ✅ Subida de fondo para carteles */}
+      <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
+        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📤 Subir nuevo fondo de cartel</h2>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const formData = new FormData(form);
+            const res = await fetch('/api/fondos', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (res.ok) {
+              alert('🎉 Fondo subido correctamente. Se aplicará a todos los carteles.');
+              form.reset();
+            } else {
+              alert('❌ Error al subir el fondo.');
+            }
+          }}
+          encType="multipart/form-data"
+          className="flex items-center gap-4"
+        >
+          <input
+            type="file"
+            name="file"
+            accept="image/*"
+            required
+            className="border border-gray-300 p-2 rounded bg-white"
+          />
+          <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+            Subir fondo
+          </Button>
+        </form>
+      </div>
+
+      {/* ✅ Tabla de lugares registrados */}
       <div className="mt-10 bg-[#E5FFD5] p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-4 text-[#1F1F1F]">Lugares Registrados</h2>
         <Input
@@ -192,6 +231,7 @@ export default function RegistrarLugar() {
         </div>
       </div>
 
+      {/* ✅ Modal para editar */}
       <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
         <DialogContent>
           <DialogHeader>
@@ -216,7 +256,7 @@ export default function RegistrarLugar() {
                   Generar QR
                 </Button>
                 {lugarEditando.qrCode && (
-                  <QRCode value={`https://tu-dominio.com/comparador?qr=${lugarEditando.qrCode}`} size={64} />
+                  <QRCode value={`https://impulsoenergetico.es/comparador?qr=${lugarEditando.qrCode}`} size={64} />
                 )}
               </div>
               <select
