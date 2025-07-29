@@ -22,24 +22,43 @@ export default function GestionFondosCartel() {
 
   const handleSubirFondo = async () => {
     if (!archivo) return toast.error('Selecciona un archivo');
+    setSubiendo(true);
 
     const formData = new FormData();
     formData.append('file', archivo);
-    setSubiendo(true);
+    formData.append('upload_preset', 'impulso_carteles'); // <- tu preset público en Cloudinary
 
-    const res = await fetch('/api/fondos', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const cloudinaryRes = await fetch('https://api.cloudinary.com/v1_1/dtu7z7ytb/image/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    setSubiendo(false);
+      const cloudinaryData = await cloudinaryRes.json();
 
-    if (res.ok) {
+      if (!cloudinaryData.secure_url) {
+        throw new Error('Error en la subida a Cloudinary');
+      }
+
+      const apiRes = await fetch('/api/fondos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: archivo.name,
+          url: cloudinaryData.secure_url,
+        }),
+      });
+
+      if (!apiRes.ok) throw new Error('Error al guardar en base de datos');
+
       toast.success('Fondo subido correctamente');
       setArchivo(null);
       fetchFondos();
-    } else {
+    } catch (error) {
+      console.error(error);
       toast.error('Error al subir el fondo');
+    } finally {
+      setSubiendo(false);
     }
   };
 
