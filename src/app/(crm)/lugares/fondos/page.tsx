@@ -26,10 +26,10 @@ export default function GestionFondosCartel() {
 
     const formData = new FormData();
     formData.append('file', archivo);
-    formData.append('upload_preset', 'impulso_carteles'); // <- tu preset público en Cloudinary
+    formData.append('upload_preset', 'impulso_carteles'); // tu preset de Cloudinary
 
     try {
-      const cloudinaryRes = await fetch('https://api.cloudinary.com/v1_1/dtu7z7ytb/image/upload', {
+      const cloudinaryRes = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', {
         method: 'POST',
         body: formData,
       });
@@ -72,7 +72,7 @@ export default function GestionFondosCartel() {
           type="file"
           accept="image/*"
           onChange={(e) => setArchivo(e.target.files?.[0] || null)}
-          className="mb-4"
+          className="mb-4 text-black" // <-- Soluciona el texto blanco sobre blanco
         />
         <Button onClick={handleSubirFondo} disabled={subiendo}>
           {subiendo ? 'Subiendo...' : 'Subir Fondo'}
