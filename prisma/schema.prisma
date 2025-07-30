@@ -162,7 +162,9 @@ model FondoCartel {
   nombre    String
   url       String
   creadoEn  DateTime @default(now())
+  activo    Boolean  @default(false)
 }
+
 
 model FondoActivo {
   id        Int      @id @default(1)

@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-
 export async function GET() {
   try {
-    const fondoActivo = await prisma.fondo.findFirst({
+    const fondoActivo = await prisma.fondoCartel.findFirst({
       where: { activo: true },
     });
 

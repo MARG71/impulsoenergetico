@@ -12,6 +12,7 @@ type Fondo = {
   nombre: string;
   url: string;
   creadoEn: string;
+  activo?: boolean;
 };
 
 export default function GestionFondosCartel() {
@@ -93,6 +94,16 @@ export default function GestionFondosCartel() {
     }
   };
 
+  const handleSeleccionarFondoActivo = async (url: string) => {
+    await fetch('/api/fondos/seleccionar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    toast.success('Fondo seleccionado como activo');
+    fetchFondos();
+  };
+
   return (
     <div className="p-8 bg-[#F6FFEC] min-h-screen">
       <h1 className="text-3xl font-bold text-[#004AAD] mb-10">🎨 Gestión de Fondos para Carteles</h1>
@@ -132,20 +143,28 @@ export default function GestionFondosCartel() {
         {fondos.map((fondo) => (
           <div
             key={fondo.id}
-            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition duration-300"
+            className={`border-4 rounded-xl overflow-hidden transition transform hover:scale-105 ${
+              fondo.activo ? 'border-blue-600' : 'border-transparent'
+            }`}
           >
             <Image
               src={fondo.url}
               alt={fondo.nombre}
               width={400}
               height={200}
-              className="w-full h-48 object-cover rounded-t-xl"
+              className="w-full h-48 object-cover"
             />
-            <div className="p-3 text-center bg-[#F9FAFB]">
+            <div className="bg-[#F9FAFB] p-3 text-center">
               <p className="text-sm font-semibold text-gray-800 truncate">{fondo.nombre}</p>
               <p className="text-xs text-gray-500 mt-1">
                 Subido el {format(new Date(fondo.creadoEn), 'dd MMMM yyyy', { locale: es })}
               </p>
+              <Button
+                onClick={() => handleSeleccionarFondoActivo(fondo.url)}
+                className="mt-2 w-full text-sm bg-[#004AAD] text-white hover:bg-[#00368A]"
+              >
+                {fondo.activo ? '✅ Fondo activo' : 'Usar como fondo actual'}
+              </Button>
               <Button
                 variant="destructive"
                 onClick={() => handleEliminar(fondo.id)}
