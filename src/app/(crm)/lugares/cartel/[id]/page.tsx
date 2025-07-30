@@ -26,8 +26,16 @@ export default function CartelLugar() {
     const fetchFondos = async () => {
       const res = await fetch('/api/fondos');
       const data = await res.json();
-      setFondos(data);
+
+      const urls = data.map((f: any) => f.url);
+      setFondos(urls);
+
+      const fondoActivoIndex = data.findIndex((f: any) => f.activo);
+      if (fondoActivoIndex !== -1) {
+        setFondoActual(fondoActivoIndex);
+      }
     };
+
 
     fetchLugar();
     fetchFondos();
