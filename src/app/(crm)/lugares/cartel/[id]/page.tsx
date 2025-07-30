@@ -134,12 +134,17 @@ export default function CartelLugar() {
         </Button>
       </div>
 
-      {/* Cartel visible y exportable */}
+      {/* Cartel visible (pantalla y PDF) */}
       <div
         ref={cartelRef}
-        className="cartel relative w-[210mm] h-[297mm] border border-gray-300 shadow-xl overflow-hidden bg-white"
+        className="relative border border-gray-300 shadow-xl overflow-hidden bg-white"
+        style={{
+          width: '210mm',
+          height: '297mm',
+          position: 'relative',
+        }}
       >
-        {/* Fondo como imagen */}
+        {/* Fondo */}
         <img
           src={fondoUrl}
           alt="Fondo del cartel"
@@ -148,7 +153,22 @@ export default function CartelLugar() {
 
         {/* QR centrado */}
         <div
-          className="qr-centro absolute z-10 bg-white p-3 rounded-lg shadow-md"
+          className="qr-centro"
+          style={{
+            position: 'absolute',
+            width: '5cm',
+            height: '5cm',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'white',
+            padding: '12px',
+            borderRadius: '12px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 2,
+          }}
         >
           <QRCode value={qrUrl} size={160} />
         </div>
