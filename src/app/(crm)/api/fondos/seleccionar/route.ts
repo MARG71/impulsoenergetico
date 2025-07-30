@@ -4,11 +4,13 @@ import { prisma } from '@/lib/prisma';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { id } = body;
+    let { id } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'ID del fondo requerida' }, { status: 400 });
     }
+
+    id = Number(id); // Asegurar que sea número
 
     // Desactivamos todos los fondos
     await prisma.fondo.updateMany({
