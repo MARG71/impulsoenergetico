@@ -71,26 +71,34 @@ export default function RegistroFormulario() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-100 to-green-100 p-6">
+    <div
+      className="min-h-screen flex items-center justify-center bg-cover bg-center p-6"
+      style={{
+        backgroundImage:
+          'linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0.85)), url("/fondo-registro.jpg")',
+      }}
+    >
       <form
         onSubmit={handleSubmit}
-        className="bg-white w-full max-w-xl p-8 rounded-xl shadow-lg space-y-6"
+        className="bg-white bg-opacity-95 w-full max-w-xl p-8 rounded-xl shadow-2xl space-y-6 backdrop-blur-md"
       >
-        <h1 className="text-2xl font-bold text-center text-green-800">
-          🚀 ¡Ahorra y gana con tus suministros!
+        <h1 className="text-3xl font-extrabold text-center text-green-700 leading-tight">
+          💡 Ahorra en tus facturas <br /> y gana dinero con tus suministros
         </h1>
-        <p className="text-center text-gray-600 text-sm">
-          Completa tus datos para comenzar a comparar ofertas y ganar comisiones.
+
+        <p className="text-center text-gray-700 text-sm">
+          Compara ofertas de luz, gas, telefonía, seguros o energía solar. 
+          Y si compartes, ¡gana comisiones por cada contrato conseguido!
         </p>
 
-        {mensaje && <p className="text-red-500 text-sm text-center">{mensaje}</p>}
+        {mensaje && <p className="text-red-600 text-sm text-center">{mensaje}</p>}
 
         <input
           type="text"
           placeholder="Nombre completo"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
-          className="w-full p-3 border rounded text-gray-800"
+          className="w-full p-3 border border-gray-300 rounded text-gray-800"
           required
         />
 
@@ -99,7 +107,7 @@ export default function RegistroFormulario() {
           placeholder="Correo electrónico"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-3 border rounded text-gray-800"
+          className="w-full p-3 border border-gray-300 rounded text-gray-800"
           required
         />
 
@@ -108,7 +116,7 @@ export default function RegistroFormulario() {
           placeholder="Teléfono"
           value={telefono}
           onChange={(e) => setTelefono(e.target.value)}
-          className="w-full p-3 border rounded text-gray-800"
+          className="w-full p-3 border border-gray-300 rounded text-gray-800"
           required
         />
 
@@ -117,10 +125,10 @@ export default function RegistroFormulario() {
           disabled={cargando}
           className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded transition duration-300"
         >
-          {cargando ? 'Enviando...' : 'Comenzar'}
+          {cargando ? 'Enviando...' : 'Comenzar ahora'}
         </button>
 
-        <p className="text-xs text-center text-gray-500">
+        <p className="text-xs text-center text-gray-600">
           Al enviar aceptas recibir comunicaciones comerciales sobre nuestras ofertas y servicios.
         </p>
 
