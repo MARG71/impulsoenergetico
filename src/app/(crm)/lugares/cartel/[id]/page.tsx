@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import QRCode from 'react-qr-code';
 import { Button } from '@/components/ui/button';
-import Image from 'next/image';
 
 export default function CartelLugar() {
   const params = useParams();
@@ -42,7 +41,7 @@ export default function CartelLugar() {
       .set({
         margin: 0,
         filename: `cartel_impulso.pdf`,
-        html2canvas: { scale: 2 },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       })
       .save();
@@ -50,19 +49,28 @@ export default function CartelLugar() {
 
   const imprimirCartel = () => {
     if (!cartelRef.current) return;
-    const printContent = cartelRef.current.innerHTML;
-    const win = window.open('', '', 'width=800,height=600');
-    win?.document.write(`
+
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
       <html>
         <head>
-          <title>Imprimir Cartel</title>
-          <style>body { margin: 0; padding: 0; }</style>
+          <title>Cartel</title>
+          <style>
+            body { margin: 0; padding: 0; font-family: sans-serif; }
+            .cartel { position: relative; width: 210mm; height: 297mm; }
+            .fondo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+            .qr { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 12px; border-radius: 12px; z-index: 2; }
+            .pie { position: absolute; bottom: 30px; width: 100%; text-align: center; color: white; font-size: 12px; z-index: 3; text-shadow: 0 0 4px black; }
+            .logo { width: 100px; margin: 0 auto 8px; }
+          </style>
         </head>
-        <body>${printContent}</body>
+        <body>${cartelRef.current.innerHTML}</body>
       </html>
     `);
-    win?.document.close();
-    win?.print();
+    printWindow.document.close();
+    printWindow.print();
   };
 
   if (!lugar || !fondoUrl) {
@@ -73,32 +81,21 @@ export default function CartelLugar() {
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-white p-6">
-      {/* Cartel A4 */}
-      <div
-        ref={cartelRef}
-        className="relative w-[210mm] h-[297mm] shadow-xl border border-gray-300 overflow-hidden rounded"
-      >
-        {/* Fondo activo */}
-        <Image
-          src={fondoUrl}
-          alt="Fondo del cartel"
-          layout="fill"
-          objectFit="cover"
-          priority
-        />
+      {/* Cartel */}
+      <div ref={cartelRef} className="cartel relative w-[210mm] h-[297mm] shadow-xl border border-gray-300 overflow-hidden rounded bg-white">
+        {/* Fondo como img estándar */}
+        <img src={fondoUrl} alt="Fondo cartel" className="fondo" />
 
         {/* QR centrado */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-xl shadow-lg">
+        <div className="qr">
           <QRCode value={qrUrl} size={180} />
         </div>
 
-        {/* Pie de cartel */}
-        <div className="absolute bottom-6 w-full text-center text-white drop-shadow-md">
-          <div className="mb-2">
-            <Image src="/logo-impulso.jpeg" alt="Logo Impulso" width={100} height={100} className="mx-auto" />
-          </div>
-          <p className="text-sm font-semibold">IMPULSO ENERGÉTICO</p>
-          <p className="text-xs">Tel: 692 137 048 — info@impulsoenergetico.es</p>
+        {/* Pie con logo e info */}
+        <div className="pie">
+          <img src="/logo-impulso.jpeg" alt="Logo Impulso" className="logo" />
+          <div><strong>IMPULSO ENERGÉTICO</strong></div>
+          <div>Tel: 692 137 048 — info@impulsoenergetico.es</div>
         </div>
       </div>
 
