@@ -36,8 +36,6 @@ export default function CartelLugar() {
   const descargarPDF = async () => {
     if (!cartelRef.current) return;
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
     const html2pdf = (await import('html2pdf.js')).default;
 
     html2pdf()
@@ -49,7 +47,6 @@ export default function CartelLugar() {
           scale: 3,
           useCORS: true,
           allowTaint: true,
-          logging: false,
         },
         jsPDF: {
           unit: 'mm',
@@ -61,42 +58,7 @@ export default function CartelLugar() {
   };
 
   const imprimirCartel = () => {
-    if (!cartelRef.current) return;
-
-    const ventana = window.open('', '_blank');
-    if (!ventana) return;
-
-    ventana.document.write(`
-      <html>
-        <head>
-          <title>Imprimir Cartel</title>
-          <style>
-            body { margin: 0; padding: 0; }
-            .cartel { width: 210mm; height: 297mm; position: relative; }
-            .fondo { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-            .qr-centro {
-              position: absolute;
-              width: 5cm;
-              height: 5cm;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              background: white;
-              padding: 12px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              border-radius: 12px;
-              box-shadow: 0 0 10px rgba(0,0,0,0.2);
-              z-index: 2;
-            }
-          </style>
-        </head>
-        <body>${cartelRef.current.innerHTML}</body>
-      </html>
-    `);
-    ventana.document.close();
-    setTimeout(() => ventana.print(), 500);
+    window.print(); // directa
   };
 
   if (!lugar || !fondoUrl) {
@@ -114,21 +76,39 @@ export default function CartelLugar() {
         </Button>
       </div>
 
-      {/* Cartel A4 */}
+      {/* Cartel A4 visible y exportable */}
       <div
         ref={cartelRef}
-        className="cartel relative w-[210mm] h-[297mm] border border-gray-300 shadow-xl overflow-hidden rounded bg-white"
+        className="relative w-[210mm] h-[297mm] border border-gray-300 shadow-xl overflow-hidden rounded bg-white print:block"
+        style={{ pageBreakAfter: 'always' }}
       >
-        <img src={fondoUrl} alt="Fondo cartel" className="fondo" />
+        {/* Fondo como <img> visible */}
+        <img
+          src={fondoUrl}
+          alt="Fondo del cartel"
+          className="absolute top-0 left-0 w-full h-full object-cover z-0"
+        />
 
         {/* QR centrado */}
-        <div className="qr-centro">
+        <div
+          className="absolute z-10 bg-white p-3 rounded-lg shadow-md"
+          style={{
+            width: '5cm',
+            height: '5cm',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <QRCode value={qrUrl} size={160} />
         </div>
       </div>
 
-      {/* Botones acción */}
-      <div className="mt-6 flex gap-4 justify-center">
+      {/* Botones */}
+      <div className="mt-6 flex gap-4 justify-center print:hidden">
         <Button onClick={descargarPDF} className="bg-blue-600 text-white hover:bg-blue-700">
           Descargar cartel en PDF
         </Button>
