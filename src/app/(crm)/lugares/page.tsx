@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import QRCode from 'react-qr-code';
 import Image from 'next/image';
+import { useSession } from 'next-auth/react';
 
 type Fondo = {
   id: number;
@@ -18,6 +19,9 @@ type Fondo = {
 
 export default function RegistrarLugar() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const esAdmin = session?.user?.role === 'ADMIN';
+
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<any[]>([]);
   const [codigoQR, setCodigoQR] = useState('');
@@ -132,21 +136,32 @@ export default function RegistrarLugar() {
         <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Registrar Lugar</Button>
       </form>
 
-      {/* Fondos disponibles */}
+      {/* Fondos del cartel */}
       <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🎨 Fondo actual del cartel</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {fondos.map((fondo) => (
-            <div key={fondo.id} onClick={() => handleSeleccionarFondo(fondo.url)} className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 ${fondo.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'}`}>
-              <Image src={fondo.url} alt={fondo.nombre} width={350} height={220} className="object-cover w-full h-36" />
-              <div className="bg-white py-1 text-center font-medium text-black">{fondo.nombre}</div>
+
+        {esAdmin && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {fondos.map((fondo) => (
+                <div key={fondo.id} onClick={() => handleSeleccionarFondo(fondo.url)} className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 ${fondo.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'}`}>
+                  <Image src={fondo.url} alt={fondo.nombre} width={350} height={220} className="object-cover w-full h-36" />
+                  <div className="bg-white py-1 text-center font-medium text-black">{fondo.nombre}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        {fondoSeleccionado && (
-          <div className="mt-4">
-            <p className="font-semibold text-[#1F1F1F]">Vista previa del fondo actual:</p>
-            <Image src={fondoSeleccionado} alt="Fondo seleccionado" width={700} height={460} className="rounded-lg mt-2 border" />
+            {fondoSeleccionado && (
+              <div className="mt-4">
+                <p className="font-semibold text-[#1F1F1F]">Vista previa del fondo actual:</p>
+                <Image src={fondoSeleccionado} alt="Fondo seleccionado" width={700} height={460} className="rounded-lg mt-2 border" />
+              </div>
+            )}
+          </>
+        )}
+
+        {!esAdmin && fondoSeleccionado && (
+          <div className="text-center">
+            <Image src={fondoSeleccionado} alt="Fondo actual" width={700} height={460} className="rounded-lg border mx-auto" />
           </div>
         )}
       </div>
