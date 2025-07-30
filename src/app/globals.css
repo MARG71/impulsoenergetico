@@ -135,6 +135,5 @@
     width: 210mm !important;
     height: 297mm !important;
     page-break-after: always;
-    overflow: hidden;
   }
 }
