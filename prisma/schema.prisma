@@ -164,4 +164,23 @@ model FondoCartel {
   creadoEn  DateTime @default(now())
 }
 
+model FondoActivo {
+  id        Int      @id @default(1)
+  url       String
+  creadoEn  DateTime @default(now())
+}
+
+model Fondo {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  url       String   @unique
+  creadoEn  DateTime @default(now())
+  activo    Boolean  @default(false)
+}
+
+
+model ConfiguracionGlobal {
+  id              Int    @id @default(1)
+  fondoCartelUrl  String
+}
 

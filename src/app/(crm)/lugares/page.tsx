@@ -7,6 +7,14 @@ import { Input } from '@/components/ui/input';
 import { v4 as uuidv4 } from 'uuid';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import QRCode from 'react-qr-code';
+import Image from 'next/image';
+
+type Fondo = {
+  id: number;
+  nombre: string;
+  url: string;
+  activo?: boolean;
+};
 
 export default function RegistrarLugar() {
   const router = useRouter();
@@ -16,23 +24,33 @@ export default function RegistrarLugar() {
   const [busqueda, setBusqueda] = useState('');
   const [lugarEditando, setLugarEditando] = useState<any | null>(null);
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [fondos, setFondos] = useState<Fondo[]>([]);
+  const [fondoSeleccionado, setFondoSeleccionado] = useState<string>('');
   const [nuevoLugar, setNuevoLugar] = useState({ nombre: '', direccion: '', qrCode: '', agenteId: '' });
 
   useEffect(() => {
-    const fetchAgentes = async () => {
-      const res = await fetch('/api/agentes');
-      const data = await res.json();
-      setAgentes(data);
+    const fetchData = async () => {
+      const [resAgentes, resLugares, resFondos] = await Promise.all([
+        fetch('/api/agentes'),
+        fetch('/api/lugares'),
+        fetch('/api/fondos'),
+      ]);
+
+      const [dataAgentes, dataLugares, dataFondos] = await Promise.all([
+        resAgentes.json(),
+        resLugares.json(),
+        resFondos.json(),
+      ]);
+
+      setAgentes(dataAgentes);
+      setLugares(dataLugares);
+      setFondos(dataFondos);
+
+      const activo = dataFondos.find((f: Fondo) => f.activo);
+      if (activo) setFondoSeleccionado(activo.url);
     };
 
-    const fetchLugares = async () => {
-      const res = await fetch('/api/lugares');
-      const data = await res.json();
-      setLugares(data);
-    };
-
-    fetchAgentes();
-    fetchLugares();
+    fetchData();
   }, []);
 
   const generarQR = () => {
@@ -47,44 +65,43 @@ export default function RegistrarLugar() {
   };
 
   const handleEliminar = async (id: number) => {
-    const confirmar = confirm('¿Estás seguro de que deseas eliminar este lugar?');
-    if (!confirmar) return;
-
-    await fetch(`/api/lugares/${id}`, {
-      method: 'DELETE'
-    });
-
-    setLugares(lugares.filter(l => l.id !== id));
+    if (!confirm('¿Estás seguro de eliminar este lugar?')) return;
+    await fetch(`/api/lugares/${id}`, { method: 'DELETE' });
+    setLugares(lugares.filter((l) => l.id !== id));
   };
 
   const handleGuardarEdicion = async () => {
     if (!lugarEditando) return;
-
     await fetch(`/api/lugares/${lugarEditando.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lugarEditando)
+      body: JSON.stringify(lugarEditando),
     });
-
-    const nuevosLugares = lugares.map(l => (l.id === lugarEditando.id ? lugarEditando : l));
-    setLugares(nuevosLugares);
+    setLugares(lugares.map((l) => (l.id === lugarEditando.id ? lugarEditando : l)));
     setLugarEditando(null);
     setMostrarModal(false);
   };
 
   const handleRegistrarLugar = async (e: any) => {
     e.preventDefault();
-
     const res = await fetch('/api/lugares', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nuevoLugar)
+      body: JSON.stringify(nuevoLugar),
     });
-
     const data = await res.json();
     setLugares([...lugares, data]);
     setNuevoLugar({ nombre: '', direccion: '', qrCode: '', agenteId: '' });
     setCodigoQR('');
+  };
+
+  const handleSeleccionarFondo = async (url: string) => {
+    await fetch('/api/fondos/seleccionar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    setFondoSeleccionado(url);
   };
 
   const lugaresFiltrados = lugares.filter((lugar) => {
@@ -96,91 +113,48 @@ export default function RegistrarLugar() {
     <div className="p-8 bg-[#B3E58C] min-h-screen">
       <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Registrar Lugar</h1>
 
-      {/* ✅ Formulario registrar lugar */}
+      {/* Formulario registrar lugar */}
       <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
-          <Input
-            placeholder="Nombre del lugar"
-            value={nuevoLugar.nombre}
-            onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })}
-            className="bg-white text-black"
-          />
-          <Input
-            placeholder="Dirección"
-            value={nuevoLugar.direccion}
-            onChange={(e) => setNuevoLugar({ ...nuevoLugar, direccion: e.target.value })}
-            className="bg-white text-black"
-          />
+          <Input placeholder="Nombre del lugar" value={nuevoLugar.nombre} onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })} className="bg-white text-black" />
+          <Input placeholder="Dirección" value={nuevoLugar.direccion} onChange={(e) => setNuevoLugar({ ...nuevoLugar, direccion: e.target.value })} className="bg-white text-black" />
         </div>
         <div className="flex items-center gap-4">
-          <Button type="button" onClick={generarQR} className="bg-blue-600 hover:bg-blue-700 text-white">
-            Generar QR
-          </Button>
+          <Button type="button" onClick={generarQR} className="bg-blue-600 hover:bg-blue-700 text-white">Generar QR</Button>
           {codigoQR && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${codigoQR}`} size={64} />}
         </div>
-        <select
-          className="w-full border px-4 py-2 rounded bg-white text-black"
-          value={nuevoLugar.agenteId}
-          onChange={(e) => setNuevoLugar({ ...nuevoLugar, agenteId: e.target.value })}
-        >
+        <select className="w-full border px-4 py-2 rounded bg-white text-black" value={nuevoLugar.agenteId} onChange={(e) => setNuevoLugar({ ...nuevoLugar, agenteId: e.target.value })}>
           <option value="">Selecciona un agente</option>
           {agentes.map((agente) => (
-            <option key={agente.id} value={agente.id}>
-              {agente.nombre}
-            </option>
+            <option key={agente.id} value={agente.id}>{agente.nombre}</option>
           ))}
         </select>
-        <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">
-          Registrar Lugar
-        </Button>
+        <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Registrar Lugar</Button>
       </form>
 
-      {/* ✅ Subida de fondo para carteles */}
+      {/* Fondos disponibles */}
       <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
-        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📤 Subir nuevo fondo de cartel</h2>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const formData = new FormData(form);
-            const res = await fetch('/api/fondos', {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (res.ok) {
-              alert('🎉 Fondo subido correctamente. Se aplicará a todos los carteles.');
-              form.reset();
-            } else {
-              alert('❌ Error al subir el fondo.');
-            }
-          }}
-          encType="multipart/form-data"
-          className="flex items-center gap-4"
-        >
-          <input
-            type="file"
-            name="file"
-            accept="image/*"
-            required
-            className="border border-gray-300 p-2 rounded bg-white"
-          />
-          <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
-            Subir fondo
-          </Button>
-        </form>
+        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🎨 Fondo actual del cartel</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {fondos.map((fondo) => (
+            <div key={fondo.id} onClick={() => handleSeleccionarFondo(fondo.url)} className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 ${fondo.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'}`}>
+              <Image src={fondo.url} alt={fondo.nombre} width={350} height={220} className="object-cover w-full h-36" />
+              <div className="bg-white py-1 text-center font-medium text-black">{fondo.nombre}</div>
+            </div>
+          ))}
+        </div>
+        {fondoSeleccionado && (
+          <div className="mt-4">
+            <p className="font-semibold text-[#1F1F1F]">Vista previa del fondo actual:</p>
+            <Image src={fondoSeleccionado} alt="Fondo seleccionado" width={700} height={460} className="rounded-lg mt-2 border" />
+          </div>
+        )}
       </div>
 
-      {/* ✅ Tabla de lugares registrados */}
+      {/* Tabla de lugares */}
       <div className="mt-10 bg-[#E5FFD5] p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-4 text-[#1F1F1F]">Lugares Registrados</h2>
-        <Input
-          placeholder="Buscar por cualquier campo..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="mb-4 bg-white text-black"
-        />
-
+        <Input placeholder="Buscar por cualquier campo..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="mb-4 bg-white text-black" />
         <div className="overflow-x-auto bg-white rounded-xl shadow-md">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#F0C300] text-black">
@@ -201,28 +175,10 @@ export default function RegistrarLugar() {
                   <td className="p-2 text-black">{lugar.direccion}</td>
                   <td className="p-2 text-black">{lugar.agente?.nombre || '-'}</td>
                   <td className="p-2 text-xs break-all text-black">{lugar.qrCode}</td>
-                  <td className="p-2 space-y-1 flex flex-col md:flex-row md:space-x-2 md:space-y-0">
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => {
-                        setLugarEditando(lugar);
-                        setMostrarModal(true);
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      className="bg-red-600 hover:bg-red-700 text-white"
-                      onClick={() => handleEliminar(lugar.id)}
-                    >
-                      Eliminar
-                    </Button>
-                    <Button
-                      className="bg-yellow-500 hover:bg-yellow-600 text-black"
-                      onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}
-                    >
-                      Generar cartel
-                    </Button>
+                  <td className="p-2 flex flex-col md:flex-row gap-2">
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setLugarEditando(lugar); setMostrarModal(true); }}>Editar</Button>
+                    <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleEliminar(lugar.id)}>Eliminar</Button>
+                    <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}>Generar cartel</Button>
                   </td>
                 </tr>
               ))}
@@ -231,49 +187,25 @@ export default function RegistrarLugar() {
         </div>
       </div>
 
-      {/* ✅ Modal para editar */}
+      {/* Modal de edición */}
       <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Lugar</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Editar Lugar</DialogTitle></DialogHeader>
           {lugarEditando && (
             <div className="space-y-4">
-              <Input
-                placeholder="Nombre"
-                value={lugarEditando.nombre}
-                onChange={(e) => setLugarEditando({ ...lugarEditando, nombre: e.target.value })}
-                className="text-black"
-              />
-              <Input
-                placeholder="Dirección"
-                value={lugarEditando.direccion}
-                onChange={(e) => setLugarEditando({ ...lugarEditando, direccion: e.target.value })}
-                className="text-black"
-              />
+              <Input placeholder="Nombre" value={lugarEditando.nombre} onChange={(e) => setLugarEditando({ ...lugarEditando, nombre: e.target.value })} className="text-black" />
+              <Input placeholder="Dirección" value={lugarEditando.direccion} onChange={(e) => setLugarEditando({ ...lugarEditando, direccion: e.target.value })} className="text-black" />
               <div className="flex items-center gap-4">
-                <Button onClick={generarQRModal} className="bg-blue-600 text-white">
-                  Generar QR
-                </Button>
-                {lugarEditando.qrCode && (
-                  <QRCode value={`https://impulsoenergetico.es/comparador?qr=${lugarEditando.qrCode}`} size={64} />
-                )}
+                <Button onClick={generarQRModal} className="bg-blue-600 text-white">Generar QR</Button>
+                {lugarEditando.qrCode && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${lugarEditando.qrCode}`} size={64} />}
               </div>
-              <select
-                className="w-full border px-4 py-2 rounded bg-white text-black"
-                value={lugarEditando.agenteId}
-                onChange={(e) => setLugarEditando({ ...lugarEditando, agenteId: e.target.value })}
-              >
+              <select className="w-full border px-4 py-2 rounded bg-white text-black" value={lugarEditando.agenteId} onChange={(e) => setLugarEditando({ ...lugarEditando, agenteId: e.target.value })}>
                 <option value="">Selecciona un agente</option>
                 {agentes.map((agente) => (
-                  <option key={agente.id} value={agente.id}>
-                    {agente.nombre}
-                  </option>
+                  <option key={agente.id} value={agente.id}>{agente.nombre}</option>
                 ))}
               </select>
-              <Button onClick={handleGuardarEdicion} className="bg-[#68B84B] hover:bg-green-700 text-white w-full">
-                Guardar Cambios
-              </Button>
+              <Button onClick={handleGuardarEdicion} className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Guardar Cambios</Button>
             </div>
           )}
         </DialogContent>
