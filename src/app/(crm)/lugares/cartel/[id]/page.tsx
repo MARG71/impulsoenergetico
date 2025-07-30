@@ -96,8 +96,12 @@ export default function CartelLugar() {
     ventana.close();
   };
 
+  // ✅ FUNCIÓN PDF ACTUALIZADA
   const descargarPDF = async () => {
     if (!cartelRef.current) return;
+
+    // Esperar un momento para que se renderice bien
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     const html2pdf = (await import('html2pdf.js')).default;
 
@@ -109,6 +113,8 @@ export default function CartelLugar() {
         html2canvas: {
           scale: 3,
           useCORS: true,
+          allowTaint: true,
+          logging: true,
         },
         jsPDF: {
           unit: 'mm',
