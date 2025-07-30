@@ -120,3 +120,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .cartel {
+    width: 210mm !important;
+    height: 297mm !important;
+    page-break-after: always;
+    overflow: hidden;
+  }
+}

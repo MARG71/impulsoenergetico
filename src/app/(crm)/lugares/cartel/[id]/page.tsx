@@ -70,7 +70,7 @@ export default function CartelLugar() {
   return (
     <div className="min-h-screen flex flex-col items-center bg-white p-6">
       {/* Botón Volver */}
-      <div className="w-full max-w-4xl mb-4">
+      <div className="w-full max-w-4xl mb-4 no-print">
         <Button onClick={() => router.back()} className="bg-gray-200 text-black hover:bg-gray-300">
           ⬅ Volver
         </Button>
@@ -79,17 +79,10 @@ export default function CartelLugar() {
       {/* Cartel A4 visible y exportable */}
       <div
         ref={cartelRef}
-        className="relative w-[210mm] h-[297mm] border border-gray-300 shadow-xl overflow-hidden rounded bg-white print:block"
-        style={{ pageBreakAfter: 'always' }}
+        className="cartel relative border border-gray-300 shadow-xl overflow-hidden rounded bg-white"
       >
-        {/* Fondo como <img> visible */}
-        <img
-          src={fondoUrl}
-          alt="Fondo del cartel"
-          className="absolute top-0 left-0 w-full h-full object-cover z-0"
-        />
+        <img src={fondoUrl} alt="Fondo cartel" className="absolute w-full h-full object-cover z-0" />
 
-        {/* QR centrado */}
         <div
           className="absolute z-10 bg-white p-3 rounded-lg shadow-md"
           style={{
@@ -108,7 +101,7 @@ export default function CartelLugar() {
       </div>
 
       {/* Botones */}
-      <div className="mt-6 flex gap-4 justify-center print:hidden">
+      <div className="mt-6 flex gap-4 justify-center no-print">
         <Button onClick={descargarPDF} className="bg-blue-600 text-white hover:bg-blue-700">
           Descargar cartel en PDF
         </Button>
@@ -116,6 +109,7 @@ export default function CartelLugar() {
           Imprimir cartel
         </Button>
       </div>
+
     </div>
   );
 }
