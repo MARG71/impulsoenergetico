@@ -19,7 +19,8 @@ type Fondo = {
 
 export default function RegistrarLugar() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const sessionData = useSession();
+  const session = sessionData?.data;
   const esAdmin = session?.user?.role === 'ADMIN';
 
   const [agentes, setAgentes] = useState<any[]>([]);
