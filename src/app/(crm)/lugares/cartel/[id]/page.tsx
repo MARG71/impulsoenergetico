@@ -10,8 +10,7 @@ export default function CartelLugar() {
   const params = useParams();
   const id = params?.id;
   const [lugar, setLugar] = useState<any | null>(null);
-  const [fondos, setFondos] = useState<string[]>([]);
-  const [fondoActual, setFondoActual] = useState(0);
+  const [fondoUrl, setFondoUrl] = useState<string | null>(null);
   const cartelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,22 +22,15 @@ export default function CartelLugar() {
       setLugar(data);
     };
 
-    const fetchFondos = async () => {
+    const fetchFondoActivo = async () => {
       const res = await fetch('/api/fondos');
       const data = await res.json();
-
-      const urls = data.map((f: any) => f.url);
-      setFondos(urls);
-
-      const fondoActivoIndex = data.findIndex((f: any) => f.activo);
-      if (fondoActivoIndex !== -1) {
-        setFondoActual(fondoActivoIndex);
-      }
+      const fondoActivo = data.find((f: any) => f.activo);
+      if (fondoActivo) setFondoUrl(fondoActivo.url);
     };
 
-
     fetchLugar();
-    fetchFondos();
+    fetchFondoActivo();
   }, [id]);
 
   const descargarPDF = async () => {
@@ -64,9 +56,7 @@ export default function CartelLugar() {
       <html>
         <head>
           <title>Imprimir Cartel</title>
-          <style>
-            body { font-family: sans-serif; padding: 40px; text-align: center; }
-          </style>
+          <style>body { margin: 0; padding: 0; }</style>
         </head>
         <body>${printContent}</body>
       </html>
@@ -75,11 +65,7 @@ export default function CartelLugar() {
     win?.print();
   };
 
-  const cambiarFondo = (index: number) => {
-    setFondoActual(index);
-  };
-
-  if (!lugar || fondos.length === 0) {
+  if (!lugar || !fondoUrl) {
     return <div className="p-10 text-center">Cargando cartel...</div>;
   }
 
@@ -90,84 +76,40 @@ export default function CartelLugar() {
       {/* Cartel A4 */}
       <div
         ref={cartelRef}
-        className="bg-white w-[210mm] h-[297mm] p-12 border border-gray-300 shadow-xl flex flex-col justify-between"
+        className="relative w-[210mm] h-[297mm] shadow-xl border border-gray-300 overflow-hidden rounded"
       >
-        <div className="flex justify-between items-center mb-6">
-          <Image
-            src="/logo-impulso.jpeg"
-            alt="Logo Impulso Energético"
-            width={120}
-            height={120}
-          />
-          <div className="text-right text-sm text-gray-600">
-            www.impulsoenergetico.com<br />
-            contacto@impulsoenergetico.com<br />
-            Tel: 900 123 456
-          </div>
+        {/* Fondo activo */}
+        <Image
+          src={fondoUrl}
+          alt="Fondo del cartel"
+          layout="fill"
+          objectFit="cover"
+          priority
+        />
+
+        {/* QR centrado */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-xl shadow-lg">
+          <QRCode value={qrUrl} size={180} />
         </div>
 
-        <div className="flex-1 grid grid-cols-2 gap-8 items-center">
-          <div>
-            <h1 className="text-4xl font-bold text-[#1F1F1F] mb-4 leading-snug">
-              ¿Quieres ahorrar <br />en tu factura de luz, gas o teléfono?
-            </h1>
-            <p className="text-lg text-gray-800 mb-6">
-              Escanea este código QR y accede al comparador. Si contratas, ¡ganas una comisión!
-              Comparte este cartel con tus amigos y gana por cada contrato.
-            </p>
-            <p className="text-sm text-gray-500">
-              Hecho con ❤️ por Impulso Energético — Smart Idea
-            </p>
+        {/* Pie de cartel */}
+        <div className="absolute bottom-6 w-full text-center text-white drop-shadow-md">
+          <div className="mb-2">
+            <Image src="/logo-impulso.jpeg" alt="Logo Impulso" width={100} height={100} className="mx-auto" />
           </div>
-          <div className="flex flex-col items-center">
-            <QRCode value={qrUrl} size={200} />
-            <p className="text-center text-xs text-gray-500 mt-2">Escanea con tu móvil</p>
-          </div>
-        </div>
-
-        <div className="mt-10 w-full">
-          <Image
-            src={fondos[fondoActual]}
-            alt="Fondo cartel"
-            width={1000}
-            height={200}
-            className="w-full object-cover rounded-md"
-          />
+          <p className="text-sm font-semibold">IMPULSO ENERGÉTICO</p>
+          <p className="text-xs">Tel: 692 137 048 — info@impulsoenergetico.es</p>
         </div>
       </div>
 
       {/* Botones */}
-      <div className="mt-6 flex flex-wrap gap-4 justify-center">
+      <div className="mt-6 flex gap-4 justify-center">
         <Button onClick={descargarPDF} className="bg-blue-600 text-white hover:bg-blue-700">
           Descargar cartel en PDF
         </Button>
         <Button onClick={imprimirCartel} className="bg-green-600 text-white hover:bg-green-700">
           Imprimir cartel
         </Button>
-      </div>
-
-      {/* Galería de fondos */}
-      <div className="mt-8 w-full max-w-4xl">
-        <h3 className="text-center mb-4 text-lg font-semibold">Elige fondo para el cartel:</h3>
-        <div className="flex gap-4 flex-wrap justify-center">
-          {fondos.map((fondo, index) => (
-            <div
-              key={fondo}
-              className={`cursor-pointer border-2 rounded-md p-1 ${
-                fondoActual === index ? 'ring-4 ring-green-500' : ''
-              }`}
-              onClick={() => cambiarFondo(index)}
-            >
-              <Image
-                src={fondo}
-                alt={`Fondo ${index + 1}`}
-                width={150}
-                height={100}
-                className="rounded"
-              />
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
