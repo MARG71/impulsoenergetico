@@ -100,6 +100,7 @@ export default function RegistrarLugar() {
   };
 
   const handleSeleccionarFondo = async (url: string) => {
+    if (!esAdmin) return;
     await fetch('/api/fondos/seleccionar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -136,11 +137,11 @@ export default function RegistrarLugar() {
         <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Registrar Lugar</Button>
       </form>
 
-      {/* Fondos del cartel */}
+      {/* Fondos disponibles */}
       <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🎨 Fondo actual del cartel</h2>
 
-        {esAdmin && (
+        {esAdmin ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {fondos.map((fondo) => (
@@ -157,12 +158,12 @@ export default function RegistrarLugar() {
               </div>
             )}
           </>
-        )}
-
-        {!esAdmin && fondoSeleccionado && (
-          <div className="text-center">
-            <Image src={fondoSeleccionado} alt="Fondo actual" width={700} height={460} className="rounded-lg border mx-auto" />
-          </div>
+        ) : (
+          fondoSeleccionado && (
+            <div className="text-center">
+              <Image src={fondoSeleccionado} alt="Fondo actual" width={700} height={460} className="rounded-lg border mx-auto" />
+            </div>
+          )
         )}
       </div>
 
