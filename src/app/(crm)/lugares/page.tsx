@@ -40,21 +40,18 @@ export default function RegistrarLugar() {
         fetch('/api/lugares'),
         fetch('/api/fondos'),
       ]);
-
       const [dataAgentes, dataLugares, dataFondos] = await Promise.all([
         resAgentes.json(),
         resLugares.json(),
         resFondos.json(),
       ]);
-
       setAgentes(dataAgentes);
       setLugares(dataLugares);
       setFondos(dataFondos);
 
-      const activo = dataFondos.find((f: Fondo) => f.activo);
-      if (activo) setFondoSeleccionado(activo.url);
+      const fondoActivo = dataFondos.find((f: Fondo) => f.activo);
+      if (fondoActivo) setFondoSeleccionado(fondoActivo.url);
     };
-
     fetchData();
   }, []);
 
@@ -101,7 +98,6 @@ export default function RegistrarLugar() {
   };
 
   const handleSeleccionarFondo = async (url: string) => {
-    if (!esAdmin) return;
     await fetch('/api/fondos/seleccionar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -119,7 +115,6 @@ export default function RegistrarLugar() {
     <div className="p-8 bg-[#B3E58C] min-h-screen">
       <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Registrar Lugar</h1>
 
-      {/* Formulario registrar lugar */}
       <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <Input placeholder="Nombre del lugar" value={nuevoLugar.nombre} onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })} className="bg-white text-black" />
@@ -138,7 +133,7 @@ export default function RegistrarLugar() {
         <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Registrar Lugar</Button>
       </form>
 
-      {/* Fondos disponibles */}
+      {/* Fondo actual del cartel */}
       <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🎨 Fondo actual del cartel</h2>
 
@@ -168,7 +163,7 @@ export default function RegistrarLugar() {
         )}
       </div>
 
-      {/* Tabla de lugares */}
+      {/* Lista de lugares */}
       <div className="mt-10 bg-[#E5FFD5] p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-4 text-[#1F1F1F]">Lugares Registrados</h2>
         <Input placeholder="Buscar por cualquier campo..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="mb-4 bg-white text-black" />
