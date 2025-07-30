@@ -46,7 +46,6 @@ export default function CartelLugar() {
         html2canvas: {
           scale: 3,
           useCORS: true,
-          allowTaint: true,
         },
         jsPDF: {
           unit: 'mm',
@@ -58,7 +57,7 @@ export default function CartelLugar() {
   };
 
   const imprimirCartel = () => {
-    window.print(); // directa
+    window.print(); // Imprime directamente solo el cartel
   };
 
   if (!lugar || !fondoUrl) {
@@ -69,6 +68,25 @@ export default function CartelLugar() {
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-white p-6">
+      {/* Estilos de impresión embebidos */}
+      <style>{`
+        @media print {
+          body {
+            margin: 0;
+            padding: 0;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .cartel {
+            width: 210mm !important;
+            height: 297mm !important;
+            page-break-after: always;
+            margin: 0 auto;
+          }
+        }
+      `}</style>
+
       {/* Botón Volver */}
       <div className="w-full max-w-4xl mb-4 no-print">
         <Button onClick={() => router.back()} className="bg-gray-200 text-black hover:bg-gray-300">
@@ -76,13 +94,17 @@ export default function CartelLugar() {
         </Button>
       </div>
 
-      {/* Cartel A4 visible y exportable */}
+      {/* Cartel A4 */}
       <div
         ref={cartelRef}
-        className="cartel relative border border-gray-300 shadow-xl overflow-hidden rounded bg-white"
+        className="cartel relative border border-gray-300 shadow-xl overflow-hidden bg-white"
       >
-        <img src={fondoUrl} alt="Fondo cartel" className="absolute w-full h-full object-cover z-0" />
-
+        <img
+          src={fondoUrl}
+          alt="Fondo del cartel"
+          className="absolute top-0 left-0 w-full h-full object-cover z-0"
+        />
+        {/* QR centrado */}
         <div
           className="absolute z-10 bg-white p-3 rounded-lg shadow-md"
           style={{
@@ -109,7 +131,6 @@ export default function CartelLugar() {
           Imprimir cartel
         </Button>
       </div>
-
     </div>
   );
 }
