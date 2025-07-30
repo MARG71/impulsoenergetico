@@ -1,27 +1,25 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { url } = body;
+    const { id } = body;
 
-    if (!url) {
-      return NextResponse.json({ error: 'URL del fondo requerida' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'ID del fondo requerida' }, { status: 400 });
     }
 
-    // Primero desactivamos todos los fondos
+    // Desactivamos todos los fondos
     await prisma.fondo.updateMany({
       data: { activo: false },
     });
 
-    // Activamos solo el seleccionado
+    // Activamos el fondo por su ID
     const fondoActualizado = await prisma.fondo.update({
-        where: { url },
-        data: { activo: true },
+      where: { id },
+      data: { activo: true },
     });
-
 
     return NextResponse.json({ ok: true, fondo: fondoActualizado });
   } catch (error) {

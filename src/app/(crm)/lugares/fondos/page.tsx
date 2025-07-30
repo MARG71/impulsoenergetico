@@ -94,15 +94,16 @@ export default function GestionFondosCartel() {
     }
   };
 
-  const handleSeleccionarFondoActivo = async (url: string) => {
+  const handleSeleccionarFondoActivo = async (id: number) => {
     await fetch('/api/fondos/seleccionar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
     });
     toast.success('Fondo seleccionado como activo');
     fetchFondos();
   };
+
 
   return (
     <div className="p-8 bg-[#F6FFEC] min-h-screen">
@@ -160,7 +161,8 @@ export default function GestionFondosCartel() {
                 Subido el {format(new Date(fondo.creadoEn), 'dd MMMM yyyy', { locale: es })}
               </p>
               <Button
-                onClick={() => handleSeleccionarFondoActivo(fondo.url)}
+                onClick={() => handleSeleccionarFondoActivo(fondo.id)}
+
                 className="mt-2 w-full text-sm bg-[#004AAD] text-white hover:bg-[#00368A]"
               >
                 {fondo.activo ? '✅ Fondo activo' : 'Usar como fondo actual'}

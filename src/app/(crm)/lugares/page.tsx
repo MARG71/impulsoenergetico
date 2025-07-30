@@ -97,14 +97,15 @@ export default function RegistrarLugar() {
     setCodigoQR('');
   };
 
-  const handleSeleccionarFondo = async (url: string) => {
+  const handleSeleccionarFondo = async (id: number, url: string) => {
     await fetch('/api/fondos/seleccionar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ id }),
     });
     setFondoSeleccionado(url);
   };
+
 
   const lugaresFiltrados = lugares.filter((lugar) => {
     const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre}`;
@@ -141,7 +142,7 @@ export default function RegistrarLugar() {
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {fondos.map((fondo) => (
-                <div key={fondo.id} onClick={() => handleSeleccionarFondo(fondo.url)} className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 ${fondo.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'}`}>
+                <div key={fondo.id} onClick={() => handleSeleccionarFondo(fondo.id, fondo.url)} className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 ${fondo.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'}`}>
                   <Image src={fondo.url} alt={fondo.nombre} width={350} height={220} className="object-cover w-full h-36" />
                   <div className="bg-white py-1 text-center font-medium text-black">{fondo.nombre}</div>
                 </div>
