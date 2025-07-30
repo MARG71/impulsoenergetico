@@ -58,7 +58,11 @@ export default function RegistroFormulario() {
       });
 
       if (res.ok) {
-        router.push(`/comparador?agenteId=${agenteId}&lugarId=${lugarId}`);
+        localStorage.setItem('agenteId', agenteId);
+        localStorage.setItem('lugarId', lugarId);
+
+        // Redirigir a la nueva pantalla de bienvenida
+        router.push(`/bienvenida?nombre=${encodeURIComponent(nombre)}&agenteId=${agenteId}&lugarId=${lugarId}`);
       } else {
         const data = await res.json();
         setMensaje(data.error || 'Error al registrar.');
@@ -75,7 +79,7 @@ export default function RegistroFormulario() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-6"
       style={{
         backgroundImage:
-          'linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0.85)), url("/fondo-registro.jpg")',
+          'linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0.85)), url(\"/fondo-registro.jpg\")',
       }}
     >
       <form
