@@ -121,7 +121,7 @@ export default function BienvenidaContenido() {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
-      className="bg-gradient-to-br from-emerald-50 to-blue-100 min-h-screen flex flex-col items-center px-4 py-6"
+      className="min-h-screen w-full bg-gradient-to-br from-emerald-100 via-sky-100 to-blue-100 flex flex-col items-center px-4 py-8"
 
     >
       {/* Logo y bienvenida */}
