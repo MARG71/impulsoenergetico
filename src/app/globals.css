@@ -4,9 +4,10 @@
 
 /* --- Personalización general --- */
 body {
-  @apply text-gray-900 bg-white;
+  @apply text-neutral-900 bg-white;
   font-family: 'Inter', sans-serif;
 }
+
 
 h1, h2, h3, h4 {
   @apply font-bold text-gray-800;
