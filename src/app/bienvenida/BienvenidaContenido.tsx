@@ -125,20 +125,21 @@ export default function BienvenidaContenido() {
         Gracias por confiar en <strong>Impulso Energético</strong>. Elige el servicio que deseas comparar o consulta nuestras promociones exclusivas.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-8">
         {secciones.map((sec) => (
           <Card
             key={sec.nombre}
             onClick={() => handleClick(sec.nombre, sec.ruta)}
-            className={`cursor-pointer text-white ${sec.bg} shadow-lg hover:shadow-xl transition-transform hover:scale-105`}
+            className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105`}
           >
             <CardContent className="flex flex-col items-center py-6">
-              {sec.icono}
-              <span className="text-lg md:text-xl font-semibold mt-4">{sec.nombre}</span>
+              {React.cloneElement(sec.icono, { className: "w-8 h-8 text-yellow-100" })}
+              <span className="text-base md:text-lg font-medium mt-3">{sec.nombre}</span>
             </CardContent>
           </Card>
         ))}
       </div>
+
 
       <p className="text-center text-white text-sm font-semibold bg-pink-600 px-4 py-1 rounded-xl shadow-lg animate-pulse mb-4">
         🔜 Más servicios próximamente disponibles
