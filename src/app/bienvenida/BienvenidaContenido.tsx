@@ -123,6 +123,7 @@ export default function BienvenidaContenido() {
       transition={{ duration: 0.8 }}
       className="bg-gradient-to-br from-white to-sky-100 flex flex-col items-center px-4 py-4"
     >
+      {/* Logo y bienvenida */}
       <div className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center mb-4 px-4 gap-4">
         <Image
           src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
@@ -146,28 +147,30 @@ export default function BienvenidaContenido() {
         Gracias por confiar en <strong>Impulso Energético</strong>. Elige el servicio que deseas comparar o consulta nuestras promociones exclusivas.
       </p>
 
-      {/* Servicios */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-8">
-        {secciones.map((sec) => (
-          <Card
-            key={sec.nombre}
-            onClick={() => handleClick(sec.nombre, sec.ruta)}
-            className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105`}
-          >
-            <CardContent className="flex flex-col items-center py-4">
-              {sec.icono}
-              <span className="text-base md:text-lg font-medium mt-2">{sec.nombre}</span>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Servicios con fondo llamativo */}
+      <div className="w-full max-w-5xl bg-gradient-to-r from-green-400 via-orange-400 to-blue-500 rounded-xl p-6 mb-6 shadow-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {secciones.map((sec) => (
+            <Card
+              key={sec.nombre}
+              onClick={() => handleClick(sec.nombre, sec.ruta)}
+              className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105`}
+            >
+              <CardContent className="flex flex-col items-center py-4">
+                {sec.icono}
+                <span className="text-base md:text-lg font-medium mt-2">{sec.nombre}</span>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       <p className="text-center text-white text-sm font-semibold bg-pink-600 px-4 py-1 rounded-xl shadow-lg animate-pulse mb-4">
         🔜 Más servicios próximamente disponibles
       </p>
 
-      {/* Ofertas Especiales */}
-      <div className="bg-white w-full py-6 px-4 rounded-xl shadow max-w-4xl mb-6">
+      {/* Carrusel de ofertas especiales con fondo más vivo */}
+      <div className="w-full py-6 px-4 rounded-xl shadow max-w-4xl mb-6 bg-gradient-to-r from-blue-100 to-indigo-100">
         <h2 className="text-2xl font-semibold text-center text-gray-800 mb-4">Ofertas Especiales</h2>
         <div className="relative mb-4">
           <motion.div
@@ -205,25 +208,51 @@ export default function BienvenidaContenido() {
         </div>
       </div>
 
-      {/* Carruseles por sección */}
-      {Object.entries(ofertasPorSeccion).map(([seccion, items]) => (
-        <div key={seccion} className="w-full max-w-5xl bg-sky-100 rounded-xl px-6 py-6 mb-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4 capitalize">Ofertas en {seccion}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {items.map((oferta, idx) => (
-              <div key={idx} className="bg-white rounded-lg shadow p-4 text-sm text-center hover:shadow-md">
-                <p className="font-medium text-gray-700 mb-2">{oferta}</p>
-                <button
-                  className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs"
-                  onClick={() => alert(`Acceder a ofertas de ${seccion}`)}
+      {/* Ofertas por sección con fondo según servicio */}
+      {Object.entries(ofertasPorSeccion).map(([seccion, items]) => {
+        const fondo =
+          seccion === 'luz' ? 'bg-green-500' :
+          seccion === 'gas' ? 'bg-orange-500' :
+          seccion === 'telefonia' ? 'bg-blue-600' :
+          'bg-gray-200';
+
+        return (
+          <div key={seccion} className={`w-full max-w-5xl ${fondo} rounded-xl px-6 py-6 mb-6 text-white`}>
+            <h3 className="text-xl font-bold mb-4 capitalize">Ofertas en {seccion}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {items.map((oferta, idx) => (
+                
+                <div
+                  key={idx}
+                  className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700"
                 >
-                  Ver más
-                </button>
-              </div>
-            ))}
+  
+                  <p className="font-medium mb-2">{oferta}</p>
+                  
+                  <button
+                    className={`
+                      text-white px-3 py-1 rounded text-xs font-semibold transition 
+                      ${
+                        seccion === 'luz'
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : seccion === 'gas'
+                          ? 'bg-orange-500 hover:bg-orange-600'
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }
+                    `}
+                    onClick={() => alert(`Acceder a ofertas de ${seccion}`)}
+                  >
+                    Ver más
+                  </button>
+
+
+                </div>
+
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </motion.div>
   );
 }
