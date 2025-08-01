@@ -121,7 +121,8 @@ export default function BienvenidaContenido() {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
-      className="bg-gradient-to-br from-white to-sky-100 flex flex-col items-center px-4 py-4"
+      className="bg-gradient-to-br from-emerald-50 to-blue-100 min-h-screen flex flex-col items-center px-4 py-6"
+
     >
       {/* Logo y bienvenida */}
       <div className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center mb-4 px-4 gap-4">
