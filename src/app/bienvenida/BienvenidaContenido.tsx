@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,7 +6,6 @@ import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight } from '
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import React from 'react';
 
 export default function BienvenidaContenido() {
   const router = useRouter();
@@ -36,7 +35,7 @@ export default function BienvenidaContenido() {
     },
   ];
 
-  const ofertas = [
+  const ofertasEspeciales = [
     {
       titulo: '💡 Ahorra hasta un 30% en tu factura de luz',
       descripcion: 'Promoción válida hasta fin de mes. Consulta condiciones.',
@@ -45,13 +44,13 @@ export default function BienvenidaContenido() {
     },
     {
       titulo: '🔥 Bono de bienvenida en tu alta de gas',
-      descripcion: 'Oferta exclusiva para nuevos clientes con asesoramiento sin coste.',
+      descripcion: 'Aprovecha esta oferta exclusiva para nuevos clientes. ¡Incluye asesoramiento técnico y económico sin coste!',
       bg: 'bg-orange-100 text-orange-800',
       accion: () => alert('Oferta de gas en construcción.'),
     },
     {
       titulo: '📱 50% de descuento en tu tarifa móvil',
-      descripcion: 'Contrata desde nuestra plataforma con permanencia mínima de 6 meses.',
+      descripcion: 'Válido contratando desde nuestra plataforma con permanencia mínima de 6 meses.',
       bg: 'bg-blue-100 text-blue-800',
       accion: () => alert('Oferta de telefonía en construcción.'),
     },
@@ -63,22 +62,43 @@ export default function BienvenidaContenido() {
     },
     {
       titulo: '🌞 Bonificación por energía solar',
-      descripcion: 'Descuento si tienes instalación fotovoltaica o estás en proceso.',
+      descripcion: 'Descuento adicional si tienes instalación fotovoltaica o estás en proceso de instalación. Promoción ecológica.',
       bg: 'bg-yellow-100 text-yellow-800',
       accion: () => alert('Oferta solar en preparación.'),
     },
   ];
 
+  const ofertasPorSeccion = {
+    luz: [
+      '💡 Tarifa estable todo el año',
+      '🔌 Sin permanencia ni letra pequeña',
+      '⚡ Ahorro garantizado con revisión anual',
+      '🧾 Gestión gratuita del cambio de compañía',
+    ],
+    gas: [
+      '🔥 Bono de 30€ en tu primera factura de gas',
+      '🏠 Ideal para calefacción eficiente',
+      '📈 Precios estables y sin sobresaltos',
+      '📞 Atención personalizada y cercana',
+    ],
+    telefonia: [
+      '📱 Tarifa móvil ilimitada desde 9,99€',
+      '📶 Cobertura nacional con red 5G',
+      '💼 Packs familia con descuentos exclusivos',
+      '🆓 Roaming gratuito en Europa y EE.UU.',
+    ],
+  };
+
   const [indiceOferta, setIndiceOferta] = useState(0);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
-      setIndiceOferta((prev) => (prev + 1) % ofertas.length);
+      setIndiceOferta((prev) => (prev + 1) % ofertasEspeciales.length);
     }, 6000);
     return () => clearInterval(intervalo);
-  }, [ofertas.length]);
+  }, [ofertasEspeciales.length]);
 
-  const ofertaActual = ofertas[indiceOferta];
+  const ofertaActual = ofertasEspeciales[indiceOferta];
 
   const handleClick = (seccion: string, ruta: string) => {
     if (seccion === 'Luz') {
@@ -89,11 +109,11 @@ export default function BienvenidaContenido() {
   };
 
   const avanzar = () => {
-    setIndiceOferta((prev) => (prev + 1) % ofertas.length);
+    setIndiceOferta((prev) => (prev + 1) % ofertasEspeciales.length);
   };
 
   const retroceder = () => {
-    setIndiceOferta((prev) => (prev - 1 + ofertas.length) % ofertas.length);
+    setIndiceOferta((prev) => (prev - 1 + ofertasEspeciales.length) % ofertasEspeciales.length);
   };
 
   return (
@@ -105,7 +125,7 @@ export default function BienvenidaContenido() {
     >
       <div className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center mb-4 px-4 gap-4">
         <Image
-          src="/LOGO%20DEFINITIVO%20IMPulso%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+          src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
           alt="Logo Impulso Energético"
           width={160}
           height={50}
@@ -126,16 +146,17 @@ export default function BienvenidaContenido() {
         Gracias por confiar en <strong>Impulso Energético</strong>. Elige el servicio que deseas comparar o consulta nuestras promociones exclusivas.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-6">
+      {/* Servicios */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-8">
         {secciones.map((sec) => (
           <Card
             key={sec.nombre}
             onClick={() => handleClick(sec.nombre, sec.ruta)}
-            className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105 py-4`}
+            className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105`}
           >
-            <CardContent className="flex flex-col items-center">
-              {React.cloneElement(sec.icono, { className: 'w-7 h-7 text-yellow-100' })}
-              <span className="text-sm md:text-base font-medium mt-3">{sec.nombre}</span>
+            <CardContent className="flex flex-col items-center py-4">
+              {sec.icono}
+              <span className="text-base md:text-lg font-medium mt-2">{sec.nombre}</span>
             </CardContent>
           </Card>
         ))}
@@ -145,82 +166,64 @@ export default function BienvenidaContenido() {
         🔜 Más servicios próximamente disponibles
       </p>
 
-      <h2 className="text-xl font-semibold mb-3 text-gray-800">Ofertas Especiales</h2>
-
-      {/* Carrusel Ofertas Destacadas */}
-      <div className="relative mb-4 max-w-xl w-full">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          key={indiceOferta}
-          transition={{ duration: 0.4 }}
-          className={`rounded-xl px-6 py-5 text-center ${ofertaActual.bg} shadow-md min-h-[160px]`}
-        >
-          <h3 className="text-base md:text-lg font-semibold mb-2">{ofertaActual.titulo}</h3>
-          <p className="text-sm md:text-base mb-4 leading-relaxed">{ofertaActual.descripcion}</p>
-          <button
-            onClick={ofertaActual.accion}
-            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition text-sm"
+      {/* Ofertas Especiales */}
+      <div className="bg-white w-full py-6 px-4 rounded-xl shadow max-w-4xl mb-6">
+        <h2 className="text-2xl font-semibold text-center text-gray-800 mb-4">Ofertas Especiales</h2>
+        <div className="relative mb-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            key={indiceOferta}
+            transition={{ duration: 0.4 }}
+            className={`rounded-xl px-6 py-5 text-center ${ofertaActual.bg} shadow-md min-h-[160px]`}
           >
-            Ir a la oferta
-          </button>
-        </motion.div>
-
-        <button
-          onClick={retroceder}
-          className="absolute left-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition"
-        >
-          <ChevronLeft className="w-4 h-4 text-gray-600" />
-        </button>
-        <button
-          onClick={avanzar}
-          className="absolute right-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition"
-        >
-          <ChevronRight className="w-4 h-4 text-gray-600" />
-        </button>
-      </div>
-
-      {/* Indicadores */}
-      <div className="flex space-x-1 mb-10">
-        {ofertas.map((_, i) => (
-          <span
-            key={i}
-            className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${
-              i === indiceOferta ? 'bg-green-600 scale-125' : 'bg-gray-300'
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* NUEVA SECCIÓN DE OFERTAS POR SERVICIO */}
-      <div className="w-full bg-green-50 py-8 px-4">
-        <h3 className="text-lg font-bold text-green-800 mb-4">💡 Ofertas Luz</h3>
-        <div className="flex space-x-4 overflow-x-auto scrollbar-hide">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="min-w-[220px] bg-white p-4 rounded-xl shadow hover:shadow-md transition"
+            <h3 className="text-base md:text-lg font-semibold mb-2">{ofertaActual.titulo}</h3>
+            <p className="text-sm md:text-base mb-4 leading-relaxed">{ofertaActual.descripcion}</p>
+            <button
+              onClick={ofertaActual.accion}
+              className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition text-sm"
             >
-              <h4 className="font-semibold text-sm mb-2 text-green-700">Oferta {i}</h4>
-              <p className="text-xs text-gray-600 mb-2">Detalles específicos de la oferta {i} sobre ahorro eléctrico.</p>
-              <button
-                onClick={() => router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`)}
-                className="text-white bg-green-600 px-3 py-1 rounded text-xs hover:bg-green-700"
-              >
-                Ver más
-              </button>
-            </div>
+              Ir a la oferta
+            </button>
+          </motion.div>
+          <button onClick={retroceder} className="absolute left-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition">
+            <ChevronLeft className="w-4 h-4 text-gray-600" />
+          </button>
+          <button onClick={avanzar} className="absolute right-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition">
+            <ChevronRight className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+        <div className="flex justify-center space-x-1">
+          {ofertasEspeciales.map((_, i) => (
+            <span
+              key={i}
+              className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${
+                i === indiceOferta ? 'bg-green-600 scale-125' : 'bg-gray-300'
+              }`}
+            />
           ))}
         </div>
-        <div className="text-right mt-3">
-          <button
-            onClick={() => router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`)}
-            className="text-green-700 underline text-sm hover:text-green-900"
-          >
-            Ver todas las ofertas de luz →
-          </button>
-        </div>
       </div>
+
+      {/* Carruseles por sección */}
+      {Object.entries(ofertasPorSeccion).map(([seccion, items]) => (
+        <div key={seccion} className="w-full max-w-5xl bg-sky-100 rounded-xl px-6 py-6 mb-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 capitalize">Ofertas en {seccion}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {items.map((oferta, idx) => (
+              <div key={idx} className="bg-white rounded-lg shadow p-4 text-sm text-center hover:shadow-md">
+                <p className="font-medium text-gray-700 mb-2">{oferta}</p>
+                <button
+                  className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs"
+                  onClick={() => alert(`Acceder a ofertas de ${seccion}`)}
+                >
+                  Ver más
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </motion.div>
   );
 }
