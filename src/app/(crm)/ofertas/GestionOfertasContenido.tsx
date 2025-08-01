@@ -5,9 +5,23 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
+// ✅ Tipado de Oferta
+type Oferta = {
+  id: number
+  titulo: string
+  descripcion: string
+  tipo: string
+  destacada: boolean
+}
+
 export default function GestionOfertasContenido() {
-  const [ofertas, setOfertas] = useState([])
-  const [form, setForm] = useState({ titulo: '', descripcion: '', tipo: 'luz', destacada: false })
+  const [ofertas, setOfertas] = useState<Oferta[]>([]) // ✅ Estado tipado
+  const [form, setForm] = useState({
+    titulo: '',
+    descripcion: '',
+    tipo: 'luz',
+    destacada: false,
+  })
 
   const cargarOfertas = async () => {
     const res = await fetch('/api/ofertas')
@@ -71,7 +85,9 @@ export default function GestionOfertasContenido() {
               <h3 className="font-semibold">{oferta.titulo}</h3>
               <p className="text-sm text-gray-700">{oferta.descripcion}</p>
               <p className="mt-2 text-xs italic">Tipo: {oferta.tipo}</p>
-              {oferta.destacada && <span className="text-orange-600 font-bold text-sm">⭐ Destacada</span>}
+              {oferta.destacada && (
+                <span className="text-orange-600 font-bold text-sm">⭐ Destacada</span>
+              )}
             </CardContent>
           </Card>
         ))}
