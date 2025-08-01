@@ -8,6 +8,14 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+h1, h2, h3, h4 {
+  @apply font-bold text-gray-800;
+}
+
+p {
+  @apply text-base leading-relaxed;
+}
+
 /* --- Para impresión de carteles A4 --- */
 @media print {
   body {
@@ -51,11 +59,11 @@ body {
 
 /* --- Estilo general botones y formularios --- */
 button, .btn {
-  @apply transition duration-300 rounded font-medium;
+  @apply transition duration-300 rounded font-medium bg-blue-600 text-white px-4 py-2 hover:bg-blue-700;
 }
 
 input, textarea, select {
-  @apply border rounded px-3 py-2 text-gray-800 w-full;
+  @apply border border-gray-300 rounded px-3 py-2 text-gray-800 w-full focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
 
 /* --- Scroll oculto para zonas específicas --- */
@@ -67,7 +75,20 @@ input, textarea, select {
   scrollbar-width: none;
 }
 
-/* Animación personalizada para carrusel de ofertas */
+/* --- Estilos especiales para la bienvenida --- */
+.welcome-container {
+  @apply max-w-4xl mx-auto p-6 text-center;
+}
+
+.welcome-title {
+  @apply text-2xl font-semibold mb-4;
+}
+
+.welcome-services {
+  @apply grid grid-cols-2 sm:grid-cols-3 gap-4 justify-center;
+}
+
+/* --- Carrusel de ofertas animado --- */
 @keyframes slideCarousel {
   0%, 33.333% {
     transform: translateX(0%);
@@ -82,4 +103,25 @@ input, textarea, select {
 
 .animate-slideCarousel {
   animation: slideCarousel 18s infinite ease-in-out;
+}
+
+.carousel-container {
+  @apply overflow-hidden w-full relative;
+}
+
+.carousel-track {
+  @apply flex w-[300%];
+}
+
+/* Estilo visual para cada oferta del carrusel */
+.oferta {
+  @apply w-full px-6 py-4 text-center flex-shrink-0;
+}
+
+.oferta h3 {
+  @apply text-lg font-bold mb-2;
+}
+
+.oferta p {
+  @apply text-sm mb-3;
 }
