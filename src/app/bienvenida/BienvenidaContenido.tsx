@@ -2,9 +2,10 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Flame, Phone, PartyPopper } from 'lucide-react';
+import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 export default function BienvenidaContenido() {
   const router = useRouter();
@@ -13,34 +14,79 @@ export default function BienvenidaContenido() {
   const agenteId = searchParams.get('agenteId') || '';
   const lugarId = searchParams.get('lugarId') || '';
 
-  const handleClick = (seccion: string, ruta: string) => {
-    if (seccion === 'Luz') {
-      router.push(ruta);
-    } else {
-      alert('🔧 Esta sección está en construcción. Muy pronto estará disponible.');
-    }
-  };
-
   const secciones = [
     {
       nombre: 'Luz',
       icono: <Sparkles className="w-10 h-10 text-yellow-100" />,
       ruta: `/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`,
-      bg: 'bg-green-500'
+      bg: 'bg-green-500',
     },
     {
       nombre: 'Gas',
       icono: <Flame className="w-10 h-10 text-yellow-100" />,
       ruta: '#',
-      bg: 'bg-orange-500'
+      bg: 'bg-orange-500',
     },
     {
       nombre: 'Telefonía',
       icono: <Phone className="w-10 h-10 text-yellow-100" />,
       ruta: '#',
-      bg: 'bg-blue-600'
+      bg: 'bg-blue-600',
     },
   ];
+
+  const ofertas = [
+    {
+      titulo: '💡 Ahorra hasta un 30% en tu factura de luz',
+      descripcion: 'Promoción válida hasta fin de mes. Consulta condiciones.',
+      bg: 'bg-green-100 text-green-800',
+      accion: () => router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`),
+    },
+    {
+      titulo: '🔥 Bono de bienvenida en tu alta de gas',
+      descripcion: 'Aprovecha esta oferta exclusiva para nuevos clientes.',
+      bg: 'bg-orange-100 text-orange-800',
+      accion: () => alert('Oferta de gas en construcción.'),
+    },
+    {
+      titulo: '📱 50% de descuento en tu tarifa móvil',
+      descripcion: 'Válido contratando desde nuestra plataforma.',
+      bg: 'bg-blue-100 text-blue-800',
+      accion: () => alert('Oferta de telefonía en construcción.'),
+    },
+    {
+      titulo: '⚡ Asesoría energética gratuita',
+      descripcion: 'Analizamos tu consumo y te recomendamos la mejor tarifa.',
+      bg: 'bg-purple-100 text-purple-800',
+      accion: () => alert('Asesoría personalizada próximamente disponible.'),
+    },
+    {
+      titulo: '🌞 Bonificación por energía solar',
+      descripcion: 'Descuento adicional si tienes instalación fotovoltaica.',
+      bg: 'bg-yellow-100 text-yellow-800',
+      accion: () => alert('Oferta solar en preparación.'),
+    },
+  ];
+
+  const [indiceOferta, setIndiceOferta] = useState(0);
+
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setIndiceOferta((prev) => (prev + 1) % ofertas.length);
+    }, 6000);
+
+    return () => clearInterval(intervalo);
+  }, [ofertas.length]);
+
+  const ofertaActual = ofertas[indiceOferta];
+
+  const avanzar = () => {
+    setIndiceOferta((prev) => (prev + 1) % ofertas.length);
+  };
+
+  const retroceder = () => {
+    setIndiceOferta((prev) => (prev - 1 + ofertas.length) % ofertas.length);
+  };
 
   return (
     <motion.div
@@ -72,12 +118,7 @@ export default function BienvenidaContenido() {
         Gracias por confiar en <strong>Impulso Energético</strong>. Elige el servicio que deseas comparar o consulta nuestras promociones exclusivas.
       </p>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-5xl mb-10"
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-5xl mb-10">
         {secciones.map((sec) => (
           <Card
             key={sec.nombre}
@@ -90,56 +131,59 @@ export default function BienvenidaContenido() {
             </CardContent>
           </Card>
         ))}
-      </motion.div>
+      </div>
 
-      <motion.p
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.5 }}
-        className="text-center text-white text-base font-semibold bg-pink-600 px-4 py-2 rounded-xl shadow-lg animate-pulse mt-2 mb-8"
-      >
+      <p className="text-center text-white text-base font-semibold bg-pink-600 px-4 py-2 rounded-xl shadow-lg animate-pulse mt-2 mb-8">
         🔜 Más servicios próximamente disponibles
-      </motion.p>
+      </p>
 
       <h2 className="text-2xl font-semibold mb-4 text-gray-800">Ofertas Especiales</h2>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="carousel-container mb-10"
-      >
+      {/* Carrusel con flechas */}
+      <div className="relative mb-6 max-w-xl w-full">
         <motion.div
-          className="carousel-track animate-slideCarousel"
-          style={{ animationDuration: '18s' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          key={indiceOferta}
+          transition={{ duration: 0.5 }}
+          className={`rounded-xl p-6 text-center ${ofertaActual.bg} shadow-md`}
         >
-          <div className="oferta bg-green-100 text-green-800">
-            <h3>💡 Ahorra hasta un 30% en tu factura de luz</h3>
-            <p>Promoción válida hasta fin de mes. Consulta condiciones.</p>
-            <button
-              onClick={() =>
-                router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`)
-              }
-            >
-              Ir a la oferta
-            </button>
-          </div>
-          <div className="oferta bg-orange-100 text-orange-800">
-            <h3>🔥 Bono de bienvenida en tu alta de gas</h3>
-            <p>Aprovecha esta oferta exclusiva para nuevos clientes.</p>
-            <button onClick={() => alert('Oferta de gas en construcción.')}>
-              Ir a la oferta
-            </button>
-          </div>
-          <div className="oferta bg-blue-100 text-blue-800">
-            <h3>📱 50% de descuento en tu tarifa móvil</h3>
-            <p>Válido contratando desde nuestra plataforma.</p>
-            <button onClick={() => alert('Oferta de telefonía en construcción.')}>
-              Ir a la oferta
-            </button>
-          </div>
+          <h3 className="text-lg font-semibold mb-2">{ofertaActual.titulo}</h3>
+          <p className="mb-4">{ofertaActual.descripcion}</p>
+          <button
+            onClick={ofertaActual.accion}
+            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
+          >
+            Ir a la oferta
+          </button>
         </motion.div>
-      </motion.div>
+
+        {/* Flechas */}
+        <button
+          onClick={retroceder}
+          className="absolute left-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
+        </button>
+        <button
+          onClick={avanzar}
+          className="absolute right-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+
+      {/* Indicadores */}
+      <div className="flex space-x-2 mb-10">
+        {ofertas.map((_, i) => (
+          <span
+            key={i}
+            className={`h-3 w-3 rounded-full transition-all duration-300 ${
+              i === indiceOferta ? 'bg-green-600 scale-125' : 'bg-gray-300'
+            }`}
+          />
+        ))}
+      </div>
     </motion.div>
   );
 }
