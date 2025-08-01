@@ -10,6 +10,7 @@ export default function DashboardPage() {
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  const [ofertas, setOfertas] = useState<any[]>([]);
 
   const [busquedaComparativas, setBusquedaComparativas] = useState('');
   const [busquedaAgentes, setBusquedaAgentes] = useState('');
@@ -19,22 +20,25 @@ export default function DashboardPage() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [resC, resA, resL, resLeads] = await Promise.all([
+        const [resC, resA, resL, resLeads, resOfertas] = await Promise.all([
           fetch('/api/comparativas'),
           fetch('/api/agentes'),
           fetch('/api/lugares'),
           fetch('/api/leads'),
+          fetch('/api/ofertas'),
         ]);
-        const [dataC, dataA, dataL, dataLeads] = await Promise.all([
+        const [dataC, dataA, dataL, dataLeads, dataOfertas] = await Promise.all([
           resC.json(),
           resA.json(),
           resL.json(),
           resLeads.json(),
+          resOfertas.json(),
         ]);
         setComparativas(Array.isArray(dataC) ? dataC : []);
         setAgentes(Array.isArray(dataA) ? dataA : []);
         setLugares(Array.isArray(dataL) ? dataL : []);
         setLeads(Array.isArray(dataLeads) ? dataLeads : []);
+        setOfertas(Array.isArray(dataOfertas) ? dataOfertas : []);
       } catch (err) {
         console.error('Error cargando datos:', err);
       }
@@ -52,10 +56,18 @@ export default function DashboardPage() {
     );
   };
 
-  const comparativasFiltradas = filtrar(comparativas, ['cliente.nombre', 'nombreTarifa', 'tipoTarifa', 'agente.nombre'], busquedaComparativas);
+  const comparativasFiltradas = filtrar(
+    comparativas,
+    ['cliente.nombre', 'nombreTarifa', 'tipoTarifa', 'agente.nombre'],
+    busquedaComparativas
+  );
   const agentesFiltrados = filtrar(agentes, ['nombre', 'email', 'telefono'], busquedaAgentes);
   const lugaresFiltrados = filtrar(lugares, ['nombre', 'direccion', 'agente.nombre'], busquedaLugares);
-  const leadsFiltrados = filtrar(leads, ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'], busquedaLeads);
+  const leadsFiltrados = filtrar(
+    leads,
+    ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'],
+    busquedaLeads
+  );
 
   const Bloque = ({ titulo, color, datos, campos, encabezados, busqueda, setBusqueda, onVer }: any) => (
     <div className={`${color} text-white p-4 rounded shadow-md mb-6 w-full`}>
@@ -63,51 +75,60 @@ export default function DashboardPage() {
         <h2 className="text-xl font-semibold">{titulo}</h2>
         <p className="text-xl font-bold">{datos.length}</p>
       </div>
-      <input
-        type="text"
-        placeholder={`Buscar en ${titulo.toLowerCase()}...`}
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        className="w-full p-2 mb-3 rounded text-black bg-white placeholder-gray-500"
-      />
-      <div className="bg-white text-black rounded max-h-64 overflow-y-auto">
-        {datos.length === 0 ? (
-          <div className="p-2 text-sm text-gray-600">No hay registros.</div>
-        ) : (
-          <>
-            {/* ENCABEZADOS */}
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] p-2 font-semibold text-sm bg-gray-200">
-              {encabezados.map((enc: string, i: number) => (
-                <div key={i}>{enc}</div>
-              ))}
-              <div className="text-right pr-2">Acción</div>
-            </div>
-
-            {/* FILAS */}
-            {datos.map((item: any, idx: number) => (
-              <div
-                key={idx}
-                className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] p-2 text-sm items-center border-t border-gray-200"
-              >
-                {campos.map((campo: string, i: number) => {
-                  const valor = campo
-                    .split('.')
-                    .reduce((acc, key) => acc?.[key], item) || '—';
-                  return <div key={i}>{valor}</div>;
-                })}
-                <div className="text-right">
-                  <button
-                    className="ml-2 text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800"
-                    onClick={() => onVer(item.id)}
-                  >
-                    Ver / Editar
-                  </button>
-                </div>
+      {campos.length > 0 && (
+        <input
+          type="text"
+          placeholder={`Buscar en ${titulo.toLowerCase()}...`}
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="w-full p-2 mb-3 rounded text-black bg-white placeholder-gray-500"
+        />
+      )}
+      {campos.length > 0 ? (
+        <div className="bg-white text-black rounded max-h-64 overflow-y-auto">
+          {datos.length === 0 ? (
+            <div className="p-2 text-sm text-gray-600">No hay registros.</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] p-2 font-semibold text-sm bg-gray-200">
+                {encabezados.map((enc: string, i: number) => (
+                  <div key={i}>{enc}</div>
+                ))}
+                <div className="text-right pr-2">Acción</div>
               </div>
-            ))}
-          </>
-        )}
-      </div>
+
+              {datos.map((item: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] p-2 text-sm items-center border-t border-gray-200"
+                >
+                  {campos.map((campo: string, i: number) => {
+                    const valor = campo.split('.').reduce((acc, key) => acc?.[key], item) || '—';
+                    return <div key={i}>{valor}</div>;
+                  })}
+                  <div className="text-right">
+                    <button
+                      className="ml-2 text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800"
+                      onClick={() => onVer(item.id)}
+                    >
+                      Ver / Editar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="mt-4 flex justify-end">
+          <button
+            className="bg-white text-black px-4 py-2 rounded shadow hover:bg-gray-200 text-sm font-semibold"
+            onClick={() => onVer()}
+          >
+            Ver / Editar Ofertas
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -159,6 +180,17 @@ export default function DashboardPage() {
         busqueda={busquedaLeads}
         setBusqueda={setBusquedaLeads}
         onVer={(id: number) => router.push(`/dashboard/leads/${id}`)}
+      />
+
+      <Bloque
+        titulo="Ofertas Promocionales"
+        color="bg-fuchsia-600"
+        datos={ofertas}
+        campos={[]} // no mostramos tabla ni buscador aquí
+        encabezados={[]}
+        busqueda={''}
+        setBusqueda={() => {}}
+        onVer={() => router.push('/ofertas')}
       />
     </div>
   );

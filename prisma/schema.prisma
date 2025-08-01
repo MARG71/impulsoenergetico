@@ -186,3 +186,12 @@ model ConfiguracionGlobal {
   fondoCartelUrl  String
 }
 
+model Oferta {
+  id          Int      @id @default(autoincrement())
+  titulo      String
+  descripcion String
+  tipo        String   // 'luz' | 'gas' | 'telefonia'
+  destacada   Boolean  @default(false)
+  activa      Boolean  @default(true)
+  creadaEn    DateTime @default(now())
+}

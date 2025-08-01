@@ -60,6 +60,10 @@ export default function CRMLayout({
                 🖼️ Fondos Carteles
               </Link>
 
+              <Link href="/ofertas" className="hover:text-yellow-300 flex items-center gap-2">
+                📢 Ofertas
+              </Link>
+
               <Link href="/dashboard/historial" className="hover:text-yellow-300 flex items-center gap-2">
                 📂 Historial Comparativas
               </Link>
