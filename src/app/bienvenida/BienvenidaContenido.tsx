@@ -1,5 +1,5 @@
 'use client';
-
+import React from 'react'; // ✅ AÑADE ESTA LÍNEA
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight } from 'lucide-react';
