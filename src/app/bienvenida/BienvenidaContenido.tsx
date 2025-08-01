@@ -92,52 +92,54 @@ export default function BienvenidaContenido() {
         ))}
       </motion.div>
 
-<motion.p
-  initial={{ scale: 0.9, opacity: 0 }}
-  animate={{ scale: 1, opacity: 1 }}
-  transition={{ delay: 0.6, duration: 0.5 }}
-  className="text-center text-white text-base font-semibold bg-pink-600 px-4 py-2 rounded-xl shadow-lg animate-pulse mt-2 mb-8"
->
-  🔜 Más servicios próximamente disponibles
-</motion.p>
+      <motion.p
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+        className="text-center text-white text-base font-semibold bg-pink-600 px-4 py-2 rounded-xl shadow-lg animate-pulse mt-2 mb-8"
+      >
+        🔜 Más servicios próximamente disponibles
+      </motion.p>
 
-<h2 className="text-2xl font-semibold mb-4 text-gray-800">Ofertas Especiales</h2>
-<motion.div
-  initial={{ opacity: 0 }}
-  animate={{ opacity: 1 }}
-  transition={{ delay: 0.6 }}
-  className="w-full max-w-5xl mb-10"
->
-  <motion.div
-    className="overflow-hidden relative rounded-xl shadow-xl"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.8 }}
-  >
-    <motion.div
-      className="flex w-[300%] animate-slideCarousel"
-      style={{ animationDuration: '18s' }}
-    >
-      <div className="w-full sm:w-1/3 p-4 bg-green-100">
-        <h3 className="font-bold text-lg mb-2 text-green-800">💡 Ahorra hasta un 30% en tu factura de luz</h3>
-        <p className="text-gray-700 text-sm mb-2">Promoción válida hasta fin de mes. Consulta condiciones.</p>
-        <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm" onClick={() => window.location.href = '/comparador?seccion=luz'}>
-          Ir a la oferta
-        </button>
-      </div>
-      <div className="w-full sm:w-1/3 p-4 bg-orange-100">
-        <h3 className="font-bold text-lg mb-2 text-orange-800">🔥 Bono de bienvenida en tu alta de gas</h3>
-        <p className="text-gray-700 text-sm mb-2">Aprovecha esta oferta exclusiva para nuevos clientes.</p>
-        <button className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 text-sm" onClick={() => alert('Oferta de gas en construcción.')}>Ir a la oferta</button>
-      </div>
-      <div className="w-full sm:w-1/3 p-4 bg-blue-100">
-        <h3 className="font-bold text-lg mb-2 text-blue-800">📱 50% de descuento en tu tarifa móvil</h3>
-        <p className="text-gray-700 text-sm mb-2">Válido contratando desde nuestra plataforma.</p>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm" onClick={() => alert('Oferta de telefonía en construcción.')}>Ir a la oferta</button>
-      </div>
-    </motion.div>
-  </motion.div>
-</motion.div>
+      <h2 className="text-2xl font-semibold mb-4 text-gray-800">Ofertas Especiales</h2>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="carousel-container mb-10"
+      >
+        <motion.div
+          className="carousel-track animate-slideCarousel"
+          style={{ animationDuration: '18s' }}
+        >
+          <div className="oferta bg-green-100 text-green-800">
+            <h3>💡 Ahorra hasta un 30% en tu factura de luz</h3>
+            <p>Promoción válida hasta fin de mes. Consulta condiciones.</p>
+            <button
+              onClick={() =>
+                router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`)
+              }
+            >
+              Ir a la oferta
+            </button>
+          </div>
+          <div className="oferta bg-orange-100 text-orange-800">
+            <h3>🔥 Bono de bienvenida en tu alta de gas</h3>
+            <p>Aprovecha esta oferta exclusiva para nuevos clientes.</p>
+            <button onClick={() => alert('Oferta de gas en construcción.')}>
+              Ir a la oferta
+            </button>
+          </div>
+          <div className="oferta bg-blue-100 text-blue-800">
+            <h3>📱 50% de descuento en tu tarifa móvil</h3>
+            <p>Válido contratando desde nuestra plataforma.</p>
+            <button onClick={() => alert('Oferta de telefonía en construcción.')}>
+              Ir a la oferta
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
     </motion.div>
   );
 }
