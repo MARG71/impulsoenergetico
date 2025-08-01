@@ -80,6 +80,14 @@ export default function BienvenidaContenido() {
 
   const ofertaActual = ofertas[indiceOferta];
 
+  const handleClick = (seccion: string, ruta: string) => {
+    if (seccion === 'Luz') {
+      router.push(ruta);
+    } else {
+      alert('🔧 Esta sección está en construcción. Muy pronto estará disponible.');
+    }
+  };
+
   const avanzar = () => {
     setIndiceOferta((prev) => (prev + 1) % ofertas.length);
   };
