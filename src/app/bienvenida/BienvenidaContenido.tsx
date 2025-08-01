@@ -92,7 +92,16 @@ export default function BienvenidaContenido() {
         ))}
       </motion.div>
 
-      <h2 className="text-2xl font-semibold mb-4 text-gray-800">Ofertas Especiales</h2>
+<motion.p
+  initial={{ scale: 0.9, opacity: 0 }}
+  animate={{ scale: 1, opacity: 1 }}
+  transition={{ delay: 0.6, duration: 0.5 }}
+  className="text-center text-white text-base font-semibold bg-pink-600 px-4 py-2 rounded-xl shadow-lg animate-pulse mt-2 mb-8"
+>
+  🔜 Más servicios próximamente disponibles
+</motion.p>
+
+<h2 className="text-2xl font-semibold mb-4 text-gray-800">Ofertas Especiales</h2>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
