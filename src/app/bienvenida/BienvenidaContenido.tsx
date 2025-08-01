@@ -7,6 +7,14 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+type Oferta = {
+  id: number
+  titulo: string
+  descripcion: string
+  tipo: string
+  destacada: boolean
+}
+
 export default function BienvenidaContenido() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,8 +43,12 @@ export default function BienvenidaContenido() {
     },
   ];
 
-  const [ofertasDestacadas, setOfertasDestacadas] = useState([]);
-  const [ofertasPorTipo, setOfertasPorTipo] = useState({ luz: [], gas: [], telefonia: [] });
+  const [ofertasDestacadas, setOfertasDestacadas] = useState<Oferta[]>([]);
+  const [ofertasPorTipo, setOfertasPorTipo] = useState<{ luz: Oferta[]; gas: Oferta[]; telefonia: Oferta[] }>({
+    luz: [],
+    gas: [],
+    telefonia: [],
+  });
   const [indiceOferta, setIndiceOferta] = useState(0);
 
   useEffect(() => {
@@ -55,6 +67,7 @@ export default function BienvenidaContenido() {
   }, []);
 
   useEffect(() => {
+    if (ofertasDestacadas.length === 0) return;
     const intervalo = setInterval(() => {
       setIndiceOferta((prev) => (prev + 1) % ofertasDestacadas.length);
     }, 6000);
@@ -142,12 +155,12 @@ export default function BienvenidaContenido() {
               animate={{ opacity: 1 }}
               key={indiceOferta}
               transition={{ duration: 0.4 }}
-              className={`rounded-xl px-6 py-5 text-center bg-white shadow-md min-h-[160px]`}
+              className="rounded-xl px-6 py-5 text-center bg-white shadow-md min-h-[160px]"
             >
               <h3 className="text-base md:text-lg font-semibold mb-2 text-green-800">{ofertaActual.titulo}</h3>
               <p className="text-sm md:text-base mb-4 leading-relaxed text-gray-700">{ofertaActual.descripcion}</p>
               <button
-                onClick={() => alert('Más información disponible próximamente')}
+                onClick={() => alert("Más información disponible próximamente")}
                 className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition text-sm"
               >
                 Ir a la oferta
@@ -164,9 +177,7 @@ export default function BienvenidaContenido() {
             {ofertasDestacadas.map((_, i) => (
               <span
                 key={i}
-                className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${
-                  i === indiceOferta ? "bg-green-600 scale-125" : "bg-gray-300"
-                }`}
+                className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${i === indiceOferta ? "bg-green-600 scale-125" : "bg-gray-300"}`}
               />
             ))}
           </div>
@@ -180,17 +191,15 @@ export default function BienvenidaContenido() {
             ? "bg-green-500"
             : seccion === "gas"
             ? "bg-orange-500"
-            : seccion === "telefonia"
-            ? "bg-blue-600"
-            : "bg-gray-200";
+            : "bg-blue-600";
 
         return (
           <div key={seccion} className={`w-full max-w-5xl ${fondo} rounded-xl px-6 py-6 mb-6 text-white`}>
             <h3 className="text-xl font-bold mb-4 capitalize">Ofertas en {seccion}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {items.map((oferta: any, idx: number) => (
+              {items.map((oferta: Oferta) => (
                 <div
-                  key={idx}
+                  key={oferta.id}
                   className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700"
                 >
                   <p className="font-medium mb-2">{oferta.titulo}</p>
