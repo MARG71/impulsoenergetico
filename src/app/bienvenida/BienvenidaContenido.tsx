@@ -1,11 +1,12 @@
 'use client';
-import React from 'react'; // ✅ AÑADE ESTA LÍNEA
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import React from 'react';
 
 export default function BienvenidaContenido() {
   const router = useRouter();
@@ -44,13 +45,13 @@ export default function BienvenidaContenido() {
     },
     {
       titulo: '🔥 Bono de bienvenida en tu alta de gas',
-      descripcion: 'Aprovecha esta oferta exclusiva para nuevos clientes. ¡Incluye asesoramiento técnico y económico sin coste!',
+      descripcion: 'Oferta exclusiva para nuevos clientes con asesoramiento sin coste.',
       bg: 'bg-orange-100 text-orange-800',
       accion: () => alert('Oferta de gas en construcción.'),
     },
     {
       titulo: '📱 50% de descuento en tu tarifa móvil',
-      descripcion: 'Válido contratando desde nuestra plataforma con permanencia mínima de 6 meses.',
+      descripcion: 'Contrata desde nuestra plataforma con permanencia mínima de 6 meses.',
       bg: 'bg-blue-100 text-blue-800',
       accion: () => alert('Oferta de telefonía en construcción.'),
     },
@@ -62,7 +63,7 @@ export default function BienvenidaContenido() {
     },
     {
       titulo: '🌞 Bonificación por energía solar',
-      descripcion: 'Descuento adicional si tienes instalación fotovoltaica o estás en proceso de instalación. Promoción ecológica.',
+      descripcion: 'Descuento si tienes instalación fotovoltaica o estás en proceso.',
       bg: 'bg-yellow-100 text-yellow-800',
       accion: () => alert('Oferta solar en preparación.'),
     },
@@ -104,7 +105,7 @@ export default function BienvenidaContenido() {
     >
       <div className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center mb-4 px-4 gap-4">
         <Image
-          src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+          src="/LOGO%20DEFINITIVO%20IMPulso%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
           alt="Logo Impulso Energético"
           width={160}
           height={50}
@@ -125,21 +126,20 @@ export default function BienvenidaContenido() {
         Gracias por confiar en <strong>Impulso Energético</strong>. Elige el servicio que deseas comparar o consulta nuestras promociones exclusivas.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-5xl mb-6">
         {secciones.map((sec) => (
           <Card
             key={sec.nombre}
             onClick={() => handleClick(sec.nombre, sec.ruta)}
-            className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105`}
+            className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105 py-4`}
           >
-            <CardContent className="flex flex-col items-center py-6">
-              {React.cloneElement(sec.icono, { className: "w-8 h-8 text-yellow-100" })}
-              <span className="text-base md:text-lg font-medium mt-3">{sec.nombre}</span>
+            <CardContent className="flex flex-col items-center">
+              {React.cloneElement(sec.icono, { className: 'w-7 h-7 text-yellow-100' })}
+              <span className="text-sm md:text-base font-medium mt-3">{sec.nombre}</span>
             </CardContent>
           </Card>
         ))}
       </div>
-
 
       <p className="text-center text-white text-sm font-semibold bg-pink-600 px-4 py-1 rounded-xl shadow-lg animate-pulse mb-4">
         🔜 Más servicios próximamente disponibles
@@ -147,7 +147,7 @@ export default function BienvenidaContenido() {
 
       <h2 className="text-xl font-semibold mb-3 text-gray-800">Ofertas Especiales</h2>
 
-      {/* Carrusel de ofertas ajustable */}
+      {/* Carrusel Ofertas Destacadas */}
       <div className="relative mb-4 max-w-xl w-full">
         <motion.div
           initial={{ opacity: 0 }}
@@ -181,7 +181,7 @@ export default function BienvenidaContenido() {
       </div>
 
       {/* Indicadores */}
-      <div className="flex space-x-1 mb-4">
+      <div className="flex space-x-1 mb-10">
         {ofertas.map((_, i) => (
           <span
             key={i}
@@ -190,6 +190,36 @@ export default function BienvenidaContenido() {
             }`}
           />
         ))}
+      </div>
+
+      {/* NUEVA SECCIÓN DE OFERTAS POR SERVICIO */}
+      <div className="w-full bg-green-50 py-8 px-4">
+        <h3 className="text-lg font-bold text-green-800 mb-4">💡 Ofertas Luz</h3>
+        <div className="flex space-x-4 overflow-x-auto scrollbar-hide">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="min-w-[220px] bg-white p-4 rounded-xl shadow hover:shadow-md transition"
+            >
+              <h4 className="font-semibold text-sm mb-2 text-green-700">Oferta {i}</h4>
+              <p className="text-xs text-gray-600 mb-2">Detalles específicos de la oferta {i} sobre ahorro eléctrico.</p>
+              <button
+                onClick={() => router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`)}
+                className="text-white bg-green-600 px-3 py-1 rounded text-xs hover:bg-green-700"
+              >
+                Ver más
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="text-right mt-3">
+          <button
+            onClick={() => router.push(`/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`)}
+            className="text-green-700 underline text-sm hover:text-green-900"
+          >
+            Ver todas las ofertas de luz →
+          </button>
+        </div>
       </div>
     </motion.div>
   );
