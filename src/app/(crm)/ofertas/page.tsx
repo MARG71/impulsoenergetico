@@ -1,12 +1,9 @@
-'use client' // 👈 IMPORTANTE
+import dynamic from 'next/dynamic'
 
-import { Suspense } from 'react'
-import GestionOfertasContenido from './GestionOfertasContenido'
+const GestionOfertasContenido = dynamic(() => import('./GestionOfertasContenido'), {
+  ssr: false, // ⛔ Evita que Next.js intente prerenderizar y falle por useSession
+})
 
 export default function Page() {
-  return (
-    <Suspense fallback={<div>Cargando ofertas...</div>}>
-      <GestionOfertasContenido />
-    </Suspense>
-  )
+  return <GestionOfertasContenido />
 }
