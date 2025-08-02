@@ -16,16 +16,20 @@ type Oferta = {
 }
 
 export default function GestionOfertasContenido() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const esAdmin = session?.user?.role === 'ADMIN'
 
   const [ofertas, setOfertas] = useState<Oferta[]>([])
   const [form, setForm] = useState({ titulo: '', descripcion: '', tipo: 'luz', destacada: false })
 
   const cargarOfertas = async () => {
-    const res = await fetch('/api/ofertas')
-    const data = await res.json()
-    setOfertas(data)
+    try {
+      const res = await fetch('/api/ofertas')
+      const data = await res.json()
+      setOfertas(data)
+    } catch (error) {
+      console.error('Error cargando ofertas:', error)
+    }
   }
 
   const crearOferta = async () => {
@@ -45,8 +49,10 @@ export default function GestionOfertasContenido() {
   }
 
   useEffect(() => {
-    cargarOfertas()
-  }, [])
+    if (status === 'authenticated') {
+      cargarOfertas()
+    }
+  }, [status])
 
   const obtenerIcono = (tipo: string) =>
     tipo === 'luz' ? <Sparkles className="w-4 h-4 inline mr-1" /> :
@@ -57,6 +63,14 @@ export default function GestionOfertasContenido() {
     tipo === 'luz' ? 'bg-green-100 text-green-800' :
     tipo === 'gas' ? 'bg-orange-100 text-orange-800' :
     'bg-blue-100 text-blue-800'
+
+  if (status === 'loading') {
+    return <div className="p-6 text-white">Cargando...</div>
+  }
+
+  if (!session) {
+    return <div className="p-6 text-white">Acceso restringido. Por favor inicia sesión.</div>
+  }
 
   return (
     <div className="p-6 space-y-6">
