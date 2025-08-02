@@ -1,16 +1,9 @@
-'use client'
-
-import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-
-// Import dinámico del componente cliente
-const GestionOfertasContenido = dynamic(() => import('./GestionOfertasContenido'), {
-  ssr: false, // Esto sigue siendo necesario para evitar prerender
-})
+import GestionOfertasContenido from './GestionOfertasContenido'
 
 export default function Page() {
   return (
-    <Suspense fallback={<div>Cargando ofertas...</div>}>
+    <Suspense fallback={<div className="p-6 text-white">Cargando ofertas...</div>}>
       <GestionOfertasContenido />
     </Suspense>
   )
