@@ -5,22 +5,13 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
-// ✅ Tipado de Oferta
-type Oferta = {
-  id: number
-  titulo: string
-  descripcion: string
-  tipo: string
-  destacada: boolean
-}
-
 export default function GestionOfertasContenido() {
-  const [ofertas, setOfertas] = useState<Oferta[]>([]) // ✅ Estado tipado
+  const [ofertas, setOfertas] = useState<any[]>([])
   const [form, setForm] = useState({
     titulo: '',
     descripcion: '',
     tipo: 'luz',
-    destacada: false,
+    destacada: false
   })
 
   const cargarOfertas = async () => {
@@ -44,16 +35,18 @@ export default function GestionOfertasContenido() {
   }, [])
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Gestión de Ofertas</h1>
+    <div className="p-6 space-y-8">
+      <h1 className="text-2xl font-bold text-white">Gestión de Ofertas</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-6 rounded-xl shadow">
         <Input
+          className="border border-gray-300 text-black"
           placeholder="Título"
           value={form.titulo}
           onChange={(e) => setForm({ ...form, titulo: e.target.value })}
         />
         <Input
+          className="border border-gray-300 text-black"
           placeholder="Descripción"
           value={form.descripcion}
           onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
@@ -61,21 +54,25 @@ export default function GestionOfertasContenido() {
         <select
           value={form.tipo}
           onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-          className="border rounded p-2"
+          className="border border-gray-300 rounded p-2 text-black"
         >
           <option value="luz">Luz</option>
           <option value="gas">Gas</option>
           <option value="telefonia">Telefonía</option>
         </select>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-black">
           <input
             type="checkbox"
             checked={form.destacada}
             onChange={(e) => setForm({ ...form, destacada: e.target.checked })}
           />
-          Destacada (carrusel)
+          Destacar en carrusel
         </label>
-        <Button onClick={crearOferta}>Crear Oferta</Button>
+        <div className="md:col-span-2">
+          <Button onClick={crearOferta} className="w-full">
+            Crear Oferta
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
