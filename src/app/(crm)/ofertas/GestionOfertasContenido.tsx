@@ -1,18 +1,26 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Sparkles, Flame, Phone, Trash2, Pencil } from 'lucide-react'
+
+type Oferta = {
+  id: number
+  titulo: string
+  descripcion: string
+  tipo: 'luz' | 'gas' | 'telefonia'
+  destacada: boolean
+}
 
 export default function GestionOfertasContenido() {
-  const [ofertas, setOfertas] = useState<any[]>([])
-  const [form, setForm] = useState({
-    titulo: '',
-    descripcion: '',
-    tipo: 'luz',
-    destacada: false
-  })
+  const { data: session } = useSession()
+  const esAdmin = session?.user?.role === 'ADMIN'
+
+  const [ofertas, setOfertas] = useState<Oferta[]>([])
+  const [form, setForm] = useState({ titulo: '', descripcion: '', tipo: 'luz', destacada: false })
 
   const cargarOfertas = async () => {
     const res = await fetch('/api/ofertas')
@@ -30,61 +38,105 @@ export default function GestionOfertasContenido() {
     cargarOfertas()
   }
 
+  const eliminarOferta = async (id: number) => {
+    if (!confirm('¿Seguro que deseas eliminar esta oferta?')) return
+    await fetch(`/api/ofertas?id=${id}`, { method: 'DELETE' })
+    cargarOfertas()
+  }
+
   useEffect(() => {
     cargarOfertas()
   }, [])
 
+  const obtenerIcono = (tipo: string) =>
+    tipo === 'luz' ? <Sparkles className="w-4 h-4 inline mr-1" /> :
+    tipo === 'gas' ? <Flame className="w-4 h-4 inline mr-1" /> :
+    <Phone className="w-4 h-4 inline mr-1" />
+
+  const colorEtiqueta = (tipo: string) =>
+    tipo === 'luz' ? 'bg-green-100 text-green-800' :
+    tipo === 'gas' ? 'bg-orange-100 text-orange-800' :
+    'bg-blue-100 text-blue-800'
+
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-white">Gestión de Ofertas</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-6 rounded-xl shadow">
-        <Input
-          className="border border-gray-300 text-black"
-          placeholder="Título"
-          value={form.titulo}
-          onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-        />
-        <Input
-          className="border border-gray-300 text-black"
-          placeholder="Descripción"
-          value={form.descripcion}
-          onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-        />
-        <select
-          value={form.tipo}
-          onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-          className="border border-gray-300 rounded p-2 text-black"
-        >
-          <option value="luz">Luz</option>
-          <option value="gas">Gas</option>
-          <option value="telefonia">Telefonía</option>
-        </select>
-        <label className="flex items-center gap-2 text-black">
-          <input
-            type="checkbox"
-            checked={form.destacada}
-            onChange={(e) => setForm({ ...form, destacada: e.target.checked })}
+      {esAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow">
+          <Input
+            placeholder="Título"
+            value={form.titulo}
+            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
           />
-          Destacar en carrusel
-        </label>
-        <div className="md:col-span-2">
-          <Button onClick={crearOferta} className="w-full">
+          <Input
+            placeholder="Descripción"
+            value={form.descripcion}
+            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+          />
+          <select
+            value={form.tipo}
+            onChange={(e) => setForm({ ...form, tipo: e.target.value as any })}
+            className="border rounded p-2"
+          >
+            <option value="luz">Luz</option>
+            <option value="gas">Gas</option>
+            <option value="telefonia">Telefonía</option>
+          </select>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.destacada}
+              onChange={(e) => setForm({ ...form, destacada: e.target.checked })}
+            />
+            Destacada (carrusel)
+          </label>
+          <Button onClick={crearOferta} className="w-full col-span-2 bg-green-600 hover:bg-green-700 text-white">
             Crear Oferta
           </Button>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {ofertas.map((oferta) => (
-          <Card key={oferta.id} className="bg-blue-50">
+          <Card key={oferta.id} className="bg-white shadow-md">
             <CardContent className="p-4">
-              <h3 className="font-semibold">{oferta.titulo}</h3>
-              <p className="text-sm text-gray-700">{oferta.descripcion}</p>
-              <p className="mt-2 text-xs italic">Tipo: {oferta.tipo}</p>
+              <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(oferta.tipo)}`}>
+                {obtenerIcono(oferta.tipo)}
+                {oferta.tipo.toUpperCase()}
+              </div>
+              <h3 className="font-semibold text-gray-800 mb-1">{oferta.titulo}</h3>
+              <p className="text-sm text-gray-600">{oferta.descripcion}</p>
               {oferta.destacada && (
-                <span className="text-orange-600 font-bold text-sm">⭐ Destacada</span>
+                <div className="mt-2 text-orange-600 font-bold text-sm">⭐ Destacada</div>
               )}
+
+              <div className="mt-4 flex gap-2">
+                <Button
+                  onClick={() => alert('Más información disponible próximamente')}
+                  className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
+                >
+                  Ir a la oferta
+                </Button>
+                {esAdmin && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
+                      onClick={() => alert('Función de edición en desarrollo')}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
+                      onClick={() => eliminarOferta(oferta.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}
