@@ -1,3 +1,5 @@
+'use client' // 👈 IMPORTANTE
+
 import { Suspense } from 'react'
 import GestionOfertasContenido from './GestionOfertasContenido'
 
