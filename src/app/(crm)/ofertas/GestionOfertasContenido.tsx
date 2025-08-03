@@ -15,6 +15,22 @@ type Oferta = {
   destacada: boolean
 }
 
+const fondoPorTipo: Record<string, string> = {
+  luz: 'bg-[#d3fce3]',
+  gas: 'bg-[#ffe9d6]',
+  telefonia: 'bg-[#e3edff]',
+}
+
+const colorEtiqueta = (tipo: string) =>
+  tipo === 'luz' ? 'bg-green-100 text-green-800' :
+  tipo === 'gas' ? 'bg-orange-100 text-orange-800' :
+  'bg-blue-100 text-blue-800'
+
+const obtenerIcono = (tipo: string) =>
+  tipo === 'luz' ? <Sparkles className="w-4 h-4 inline mr-1" /> :
+  tipo === 'gas' ? <Flame className="w-4 h-4 inline mr-1" /> :
+  <Phone className="w-4 h-4 inline mr-1" />
+
 export default function GestionOfertasContenido() {
   const { data: session, status } = useSession()
   const esAdmin = session?.user?.role === 'ADMIN'
@@ -53,16 +69,6 @@ export default function GestionOfertasContenido() {
       cargarOfertas()
     }
   }, [status])
-
-  const obtenerIcono = (tipo: string) =>
-    tipo === 'luz' ? <Sparkles className="w-4 h-4 inline mr-1" /> :
-    tipo === 'gas' ? <Flame className="w-4 h-4 inline mr-1" /> :
-    <Phone className="w-4 h-4 inline mr-1" />
-
-  const colorEtiqueta = (tipo: string) =>
-    tipo === 'luz' ? 'bg-green-100 text-green-800' :
-    tipo === 'gas' ? 'bg-orange-100 text-orange-800' :
-    'bg-blue-100 text-blue-800'
 
   if (status === 'loading') {
     return <div className="p-6 text-white">Cargando...</div>
@@ -112,49 +118,56 @@ export default function GestionOfertasContenido() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {ofertas.map((oferta) => (
-          <Card key={oferta.id} className="bg-white shadow-md">
-            <CardContent className="p-4">
-              <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(oferta.tipo)}`}>
-                {obtenerIcono(oferta.tipo)}
-                {oferta.tipo.toUpperCase()}
-              </div>
-              <h3 className="font-semibold text-gray-800 mb-1">{oferta.titulo}</h3>
-              <p className="text-sm text-gray-600">{oferta.descripcion}</p>
-              {oferta.destacada && (
-                <div className="mt-2 text-orange-600 font-bold text-sm">⭐ Destacada</div>
-              )}
+        {ofertas.map((oferta) => {
+          const tipo = oferta.tipo.toLowerCase()
+          return (
+            <Card key={oferta.id} className={`${fondoPorTipo[tipo]} shadow-md rounded-2xl text-black`}>
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div>
+                  <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(tipo)}`}>
+                    {obtenerIcono(tipo)}
+                    {tipo.toUpperCase()}
+                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
+                  <p className="text-sm text-gray-800">{oferta.descripcion}</p>
+                  {oferta.destacada && (
+                    <div className="mt-2 text-orange-600 font-bold text-sm">⭐ Destacada</div>
+                  )}
+                </div>
 
-              <div className="mt-4 flex gap-2">
-                <Button
-                  onClick={() => alert('Más información disponible próximamente')}
-                  className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
-                >
-                  Ir a la oferta
-                </Button>
-                {esAdmin && (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
-                      onClick={() => alert('Función de edición en desarrollo')}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
-                      onClick={() => eliminarOferta(oferta.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="mt-4 flex gap-2">
+                  <Button
+                    onClick={() => alert('Más información disponible próximamente')}
+                    className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
+                  >
+                    Ir a la oferta
+                  </Button>
+                  {esAdmin && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
+                        onClick={() => alert('Función de edición en desarrollo')}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
+                        onClick={() => eliminarOferta(oferta.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </div>
   )
 }
+
+
