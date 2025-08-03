@@ -11,8 +11,10 @@ type Oferta = {
   id: number
   titulo: string
   descripcion: string
+  descripcionCorta: string
   tipo: 'luz' | 'gas' | 'telefonia'
   destacada: boolean
+  activa: boolean
 }
 
 const fondoPorTipo: Record<string, string> = {
@@ -36,7 +38,14 @@ export default function GestionOfertasContenido() {
   const esAdmin = session?.user?.role === 'ADMIN'
 
   const [ofertas, setOfertas] = useState<Oferta[]>([])
-  const [form, setForm] = useState({ titulo: '', descripcion: '', tipo: 'luz', destacada: false })
+  const [form, setForm] = useState({
+    titulo: '',
+    descripcion: '',
+    descripcionCorta: '',
+    tipo: 'luz',
+    destacada: false,
+    activa: true,
+  })
 
   const cargarOfertas = async () => {
     try {
@@ -54,7 +63,14 @@ export default function GestionOfertasContenido() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })
-    setForm({ titulo: '', descripcion: '', tipo: 'luz', destacada: false })
+    setForm({
+      titulo: '',
+      descripcion: '',
+      descripcionCorta: '',
+      tipo: 'luz',
+      destacada: false,
+      activa: true,
+    })
     cargarOfertas()
   }
 
@@ -70,20 +86,15 @@ export default function GestionOfertasContenido() {
     }
   }, [status])
 
-  if (status === 'loading') {
-    return <div className="p-6 text-white">Cargando...</div>
-  }
-
-  if (!session) {
-    return <div className="p-6 text-white">Acceso restringido. Por favor inicia sesión.</div>
-  }
+  if (status === 'loading') return <div className="p-6 text-white">Cargando...</div>
+  if (!session) return <div className="p-6 text-white">Acceso restringido. Por favor inicia sesión.</div>
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-white">Gestión de Ofertas</h1>
 
       {esAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow text-black">
           <Input
             placeholder="Título"
             value={form.titulo}
@@ -94,16 +105,21 @@ export default function GestionOfertasContenido() {
             value={form.descripcion}
             onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
           />
+          <Input
+            placeholder="Descripción Corta"
+            value={form.descripcionCorta}
+            onChange={(e) => setForm({ ...form, descripcionCorta: e.target.value })}
+          />
           <select
             value={form.tipo}
             onChange={(e) => setForm({ ...form, tipo: e.target.value as any })}
-            className="border rounded p-2"
+            className="border rounded p-2 bg-white text-black"
           >
             <option value="luz">Luz</option>
             <option value="gas">Gas</option>
             <option value="telefonia">Telefonía</option>
           </select>
-          <label className="flex items-center gap-2">
+          <label className="flex items-center gap-2 col-span-2">
             <input
               type="checkbox"
               checked={form.destacada}
@@ -111,7 +127,18 @@ export default function GestionOfertasContenido() {
             />
             Destacada (carrusel)
           </label>
-          <Button onClick={crearOferta} className="w-full col-span-2 bg-green-600 hover:bg-green-700 text-white">
+          <label className="flex items-center gap-2 col-span-2">
+            <input
+              type="checkbox"
+              checked={form.activa}
+              onChange={(e) => setForm({ ...form, activa: e.target.checked })}
+            />
+            Oferta Activa
+          </label>
+          <Button
+            onClick={crearOferta}
+            className="w-full col-span-2 bg-green-600 hover:bg-green-700 text-white"
+          >
             Crear Oferta
           </Button>
         </div>
@@ -129,12 +156,10 @@ export default function GestionOfertasContenido() {
                     {tipo.toUpperCase()}
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
-                  <p className="text-sm text-gray-800">{oferta.descripcion}</p>
-                  {oferta.destacada && (
-                    <div className="mt-2 text-orange-600 font-bold text-sm">⭐ Destacada</div>
-                  )}
+                  <p className="text-sm text-gray-800">{oferta.descripcionCorta || oferta.descripcion}</p>
+                  {oferta.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
+                  {!oferta.activa && <div className="text-red-600 text-sm font-bold">❌ Inactiva</div>}
                 </div>
-
                 <div className="mt-4 flex gap-2">
                   <Button
                     onClick={() => alert('Más información disponible próximamente')}
