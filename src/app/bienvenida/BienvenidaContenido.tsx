@@ -8,12 +8,14 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 
 type Oferta = {
-  id: number
-  titulo: string
-  descripcion: string
-  tipo: string
-  destacada: boolean
-}
+  id: number;
+  titulo: string;
+  descripcion: string;
+  descripcionLarga?: string;
+  tipo: string;
+  destacada: boolean;
+  activa?: boolean;
+};
 
 export default function BienvenidaContenido() {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function BienvenidaContenido() {
   const nombre = searchParams.get("nombre") || "";
   const agenteId = searchParams.get("agenteId") || "";
   const lugarId = searchParams.get("lugarId") || "";
+  const [filtro, setFiltro] = useState("");
 
   const secciones = [
     {
@@ -184,6 +187,17 @@ export default function BienvenidaContenido() {
         </div>
       )}
 
+      {/* Buscador general */}
+      <div className="w-full max-w-5xl mb-4">
+        <input
+          type="text"
+          placeholder="🔍 Buscar ofertas por título, descripción..."
+          className="w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+        />
+      </div>
+
       {/* Ofertas por sección */}
       {Object.entries(ofertasPorTipo).map(([seccion, items]) => {
         const fondo =
@@ -197,26 +211,45 @@ export default function BienvenidaContenido() {
           <div key={seccion} className={`w-full max-w-5xl ${fondo} rounded-xl px-6 py-6 mb-6 text-white`}>
             <h3 className="text-xl font-bold mb-4 capitalize">Ofertas en {seccion}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {items.map((oferta: Oferta) => (
-                <div
-                  key={oferta.id}
-                  className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700"
-                >
-                  <p className="font-medium mb-2">{oferta.titulo}</p>
-                  <button
-                    className={`text-white px-3 py-1 rounded text-xs font-semibold transition ${
-                      seccion === "luz"
-                        ? "bg-green-600 hover:bg-green-700"
-                        : seccion === "gas"
-                        ? "bg-orange-500 hover:bg-orange-600"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                    onClick={() => alert("Más información próximamente")}
+              {items
+                .filter((oferta) =>
+                  [oferta.titulo, oferta.descripcion, oferta.descripcionLarga]
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(filtro.toLowerCase())
+                )
+                .map((oferta) => (
+                  <div
+                    key={oferta.id}
+                    className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700"
                   >
-                    Ver más
-                  </button>
-                </div>
-              ))}
+                    <p className="font-bold text-lg text-black mb-1">{oferta.titulo}</p>
+                    <p className="text-sm text-gray-600 mb-2">{oferta.descripcion}</p>
+                    <p className="text-xs italic text-gray-500 mb-2">{oferta.descripcionLarga}</p>
+                    {oferta.destacada && (
+                      <span className="inline-block text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded mb-2">
+                        ⭐ Oferta destacada
+                      </span>
+                    )}
+                    {!oferta.activa && (
+                      <span className="inline-block text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded mb-2">
+                        🔒 Inactiva
+                      </span>
+                    )}
+                    <button
+                      className={`text-white px-3 py-1 rounded text-xs font-semibold transition ${
+                        seccion === "luz"
+                          ? "bg-green-600 hover:bg-green-700"
+                          : seccion === "gas"
+                          ? "bg-orange-500 hover:bg-orange-600"
+                          : "bg-blue-600 hover:bg-blue-700"
+                      }`}
+                      onClick={() => alert("Más información próximamente")}
+                    >
+                      Ver más
+                    </button>
+                  </div>
+                ))}
             </div>
           </div>
         );
