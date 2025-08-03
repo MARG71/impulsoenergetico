@@ -188,15 +188,20 @@ export default function BienvenidaContenido() {
       )}
 
       {/* Buscador general */}
-      <div className="w-full max-w-5xl mb-4">
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        className="w-full max-w-5xl mb-4"
+      >
         <input
           type="text"
           placeholder="🔍 Buscar ofertas por título, descripción..."
-          className="w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          className="w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-black placeholder-gray-500"
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
         />
-      </div>
+      </form>
+
+
 
       {/* Ofertas por sección */}
       {Object.entries(ofertasPorTipo).map(([seccion, items]) => {
@@ -211,6 +216,7 @@ export default function BienvenidaContenido() {
           <div key={seccion} className={`w-full max-w-5xl ${fondo} rounded-xl px-6 py-6 mb-6 text-white`}>
             <h3 className="text-xl font-bold mb-4 capitalize">Ofertas en {seccion}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              
               {items
                 .filter((oferta) =>
                   [oferta.titulo, oferta.descripcion, oferta.descripcionLarga]
@@ -219,10 +225,7 @@ export default function BienvenidaContenido() {
                     .includes(filtro.toLowerCase())
                 )
                 .map((oferta) => (
-                  <div
-                    key={oferta.id}
-                    className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700"
-                  >
+                  <div key={oferta.id} className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700">
                     <p className="font-bold text-lg text-black mb-1">{oferta.titulo}</p>
                     <p className="text-sm text-gray-600 mb-2">{oferta.descripcion}</p>
                     <p className="text-xs italic text-gray-500 mb-2">{oferta.descripcionLarga}</p>
@@ -250,6 +253,18 @@ export default function BienvenidaContenido() {
                     </button>
                   </div>
                 ))}
+
+              {items.filter((oferta) =>
+                [oferta.titulo, oferta.descripcion, oferta.descripcionLarga]
+                  .join(" ")
+                  .toLowerCase()
+                  .includes(filtro.toLowerCase())
+              ).length === 0 && (
+                <div className="col-span-full text-center text-white text-sm italic mt-2">
+                  ❌ No se encontraron ofertas para tu búsqueda.
+                </div>
+              )}
+  
             </div>
           </div>
         );
@@ -257,3 +272,5 @@ export default function BienvenidaContenido() {
     </motion.div>
   );
 }
+
+
