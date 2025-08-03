@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [busquedaAgentes, setBusquedaAgentes] = useState('')
   const [busquedaLugares, setBusquedaLugares] = useState('')
   const [busquedaLeads, setBusquedaLeads] = useState('')
+  const [busquedaOfertas, setBusquedaOfertas] = useState('') // NUEVO buscador para Ofertas
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -65,6 +66,7 @@ export default function DashboardPage() {
   const agentesFiltrados = filtrar(agentes, ['nombre', 'email', 'telefono'], busquedaAgentes)
   const lugaresFiltrados = filtrar(lugares, ['nombre', 'direccion', 'agente.nombre'], busquedaLugares)
   const leadsFiltrados = filtrar(leads, ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'], busquedaLeads)
+  const ofertasFiltradas = filtrar(ofertas, ['titulo', 'tipo', 'descripcion', 'descripcionCorta'], busquedaOfertas)
 
   const Bloque = ({ titulo, color, datos, campos, encabezados, busqueda, setBusqueda, onVer }: any) => (
     <div className={`${color} text-white p-4 rounded shadow-md mb-6 w-full`}>
@@ -183,12 +185,12 @@ export default function DashboardPage() {
         <Bloque
           titulo="Ofertas Promocionales"
           color="bg-fuchsia-600"
-          datos={ofertas}
-          campos={[]} // no mostramos tabla ni buscador aquí
-          encabezados={[]}
-          busqueda={''}
-          setBusqueda={() => {}}
-          onVer={() => router.push('/ofertas')}
+          datos={ofertasFiltradas}
+          campos={['titulo', 'tipo', 'descripcionCorta', 'activa']}
+          encabezados={['Título', 'Tipo', 'Descripción', 'Activa']}
+          busqueda={busquedaOfertas}
+          setBusqueda={setBusquedaOfertas}
+          onVer={(id: number) => router.push(`/dashboard/ofertas/${id}`)}
         />
       </div>
     </CRMClienteLayout>
