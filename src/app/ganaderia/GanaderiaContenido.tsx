@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Tractor, EggFried, Cheese, Milk } from "lucide-react";
+import { Tractor, EggFried, Milk, Package } from "lucide-react";
+
 
 const productos = [
   {
@@ -18,9 +19,9 @@ const productos = [
   },
   {
     nombre: "Lácteos y quesos",
-    icono: <Cheese className="w-8 h-8 text-white" />,
+    icono: <Package className="w-8 h-8 text-white" />,
     color: "bg-yellow-600",
-  },
+    },
   {
     nombre: "Suministros veterinarios",
     icono: <Milk className="w-8 h-8 text-white" />,
