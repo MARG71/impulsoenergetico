@@ -1,21 +1,22 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import CRMClienteLayout from '../CRMClienteLayout'
 
 export default function DashboardPage() {
-  const router = useRouter();
+  const router = useRouter()
 
-  const [comparativas, setComparativas] = useState<any[]>([]);
-  const [agentes, setAgentes] = useState<any[]>([]);
-  const [lugares, setLugares] = useState<any[]>([]);
-  const [leads, setLeads] = useState<any[]>([]);
-  const [ofertas, setOfertas] = useState<any[]>([]);
+  const [comparativas, setComparativas] = useState<any[]>([])
+  const [agentes, setAgentes] = useState<any[]>([])
+  const [lugares, setLugares] = useState<any[]>([])
+  const [leads, setLeads] = useState<any[]>([])
+  const [ofertas, setOfertas] = useState<any[]>([])
 
-  const [busquedaComparativas, setBusquedaComparativas] = useState('');
-  const [busquedaAgentes, setBusquedaAgentes] = useState('');
-  const [busquedaLugares, setBusquedaLugares] = useState('');
-  const [busquedaLeads, setBusquedaLeads] = useState('');
+  const [busquedaComparativas, setBusquedaComparativas] = useState('')
+  const [busquedaAgentes, setBusquedaAgentes] = useState('')
+  const [busquedaLugares, setBusquedaLugares] = useState('')
+  const [busquedaLeads, setBusquedaLeads] = useState('')
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -26,25 +27,25 @@ export default function DashboardPage() {
           fetch('/api/lugares'),
           fetch('/api/leads'),
           fetch('/api/ofertas'),
-        ]);
+        ])
         const [dataC, dataA, dataL, dataLeads, dataOfertas] = await Promise.all([
           resC.json(),
           resA.json(),
           resL.json(),
           resLeads.json(),
           resOfertas.json(),
-        ]);
-        setComparativas(Array.isArray(dataC) ? dataC : []);
-        setAgentes(Array.isArray(dataA) ? dataA : []);
-        setLugares(Array.isArray(dataL) ? dataL : []);
-        setLeads(Array.isArray(dataLeads) ? dataLeads : []);
-        setOfertas(Array.isArray(dataOfertas) ? dataOfertas : []);
+        ])
+        setComparativas(Array.isArray(dataC) ? dataC : [])
+        setAgentes(Array.isArray(dataA) ? dataA : [])
+        setLugares(Array.isArray(dataL) ? dataL : [])
+        setLeads(Array.isArray(dataLeads) ? dataLeads : [])
+        setOfertas(Array.isArray(dataOfertas) ? dataOfertas : [])
       } catch (err) {
-        console.error('Error cargando datos:', err);
+        console.error('Error cargando datos:', err)
       }
-    };
-    cargarDatos();
-  }, []);
+    }
+    cargarDatos()
+  }, [])
 
   const filtrar = (array: any[], campos: string[], busqueda: string) => {
     return array.filter((item) =>
@@ -53,21 +54,17 @@ export default function DashboardPage() {
         .join(' ')
         .toLowerCase()
         .includes(busqueda.toLowerCase())
-    );
-  };
+    )
+  }
 
   const comparativasFiltradas = filtrar(
     comparativas,
     ['cliente.nombre', 'nombreTarifa', 'tipoTarifa', 'agente.nombre'],
     busquedaComparativas
-  );
-  const agentesFiltrados = filtrar(agentes, ['nombre', 'email', 'telefono'], busquedaAgentes);
-  const lugaresFiltrados = filtrar(lugares, ['nombre', 'direccion', 'agente.nombre'], busquedaLugares);
-  const leadsFiltrados = filtrar(
-    leads,
-    ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'],
-    busquedaLeads
-  );
+  )
+  const agentesFiltrados = filtrar(agentes, ['nombre', 'email', 'telefono'], busquedaAgentes)
+  const lugaresFiltrados = filtrar(lugares, ['nombre', 'direccion', 'agente.nombre'], busquedaLugares)
+  const leadsFiltrados = filtrar(leads, ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'], busquedaLeads)
 
   const Bloque = ({ titulo, color, datos, campos, encabezados, busqueda, setBusqueda, onVer }: any) => (
     <div className={`${color} text-white p-4 rounded shadow-md mb-6 w-full`}>
@@ -103,8 +100,8 @@ export default function DashboardPage() {
                   className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] p-2 text-sm items-center border-t border-gray-200"
                 >
                   {campos.map((campo: string, i: number) => {
-                    const valor = campo.split('.').reduce((acc, key) => acc?.[key], item) || '—';
-                    return <div key={i}>{valor}</div>;
+                    const valor = campo.split('.').reduce((acc, key) => acc?.[key], item) || '—'
+                    return <div key={i}>{valor}</div>
                   })}
                   <div className="text-right">
                     <button
@@ -130,68 +127,70 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
-  );
+  )
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-center text-blue-900 mb-6">
-        Panel de Administración IMPULSO ENERGÉTICO
-      </h1>
+    <CRMClienteLayout>
+      <div className="p-6 max-w-7xl mx-auto">
+        <h1 className="text-2xl font-bold text-center text-blue-900 mb-6">
+          Panel de Administración IMPULSO ENERGÉTICO
+        </h1>
 
-      <Bloque
-        titulo="Comparativas de Luz"
-        color="bg-orange-500"
-        datos={comparativasFiltradas}
-        campos={['cliente.nombre', 'nombreTarifa', 'tipoTarifa', 'agente.nombre']}
-        encabezados={['Cliente', 'Tarifa', 'Tipo', 'Agente']}
-        busqueda={busquedaComparativas}
-        setBusqueda={setBusquedaComparativas}
-        onVer={(id: number) => router.push(`/dashboard/comparativas/${id}`)}
-      />
+        <Bloque
+          titulo="Comparativas de Luz"
+          color="bg-orange-500"
+          datos={comparativasFiltradas}
+          campos={['cliente.nombre', 'nombreTarifa', 'tipoTarifa', 'agente.nombre']}
+          encabezados={['Cliente', 'Tarifa', 'Tipo', 'Agente']}
+          busqueda={busquedaComparativas}
+          setBusqueda={setBusquedaComparativas}
+          onVer={(id: number) => router.push(`/dashboard/comparativas/${id}`)}
+        />
 
-      <Bloque
-        titulo="Agentes IMPULSO ENERGÉTICO"
-        color="bg-blue-800"
-        datos={agentesFiltrados}
-        campos={['nombre', 'email', 'telefono']}
-        encabezados={['Nombre', 'Email', 'Teléfono']}
-        busqueda={busquedaAgentes}
-        setBusqueda={setBusquedaAgentes}
-        onVer={(id: number) => router.push(`/dashboard/agentes/${id}`)}
-      />
+        <Bloque
+          titulo="Agentes IMPULSO ENERGÉTICO"
+          color="bg-blue-800"
+          datos={agentesFiltrados}
+          campos={['nombre', 'email', 'telefono']}
+          encabezados={['Nombre', 'Email', 'Teléfono']}
+          busqueda={busquedaAgentes}
+          setBusqueda={setBusquedaAgentes}
+          onVer={(id: number) => router.push(`/dashboard/agentes/${id}`)}
+        />
 
-      <Bloque
-        titulo="Lugares CLIENTES ASOCIADOS"
-        color="bg-lime-500"
-        datos={lugaresFiltrados}
-        campos={['nombre', 'direccion', 'agente.nombre']}
-        encabezados={['Nombre', 'Dirección', 'Agente']}
-        busqueda={busquedaLugares}
-        setBusqueda={setBusquedaLugares}
-        onVer={(id: number) => router.push(`/dashboard/lugares/${id}`)}
-      />
+        <Bloque
+          titulo="Lugares CLIENTES ASOCIADOS"
+          color="bg-lime-500"
+          datos={lugaresFiltrados}
+          campos={['nombre', 'direccion', 'agente.nombre']}
+          encabezados={['Nombre', 'Dirección', 'Agente']}
+          busqueda={busquedaLugares}
+          setBusqueda={setBusquedaLugares}
+          onVer={(id: number) => router.push(`/dashboard/lugares/${id}`)}
+        />
 
-      <Bloque
-        titulo="Leads Registrados"
-        color="bg-teal-600"
-        datos={leadsFiltrados}
-        campos={['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre']}
-        encabezados={['Nombre', 'Email', 'Teléfono', 'Agente', 'Lugar']}
-        busqueda={busquedaLeads}
-        setBusqueda={setBusquedaLeads}
-        onVer={(id: number) => router.push(`/dashboard/leads/${id}`)}
-      />
+        <Bloque
+          titulo="Leads Registrados"
+          color="bg-teal-600"
+          datos={leadsFiltrados}
+          campos={['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre']}
+          encabezados={['Nombre', 'Email', 'Teléfono', 'Agente', 'Lugar']}
+          busqueda={busquedaLeads}
+          setBusqueda={setBusquedaLeads}
+          onVer={(id: number) => router.push(`/dashboard/leads/${id}`)}
+        />
 
-      <Bloque
-        titulo="Ofertas Promocionales"
-        color="bg-fuchsia-600"
-        datos={ofertas}
-        campos={[]} // no mostramos tabla ni buscador aquí
-        encabezados={[]}
-        busqueda={''}
-        setBusqueda={() => {}}
-        onVer={() => router.push('/ofertas')}
-      />
-    </div>
-  );
+        <Bloque
+          titulo="Ofertas Promocionales"
+          color="bg-fuchsia-600"
+          datos={ofertas}
+          campos={[]} // no mostramos tabla ni buscador aquí
+          encabezados={[]}
+          busqueda={''}
+          setBusqueda={() => {}}
+          onVer={() => router.push('/ofertas')}
+        />
+      </div>
+    </CRMClienteLayout>
+  )
 }
