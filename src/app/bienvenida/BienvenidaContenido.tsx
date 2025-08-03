@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight, Cow } from "lucide-react";
+import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight, PiggyBank } from "lucide-react";
 
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -49,10 +49,11 @@ export default function BienvenidaContenido() {
     },
     {
       nombre: "Ganadería",
-      icono: <Cow className="w-8 h-8 text-yellow-100" />,
+      icono: <PiggyBank className="w-8 h-8 text-yellow-100" />,
       ruta: "#",
       bg: "bg-lime-600",
     },
+
   ];
   
   const [ofertasDestacadas, setOfertasDestacadas] = useState<Oferta[]>([]);
