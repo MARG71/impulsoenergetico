@@ -7,7 +7,8 @@ import { Toaster } from "sonner";
 import SessionProvider from '@/components/SessionProvider'
 
 import { getServerSession } from "next-auth";
-import { authOptions } from "./api/auth/[...nextauth]/authOptions";
+
+import { authOptions } from "@/lib/authOptions";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
