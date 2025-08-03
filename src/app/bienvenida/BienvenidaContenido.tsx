@@ -97,13 +97,10 @@ export default function BienvenidaContenido() {
     setIndiceOferta((prev) => (prev - 1 + ofertasDestacadas.length) % ofertasDestacadas.length);
   };
 
-  const handleClick = (seccion: string, ruta: string) => {
-    if (seccion === "Luz") {
-      router.push(ruta);
-    } else {
-      alert("🔧 Esta sección está en construcción. Muy pronto estará disponible.");
-    }
-  };
+  const handleClick = (_seccion: string, ruta: string) => {
+  router.push(ruta);
+};
+
 
   return (
     <motion.div
