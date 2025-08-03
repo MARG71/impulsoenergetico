@@ -25,27 +25,37 @@ export default function BienvenidaContenido() {
   const lugarId = searchParams.get("lugarId") || "";
   const [filtro, setFiltro] = useState("");
 
+  import { Sparkles, Flame, Phone, PartyPopper, Cow } from "lucide-react"; // 👈 Asegúrate de importar Cow
+
+  import { Sparkles, Flame, Phone, PartyPopper, Cow } from "lucide-react"; // 👈 Asegúrate de importar Cow
+
   const secciones = [
     {
       nombre: "Luz",
-      icono: <Sparkles className="w-10 h-10 text-yellow-100" />,
+      icono: <Sparkles className="w-8 h-8 text-yellow-100" />,
       ruta: `/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`,
       bg: "bg-green-500",
     },
     {
       nombre: "Gas",
-      icono: <Flame className="w-10 h-10 text-yellow-100" />,
+      icono: <Flame className="w-8 h-8 text-yellow-100" />,
       ruta: "#",
       bg: "bg-orange-500",
     },
     {
       nombre: "Telefonía",
-      icono: <Phone className="w-10 h-10 text-yellow-100" />,
+      icono: <Phone className="w-8 h-8 text-yellow-100" />,
       ruta: "#",
       bg: "bg-blue-600",
     },
+    {
+      nombre: "Ganadería",
+      icono: <Cow className="w-8 h-8 text-yellow-100" />,
+      ruta: "#",
+      bg: "bg-lime-600",
+    },
   ];
-
+  
   const [ofertasDestacadas, setOfertasDestacadas] = useState<Oferta[]>([]);
   const [ofertasPorTipo, setOfertasPorTipo] = useState<{ luz: Oferta[]; gas: Oferta[]; telefonia: Oferta[] }>({
     luz: [],
@@ -128,7 +138,7 @@ export default function BienvenidaContenido() {
 
       {/* Secciones */}
       <div className="w-full max-w-5xl bg-gradient-to-r from-green-400 via-orange-400 to-blue-500 rounded-xl p-6 mb-6 shadow-lg">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {secciones.map((sec) => (
             <Card
               key={sec.nombre}
