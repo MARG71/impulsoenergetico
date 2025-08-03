@@ -2,10 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight, Cow } from "lucide-react";
+
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+
 
 type Oferta = {
   id: number;
@@ -25,9 +27,6 @@ export default function BienvenidaContenido() {
   const lugarId = searchParams.get("lugarId") || "";
   const [filtro, setFiltro] = useState("");
 
-  import { Sparkles, Flame, Phone, PartyPopper, Cow } from "lucide-react"; // 👈 Asegúrate de importar Cow
-
-  import { Sparkles, Flame, Phone, PartyPopper, Cow } from "lucide-react"; // 👈 Asegúrate de importar Cow
 
   const secciones = [
     {
