@@ -9,6 +9,8 @@ import { Toaster } from "sonner";
 export default function CRMClienteLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
 
+  const esAdmin = session?.user?.role === "ADMIN";
+
   return (
     <div className="flex min-h-screen">
       {/* MENÚ LATERAL AZUL */}
@@ -48,6 +50,14 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
           <Link href="/lugares" className="hover:text-yellow-300 flex items-center gap-2">📍 Lugares</Link>
           <Link href="/lugares/fondos" className="hover:text-yellow-300 flex items-center gap-2">🖼️ Fondos Carteles</Link>
           <Link href="/ofertas" className="hover:text-yellow-300 flex items-center gap-2">📢 Ofertas</Link>
+
+          {/* NUEVO BOTÓN SOLO PARA ADMIN */}
+          {esAdmin && (
+            <Link href="/productos-ganaderos" className="hover:text-yellow-300 flex items-center gap-2">
+              🐄 Productos Ganaderos
+            </Link>
+          )}
+
           <Link href="/dashboard/historial" className="hover:text-yellow-300 flex items-center gap-2">📂 Historial Comparativas</Link>
           <Link href="/comparador" className="hover:text-yellow-300 flex items-center gap-2">🧮 Comparador</Link>
           <Link href="/crear-usuario" className="text-white hover:text-gray-300 px-4 py-2 block">Crear Acceso Usuario</Link>

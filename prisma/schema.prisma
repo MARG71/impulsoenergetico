@@ -195,3 +195,18 @@ model Oferta {
   activa      Boolean  @default(true)
   creadaEn    DateTime @default(now())
 }
+
+model ProductoGanadero {
+  id              String   @id @default(cuid())
+  nombre          String
+  descripcion     String
+  categoria       String   // Ej: "Plásticos y Mallas", "Ventilación", etc.
+  precioCoste     Float
+  margen          Float    // Ej: 25.0 representa un 25%
+  precioPVP       Float    // Calculado: precioCoste + (precioCoste * margen / 100)
+  descuento       Float?   // Opcional. Ej: 10.0 para 10%
+  precioFinal     Float    // Calculado: precioPVP - (precioPVP * descuento / 100) si aplica
+  imagenUrl       String
+  activo          Boolean  @default(true)
+  creadoEn        DateTime @default(now())
+}
