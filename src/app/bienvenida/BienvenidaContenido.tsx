@@ -50,7 +50,7 @@ export default function BienvenidaContenido() {
     {
       nombre: "Ganadería",
       icono: <PiggyBank className="w-8 h-8 text-yellow-100" />,
-      ruta: "#",
+      ruta: `/ganaderia?agenteId=${agenteId}&lugarId=${lugarId}`,
       bg: "bg-lime-600",
     },
 
