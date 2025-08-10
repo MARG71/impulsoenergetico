@@ -5,11 +5,9 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
 
-const handler = NextAuth({
+export const authOptions = {
   adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: "jwt" as const },
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -23,14 +21,14 @@ const handler = NextAuth({
         const user = await prisma.usuario.findUnique({
           where: { email: credentials.email },
         });
+        if (!user || !user.activo) return null;
 
-        if (!user) return null;
-
-        const passwordOk = await compare(credentials.password, user.password);
-        if (!passwordOk) return null;
+        // El campo "password" en tu modelo ya contiene el hash
+        const ok = await compare(credentials.password, user.password);
+        if (!ok) return null;
 
         return {
-          id: user.id.toString(), // ✅ convertimos id a string
+          id: String(user.id),
           email: user.email,
           name: user.nombre,
           role: user.rol,
@@ -39,31 +37,29 @@ const handler = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: any) {
       if (user) {
-        token.role = user.role;
         token.id = user.id;
-        token.name = user.name;
         token.email = user.email;
+        token.name = user.name;
+        token.role = user.role;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user && token) {
-        const t = token as any; // ✅ forzamos el tipo para evitar error TS
-
-        session.user.role = t.role;
-        session.user.id = t.id;
-        session.user.name = t.name;
-        session.user.email = t.email;
+        (session.user as any).id = token.id;
+        session.user.email = token.email;
+        session.user.name = token.name;
+        (session.user as any).role = token.role;
       }
       return session;
     },
   },
-  pages: {
-    signIn: "/login",
-  },
+  pages: { signIn: "/login" },
   secret: process.env.NEXTAUTH_SECRET,
-});
+} as const;
 
+const handler = NextAuth(authOptions as any);
 export { handler as GET, handler as POST };
+

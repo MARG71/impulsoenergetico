@@ -1,4 +1,3 @@
-// src/lib/prisma.ts
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
@@ -8,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['query'], // Puedes quitar esta línea si no quieres ver las queries en consola
+    log: ['warn', 'error'],
   });
 
 if (process.env.NODE_ENV !== 'production') {
