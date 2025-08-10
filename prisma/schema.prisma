@@ -47,7 +47,7 @@ model Comparativa {
 model ResultadoComparativa {
   id             Int    @id @default(autoincrement())
   comparativaId  Int
-  compañia      String
+  compañia       String
   tarifa         String
   precioAnual    Float
   ahorroEstimado Float
@@ -59,7 +59,7 @@ model Contrato {
   id        Int      @id @default(autoincrement())
   clienteId Int
   servicio  String
-  compañia String
+  compañia  String
   tarifa    String
   fechaAlta DateTime @default(now())
   comision  Float
@@ -74,12 +74,19 @@ model Agente {
   nombre       String
   email        String        @unique
   telefono     String?
+
+  // % del REMANENTE para el Agente (0..1). Si es null, se usan defaults/overrides.
+  pctAgente    Decimal?      @db.Decimal(5, 4)
+
   contratos    Contrato[]
   lugares      Lugar[]
   comparativas Comparativa[]
   qrs          QR[]
   leads        Lead[]
   usuarios     Usuario[]
+  overrides    ComisionOverride[]
+
+  creadoEn     DateTime @default(now())
 }
 
 model Lugar {
@@ -89,11 +96,19 @@ model Lugar {
   qrCode    String @unique
   agenteId  Int
 
+  // % del POOL para el Cliente (0..1). Si es null, se usan defaults/overrides.
+  pctCliente Decimal? @db.Decimal(5, 4)
+  // % del REMANENTE para el Lugar (0..1). Si es null, se usan defaults/overrides.
+  pctLugar   Decimal? @db.Decimal(5, 4)
+
   agente       Agente        @relation(fields: [agenteId], references: [id])
   comparativas Comparativa[]
   qrs          QR[]
   leads        Lead[]
   usuarios     Usuario[]
+  overrides    ComisionOverride[]
+
+  creadoEn     DateTime @default(now())
 }
 
 model QR {
@@ -153,7 +168,7 @@ model DatosFactura {
   exceso                Float?
   alquiler              Float?
   otros                 Float?
-  comparativaId         Int           @unique // ✅ Esto es lo que faltaba
+  comparativaId         Int           @unique
   comparativa           Comparativa   @relation(fields: [comparativaId], references: [id])
 }
 
@@ -164,7 +179,6 @@ model FondoCartel {
   creadoEn  DateTime @default(now())
   activo    Boolean  @default(false)
 }
-
 
 model FondoActivo {
   id        Int      @id @default(1)
@@ -179,7 +193,6 @@ model Fondo {
   creadoEn  DateTime @default(now())
   activo    Boolean  @default(false)
 }
-
 
 model ConfiguracionGlobal {
   id              Int    @id @default(1)
@@ -200,13 +213,61 @@ model ProductoGanadero {
   id              String   @id @default(cuid())
   nombre          String
   descripcion     String
-  categoria       String   // Ej: "Plásticos y Mallas", "Ventilación", etc.
+  categoria       String
   precioCoste     Float
-  margen          Float    // Ej: 25.0 representa un 25%
-  precioPVP       Float    // Calculado: precioCoste + (precioCoste * margen / 100)
-  descuento       Float?   // Opcional. Ej: 10.0 para 10%
-  precioFinal     Float    // Calculado: precioPVP - (precioPVP * descuento / 100) si aplica
+  margen          Float
+  precioPVP       Float
+  descuento       Float?
+  precioFinal     Float
   imagenUrl       String
   activo          Boolean  @default(true)
   creadoEn        DateTime @default(now())
+}
+
+/* =========
+   COMISIONES
+   ========= */
+
+/// Defaults globales cuando Lugar/Agente no tienen valores propios ni hay override.
+/// Porcentajes 0..1 (ej: 0.30 = 30%)
+model GlobalComisionDefaults {
+  id                Int     @id @default(1)
+  defaultPctCliente Decimal  @db.Decimal(5, 4)
+  defaultPctLugar   Decimal  @db.Decimal(5, 4)
+  defaultPctAgente  Decimal  @db.Decimal(5, 4)
+  actualizadoEn     DateTime @updatedAt
+
+  @@map("global_comision_defaults")
+}
+
+/// Reglas específicas por Lugar (y opcionalmente Agente), filtrables por compañía/tarifa,
+/// con vigencia y prioridad. pctCliente aplica sobre POOL; pctLugar/pctAgente sobre REMANENTE.
+model ComisionOverride {
+  id        Int     @id @default(autoincrement())
+
+  lugarId   Int
+  lugar     Lugar   @relation(fields: [lugarId], references: [id])
+
+  agenteId  Int?
+  agente    Agente? @relation(fields: [agenteId], references: [id])
+
+  // Filtros opcionales
+  compania  String?
+  tarifa    String?
+
+  // Si no son null, pisan el valor correspondiente (0..1)
+  pctCliente Decimal? @db.Decimal(5, 4)
+  pctLugar   Decimal? @db.Decimal(5, 4)
+  pctAgente  Decimal? @db.Decimal(5, 4)
+
+  validFrom  DateTime?
+  validTo    DateTime?
+  activo     Boolean  @default(true)
+  prioridad  Int      @default(0)
+
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([lugarId, compania, tarifa, activo, validFrom, validTo])
+  @@map("comision_override")
 }
