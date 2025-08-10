@@ -1,3 +1,4 @@
+// src/app/(crm)/agentes/ID/DETALLE/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export default function DetalleAgente() {
-  const { id } = useParams();
+  const { id } = useParams() as { id: string };
   const router = useRouter();
   const [agente, setAgente] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
@@ -19,7 +20,7 @@ export default function DetalleAgente() {
       setAgente(data);
       setCargando(false);
     };
-    fetchAgente();
+    if (id) fetchAgente();
   }, [id]);
 
   if (cargando) return <p className="text-center text-gray-600">Cargando...</p>;
@@ -50,15 +51,16 @@ export default function DetalleAgente() {
 
       <h1 className="text-2xl font-bold text-white mb-6">Detalle del Agente</h1>
 
-      {/* DATOS DEL CLIENTE/AGENTE SELECCIONADO */}
+      {/* DATOS DEL AGENTE */}
       <div className="bg-[#FFE0B2] p-6 rounded-xl shadow mb-8">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🧾 Información General del Agente</h2>
         <p><strong>Nombre:</strong> {agente.nombre}</p>
         <p><strong>Email:</strong> {agente.email}</p>
         <p><strong>Teléfono:</strong> {agente.telefono || '-'}</p>
+        <p><strong>% Agente:</strong> {agente.pctAgente != null ? `${(Number(agente.pctAgente) * 100).toFixed(1)}%` : '—'}</p> {/* ← NUEVO */}
       </div>
 
-      {/* DATOS DEL AGENTE / USUARIO */}
+      {/* USUARIOS */}
       <div className="bg-[#D0F0C0] p-6 rounded-xl shadow mb-8">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📇 Datos del Usuario Vinculado</h2>
 
@@ -92,7 +94,7 @@ export default function DetalleAgente() {
         )}
       </div>
 
-      {/* LUGARES ASIGNADOS */}
+      {/* LUGARES */}
       <div className="bg-white p-6 rounded-xl shadow mb-8">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📍 Lugares asignados</h2>
 

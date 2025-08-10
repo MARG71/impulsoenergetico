@@ -1,3 +1,4 @@
+// src/app/(crm)/agentes/ID/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,14 +8,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
+// helper
+const toPct = (v: string) => {
+  const n = Number((v ?? '').replace(',', '.'));
+  if (Number.isNaN(n)) return undefined;
+  return n > 1 ? n / 100 : n;
+};
+
 export default function EditarAgente() {
   const router = useRouter();
-  const params = useParams();
+  const params = useParams() as { id: string };
   const { id } = params;
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [pctAgente, setPctAgente] = useState(''); // ← NUEVO
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
@@ -24,9 +33,10 @@ export default function EditarAgente() {
       setNombre(data.nombre);
       setEmail(data.email);
       setTelefono(data.telefono || '');
+      setPctAgente(data.pctAgente != null ? String(Number(data.pctAgente) * 100) : ''); // ← init %
       setCargando(false);
     };
-    cargarAgente();
+    if (id) cargarAgente();
   }, [id]);
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -34,14 +44,15 @@ export default function EditarAgente() {
     const res = await fetch(`/api/agentes/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, email, telefono }),
+      body: JSON.stringify({ nombre, email, telefono, pctAgente: toPct(pctAgente) }), // ← añadido
     });
 
     if (res.ok) {
       toast.success('Agente actualizado correctamente');
       router.push('/agentes');
     } else {
-      toast.error('Error al actualizar agente');
+      const err = await res.json().catch(() => ({}));
+      toast.error(err?.error || 'Error al actualizar agente');
     }
   };
 
@@ -79,6 +90,17 @@ export default function EditarAgente() {
               className="bg-white text-black"
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
+            />
+          </div>
+          <div>{/* NUEVO */}
+            <Label className="text-black">% Agente</Label>
+            <Input
+              type="number"
+              step="0.01"
+              className="bg-white text-black"
+              placeholder="ej. 15 o 0.15"
+              value={pctAgente}
+              onChange={(e) => setPctAgente(e.target.value)}
             />
           </div>
 

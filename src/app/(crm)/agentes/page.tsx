@@ -1,3 +1,4 @@
+// src/app/(crm)/agentes/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,11 +10,21 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
+// 🔧 helpers
+const toPct = (v: string) => {
+  const n = Number((v ?? '').replace(',', '.'));
+  if (Number.isNaN(n)) return undefined;
+  return n > 1 ? n / 100 : n; // 15 -> 0.15
+};
+const fmtPct = (v: any) => (v == null ? '—' : `${(Number(v) * 100).toFixed(1)}%`);
+
+// tipos
 interface Agente {
   id: number;
   nombre: string;
   email: string;
   telefono?: string;
+  pctAgente?: number | string; // ← NUEVO
 }
 
 export default function AgentesPage() {
@@ -21,16 +32,17 @@ export default function AgentesPage() {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [pctAgente, setPctAgente] = useState('');          // ← NUEVO (alta)
   const [agenteEditando, setAgenteEditando] = useState<Agente | null>(null);
+  const [pctAgenteEdit, setPctAgenteEdit] = useState('');  // ← NUEVO (editar)
   const router = useRouter();
 
   useEffect(() => {
     fetch('/api/agentes')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          setAgentes(data);
-        } else {
+        if (Array.isArray(data)) setAgentes(data);
+        else {
           console.error('La respuesta no es un array:', data);
           toast.error('Error al cargar agentes');
         }
@@ -45,7 +57,7 @@ export default function AgentesPage() {
     const res = await fetch('/api/agentes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, email, telefono }),
+      body: JSON.stringify({ nombre, email, telefono, pctAgente: toPct(pctAgente) }), // ← añadido
     });
 
     if (res.ok) {
@@ -54,9 +66,11 @@ export default function AgentesPage() {
       setNombre('');
       setEmail('');
       setTelefono('');
+      setPctAgente(''); // ← limpiar
       toast.success('Agente creado correctamente');
     } else {
-      toast.error('Error al crear agente');
+      const err = await res.json().catch(() => ({}));
+      toast.error(err?.error || 'Error al crear agente');
     }
   };
 
@@ -66,7 +80,8 @@ export default function AgentesPage() {
       setAgentes(agentes.filter(a => a.id !== id));
       toast.success('Agente eliminado');
     } else {
-      toast.error('Error al eliminar agente');
+      const err = await res.json().catch(() => ({}));
+      toast.error(err?.error || 'Error al eliminar agente');
     }
   };
 
@@ -77,16 +92,18 @@ export default function AgentesPage() {
     const res = await fetch(`/api/agentes/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, email, telefono }),
+      body: JSON.stringify({ nombre, email, telefono, pctAgente: toPct(pctAgenteEdit) }), // ← añadido
     });
 
     if (res.ok) {
       const actualizado = await res.json();
       setAgentes(agentes.map(a => (a.id === actualizado.id ? actualizado : a)));
       setAgenteEditando(null);
+      setPctAgenteEdit('');
       toast.success('Agente actualizado');
     } else {
-      toast.error('Error al actualizar');
+      const err = await res.json().catch(() => ({}));
+      toast.error(err?.error || 'Error al actualizar');
     }
   };
 
@@ -95,7 +112,7 @@ export default function AgentesPage() {
       <h1 className="text-2xl font-bold text-white mb-6">Registrar Agente</h1>
 
       <div className="bg-[#F0F0F0] p-6 rounded-xl shadow w-full mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">{/* ← 4 cols para el % */}
           <div>
             <Label className="text-black">Nombre</Label>
             <Input value={nombre} onChange={e => setNombre(e.target.value)} className="bg-white text-black" />
@@ -107,6 +124,17 @@ export default function AgentesPage() {
           <div>
             <Label className="text-black">Teléfono</Label>
             <Input value={telefono} onChange={e => setTelefono(e.target.value)} className="bg-white text-black" />
+          </div>
+          <div>{/* NUEVO */}
+            <Label className="text-black">% Agente</Label>
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="ej. 15 o 0.15"
+              value={pctAgente}
+              onChange={(e) => setPctAgente(e.target.value)}
+              className="bg-white text-black"
+            />
           </div>
         </div>
 
@@ -123,6 +151,7 @@ export default function AgentesPage() {
                 <th className="px-4 py-2">Nombre</th>
                 <th className="px-4 py-2">Email</th>
                 <th className="px-4 py-2">Teléfono</th>
+                <th className="px-4 py-2">% Agente</th> {/* ← NUEVO */}
                 <th className="px-4 py-2">Acciones</th>
               </tr>
             </thead>
@@ -134,10 +163,19 @@ export default function AgentesPage() {
                     <td className="border px-4 py-2">{a.nombre}</td>
                     <td className="border px-4 py-2">{a.email}</td>
                     <td className="border px-4 py-2">{a.telefono || '-'}</td>
+                    <td className="border px-4 py-2">{fmtPct(a.pctAgente)}</td> {/* ← NUEVO */}
                     <td className="border px-4 py-2 space-x-2">
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button className="bg-blue-600 text-white hover:bg-blue-800" onClick={() => setAgenteEditando(a)}>Editar</Button>
+                          <Button
+                            className="bg-blue-600 text-white hover:bg-blue-800"
+                            onClick={() => {
+                              setAgenteEditando(a);
+                              setPctAgenteEdit(a.pctAgente != null ? String(Number(a.pctAgente) * 100) : ''); // ← init %
+                            }}
+                          >
+                            Editar
+                          </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl bg-[#F3F8F1] rounded-xl shadow-lg p-6">
                           <DialogHeader>
@@ -152,9 +190,19 @@ export default function AgentesPage() {
                               <Label className="text-[#1F1F1F]">Email</Label>
                               <Input value={agenteEditando?.email || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, email: e.target.value } : null)} />
                             </div>
-                            <div className="md:col-span-2">
+                            <div>
                               <Label className="text-[#1F1F1F]">Teléfono</Label>
                               <Input value={agenteEditando?.telefono || ''} onChange={e => setAgenteEditando(prev => prev ? { ...prev, telefono: e.target.value } : null)} />
+                            </div>
+                            <div>{/* NUEVO */}
+                              <Label className="text-[#1F1F1F]">% Agente</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="ej. 15 o 0.15"
+                                value={pctAgenteEdit}
+                                onChange={(e) => setPctAgenteEdit(e.target.value)}
+                              />
                             </div>
                           </div>
                           <div className="mt-6 flex justify-end">
@@ -173,7 +221,7 @@ export default function AgentesPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="text-center text-gray-600 py-4">No hay agentes registrados.</td>
+                  <td colSpan={6} className="text-center text-gray-600 py-4">No hay agentes registrados.</td>
                 </tr>
               )}
             </tbody>

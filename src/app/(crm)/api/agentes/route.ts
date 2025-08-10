@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import type { Prisma } from '@prisma/client'; // 👈 clave para tipar where
+import type { Prisma } from '@prisma/client';
+
+const normPct = (v: any) => {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
+  if (Number.isNaN(n)) return undefined;
+  return n > 1 ? n / 100 : n; // 15 -> 0.15
+};
 
 // GET /api/agentes?take=6&skip=0&q=texto
 export async function GET(req: Request) {
@@ -11,58 +18,48 @@ export async function GET(req: Request) {
     const q = searchParams.get('q')?.trim() ?? '';
 
     let where: Prisma.AgenteWhereInput | undefined;
-
     if (q) {
-      const orFilters: Prisma.AgenteWhereInput[] = [
-        { nombre:   { contains: q, mode: 'insensitive' as const } },
-        { email:    { contains: q, mode: 'insensitive' as const } },
-        { telefono: { contains: q, mode: 'insensitive' as const } },
-      ];
-      where = { OR: orFilters };
+      where = {
+        OR: [
+          { nombre:   { contains: q, mode: 'insensitive' as const } },
+          { email:    { contains: q, mode: 'insensitive' as const } },
+          { telefono: { contains: q, mode: 'insensitive' as const } },
+        ],
+      };
     }
 
-    const agentes = await prisma.agente.findMany({
-      where,
-      orderBy: { id: 'desc' }, // cambia a { creadoEn: 'desc' } si tu modelo lo tiene
-      take,
-      skip,
-      select: { id: true, nombre: true, email: true, telefono: true },
+    const items = await prisma.agente.findMany({
+      where, orderBy: { id: 'desc' }, take, skip,
+      select: { id: true, nombre: true, email: true, telefono: true, pctAgente: true },
     });
-
-    // Tu Dashboard espera un array plano
-    return NextResponse.json(agentes);
-  } catch (error: any) {
-    console.error('Error al obtener agentes:', error);
-    return NextResponse.json({ error: error.message ?? 'Error al obtener agentes' }, { status: 500 });
+    return NextResponse.json(items);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
-// POST: Crear un nuevo agente
-export async function POST(request: Request) {
+// POST /api/agentes {nombre,email,telefono?,pctAgente?}
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const nombre = (body?.nombre ?? '').trim();
-    const email = (body?.email ?? '').trim();
-    const telefono = (body?.telefono ?? '').trim();
+    const b = await req.json();
+    const nombre = (b?.nombre ?? '').trim();
+    const email = (b?.email ?? '').trim();
+    const telefono = (b?.telefono ?? '').trim();
+    const pctAgente = normPct(b?.pctAgente);
 
     if (!nombre || !email) {
       return NextResponse.json({ error: 'nombre y email son obligatorios' }, { status: 400 });
     }
 
-    // Evitar duplicados (si email es unique)
-    const existente = await prisma.agente.findUnique({ where: { email } });
-    if (existente) {
-      return NextResponse.json({ error: 'Ya existe un agente con ese email' }, { status: 409 });
-    }
+    const dup = await prisma.agente.findUnique({ where: { email } });
+    if (dup) return NextResponse.json({ error: 'Email ya existe' }, { status: 409 });
 
-    const nuevoAgente = await prisma.agente.create({
-      data: { nombre, email, telefono },
-      select: { id: true, nombre: true, email: true, telefono: true },
+    const agente = await prisma.agente.create({
+      data: { nombre, email, telefono, ...(pctAgente !== undefined ? { pctAgente } : {}) },
+      select: { id: true, nombre: true, email: true, telefono: true, pctAgente: true },
     });
-
-    return NextResponse.json(nuevoAgente, { status: 201 });
-  } catch (error: any) {
-    console.error('Error al crear el agente:', error);
-    return NextResponse.json({ error: error.message ?? 'Error al crear el agente' }, { status: 500 });
+    return NextResponse.json(agente, { status: 201 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
