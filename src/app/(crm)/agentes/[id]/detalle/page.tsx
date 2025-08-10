@@ -63,7 +63,7 @@ export default function DetalleAgente() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Image
-            src="/logo-impulso.png"
+            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
             alt="Impulso Energético"
             width={160}
             height={48}
@@ -222,11 +222,12 @@ export default function DetalleAgente() {
       </div>
 
       {/* LEADS — NUEVA SECCIÓN */}
+      {/* LEADS — SIMPLIFICADO */}
       <div className="bg-white text-[#1F1F1F] p-6 rounded-xl shadow">
         <h2 className="text-xl font-bold mb-4">🧲 Leads del agente</h2>
 
         <Input
-          placeholder="🔍 Buscar por nombre, email, teléfono, estado o lugar..."
+          placeholder="🔍 Buscar por nombre, email, teléfono o lugar..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="mb-4 w-full bg-white text-black"
@@ -238,31 +239,26 @@ export default function DetalleAgente() {
           <table className="w-full border-collapse bg-[#FFF6E0] rounded-xl">
             <thead>
               <tr className="bg-[#F0C300] text-left text-black">
-                <th className="p-2">ID</th>
                 <th className="p-2">Nombre</th>
                 <th className="p-2">Email</th>
                 <th className="p-2">Teléfono</th>
-                <th className="p-2">Estado</th>
                 <th className="p-2">Lugar</th>
-                <th className="p-2">Creado</th>
               </tr>
             </thead>
             <tbody className="text-[#1F1F1F]">
               {leadsFiltrados.map((lead: any) => (
                 <tr key={lead.id} className="border-b hover:bg-[#f6f6f6]">
-                  <td className="p-2 font-semibold">#{lead.id}</td>
                   <td className="p-2">{lead.nombre}</td>
                   <td className="p-2">{lead.email}</td>
                   <td className="p-2">{lead.telefono}</td>
-                  <td className="p-2">{lead.estado}</td>
                   <td className="p-2">{lead.lugar?.nombre || '-'}</td>
-                  <td className="p-2">{fmtDate(lead.creadoEn)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
     </div>
   );
 }
