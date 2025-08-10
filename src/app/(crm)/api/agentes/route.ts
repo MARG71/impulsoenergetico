@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client'; // 👈 clave para tipar where
 
 // GET /api/agentes?take=6&skip=0&q=texto
 export async function GET(req: Request) {
@@ -9,30 +10,26 @@ export async function GET(req: Request) {
     const skip = Number(searchParams.get('skip') ?? 0);
     const q = searchParams.get('q')?.trim() ?? '';
 
-    const where = q
-      ? {
-          OR: [
-            { nombre: { contains: q, mode: 'insensitive' } },
-            { email: { contains: q, mode: 'insensitive' } },
-            { telefono: { contains: q, mode: 'insensitive' } },
-          ],
-        }
-      : undefined;
+    let where: Prisma.AgenteWhereInput | undefined;
+
+    if (q) {
+      const orFilters: Prisma.AgenteWhereInput[] = [
+        { nombre:   { contains: q, mode: 'insensitive' as const } },
+        { email:    { contains: q, mode: 'insensitive' as const } },
+        { telefono: { contains: q, mode: 'insensitive' as const } },
+      ];
+      where = { OR: orFilters };
+    }
 
     const agentes = await prisma.agente.findMany({
       where,
-      orderBy: { id: 'desc' }, // usa createdAt/creadoEn si lo tienes
+      orderBy: { id: 'desc' }, // cambia a { creadoEn: 'desc' } si tu modelo lo tiene
       take,
       skip,
-      select: {
-        id: true,
-        nombre: true,
-        email: true,
-        telefono: true,
-      },
+      select: { id: true, nombre: true, email: true, telefono: true },
     });
 
-    // Tu dashboard espera un array simple
+    // Tu Dashboard espera un array plano
     return NextResponse.json(agentes);
   } catch (error: any) {
     console.error('Error al obtener agentes:', error);
@@ -52,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'nombre y email son obligatorios' }, { status: 400 });
     }
 
-    // Evitar duplicados por email (si tienes unique)
+    // Evitar duplicados (si email es unique)
     const existente = await prisma.agente.findUnique({ where: { email } });
     if (existente) {
       return NextResponse.json({ error: 'Ya existe un agente con ese email' }, { status: 409 });
