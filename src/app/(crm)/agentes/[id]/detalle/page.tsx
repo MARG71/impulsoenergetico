@@ -3,10 +3,19 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import Image from 'next/image';
 
+const fmtPct = (v: any) =>
+  v == null ? '—' : `${(Number(v) * 100).toFixed(1)}%`;
+
+const fmtDate = (s?: string) => {
+  if (!s) return '—';
+  const d = new Date(s);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 export default function DetalleAgente() {
   const { id } = useParams() as { id: string };
@@ -28,27 +37,33 @@ export default function DetalleAgente() {
   if (cargando) return <p className="text-center text-gray-600">Cargando...</p>;
   if (!agente) return <p className="text-center text-red-600">Agente no encontrado</p>;
 
-  const comparativasFiltradas = agente.comparativas.filter((comp: any) => {
+  const comparativasFiltradas = (agente.comparativas ?? []).filter((comp: any) => {
     const texto = `${comp.id} ${comp.tipoServicio} ${comp.tipoTarifa} ${comp.nombreTarifa} ${comp.importeFactura} ${comp.cliente?.nombre} ${comp.lugar?.nombre}`;
     return normalizarTexto(texto).includes(normalizarTexto(busqueda));
   });
 
-  const lugaresFiltrados = agente.lugares.filter((lugar: any) => {
+  const lugaresFiltrados = (agente.lugares ?? []).filter((lugar: any) => {
     const texto = `${lugar.nombre} ${lugar.direccion}`;
     return normalizarTexto(texto).includes(normalizarTexto(busqueda));
   });
 
-  const usuariosFiltrados = agente.usuarios.filter((user: any) => {
+  const usuariosFiltrados = (agente.usuarios ?? []).filter((user: any) => {
     const texto = `${user.nombre} ${user.email} ${user.rol}`;
+    return normalizarTexto(texto).includes(normalizarTexto(busqueda));
+  });
+
+  const leadsFiltrados = (agente.leads ?? []).filter((lead: any) => {
+    const texto = `${lead.nombre} ${lead.email} ${lead.telefono} ${lead.estado} ${lead.lugar?.nombre}`;
     return normalizarTexto(texto).includes(normalizarTexto(busqueda));
   });
 
   return (
     <div className="p-6 bg-[#68B84B] min-h-screen">
+      {/* Header con logo y navegación */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Image
-            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+            src="/logo-impulso.png"
             alt="Impulso Energético"
             width={160}
             height={48}
@@ -66,34 +81,33 @@ export default function DetalleAgente() {
         </div>
       </div>
 
-
       <h1 className="text-2xl font-bold text-white mb-6">Detalle del Agente</h1>
 
-      {/* DATOS DEL AGENTE */}
-      <div className="bg-[#FFE0B2] p-6 rounded-xl shadow mb-8">
-        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🧾 Información General del Agente</h2>
+      {/* INFO GENERAL — forzamos texto oscuro para contraste */}
+      <div className="bg-[#FFE0B2] text-[#1F1F1F] p-6 rounded-xl shadow mb-8">
+        <h2 className="text-xl font-bold mb-4">🧾 Información General del Agente</h2>
         <p><strong>Nombre:</strong> {agente.nombre}</p>
         <p><strong>Email:</strong> {agente.email}</p>
         <p><strong>Teléfono:</strong> {agente.telefono || '-'}</p>
-        <p><strong>% Agente:</strong> {agente.pctAgente != null ? `${(Number(agente.pctAgente) * 100).toFixed(1)}%` : '—'}</p> {/* ← NUEVO */}
+        <p><strong>% Agente:</strong> {fmtPct(agente.pctAgente)}</p>
       </div>
 
-      {/* USUARIOS */}
-      <div className="bg-[#D0F0C0] p-6 rounded-xl shadow mb-8">
-        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📇 Datos del Usuario Vinculado</h2>
+      {/* USUARIOS VINCULADOS */}
+      <div className="bg-[#D0F0C0] text-[#1F1F1F] p-6 rounded-xl shadow mb-8">
+        <h2 className="text-xl font-bold mb-4">📇 Datos del Usuario Vinculado</h2>
 
         <Input
           placeholder="🔍 Buscar por nombre, email o rol..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="mb-4 w-full"
+          className="mb-4 w-full bg-white text-black"
         />
 
         {usuariosFiltrados.length > 0 ? (
           usuariosFiltrados.map((user: any) => {
-            const lugarNombre = agente.lugares.find((l: any) => l.id === user.lugarId)?.nombre || '-';
+            const lugarNombre = (agente.lugares ?? []).find((l: any) => l.id === user.lugarId)?.nombre || '-';
             return (
-              <div key={user.id} className="grid md:grid-cols-2 gap-4 border p-4 rounded bg-[#FFFCF0] mb-4">
+              <div key={user.id} className="grid md:grid-cols-2 gap-4 border p-4 rounded bg-[#FFFCF0] text-[#1F1F1F] mb-4">
                 <div>
                   <p><strong>Nombre:</strong> {user.nombre}</p>
                   <p><strong>Email:</strong> {user.email}</p>
@@ -112,15 +126,15 @@ export default function DetalleAgente() {
         )}
       </div>
 
-      {/* LUGARES */}
-      <div className="bg-white p-6 rounded-xl shadow mb-8">
-        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📍 Lugares asignados</h2>
+      {/* LUGARES ASIGNADOS — añadimos % y texto oscuro */}
+      <div className="bg-white text-[#1F1F1F] p-6 rounded-xl shadow mb-8">
+        <h2 className="text-xl font-bold mb-4">📍 Lugares asignados</h2>
 
         <Input
           placeholder="🔍 Buscar por nombre o dirección..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="mb-4 w-full"
+          className="mb-4 w-full bg-white text-black"
         />
 
         {lugaresFiltrados.length === 0 ? (
@@ -132,15 +146,19 @@ export default function DetalleAgente() {
                 <th className="p-2">ID</th>
                 <th className="p-2">Nombre</th>
                 <th className="p-2">Dirección</th>
+                <th className="p-2">% Cliente</th>
+                <th className="p-2">% Lugar</th>
                 <th className="p-2">Acción</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-[#1F1F1F]">
               {lugaresFiltrados.map((lugar: any) => (
                 <tr key={lugar.id} className="border-b hover:bg-[#f6f6f6]">
                   <td className="p-2 font-semibold">#{lugar.id}</td>
                   <td className="p-2">{lugar.nombre}</td>
                   <td className="p-2">{lugar.direccion}</td>
+                  <td className="p-2">{fmtPct(lugar.pctCliente)}</td>
+                  <td className="p-2">{fmtPct(lugar.pctLugar)}</td>
                   <td className="p-2">
                     <Button
                       onClick={() => router.push(`/lugares/${lugar.id}/detalle`)}
@@ -156,15 +174,15 @@ export default function DetalleAgente() {
         )}
       </div>
 
-      {/* COMPARATIVAS */}
-      <div className="bg-white p-6 rounded-xl shadow">
-        <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">📊 Comparativas</h2>
+      {/* COMPARATIVAS — forzamos texto oscuro en filas */}
+      <div className="bg-white text-[#1F1F1F] p-6 rounded-xl shadow mb-8">
+        <h2 className="text-xl font-bold mb-4">📊 Comparativas</h2>
 
         <Input
           placeholder="🔍 Buscar por tipo, tarifa, cliente o lugar..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="mb-4 w-full"
+          className="mb-4 w-full bg-white text-black"
         />
 
         {comparativasFiltradas.length === 0 ? (
@@ -182,7 +200,7 @@ export default function DetalleAgente() {
                 <th className="p-2">Acción</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-[#1F1F1F]">
               {comparativasFiltradas.map((comp: any) => (
                 <tr key={comp.id} className="border-b hover:bg-[#f6f6f6]">
                   <td className="p-2 font-semibold">#{comp.id}</td>
@@ -196,6 +214,49 @@ export default function DetalleAgente() {
                       Cargar
                     </Button>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* LEADS — NUEVA SECCIÓN */}
+      <div className="bg-white text-[#1F1F1F] p-6 rounded-xl shadow">
+        <h2 className="text-xl font-bold mb-4">🧲 Leads del agente</h2>
+
+        <Input
+          placeholder="🔍 Buscar por nombre, email, teléfono, estado o lugar..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="mb-4 w-full bg-white text-black"
+        />
+
+        {leadsFiltrados.length === 0 ? (
+          <p>No hay leads asignados.</p>
+        ) : (
+          <table className="w-full border-collapse bg-[#FFF6E0] rounded-xl">
+            <thead>
+              <tr className="bg-[#F0C300] text-left text-black">
+                <th className="p-2">ID</th>
+                <th className="p-2">Nombre</th>
+                <th className="p-2">Email</th>
+                <th className="p-2">Teléfono</th>
+                <th className="p-2">Estado</th>
+                <th className="p-2">Lugar</th>
+                <th className="p-2">Creado</th>
+              </tr>
+            </thead>
+            <tbody className="text-[#1F1F1F]">
+              {leadsFiltrados.map((lead: any) => (
+                <tr key={lead.id} className="border-b hover:bg-[#f6f6f6]">
+                  <td className="p-2 font-semibold">#{lead.id}</td>
+                  <td className="p-2">{lead.nombre}</td>
+                  <td className="p-2">{lead.email}</td>
+                  <td className="p-2">{lead.telefono}</td>
+                  <td className="p-2">{lead.estado}</td>
+                  <td className="p-2">{lead.lugar?.nombre || '-'}</td>
+                  <td className="p-2">{fmtDate(lead.creadoEn)}</td>
                 </tr>
               ))}
             </tbody>
