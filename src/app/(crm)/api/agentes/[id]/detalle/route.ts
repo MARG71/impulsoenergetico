@@ -1,24 +1,20 @@
-// src/app/api/agentes/[id]/detalle/route.ts
 import { prisma } from '@/lib/prisma';
-
-
 import { NextResponse } from 'next/server';
 
-// ✅ Obtener agente por ID desde URL
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const id = url.pathname.split('/').filter(Boolean).pop(); // obtener el último segmento: el ID
+function toId(v: string) {
+  const id = Number(v);
+  if (Number.isNaN(id)) throw new Error('ID inválido');
+  return id;
+}
 
-  const agenteId = parseInt(id || '', 10);
-
-  if (isNaN(agenteId)) {
-    return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-  }
-
+export async function GET(_req: Request, context: any) {
   try {
+    const agenteId = toId(context.params.id);
+
     const agente = await prisma.agente.findUnique({
       where: { id: agenteId },
       include: {
+        // Quita o ajusta relaciones según tu schema
         usuarios: true,
         lugares: true,
         comparativas: {
@@ -30,23 +26,19 @@ export async function GET(req: Request) {
       },
     });
 
-    if (!agente) {
-      return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
-    }
+    if (!agente) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
 
-    const comparativasConLugar = agente.comparativas.map((comp) => ({
+    const comparativasConLugar = (agente.comparativas ?? []).map((comp: any) => ({
       ...comp,
       nombreLugar: comp.lugar?.nombre || null,
       direccionLugar: comp.lugar?.direccion || null,
       nombreCliente: comp.cliente?.nombre || null,
     }));
 
-    return NextResponse.json({
-      ...agente,
-      comparativas: comparativasConLugar,
-    });
-  } catch (error) {
-    console.error('Error al obtener detalle del agente:', error);
-    return NextResponse.json({ error: 'Error al obtener detalle del agente' }, { status: 500 });
+    return NextResponse.json({ ...agente, comparativas: comparativasConLugar });
+  } catch (error: any) {
+    const msg = error?.message ?? 'Error al obtener detalle del agente';
+    const status = msg.includes('ID inválido') ? 400 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
