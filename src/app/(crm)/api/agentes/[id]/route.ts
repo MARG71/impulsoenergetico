@@ -13,7 +13,7 @@ export async function GET(_req: Request, context: any) {
     const id = toId(context.params.id);
     const agente = await prisma.agente.findUnique({
       where: { id },
-      select: { id: true, nombre: true, email: true, telefono: true, activo: true },
+      select: { id: true, nombre: true, email: true, telefono: true },
     });
     if (!agente) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
     return NextResponse.json(agente);
@@ -33,12 +33,11 @@ export async function PUT(req: Request, context: any) {
     if (body?.nombre !== undefined) data.nombre = String(body.nombre).trim();
     if (body?.email !== undefined) data.email = String(body.email).trim();
     if (body?.telefono !== undefined) data.telefono = String(body.telefono).trim();
-    if (body?.activo !== undefined) data.activo = Boolean(body.activo);
 
     const updated = await prisma.agente.update({
       where: { id },
       data,
-      select: { id: true, nombre: true, email: true, telefono: true, activo: true },
+      select: { id: true, nombre: true, email: true, telefono: true },
     });
     return NextResponse.json(updated);
   } catch (error: any) {
