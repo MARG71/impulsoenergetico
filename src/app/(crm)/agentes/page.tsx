@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import Image from 'next/image';
+
+
 
 // 🔧 helpers
 const toPct = (v: string) => {
@@ -109,6 +112,22 @@ export default function AgentesPage() {
 
   return (
     <div className="p-6 bg-[#68B84B] min-h-screen">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+            alt="Impulso Energético"
+            width={160}
+            height={48}
+            priority
+          />
+          <span className="hidden md:inline text-white/90">CRM · Agentes</span>
+        </div>
+        <Link href="/dashboard">
+          <Button className="bg-[#F0C300] text-black hover:bg-yellow-400">⬅ Volver al dashboard</Button>
+        </Link>
+      </div>
+
       <h1 className="text-2xl font-bold text-white mb-6">Registrar Agente</h1>
 
       <div className="bg-[#F0F0F0] p-6 rounded-xl shadow w-full mb-8">

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Image from 'next/image';
+
 
 export default function DetalleAgente() {
   const { id } = useParams() as { id: string };
@@ -43,11 +45,27 @@ export default function DetalleAgente() {
 
   return (
     <div className="p-6 bg-[#68B84B] min-h-screen">
-      <div className="mb-4">
-        <Button onClick={() => router.push('/agentes')} className="bg-[#F0C300] text-black hover:bg-yellow-400">
-          ⬅ Volver
-        </Button>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+            alt="Impulso Energético"
+            width={160}
+            height={48}
+            priority
+          />
+          <span className="hidden md:inline text-white/90">CRM · Detalle de agente</span>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => router.push('/agentes')} className="bg-[#68B84B] text-white hover:bg-green-700">
+            ⬅ Volver a agentes
+          </Button>
+          <Button onClick={() => router.push('/dashboard')} className="bg-[#F0C300] text-black hover:bg-yellow-400">
+            🏠 Dashboard
+          </Button>
+        </div>
       </div>
+
 
       <h1 className="text-2xl font-bold text-white mb-6">Detalle del Agente</h1>
 
