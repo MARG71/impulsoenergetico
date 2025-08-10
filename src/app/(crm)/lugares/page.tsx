@@ -17,6 +17,8 @@ type Fondo = {
   activo?: boolean;
 };
 
+const fmtPct = (v: any) => (v == null ? '—' : `${(Number(v) * 100).toFixed(1)}%`);
+
 export default function RegistrarLugar() {
   const router = useRouter();
   const sessionData = useSession();
@@ -31,7 +33,16 @@ export default function RegistrarLugar() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [fondos, setFondos] = useState<Fondo[]>([]);
   const [fondoSeleccionado, setFondoSeleccionado] = useState<string>('');
-  const [nuevoLugar, setNuevoLugar] = useState({ nombre: '', direccion: '', qrCode: '', agenteId: '' });
+
+  // Inputs de alta de lugar (pctCliente/pctLugar aceptan 15 o 0.15)
+  const [nuevoLugar, setNuevoLugar] = useState({
+    nombre: '',
+    direccion: '',
+    qrCode: '',
+    agenteId: '',
+    pctCliente: '', // string: lo normaliza la API
+    pctLugar: '',   // string: lo normaliza la API
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,28 +69,37 @@ export default function RegistrarLugar() {
   const generarQR = () => {
     const nuevoQR = uuidv4();
     setCodigoQR(nuevoQR);
-    setNuevoLugar({ ...nuevoLugar, qrCode: nuevoQR });
+    setNuevoLugar((s) => ({ ...s, qrCode: nuevoQR }));
   };
 
   const generarQRModal = () => {
     const nuevoQR = uuidv4();
-    setLugarEditando({ ...lugarEditando, qrCode: nuevoQR });
+    setLugarEditando((s: any) => ({ ...s, qrCode: nuevoQR }));
   };
 
   const handleEliminar = async (id: number) => {
     if (!confirm('¿Estás seguro de eliminar este lugar?')) return;
     await fetch(`/api/lugares/${id}`, { method: 'DELETE' });
-    setLugares(lugares.filter((l) => l.id !== id));
+    setLugares((arr) => arr.filter((l) => l.id !== id));
   };
 
   const handleGuardarEdicion = async () => {
     if (!lugarEditando) return;
-    await fetch(`/api/lugares/${lugarEditando.id}`, {
+    // Enviamos tal cual; la API normaliza pctCliente/pctLugar
+    const res = await fetch(`/api/lugares/${lugarEditando.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lugarEditando),
+      body: JSON.stringify({
+        nombre: lugarEditando.nombre,
+        direccion: lugarEditando.direccion,
+        qrCode: lugarEditando.qrCode,
+        agenteId: lugarEditando.agenteId,
+        pctCliente: lugarEditando.pctCliente, // puede ser "15" o "0.15"
+        pctLugar: lugarEditando.pctLugar,
+      }),
     });
-    setLugares(lugares.map((l) => (l.id === lugarEditando.id ? lugarEditando : l)));
+    const actualizado = await res.json();
+    setLugares((arr) => arr.map((l) => (l.id === actualizado.id ? actualizado : l)));
     setLugarEditando(null);
     setMostrarModal(false);
   };
@@ -89,11 +109,18 @@ export default function RegistrarLugar() {
     const res = await fetch('/api/lugares', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nuevoLugar),
+      body: JSON.stringify(nuevoLugar), // API normaliza %
     });
     const data = await res.json();
-    setLugares([...lugares, data]);
-    setNuevoLugar({ nombre: '', direccion: '', qrCode: '', agenteId: '' });
+    setLugares((arr) => [data, ...arr]);
+    setNuevoLugar({
+      nombre: '',
+      direccion: '',
+      qrCode: '',
+      agenteId: '',
+      pctCliente: '',
+      pctLugar: '',
+    });
     setCodigoQR('');
   };
 
@@ -106,9 +133,8 @@ export default function RegistrarLugar() {
     setFondoSeleccionado(url);
   };
 
-
   const lugaresFiltrados = lugares.filter((lugar) => {
-    const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre}`;
+    const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre} ${fmtPct(lugar.pctCliente)} ${fmtPct(lugar.pctLugar)}`;
     return texto.toLowerCase().includes(busqueda.toLowerCase());
   });
 
@@ -121,16 +147,34 @@ export default function RegistrarLugar() {
           <Input placeholder="Nombre del lugar" value={nuevoLugar.nombre} onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })} className="bg-white text-black" />
           <Input placeholder="Dirección" value={nuevoLugar.direccion} onChange={(e) => setNuevoLugar({ ...nuevoLugar, direccion: e.target.value })} className="bg-white text-black" />
         </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Input
+            placeholder="% Cliente (ej. 15 o 0.15)"
+            value={nuevoLugar.pctCliente}
+            onChange={(e) => setNuevoLugar({ ...nuevoLugar, pctCliente: e.target.value })}
+            className="bg-white text-black"
+          />
+          <Input
+            placeholder="% Lugar (ej. 10 o 0.10)"
+            value={nuevoLugar.pctLugar}
+            onChange={(e) => setNuevoLugar({ ...nuevoLugar, pctLugar: e.target.value })}
+            className="bg-white text-black"
+          />
+        </div>
+
         <div className="flex items-center gap-4">
           <Button type="button" onClick={generarQR} className="bg-blue-600 hover:bg-blue-700 text-white">Generar QR</Button>
           {codigoQR && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${codigoQR}`} size={64} />}
         </div>
+
         <select className="w-full border px-4 py-2 rounded bg-white text-black" value={nuevoLugar.agenteId} onChange={(e) => setNuevoLugar({ ...nuevoLugar, agenteId: e.target.value })}>
           <option value="">Selecciona un agente</option>
           {agentes.map((agente) => (
             <option key={agente.id} value={agente.id}>{agente.nombre}</option>
           ))}
         </select>
+
         <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Registrar Lugar</Button>
       </form>
 
@@ -176,6 +220,8 @@ export default function RegistrarLugar() {
                 <th className="p-2">Nombre</th>
                 <th className="p-2">Dirección</th>
                 <th className="p-2">Agente</th>
+                <th className="p-2">% Cliente</th>
+                <th className="p-2">% Lugar</th>
                 <th className="p-2">QR</th>
                 <th className="p-2">Acciones</th>
               </tr>
@@ -187,11 +233,14 @@ export default function RegistrarLugar() {
                   <td className="p-2 text-black">{lugar.nombre}</td>
                   <td className="p-2 text-black">{lugar.direccion}</td>
                   <td className="p-2 text-black">{lugar.agente?.nombre || '-'}</td>
+                  <td className="p-2 text-black">{fmtPct(lugar.pctCliente)}</td>
+                  <td className="p-2 text-black">{fmtPct(lugar.pctLugar)}</td>
                   <td className="p-2 text-xs break-all text-black">{lugar.qrCode}</td>
                   <td className="p-2 flex flex-col md:flex-row gap-2">
                     <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setLugarEditando(lugar); setMostrarModal(true); }}>Editar</Button>
+                    <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => router.push(`/lugares/${lugar.id}/detalle`)}>Ver</Button>
+                    <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}>Generar cartel</Button>
                     <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleEliminar(lugar.id)}>Eliminar</Button>
-                    <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}>Generar cartel</Button>
                   </td>
                 </tr>
               ))}
@@ -208,16 +257,34 @@ export default function RegistrarLugar() {
             <div className="space-y-4">
               <Input placeholder="Nombre" value={lugarEditando.nombre} onChange={(e) => setLugarEditando({ ...lugarEditando, nombre: e.target.value })} className="text-black" />
               <Input placeholder="Dirección" value={lugarEditando.direccion} onChange={(e) => setLugarEditando({ ...lugarEditando, direccion: e.target.value })} className="text-black" />
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input
+                  placeholder="% Cliente (ej. 15 o 0.15)"
+                  value={lugarEditando.pctCliente ?? ''} // dejamos raw, normaliza backend
+                  onChange={(e) => setLugarEditando({ ...lugarEditando, pctCliente: e.target.value })}
+                  className="text-black"
+                />
+                <Input
+                  placeholder="% Lugar (ej. 10 o 0.10)"
+                  value={lugarEditando.pctLugar ?? ''}
+                  onChange={(e) => setLugarEditando({ ...lugarEditando, pctLugar: e.target.value })}
+                  className="text-black"
+                />
+              </div>
+
               <div className="flex items-center gap-4">
                 <Button onClick={generarQRModal} className="bg-blue-600 text-white">Generar QR</Button>
                 {lugarEditando.qrCode && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${lugarEditando.qrCode}`} size={64} />}
               </div>
+
               <select className="w-full border px-4 py-2 rounded bg-white text-black" value={lugarEditando.agenteId} onChange={(e) => setLugarEditando({ ...lugarEditando, agenteId: e.target.value })}>
                 <option value="">Selecciona un agente</option>
                 {agentes.map((agente) => (
                   <option key={agente.id} value={agente.id}>{agente.nombre}</option>
                 ))}
               </select>
+
               <Button onClick={handleGuardarEdicion} className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Guardar Cambios</Button>
             </div>
           )}

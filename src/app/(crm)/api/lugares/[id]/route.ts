@@ -2,6 +2,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+const toPct = (v: any) => {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  if (Number.isNaN(n)) return undefined;
+  const p = n > 1 ? n / 100 : n;
+  return Math.max(0, Math.min(1, p));
+};
+
 function toId(v: string) {
   const id = Number(v);
   if (Number.isNaN(id)) throw new Error('ID inválido');
@@ -34,7 +42,7 @@ export async function GET(_req: Request, context: any) {
   }
 }
 
-// PUT /api/lugares/:id  { nombre?, direccion?, qrCode?, agenteId? }
+// PUT /api/lugares/:id  { nombre?, direccion?, qrCode?, agenteId?, pctCliente?, pctLugar? }
 export async function PUT(req: Request, context: any) {
   try {
     const id = toId(context.params.id);
@@ -54,6 +62,9 @@ export async function PUT(req: Request, context: any) {
       if (!agente) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
       data.agenteId = agenteId;
     }
+
+    if (body?.pctCliente !== undefined) data.pctCliente = toPct(body.pctCliente);
+    if (body?.pctLugar !== undefined) data.pctLugar = toPct(body.pctLugar);
 
     const updated = await prisma.lugar.update({
       where: { id },

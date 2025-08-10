@@ -3,6 +3,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
+const toPct = (v: any) => {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return null;
+  const p = n > 1 ? n / 100 : n; // 15 -> 0.15
+  return Math.max(0, Math.min(1, p));
+};
+
 // GET /api/lugares?take=6&skip=0&q=texto&agenteId=1
 export async function GET(req: Request) {
   try {
@@ -16,9 +24,9 @@ export async function GET(req: Request) {
 
     if (q) {
       where.OR = [
-        { nombre:    { contains: q, mode: 'insensitive' as const } },
-        { direccion: { contains: q, mode: 'insensitive' as const } },
-        { qrCode:    { contains: q, mode: 'insensitive' as const } },
+        { nombre:    { contains: q, mode: 'insensitive' } },
+        { direccion: { contains: q, mode: 'insensitive' } },
+        { qrCode:    { contains: q, mode: 'insensitive' } },
       ];
     }
     if (agenteIdParam) {
@@ -28,7 +36,7 @@ export async function GET(req: Request) {
 
     const lugares = await prisma.lugar.findMany({
       where,
-      orderBy: { id: 'desc' }, // cambia a { creadoEn: 'desc' } si prefieres
+      orderBy: { id: 'desc' },
       take,
       skip,
       select: {
@@ -37,7 +45,6 @@ export async function GET(req: Request) {
         direccion: true,
         qrCode: true,
         agenteId: true,
-        // comisiones configurables en el CRM
         pctLugar: true,
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
@@ -51,7 +58,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/lugares  { nombre, direccion, qrCode, agenteId }
+// POST /api/lugares  { nombre, direccion, qrCode, agenteId, pctCliente?, pctLugar? }
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -60,17 +67,18 @@ export async function POST(req: Request) {
     const qrCode = (body?.qrCode ?? '').trim();
     const agenteId = Number(body?.agenteId);
 
+    const pctCliente = toPct(body?.pctCliente);
+    const pctLugar = toPct(body?.pctLugar);
+
     if (!nombre || !direccion || !qrCode || Number.isNaN(agenteId)) {
       return NextResponse.json({ error: 'nombre, direccion, qrCode y agenteId son obligatorios' }, { status: 400 });
     }
 
-    // valida agente existente
     const agente = await prisma.agente.findUnique({ where: { id: agenteId } });
     if (!agente) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
 
-    // crea lugar
     const lugar = await prisma.lugar.create({
-      data: { nombre, direccion, qrCode, agenteId },
+      data: { nombre, direccion, qrCode, agenteId, pctCliente, pctLugar },
       select: {
         id: true, nombre: true, direccion: true, qrCode: true, agenteId: true,
         pctLugar: true, pctCliente: true,
@@ -80,7 +88,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(lugar, { status: 201 });
   } catch (error: any) {
-    // P2002 = unique constraint (ej: qrCode duplicado)
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'qrCode ya existe' }, { status: 409 });
     }
