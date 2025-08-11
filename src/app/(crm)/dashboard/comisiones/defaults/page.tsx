@@ -49,13 +49,13 @@ export default function DefaultsComisionesPage() {
     if ([pCliente, pLugar, pAgente].some(isNaN)) return null;
     if (pLugar + pAgente > 1) return { error: 'Lugar + Agente excede el 100% del remanente' };
 
-    const cliente€   = pool * pCliente;
-    const remanente  = pool - cliente€;
-    const agente€    = remanente * pAgente;
-    const lugar€     = remanente * pLugar;
-    const admin€     = remanente - agente€ - lugar€;
+    const clienteEur   = pool * pCliente;
+    const remanente    = pool - clienteEur;
+    const agenteEur    = remanente * pAgente;
+    const lugarEur     = remanente * pLugar;
+    const adminEur     = remanente - agenteEur - lugarEur;
 
-    return { pool, cliente€, agente€, lugar€, admin€ };
+    return { pool, clienteEur, agenteEur, lugarEur, adminEur };
   }, [cliente, lugar, agente]);
 
   const guardar = async () => {
@@ -134,10 +134,12 @@ export default function DefaultsComisionesPage() {
           <div className="mt-6 bg-[#FFFCF0] border rounded-xl p-4">
             <div className="font-semibold mb-2">Vista previa con pool = 100€</div>
             <ul className="text-sm leading-7">
-              <li>Cliente: <strong>{asPct(asFrac(cliente))}</strong> → {preview.cliente€.toFixed(2)} €</li>
-              <li>Agente:  <strong>{asPct(asFrac(agente))}</strong> del remanente → {preview.agente€.toFixed(2)} €</li>
-              <li>Lugar:   <strong>{asPct(asFrac(lugar))}</strong> del remanente → {preview.lugar€.toFixed(2)} €</li>
-              <li>Admin:   (remanente - agente - lugar) → {preview.admin€.toFixed(2)} €</li>
+
+              <li>Cliente: <strong>{asPct(asFrac(cliente))}</strong> → {preview.clienteEur.toFixed(2)} €</li>
+              <li>Agente:  <strong>{asPct(asFrac(agente))}</strong> del remanente → {preview.agenteEur.toFixed(2)} €</li>
+              <li>Lugar:   <strong>{asPct(asFrac(lugar))}</strong> del remanente → {preview.lugarEur.toFixed(2)} €</li>
+              <li>Admin:   (remanente - agente - lugar) → {preview.adminEur.toFixed(2)} €</li>
+
             </ul>
           </div>
         )}
