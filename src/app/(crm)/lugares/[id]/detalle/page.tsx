@@ -49,7 +49,7 @@ export default function DetalleLugar() {
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Image
-            src="/logo-impulso.png"
+            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
             alt="Impulso Energético"
             width={160}
             height={48}

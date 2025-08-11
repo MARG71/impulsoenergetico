@@ -140,6 +140,28 @@ export default function RegistrarLugar() {
 
   return (
     <div className="p-8 bg-[#B3E58C] min-h-screen">
+      {/* Header con logo y acceso al dashboard */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+            alt="Impulso Energético"
+            width={160}
+            height={48}
+            priority
+          />
+          <span className="hidden md:inline text-[#1F1F1F]">CRM · Lugares</span>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => router.push('/dashboard')}
+            className="bg-[#F0C300] text-black hover:bg-yellow-400"
+          >
+            🏠 Dashboard
+          </Button>
+        </div>
+      </div>
+
       <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Registrar Lugar</h1>
 
       <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-4">
