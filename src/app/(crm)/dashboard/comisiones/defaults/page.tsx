@@ -1,7 +1,9 @@
+// src/app/(crm)/dashboard/comisiones/defaults/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
@@ -9,55 +11,77 @@ import Image from 'next/image';
 type Defaults = {
   id: number;
   defaultPctCliente: number; // 0..1
-  defaultPctLugar: number;   // 0..1 sobre remanente
-  defaultPctAgente: number;  // 0..1 sobre remanente
+  defaultPctLugar: number;   // 0..1 (sobre remanente)
+  defaultPctAgente: number;  // 0..1 (sobre remanente)
 };
 
 export default function DefaultsComisionesPage() {
   const router = useRouter();
-  const [data, setData] = useState<Defaults | null>(null);
-  const [cliente, setCliente] = useState<string>(''); // aceptamos 15 o 0.15
-  const [lugar, setLugar]     = useState<string>('');
-  const [agente, setAgente]   = useState<string>('');
-  const [saving, setSaving]   = useState(false);
-  const [msg, setMsg]         = useState<string>('');
+  const { data: session, status } = useSession();
 
+  const [data, setData] = useState<Defaults | null>(null);
+  const [cliente, setCliente] = useState(''); // aceptamos 15 ó 0.15
+  const [lugar, setLugar]     = useState('');
+  const [agente, setAgente]   = useState('');
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState('');
+
+  // ---- helpers
   const asFrac = (v: string) => {
-    const n = Number(v.replace(',', '.'));
+    const n = Number(String(v).replace(',', '.'));
     if (Number.isNaN(n)) return NaN;
-    return n > 1 ? n / 100 : n;
+    return n > 1 ? n / 100 : n; // "15" -> 0.15
   };
   const asPct = (f: number) => `${(f * 100).toFixed(1)}%`;
 
+  // ---- guard: solo ADMIN
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!session) return; // el middleware ya te manda a /login si no hay sesión
+    if ((session.user as any)?.role !== 'ADMIN') {
+      router.push('/unauthorized');
+    }
+  }, [session, status, router]);
+
+  // ---- cargar defaults
   useEffect(() => {
     (async () => {
       const res = await fetch('/api/comisiones/defaults', { cache: 'no-store' });
       const json = await res.json();
-      setData(json);
-      setCliente(json?.defaultPctCliente?.toString() ?? '0');
-      setLugar(json?.defaultPctLugar?.toString() ?? '0');
-      setAgente(json?.defaultPctAgente?.toString() ?? '0');
+      if (res.ok) {
+        setData(json);
+        setCliente(json?.defaultPctCliente?.toString() ?? '0');
+        setLugar(json?.defaultPctLugar?.toString() ?? '0');
+        setAgente(json?.defaultPctAgente?.toString() ?? '0');
+      } else {
+        setMsg(json?.error ?? 'Error al cargar');
+      }
     })();
   }, []);
 
+  // ---- vista previa con pool=100€
   const preview = useMemo(() => {
-    const pool = 100; // ejemplo 100€
+    const pool = 100;
     const pCliente = asFrac(cliente);
     const pLugar   = asFrac(lugar);
     const pAgente  = asFrac(agente);
 
     if ([pCliente, pLugar, pAgente].some(isNaN)) return null;
     if (pLugar + pAgente > 1) return { error: 'Lugar + Agente excede el 100% del remanente' };
+    if (pCliente < 0 || pCliente > 1 || pLugar < 0 || pLugar > 1 || pAgente < 0 || pAgente > 1) {
+      return { error: 'Todos los porcentajes deben estar entre 0 y 1 (o 0% y 100%)' };
+    }
 
-    const clienteEur   = pool * pCliente;
-    const remanente    = pool - clienteEur;
-    const agenteEur    = remanente * pAgente;
-    const lugarEur     = remanente * pLugar;
-    const adminEur     = remanente - agenteEur - lugarEur;
+    const clienteEur = pool * pCliente;
+    const remanente  = pool - clienteEur;
+    const agenteEur  = remanente * pAgente;
+    const lugarEur   = remanente * pLugar;
+    const adminEur   = remanente - agenteEur - lugarEur;
 
     return { pool, clienteEur, agenteEur, lugarEur, adminEur };
   }, [cliente, lugar, agente]);
 
+  // ---- guardar
   const guardar = async () => {
     setSaving(true);
     setMsg('');
@@ -72,13 +96,12 @@ export default function DefaultsComisionesPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) {
-        setMsg(json?.error ?? 'Error');
-      } else {
+      if (!res.ok) setMsg(json?.error ?? 'Error');
+      else {
         setData(json);
         setMsg('Guardado ✅');
       }
-    } catch (e) {
+    } catch {
       setMsg('Error de red');
     } finally {
       setSaving(false);
@@ -111,15 +134,30 @@ export default function DefaultsComisionesPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-[#1F1F1F] mb-1">% Cliente (pool)</label>
-            <Input value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="ej. 15 o 0.15" />
+            <Input
+              inputMode="decimal"
+              value={cliente}
+              onChange={(e) => setCliente(e.target.value)}
+              placeholder="ej. 15 o 0.15"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-[#1F1F1F] mb-1">% Lugar (remanente)</label>
-            <Input value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="ej. 10 o 0.10" />
+            <Input
+              inputMode="decimal"
+              value={lugar}
+              onChange={(e) => setLugar(e.target.value)}
+              placeholder="ej. 10 o 0.10"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-[#1F1F1F] mb-1">% Agente (remanente)</label>
-            <Input value={agente} onChange={(e) => setAgente(e.target.value)} placeholder="ej. 20 o 0.20" />
+            <Input
+              inputMode="decimal"
+              value={agente}
+              onChange={(e) => setAgente(e.target.value)}
+              placeholder="ej. 20 o 0.20"
+            />
           </div>
         </div>
 
@@ -134,12 +172,10 @@ export default function DefaultsComisionesPage() {
           <div className="mt-6 bg-[#FFFCF0] border rounded-xl p-4">
             <div className="font-semibold mb-2">Vista previa con pool = 100€</div>
             <ul className="text-sm leading-7">
-
               <li>Cliente: <strong>{asPct(asFrac(cliente))}</strong> → {preview.clienteEur.toFixed(2)} €</li>
               <li>Agente:  <strong>{asPct(asFrac(agente))}</strong> del remanente → {preview.agenteEur.toFixed(2)} €</li>
               <li>Lugar:   <strong>{asPct(asFrac(lugar))}</strong> del remanente → {preview.lugarEur.toFixed(2)} €</li>
               <li>Admin:   (remanente - agente - lugar) → {preview.adminEur.toFixed(2)} €</li>
-
             </ul>
           </div>
         )}

@@ -1,23 +1,34 @@
 // src/app/(crm)/api/comisiones/defaults/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { prisma } from '@/lib/prisma';
 
-// Helper: normaliza porcentajes escritos como "15" (15%) o "0.15" (15%)
-function toFrac(v: unknown) {
+// Convierte "15" -> 0.15 y "0,15" -> 0.15
+function toFrac(v: unknown): number | undefined {
   if (v === null || v === undefined || v === '') return undefined;
   const n = Number(String(v).replace(',', '.'));
   if (Number.isNaN(n)) return undefined;
-  // si el usuario mete 15 asumimos 15%
   return n > 1 ? n / 100 : n;
 }
 
-export async function GET() {
-  // Devuelve el registro único; si no existe, lo crea con 0
-  const existing = await prisma.globalComisionDefaults.findFirst();
+async function ensureAdmin(req: NextRequest) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token || (token as any).role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const guard = await ensureAdmin(req);
+  if (guard) return guard;
+
+  // Único registro con id=1
+  const existing = await prisma.globalComisionDefaults.findUnique({ where: { id: 1 } });
+
   if (existing) {
     return NextResponse.json({
       ...existing,
-      // Prisma Decimal -> number
       defaultPctCliente: Number(existing.defaultPctCliente),
       defaultPctLugar: Number(existing.defaultPctLugar),
       defaultPctAgente: Number(existing.defaultPctAgente),
@@ -25,11 +36,7 @@ export async function GET() {
   }
 
   const created = await prisma.globalComisionDefaults.create({
-    data: {
-      defaultPctCliente: 0,
-      defaultPctLugar: 0,
-      defaultPctAgente: 0,
-    },
+    data: { id: 1, defaultPctCliente: 0, defaultPctLugar: 0, defaultPctAgente: 0 },
   });
 
   return NextResponse.json({
@@ -40,7 +47,10 @@ export async function GET() {
   });
 }
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
+  const guard = await ensureAdmin(req);
+  if (guard) return guard;
+
   try {
     const body = await req.json();
 
@@ -53,10 +63,9 @@ export async function PUT(req: Request) {
       pctLugar   === undefined ||
       pctAgente  === undefined
     ) {
-      return NextResponse.json({ error: 'Valores inválidos' }, { status: 400 });
+      return NextResponse.json({ error: 'Valores inválidos (usa 0..1 o 0..100%)' }, { status: 400 });
     }
 
-    // Validaciones básicas
     if (pctCliente < 0 || pctCliente > 1) {
       return NextResponse.json({ error: 'pctCliente debe estar entre 0 y 1' }, { status: 400 });
     }
@@ -66,13 +75,11 @@ export async function PUT(req: Request) {
     if (pctAgente < 0 || pctAgente > 1) {
       return NextResponse.json({ error: 'pctAgente debe estar entre 0 y 1' }, { status: 400 });
     }
-
-    // Recuerda: Cliente va sobre POOL; Lugar+Agente sobre REMANENTE → su suma debe ≤ 1
+    // Lugar + Agente se aplican sobre el remanente
     if (pctLugar + pctAgente > 1) {
       return NextResponse.json({ error: 'pctLugar + pctAgente no puede exceder 1 (100% del remanente)' }, { status: 400 });
     }
 
-    // upsert del único registro
     const saved = await prisma.globalComisionDefaults.upsert({
       where: { id: 1 },
       update: {
@@ -94,7 +101,7 @@ export async function PUT(req: Request) {
       defaultPctLugar: Number(saved.defaultPctLugar),
       defaultPctAgente: Number(saved.defaultPctAgente),
     });
-  } catch (e: any) {
+  } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Error al guardar' }, { status: 500 });
   }
