@@ -8,7 +8,6 @@ import { Toaster } from "sonner";
 
 export default function CRMClienteLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
-
   const esAdmin = session?.user?.role === "ADMIN";
 
   return (
@@ -51,7 +50,27 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
           <Link href="/lugares/fondos" className="hover:text-yellow-300 flex items-center gap-2">🖼️ Fondos Carteles</Link>
           <Link href="/ofertas" className="hover:text-yellow-300 flex items-center gap-2">📢 Ofertas</Link>
 
-          {/* NUEVO BOTÓN SOLO PARA ADMIN */}
+          {/* BLOQUE DE COMISIONES (solo ADMIN) */}
+          {esAdmin && (
+            <>
+              <div className="h-px bg-white/15 -mx-4" />
+              <div className="text-xs uppercase tracking-wider text-white/70 px-1">Comisiones</div>
+
+              <Link
+                href="/dashboard/comisiones/defaults"
+                className="hover:text-yellow-300 flex items-center gap-2"
+                title="Definir porcentajes por defecto de Cliente, Lugar y Agente"
+              >
+                ⚖️ Defaults de comisión
+              </Link>
+              {/* Para futuros overrides:
+              <Link href="/dashboard/comisiones/overrides" className="hover:text-yellow-300 flex items-center gap-2">
+                🎛️ Overrides
+              </Link> */}
+            </>
+          )}
+
+          {/* SOLO ADMIN (ya lo tenías) */}
           {esAdmin && (
             <Link href="/productos-ganaderos" className="hover:text-yellow-300 flex items-center gap-2">
               🐄 Productos Ganaderos
