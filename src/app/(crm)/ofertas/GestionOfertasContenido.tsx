@@ -284,116 +284,15 @@ export default function GestionOfertasContenido() {
   if (!session) return <div className="p-6 text-white">Acceso restringido. Por favor inicia sesión.</div>
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-white">Gestión de Ofertas</h1>
-
-      {esAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow text-black">
-          <Input
-            placeholder="Título"
-            value={form.titulo}
-            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-          />
-          <Input
-            placeholder="Descripción"
-            value={form.descripcion}
-            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-          />
-          <Input
-            placeholder="Descripción Corta"
-            value={form.descripcionCorta}
-            onChange={(e) => setForm({ ...form, descripcionCorta: e.target.value })}
-          />
-          <select
-            value={form.tipo}
-            onChange={(e) => setForm({ ...form, tipo: e.target.value as any })}
-            className="border rounded p-2 bg-white text-black"
-          >
-            <option value="luz">Luz</option>
-            <option value="gas">Gas</option>
-            <option value="telefonia">Telefonía</option>
-          </select>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={form.destacada}
-              onChange={(e) => setForm({ ...form, destacada: e.target.checked })}
-            />
-            Destacada (carrusel)
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={form.activa}
-              onChange={(e) => setForm({ ...form, activa: e.target.checked })}
-            />
-            Oferta Activa
-          </label>
-          <Button
-            onClick={crearOferta}
-            className="w-full col-span-2 bg-green-600 hover:bg-green-700 text-white"
-          >
-            Crear Oferta
-          </Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {ofertas.map((oferta) => {
-          const tipo = oferta.tipo.toLowerCase()
-          return (
-            <Card key={oferta.id} className={`${fondoPorTipo[tipo]} shadow-md rounded-2xl text-black`}>
-              <CardContent className="p-4 flex flex-col justify-between h-full">
-                <div>
-                  <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(tipo)}`}>
-                    {obtenerIcono(tipo)}
-                    {tipo.toUpperCase()}
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
-                  <p className="text-sm text-gray-800">{oferta.descripcionCorta || oferta.descripcion}</p>
-                  {oferta.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
-                  {!oferta.activa && <div className="text-red-600 text-sm font-bold">❌ Inactiva</div>}
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    onClick={() => alert('Más información disponible próximamente')}
-                    className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
-                  >
-                    Ir a la oferta
-                  </Button>
-                  {esAdmin && (
-                    <>
-                      <Button
-                        variant="outline"
-                        className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
-                        onClick={() => alert('Función de edición en desarrollo')}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
-                        onClick={() => eliminarOferta(oferta.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* NUEVOS BLOQUES SOLO ADMIN */}
-      {true && (
-        <div className="space-y-4">
-          <ImportadorTarifas />
-          <TablaTarifas />
-        </div>
-      )}
-
+  <div className="p-6 space-y-6 border-4 border-red-500">
+    <div className="bg-yellow-300 text-black p-3 rounded-lg font-extrabold text-center">
+      DEBUG: NUEVO CATÁLOGO ACTIVO EN /ofertas
     </div>
-  )
+
+    {/* MOSTRAR SOLO EL CATALOGO/IMPORTADOR (temporal para probar) */}
+    <ImportadorTarifas />
+    <TablaTarifas />
+  </div>
+);
+
 }
