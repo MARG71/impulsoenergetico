@@ -1,4 +1,4 @@
-// src/app/(crm)/ofertas/page.tsx
+// Desactiva SSG/caché para esta ruta
 export const dynamic = 'force-dynamic';
 
 import GestionOfertasContenido from './GestionOfertasContenido';
