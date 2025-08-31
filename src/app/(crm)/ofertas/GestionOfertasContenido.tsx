@@ -222,8 +222,12 @@ function TablaTarifas() {
 
 export default function GestionOfertasContenido() {
   const { data: session, status } = useSession()
-  const esAdmin = session?.user?.role === 'ADMIN'
-  
+  const rawRole =
+    (session as any)?.user?.role ??
+    (session as any)?.user?.rol ?? // por si lo traes como 'rol'
+    ''
+  const esAdmin = String(rawRole).toUpperCase() === 'ADMIN'
+
   console.log('DEBUG session.user =>', (session as any)?.user);
 
 
