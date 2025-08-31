@@ -1,11 +1,11 @@
 // src/app/(crm)/ofertas/page.tsx
-export const dynamic = 'force-dynamic'; // desactiva SSG/caché de la ruta
+export const dynamic = 'force-dynamic'; // evitar SSG/caché
 
-import dynamic from 'next/dynamic';
+import NextDynamic from 'next/dynamic';
 import { Suspense } from 'react';
 
 // Carga cliente-only del contenido
-const GestionOfertasContenido = dynamic(() => import('./GestionOfertasContenido'), {
+const GestionOfertasContenido = NextDynamic(() => import('./GestionOfertasContenido'), {
   ssr: false,
 });
 
