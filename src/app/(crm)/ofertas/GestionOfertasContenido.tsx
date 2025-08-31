@@ -226,7 +226,7 @@ export default function GestionOfertasContenido() {
     (session as any)?.user?.role ??
     (session as any)?.user?.rol ?? // por si lo traes como 'rol'
     ''
-  const esAdmin = String(rawRole).toUpperCase() === 'ADMIN'
+  const esAdmin = String(rawRole).toUpperCase() === 'Admin'
 
   console.log('DEBUG session.user =>', (session as any)?.user);
 
