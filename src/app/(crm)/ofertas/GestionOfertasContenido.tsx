@@ -223,6 +223,9 @@ function TablaTarifas() {
 export default function GestionOfertasContenido() {
   const { data: session, status } = useSession()
   const esAdmin = session?.user?.role === 'ADMIN'
+  
+  console.log('DEBUG session.user =>', (session as any)?.user);
+
 
   const [ofertas, setOfertas] = useState<Oferta[]>([])
   const [form, setForm] = useState({
@@ -380,12 +383,13 @@ export default function GestionOfertasContenido() {
       </div>
 
       {/* NUEVOS BLOQUES SOLO ADMIN */}
-      {esAdmin && (
+      {true && (
         <div className="space-y-4">
           <ImportadorTarifas />
           <TablaTarifas />
         </div>
       )}
+
     </div>
   )
 }
