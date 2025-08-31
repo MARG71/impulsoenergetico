@@ -271,3 +271,76 @@ model ComisionOverride {
   @@index([lugarId, compania, tarifa, activo, validFrom, validTo])
   @@map("comision_override")
 }
+
+/// Tipos de catálogo (independiente del modelo Oferta "marketing")
+enum TipoOferta {
+  LUZ
+  GAS
+  TELEFONIA
+}
+
+model OfertaTarifa {
+  id            Int         @id @default(autoincrement())
+  tipo          TipoOferta  // LUZ | GAS | TELEFONIA
+  subtipo       String      // p.ej. '2.0TD' | '3.0TD' | '6.1TD'
+  compania      String
+  anexoPrecio   String?     // nombre/código del anexo de precios (si viene)
+  nombre        String      // nombre comercial de la tarifa en el Excel
+  descripcion   String?     // descripción de la oferta (del Excel)
+  descripcionCorta String?   // <- NUEVO CAMPO AQUÍ
+  activa        Boolean     @default(true)
+  destacada     Boolean     @default(false)
+
+  // --- PRECIOS ENERGÍA (€/kWh) por periodo. Para 2.0TD deja P4..P6 a 0 ---
+  precioKwhP1   Decimal?    @db.Decimal(10, 6)
+  precioKwhP2   Decimal?    @db.Decimal(10, 6)
+  precioKwhP3   Decimal?    @db.Decimal(10, 6)
+  precioKwhP4   Decimal?    @db.Decimal(10, 6)
+  precioKwhP5   Decimal?    @db.Decimal(10, 6)
+  precioKwhP6   Decimal?    @db.Decimal(10, 6)
+
+  // Comisión base (€/kWh) para cuando no encaje ningún tramo
+  comisionKwhAdminBase Decimal? @db.Decimal(10, 6)
+
+  // Extras que quieras guardar tal cual del Excel (condiciones, URLs, etc.)
+  payload       Json?
+
+  // Tramos de consumo que modifican la comisión
+  tramos        OfertaTarifaTramo[]
+
+  creadaEn      DateTime    @default(now())
+  actualizadaEn DateTime    @updatedAt
+
+  @@index([tipo, subtipo, compania])
+  @@index([tipo, subtipo, anexoPrecio])
+  @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
+}
+
+model OfertaTarifaTramo {
+  id                 Int      @id @default(autoincrement())
+  ofertaTarifaId     Int
+  // Consumo anual en kWh (si tu Excel trae mensual, luego convertimos al importar)
+  consumoDesdeKWh    Int
+  consumoHastaKWh    Int?     // null = sin tope superior
+
+  // Comisión específica del tramo (cualquiera de las dos o ambas)
+  comisionKwhAdmin   Decimal? @db.Decimal(10, 6) // €/kWh
+  comisionFijaAdmin  Decimal? @db.Decimal(10, 2) // € fijos (opcional)
+
+  // (Opcional) si el Excel trae reparto por rol para este tramo, lo guardamos aquí
+  pctCliente         Decimal? @db.Decimal(5, 4)  // 0..1
+  pctLugar           Decimal? @db.Decimal(5, 4)  // 0..1
+  pctAgente          Decimal? @db.Decimal(5, 4)  // 0..1
+
+  // Vigencia opcional por tramo (si el Excel trae fechas)
+  validFrom          DateTime?
+  validTo            DateTime?
+  activo             Boolean  @default(true)
+  notas              String?
+
+  ofertaTarifa       OfertaTarifa @relation(fields: [ofertaTarifaId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaTarifaId])
+  @@index([consumoDesdeKWh, consumoHastaKWh])
+  @@unique([ofertaTarifaId, consumoDesdeKWh, consumoHastaKWh])
+}
