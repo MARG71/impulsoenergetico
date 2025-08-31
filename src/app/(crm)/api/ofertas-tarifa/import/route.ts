@@ -37,7 +37,11 @@ export async function POST(req: Request) {
     const subtipo = getStr(r, ['subtipo','Subtipo','tarifa','Tarifa'], subtipoGlobal || '2.0TD')
 
     const compania = getStr(r, ['compania','compañia','Company','COMPAÑIA','Compañia'], 'N/D')
-    const anexo = getStr(r, ['anexo','anexoPrecio','Anexo','Anexo Precio'], null)
+    
+    const anexoRaw = getStr(r, ['anexo','anexoPrecio','Anexo','Anexo Precio'], '')
+    const anexo = anexoRaw || null
+
+    
     const nombre = getStr(r, ['nombre','Nombre','nombre_tarifa','Nombre tarifa','Tarifa'], subtipo)
     const descripcion = getStr(r, ['descripcion','Descripción','descripcion_oferta','Descripción oferta'], '')
 
