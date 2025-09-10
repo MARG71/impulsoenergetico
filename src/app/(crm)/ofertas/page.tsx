@@ -1,17 +1,8 @@
-'use client'
+// Desactiva SSG/caché para esta ruta
+export const dynamic = 'force-dynamic';
 
-import dynamic from 'next/dynamic'
-import { Suspense } from 'react'
-
-// ⚠️ ¡Import dinámico para evitar que el componente cliente se use en el build del servidor!
-const GestionOfertasContenido = dynamic(() => import('./GestionOfertasContenido'), {
-  ssr: false,
-})
+import GestionOfertasContenido from './GestionOfertasContenido';
 
 export default function Page() {
-  return (
-    <Suspense fallback={<div className="p-6 text-white">Cargando ofertas...</div>}>
-      <GestionOfertasContenido />
-    </Suspense>
-  )
+  return <GestionOfertasContenido />;
 }

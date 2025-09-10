@@ -47,7 +47,7 @@ model Comparativa {
 model ResultadoComparativa {
   id             Int    @id @default(autoincrement())
   comparativaId  Int
-  compañia       String
+  compañia      String
   tarifa         String
   precioAnual    Float
   ahorroEstimado Float
@@ -59,7 +59,7 @@ model Contrato {
   id        Int      @id @default(autoincrement())
   clienteId Int
   servicio  String
-  compañia  String
+  compañia String
   tarifa    String
   fechaAlta DateTime @default(now())
   comision  Float
@@ -70,13 +70,13 @@ model Contrato {
 }
 
 model Agente {
-  id           Int           @id @default(autoincrement())
-  nombre       String
-  email        String        @unique
-  telefono     String?
+  id       Int     @id @default(autoincrement())
+  nombre   String
+  email    String  @unique
+  telefono String?
 
   // % del REMANENTE para el Agente (0..1). Si es null, se usan defaults/overrides.
-  pctAgente    Decimal?      @db.Decimal(5, 4)
+  pctAgente Decimal? @db.Decimal(5, 4)
 
   contratos    Contrato[]
   lugares      Lugar[]
@@ -86,7 +86,7 @@ model Agente {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
-  creadoEn     DateTime @default(now())
+  creadoEn DateTime @default(now())
 }
 
 model Lugar {
@@ -101,14 +101,14 @@ model Lugar {
   // % del REMANENTE para el Lugar (0..1). Si es null, se usan defaults/overrides.
   pctLugar   Decimal? @db.Decimal(5, 4)
 
-  agente       Agente        @relation(fields: [agenteId], references: [id])
+  agente       Agente             @relation(fields: [agenteId], references: [id])
   comparativas Comparativa[]
   qrs          QR[]
   leads        Lead[]
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
-  creadoEn     DateTime @default(now())
+  creadoEn DateTime @default(now())
 }
 
 model QR {
@@ -150,88 +150,100 @@ model Lead {
 }
 
 model DatosFactura {
-  id                    Int           @id @default(autoincrement())
-  tipoCliente           String?
-  tipoTarifa            String?
-  nombreTarifa          String?
-  cups                  String?
-  fechaInicio           String?
-  fechaFin              String?
-  consumoPeriodos       String?
-  potencias             String?
-  consumoAnualKWh       Float?
-  importeFactura        Float?
-  iva                   Float?
-  impuestoElectricidad  Float?
-  territorio            String?
-  reactiva              Float?
-  exceso                Float?
-  alquiler              Float?
-  otros                 Float?
-  comparativaId         Int           @unique
-  comparativa           Comparativa   @relation(fields: [comparativaId], references: [id])
+  id                   Int         @id @default(autoincrement())
+  tipoCliente          String?
+  tipoTarifa           String?
+  nombreTarifa         String?
+  cups                 String?
+  fechaInicio          String?
+  fechaFin             String?
+  consumoPeriodos      String?
+  potencias            String?
+  consumoAnualKWh      Float?
+  importeFactura       Float?
+  iva                  Float?
+  impuestoElectricidad Float?
+  territorio           String?
+  reactiva             Float?
+  exceso               Float?
+  alquiler             Float?
+  otros                Float?
+  comparativaId        Int         @unique
+  comparativa          Comparativa @relation(fields: [comparativaId], references: [id])
 }
 
 model FondoCartel {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  url       String
-  creadoEn  DateTime @default(now())
-  activo    Boolean  @default(false)
+  id       Int      @id @default(autoincrement())
+  nombre   String
+  url      String
+  creadoEn DateTime @default(now())
+  activo   Boolean  @default(false)
 }
 
 model FondoActivo {
-  id        Int      @id @default(1)
-  url       String
-  creadoEn  DateTime @default(now())
+  id       Int      @id @default(1)
+  url      String
+  creadoEn DateTime @default(now())
 }
 
 model Fondo {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  url       String   @unique
-  creadoEn  DateTime @default(now())
-  activo    Boolean  @default(false)
+  id       Int      @id @default(autoincrement())
+  nombre   String
+  url      String   @unique
+  creadoEn DateTime @default(now())
+  activo   Boolean  @default(false)
 }
 
 model ConfiguracionGlobal {
-  id              Int    @id @default(1)
-  fondoCartelUrl  String
+  id             Int    @id @default(1)
+  fondoCartelUrl String
 }
 
+// ======================
+// Ofertas (marketing)
+// ======================
 model Oferta {
-  id          Int      @id @default(autoincrement())
-  titulo      String
-  descripcion String
-  tipo        String   // 'luz' | 'gas' | 'telefonia'
-  destacada   Boolean  @default(false)
-  activa      Boolean  @default(true)
-  creadaEn    DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  titulo           String
+  descripcion      String
+  descripcionCorta String?
+  tipo             String // 'luz' | 'gas' | 'telefonia'
+  destacada        Boolean  @default(false)
+  activa           Boolean  @default(true)
+  creadaEn         DateTime @default(now())
+
+  // Enlace opcional al catálogo (si esta oferta nace de una tarifa)
+  ofertaTarifaId Int?
+  ofertaTarifa   OfertaTarifa? @relation("TarifaAOferta", fields: [ofertaTarifaId], references: [id])
+
+  @@index([ofertaTarifaId])
 }
 
 model ProductoGanadero {
-  id              String   @id @default(cuid())
-  nombre          String
-  descripcion     String
-  categoria       String
-  precioCoste     Float
-  margen          Float
-  precioPVP       Float
-  descuento       Float?
-  precioFinal     Float
-  imagenUrl       String
-  activo          Boolean  @default(true)
-  creadoEn        DateTime @default(now())
+  id          String   @id @default(cuid())
+  nombre      String
+  descripcion String
+  categoria   String
+  precioCoste Float
+  margen      Float
+  precioPVP   Float
+  descuento   Float?
+  precioFinal Float
+  imagenUrl   String
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
 }
 
-/* =========
-   COMISIONES
-   ========= */
+/**
+ * =========
+ * COMISIONES
+ * =========
+ */
 
 /// Defaults globales cuando Lugar/Agente no tienen valores propios ni hay override.
 /// Porcentajes 0..1 (ej: 0.30 = 30%)
 model GlobalComisionDefaults {
-  id                Int     @id @default(1)
+  id                Int      @id @default(1)
   defaultPctCliente Decimal  @db.Decimal(5, 4)
   defaultPctLugar   Decimal  @db.Decimal(5, 4)
   defaultPctAgente  Decimal  @db.Decimal(5, 4)
@@ -243,31 +255,108 @@ model GlobalComisionDefaults {
 /// Reglas específicas por Lugar (y opcionalmente Agente), filtrables por compañía/tarifa,
 /// con vigencia y prioridad. pctCliente aplica sobre POOL; pctLugar/pctAgente sobre REMANENTE.
 model ComisionOverride {
-  id        Int     @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  lugarId   Int
-  lugar     Lugar   @relation(fields: [lugarId], references: [id])
+  lugarId Int
+  lugar   Lugar @relation(fields: [lugarId], references: [id])
 
-  agenteId  Int?
-  agente    Agente? @relation(fields: [agenteId], references: [id])
+  agenteId Int?
+  agente   Agente? @relation(fields: [agenteId], references: [id])
 
   // Filtros opcionales
-  compania  String?
-  tarifa    String?
+  compania String?
+  tarifa   String?
 
   // Si no son null, pisan el valor correspondiente (0..1)
   pctCliente Decimal? @db.Decimal(5, 4)
   pctLugar   Decimal? @db.Decimal(5, 4)
   pctAgente  Decimal? @db.Decimal(5, 4)
 
-  validFrom  DateTime?
-  validTo    DateTime?
-  activo     Boolean  @default(true)
-  prioridad  Int      @default(0)
+  validFrom DateTime?
+  validTo   DateTime?
+  activo    Boolean   @default(true)
+  prioridad Int       @default(0)
 
-  creadoEn     DateTime @default(now())
+  creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
   @@index([lugarId, compania, tarifa, activo, validFrom, validTo])
   @@map("comision_override")
+}
+
+// ======================
+// Catálogo de tarifas
+// ======================
+enum TipoOferta {
+  LUZ
+  GAS
+  TELEFONIA
+}
+
+model OfertaTarifa {
+  id               Int        @id @default(autoincrement())
+  tipo             TipoOferta // LUZ | GAS | TELEFONIA
+  subtipo          String // p.ej. '2.0TD' | '3.0TD' | '6.1TD'
+  compania         String
+  anexoPrecio      String? // nombre/código del anexo de precios (si viene)
+  nombre           String // nombre comercial de la tarifa en el Excel
+  descripcion      String? // descripción de la oferta (del Excel)
+  descripcionCorta String?
+  activa           Boolean    @default(true)
+  destacada        Boolean    @default(false)
+
+  // PRECIOS ENERGÍA (€/kWh) por periodo. Para 2.0TD deja P4..P6 a 0
+  precioKwhP1 Decimal? @db.Decimal(10, 6)
+  precioKwhP2 Decimal? @db.Decimal(10, 6)
+  precioKwhP3 Decimal? @db.Decimal(10, 6)
+  precioKwhP4 Decimal? @db.Decimal(10, 6)
+  precioKwhP5 Decimal? @db.Decimal(10, 6)
+  precioKwhP6 Decimal? @db.Decimal(10, 6)
+
+  // Comisión base (€/kWh) cuando no encaja ningún tramo
+  comisionKwhAdminBase Decimal? @db.Decimal(10, 6)
+
+  // Extras (condiciones, URLs, etc.)
+  payload Json?
+
+  // Relaciones
+  tramos  OfertaTarifaTramo[]
+  ofertas Oferta[]            @relation("TarifaAOferta") // 👈 back-rel a Oferta
+
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
+  @@index([tipo, subtipo, compania])
+  @@index([tipo, subtipo, anexoPrecio])
+}
+
+model OfertaTarifaTramo {
+  id             Int @id @default(autoincrement())
+  ofertaTarifaId Int
+
+  // Consumo anual en kWh (si el Excel trae mensual, conviertes al importar)
+  consumoDesdeKWh Int
+  consumoHastaKWh Int? // null = sin tope superior
+
+  // Comisión específica del tramo
+  comisionKwhAdmin  Decimal? @db.Decimal(10, 6) // €/kWh
+  comisionFijaAdmin Decimal? @db.Decimal(10, 2) // € fijos
+
+  // Reparto por rol (opcional)
+  pctCliente Decimal? @db.Decimal(5, 4) // 0..1
+  pctLugar   Decimal? @db.Decimal(5, 4) // 0..1
+  pctAgente  Decimal? @db.Decimal(5, 4) // 0..1
+
+  // Vigencia por tramo (opcional)
+  validFrom DateTime?
+  validTo   DateTime?
+  activo    Boolean   @default(true)
+  notas     String?
+
+  ofertaTarifa OfertaTarifa @relation(fields: [ofertaTarifaId], references: [id], onDelete: Cascade)
+
+  @@unique([ofertaTarifaId, consumoDesdeKWh, consumoHastaKWh])
+  @@index([ofertaTarifaId])
+  @@index([consumoDesdeKWh, consumoHastaKWh])
 }
