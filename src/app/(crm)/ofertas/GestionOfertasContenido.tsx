@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Sparkles, Flame, Phone, Trash2, Pencil, Upload, Download, Trash } from 'lucide-react'
 
+/* =========================
+   Tipados locales
+   ========================= */
 type Oferta = {
   id: number
   titulo: string
@@ -42,6 +45,9 @@ type OfertaTarifa = {
   tramos?: Tramo[]
 }
 
+/* =========================
+   Helpers UI
+   ========================= */
 const fondoPorTipo: Record<string, string> = {
   luz: 'bg-[#d3fce3]',
   gas: 'bg-[#ffe9d6]',
@@ -58,9 +64,9 @@ const obtenerIcono = (tipo: string) =>
   tipo === 'gas' ? <Flame className="w-4 h-4 inline mr-1" /> :
   <Phone className="w-4 h-4 inline mr-1" />
 
-/* ============================
-   Bloque NUEVO: Importar Excel
-   ============================ */
+/* =========================
+   Importador Excel (solo ADMIN)
+   ========================= */
 function ImportadorTarifas() {
   const [file, setFile] = useState<File|null>(null);
   const [tipo, setTipo] = useState<'LUZ'|'GAS'|'TELEFONIA'>('LUZ');
@@ -121,10 +127,10 @@ function ImportadorTarifas() {
   );
 }
 
-/* ============================
-   Bloque NUEVO: Tabla catálogo
-   ============================ */
-function TablaTarifas() {
+/* =========================
+   Tabla Catálogo + Publicar
+   ========================= */
+function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: ()=>void }) {
   const [rows, setRows] = useState<OfertaTarifa[]>([]);
   const [tipo, setTipo] = useState<'LUZ'|'GAS'|'TELEFONIA'>('LUZ');
   const [subtipo, setSubtipo] = useState('2.0TD');
@@ -152,6 +158,35 @@ function TablaTarifas() {
     load();
   };
 
+  const publicarComoOferta = async (r: OfertaTarifa) => {
+    const titulo = `${r.compania} · ${r.nombre}`;
+    const descripcion = `Tarifa ${r.subtipo} (${r.tipo})`;
+    const descripcionCorta =
+      `P1 ${r.precioKwhP1 ?? '-'} | P2 ${r.precioKwhP2 ?? '-'} | P3 ${r.precioKwhP3 ?? '-'}`;
+
+    const res = await fetch('/api/ofertas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo,
+        descripcion,
+        descripcionCorta,
+        tipo: 'luz',      // estamos en catálogo de luz; para gas/telefonía cambiará
+        destacada: false,
+        activa: true,
+        ofertaTarifaId: r.id, // enlace al catálogo
+      }),
+    });
+
+    if (res.ok) {
+      alert('Publicada en Ofertas');
+      onPublicada(); // refresca las tarjetas de marketing
+    } else {
+      const data = await res.json().catch(()=>({}));
+      alert('Error al publicar: ' + (data?.error || res.statusText));
+    }
+  };
+
   const fmt = (v: any) => (v === null || v === undefined || v === '') ? '-' : String(v);
 
   return (
@@ -163,8 +198,15 @@ function TablaTarifas() {
             <option value="GAS">Gas</option>
             <option value="TELEFONIA">Telefonía</option>
           </select>
-          <input className="border rounded p-2" value={subtipo} onChange={e=>setSubtipo(e.target.value)} placeholder="Subtipo (2.0TD/3.0TD/6.1TD)" />
-          <Button variant="outline" onClick={load} className="flex items-center gap-2"><Download className="w-4 h-4" /> Refrescar</Button>
+          <input
+            className="border rounded p-2"
+            value={subtipo}
+            onChange={e=>setSubtipo(e.target.value)}
+            placeholder="Subtipo (2.0TD/3.0TD/6.1TD)"
+          />
+          <Button variant="outline" onClick={load} className="flex items-center gap-2">
+            <Download className="w-4 h-4" /> Refrescar
+          </Button>
         </div>
         <div className="text-sm text-gray-700">{loading ? 'Cargando…' : `${rows.length} tarifas`}</div>
       </div>
@@ -203,10 +245,27 @@ function TablaTarifas() {
                 <td className="p-2 text-right">{fmt(r.precioKwhP6)}</td>
                 <td className="p-2 text-right">{fmt(r.comisionKwhAdminBase)}</td>
                 <td className="p-2 text-right">{r.tramos?.length ?? 0}</td>
-                <td className="p-2 text-right">
-                  <Button variant="outline" className="text-red-600 border-red-600 hover:bg-red-50" onClick={() => borrar(r.id)}>
-                    <Trash className="w-4 h-4" />
-                  </Button>
+                <td className="p-2">
+                  <div className="flex gap-2 justify-end">
+                    {esAdmin && (
+                      <Button
+                        variant="outline"
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                        onClick={() => publicarComoOferta(r)}
+                      >
+                        Publicar
+                      </Button>
+                    )}
+                    {esAdmin && (
+                      <Button
+                        variant="outline"
+                        className="text-red-600 border-red-600 hover:bg-red-50"
+                        onClick={() => borrar(r.id)}
+                      >
+                        <Trash className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -220,15 +279,19 @@ function TablaTarifas() {
   );
 }
 
+/* =========================
+   Página principal con pestañas
+   ========================= */
 export default function GestionOfertasContenido() {
   const { data: session, status } = useSession()
   const rawRole =
     (session as any)?.user?.role ??
-    (session as any)?.user?.rol ?? // por si lo traes como 'rol'
+    (session as any)?.user?.rol ??
     ''
   const esAdmin = String(rawRole).toUpperCase() === 'ADMIN'
 
-  console.log('DEBUG session.user =>', (session as any)?.user);
+  // pestañas: marketing (ofertas manuales) | catalogo-luz (import/lista/publicar)
+  const [tab, setTab] = useState<'marketing'|'catalogo-luz'>('marketing')
 
   const [ofertas, setOfertas] = useState<Oferta[]>([])
   const [form, setForm] = useState({
@@ -242,7 +305,7 @@ export default function GestionOfertasContenido() {
 
   const cargarOfertas = async () => {
     try {
-      const res = await fetch('/api/ofertas')
+      const res = await fetch('/api/ofertas?activa=true')
       const data = await res.json()
       setOfertas(data)
     } catch (error) {
@@ -286,113 +349,140 @@ export default function GestionOfertasContenido() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-white">Gestión de Ofertas</h1>
 
-      {esAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow text-black">
-          <Input
-            placeholder="Título"
-            value={form.titulo}
-            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-          />
-          <Input
-            placeholder="Descripción"
-            value={form.descripcion}
-            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-          />
-          <Input
-            placeholder="Descripción Corta"
-            value={form.descripcionCorta}
-            onChange={(e) => setForm({ ...form, descripcionCorta: e.target.value })}
-          />
-          <select
-            value={form.tipo}
-            onChange={(e) => setForm({ ...form, tipo: e.target.value as any })}
-            className="border rounded p-2 bg-white text-black"
-          >
-            <option value="luz">Luz</option>
-            <option value="gas">Gas</option>
-            <option value="telefonia">Telefonía</option>
-          </select>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={form.destacada}
-              onChange={(e) => setForm({ ...form, destacada: e.target.checked })}
-            />
-            Destacada (carrusel)
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={form.activa}
-              onChange={(e) => setForm({ ...form, activa: e.target.checked })}
-            />
-            Oferta Activa
-          </label>
-          <Button
-            onClick={crearOferta}
-            className="w-full col-span-2 bg-green-600 hover:bg-green-700 text-white"
-          >
-            Crear Oferta
-          </Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {ofertas.map((oferta) => {
-          const tipo = oferta.tipo.toLowerCase()
-          return (
-            <Card key={oferta.id} className={`${fondoPorTipo[tipo]} shadow-md rounded-2xl text-black`}>
-              <CardContent className="p-4 flex flex-col justify-between h-full">
-                <div>
-                  <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(tipo)}`}>
-                    {obtenerIcono(tipo)}
-                    {tipo.toUpperCase()}
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
-                  <p className="text-sm text-gray-800">{oferta.descripcionCorta || oferta.descripcion}</p>
-                  {oferta.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
-                  {!oferta.activa && <div className="text-red-600 text-sm font-bold">❌ Inactiva</div>}
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    onClick={() => alert('Más información disponible próximamente')}
-                    className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
-                  >
-                    Ir a la oferta
-                  </Button>
-                  {esAdmin && (
-                    <>
-                      <Button
-                        variant="outline"
-                        className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
-                        onClick={() => alert('Función de edición en desarrollo')}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
-                        onClick={() => eliminarOferta(oferta.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+      {/* Pestañas */}
+      <div className="flex gap-2">
+        <button
+          onClick={()=>setTab('marketing')}
+          className={`px-3 py-1 rounded ${tab==='marketing'?'bg-yellow-400 text-black':'bg-white text-black border'}`}
+        >
+          Ofertas (marketing)
+        </button>
+        <button
+          onClick={()=>setTab('catalogo-luz')}
+          className={`px-3 py-1 rounded ${tab==='catalogo-luz'?'bg-yellow-400 text-black':'bg-white text-black border'}`}
+        >
+          Catálogo Luz
+        </button>
       </div>
 
-      {/* NUEVOS BLOQUES SOLO ADMIN */}
-      {true && (
-        <div className="space-y-4">
-          <ImportadorTarifas />
-          <TablaTarifas />
-        </div>
+      {/* ---- Pestaña: Ofertas marketing ---- */}
+      {tab==='marketing' && (
+        <>
+          {esAdmin && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl shadow text-black">
+              <Input
+                placeholder="Título"
+                value={form.titulo}
+                onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              />
+              <Input
+                placeholder="Descripción"
+                value={form.descripcion}
+                onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+              />
+              <Input
+                placeholder="Descripción Corta"
+                value={form.descripcionCorta}
+                onChange={(e) => setForm({ ...form, descripcionCorta: e.target.value })}
+              />
+              <select
+                value={form.tipo}
+                onChange={(e) => setForm({ ...form, tipo: e.target.value as any })}
+                className="border rounded p-2 bg-white text-black"
+              >
+                <option value="luz">Luz</option>
+                <option value="gas">Gas</option>
+                <option value="telefonia">Telefonía</option>
+              </select>
+              <label className="flex items-center gap-2 col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.destacada}
+                  onChange={(e) => setForm({ ...form, destacada: e.target.checked })}
+                />
+                Destacada (carrusel)
+              </label>
+              <label className="flex items-center gap-2 col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.activa}
+                  onChange={(e) => setForm({ ...form, activa: e.target.checked })}
+                />
+                Oferta Activa
+              </label>
+              <Button
+                onClick={crearOferta}
+                className="w-full col-span-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                Crear Oferta
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {ofertas.map((oferta) => {
+              const tipo = oferta.tipo.toLowerCase()
+              return (
+                <Card key={oferta.id} className={`${fondoPorTipo[tipo]} shadow-md rounded-2xl text-black`}>
+                  <CardContent className="p-4 flex flex-col justify-between h-full">
+                    <div>
+                      <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(tipo)}`}>
+                        {obtenerIcono(tipo)}
+                        {tipo.toUpperCase()}
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
+                      <p className="text-sm text-gray-800">{oferta.descripcionCorta || oferta.descripcion}</p>
+                      {oferta.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
+                      {!oferta.activa && <div className="text-red-600 text-sm font-bold">❌ Inactiva</div>}
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        onClick={() => alert('Más información disponible próximamente')}
+                        className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
+                      >
+                        Ir a la oferta
+                      </Button>
+                      {esAdmin && (
+                        <>
+                          <Button
+                            variant="outline"
+                            className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
+                            onClick={() => alert('Función de edición en desarrollo')}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
+                            onClick={() => eliminarOferta(oferta.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </>
       )}
 
+      {/* ---- Pestaña: Catálogo Luz ---- */}
+      {tab==='catalogo-luz' && (
+        <div className="space-y-4">
+          {esAdmin && <ImportadorTarifas />}
+          <TablaTarifas
+            esAdmin={esAdmin}
+            onPublicada={() => {
+              // Al publicar desde catálogo, recargamos las tarjetas de marketing
+              setTab('marketing')
+              cargarOfertas()
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

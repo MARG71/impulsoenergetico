@@ -199,15 +199,25 @@ model ConfiguracionGlobal {
   fondoCartelUrl  String
 }
 
+// prisma/schema.prisma
+
 model Oferta {
-  id          Int      @id @default(autoincrement())
-  titulo      String
-  descripcion String
-  tipo        String   // 'luz' | 'gas' | 'telefonia'
-  destacada   Boolean  @default(false)
-  activa      Boolean  @default(true)
-  creadaEn    DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  titulo          String
+  descripcion     String
+  descripcionCorta String?
+  tipo            String   // 'luz' | 'gas' | 'telefonia'
+  destacada       Boolean  @default(false)
+  activa          Boolean  @default(true)
+  creadaEn        DateTime @default(now())
+
+  // 👉 Enlace opcional al catálogo (si esta oferta nace de una tarifa)
+  ofertaTarifaId  Int?
+  ofertaTarifa    OfertaTarifa? @relation(fields: [ofertaTarifaId], references: [id])
+
+  @@index([ofertaTarifaId])
 }
+
 
 model ProductoGanadero {
   id              String   @id @default(cuid())
