@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -8,13 +8,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Sparkles, Flame, Phone, Trash2, Pencil, Upload, Download, Trash } from 'lucide-react'
 
 /* =========================
-   Tipados locales
+   Tipados
    ========================= */
 type Oferta = {
   id: number
   titulo: string
   descripcion: string
-  descripcionCorta: string
+  descripcionCorta: string | null
   tipo: 'luz' | 'gas' | 'telefonia'
   destacada: boolean
   activa: boolean
@@ -35,6 +35,7 @@ type OfertaTarifa = {
   compania: string
   nombre: string
   activa: boolean
+  destacada?: boolean
   precioKwhP1?: number | string | null
   precioKwhP2?: number | string | null
   precioKwhP3?: number | string | null
@@ -86,7 +87,8 @@ function ImportadorTarifas() {
     fd.append('subtipo', subtipo);
     fd.append('replace', String(replace));
 
-    const res = await fetch('/api/ofertas-tarifa/import', { method: 'POST', body: fd });
+    // OJO: esta ruta existe en tu proyecto (singular: oferta-tarifa/import)
+    const res = await fetch('/api/oferta-tarifa/import', { method: 'POST', body: fd });
     const data = await res.json();
     setLoading(false);
     setMsg(res.ok ? `Importadas ${data.ofertas} ofertas y ${data.tramos} tramos` : (data?.error || 'Error al importar'));
@@ -171,7 +173,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
         titulo,
         descripcion,
         descripcionCorta,
-        tipo: 'luz',      // estamos en catálogo de luz; para gas/telefonía cambiará
+        tipo: 'luz',      // en catálogo de luz publicaríamos como 'luz'
         destacada: false,
         activa: true,
         ofertaTarifaId: r.id, // enlace al catálogo
@@ -198,7 +200,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
             <option value="GAS">Gas</option>
             <option value="TELEFONIA">Telefonía</option>
           </select>
-          <input
+          <Input
             className="border rounded p-2"
             value={subtipo}
             onChange={e=>setSubtipo(e.target.value)}
@@ -290,9 +292,10 @@ export default function GestionOfertasContenido() {
     ''
   const esAdmin = String(rawRole).toUpperCase() === 'ADMIN'
 
-  // pestañas: marketing (ofertas manuales) | catalogo-luz (import/lista/publicar)
+  // Tabs
   const [tab, setTab] = useState<'marketing'|'catalogo-luz'>('marketing')
 
+  // Marketing (ofertas manuales)
   const [ofertas, setOfertas] = useState<Oferta[]>([])
   const [form, setForm] = useState({
     titulo: '',
@@ -303,14 +306,18 @@ export default function GestionOfertasContenido() {
     activa: true,
   })
 
+  // Catálogo de Luz para mostrar resumen en Marketing (sección LUZ)
+  const [tarifasLuz, setTarifasLuz] = useState<OfertaTarifa[]>([])
+
   const cargarOfertas = async () => {
-    try {
-      const res = await fetch('/api/ofertas?activa=true')
-      const data = await res.json()
-      setOfertas(data)
-    } catch (error) {
-      console.error('Error cargando ofertas:', error)
-    }
+    const res = await fetch('/api/ofertas?activa=true', { cache: 'no-store' })
+    const data = await res.json()
+    setOfertas(data)
+  }
+  const cargarTarifasLuz = async () => {
+    const res = await fetch('/api/ofertas-tarifa?tipo=LUZ&activa=true', { cache: 'no-store' })
+    const data = await res.json()
+    setTarifasLuz(data.items || [])
   }
 
   const crearOferta = async () => {
@@ -339,11 +346,28 @@ export default function GestionOfertasContenido() {
   useEffect(() => {
     if (status === 'authenticated') {
       cargarOfertas()
+      cargarTarifasLuz()
     }
   }, [status])
 
   if (status === 'loading') return <div className="p-6 text-white">Cargando...</div>
   if (!session) return <div className="p-6 text-white">Acceso restringido. Por favor inicia sesión.</div>
+
+  // Agrupar ofertas por tipo (marketing)
+  const ofertasLuz = useMemo(() => ofertas.filter(o => o.tipo === 'luz'), [ofertas])
+  const ofertasGas = useMemo(() => ofertas.filter(o => o.tipo === 'gas'), [ofertas])
+  const ofertasTel = useMemo(() => ofertas.filter(o => o.tipo === 'telefonia'), [ofertas])
+
+  // Tarjetas derivadas del Catálogo de Luz (para Marketing/Luz)
+  const tarjetasCatalogoLuz = useMemo(() => {
+    const fmt = (v: any) => (v === null || v === undefined || v === '') ? '-' : String(v)
+    return (tarifasLuz || []).map(t => ({
+      id: t.id,
+      titulo: `${t.compania} — ${t.nombre}`,
+      descripcionCorta: `P1 ${fmt(t.precioKwhP1)} · P2 ${fmt(t.precioKwhP2)} · P3 ${fmt(t.precioKwhP3)}`,
+      destacada: !!t.destacada,
+    }))
+  }, [tarifasLuz])
 
   return (
     <div className="p-6 space-y-6">
@@ -419,53 +443,65 @@ export default function GestionOfertasContenido() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {ofertas.map((oferta) => {
-              const tipo = oferta.tipo.toLowerCase()
-              return (
-                <Card key={oferta.id} className={`${fondoPorTipo[tipo]} shadow-md rounded-2xl text-black`}>
-                  <CardContent className="p-4 flex flex-col justify-between h-full">
-                    <div>
-                      <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(tipo)}`}>
-                        {obtenerIcono(tipo)}
-                        {tipo.toUpperCase()}
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
-                      <p className="text-sm text-gray-800">{oferta.descripcionCorta || oferta.descripcion}</p>
-                      {oferta.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
-                      {!oferta.activa && <div className="text-red-600 text-sm font-bold">❌ Inactiva</div>}
+          {/* Sección LUZ (marketing + catálogo) */}
+          <Section title="LUZ" tipo="luz">
+            {/* Ofertas marketing */}
+            {ofertasLuz.map((oferta) => (
+              <TarjetaMarketing
+                key={`O-${oferta.id}`}
+                oferta={oferta}
+                esAdmin={esAdmin}
+                onEliminar={()=>eliminarOferta(oferta.id)}
+              />
+            ))}
+            {/* Tarjetas provenientes del catálogo */}
+            {tarjetasCatalogoLuz.map((t) => (
+              <Card key={`T-${t.id}`} className={`${fondoPorTipo['luz']} shadow-md rounded-2xl text-black border border-green-200`}>
+                <CardContent className="p-4 flex flex-col justify-between h-full">
+                  <div>
+                    <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta('luz')}`}>
+                      {obtenerIcono('luz')} CATÁLOGO · LUZ
                     </div>
-                    <div className="mt-4 flex gap-2">
-                      <Button
-                        onClick={() => alert('Más información disponible próximamente')}
-                        className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
-                      >
-                        Ir a la oferta
-                      </Button>
-                      {esAdmin && (
-                        <>
-                          <Button
-                            variant="outline"
-                            className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
-                            onClick={() => alert('Función de edición en desarrollo')}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
-                            onClick={() => eliminarOferta(oferta.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+                    <h3 className="font-semibold text-gray-900 mb-1">{t.titulo}</h3>
+                    <p className="text-sm text-gray-800">{t.descripcionCorta}</p>
+                    {t.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
+                  </div>
+                  <div className="mt-4">
+                    <Button
+                      onClick={() => alert('Más información disponible próximamente')}
+                      className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
+                    >
+                      Ir a la oferta
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </Section>
+
+          {/* Sección GAS */}
+          <Section title="GAS" tipo="gas">
+            {ofertasGas.map((oferta) => (
+              <TarjetaMarketing
+                key={`O-${oferta.id}`}
+                oferta={oferta}
+                esAdmin={esAdmin}
+                onEliminar={()=>eliminarOferta(oferta.id)}
+              />
+            ))}
+          </Section>
+
+          {/* Sección TELEFONÍA */}
+          <Section title="TELEFONÍA" tipo="telefonia">
+            {ofertasTel.map((oferta) => (
+              <TarjetaMarketing
+                key={`O-${oferta.id}`}
+                oferta={oferta}
+                esAdmin={esAdmin}
+                onEliminar={()=>eliminarOferta(oferta.id)}
+              />
+            ))}
+          </Section>
         </>
       )}
 
@@ -476,13 +512,83 @@ export default function GestionOfertasContenido() {
           <TablaTarifas
             esAdmin={esAdmin}
             onPublicada={() => {
-              // Al publicar desde catálogo, recargamos las tarjetas de marketing
+              // Al publicar desde catálogo recargamos marketing y también el catálogo de luz (por si cambió)
               setTab('marketing')
               cargarOfertas()
+              cargarTarifasLuz()
             }}
           />
         </div>
       )}
     </div>
+  )
+}
+
+/* ============ Componentes de apoyo ============ */
+
+function Section({ title, tipo, children }:{
+  title: string
+  tipo: 'luz'|'gas'|'telefonia'
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xl font-extrabold text-white">{title}</h2>
+      <div className={`rounded-2xl p-4 ${fondoPorTipo[tipo]}`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TarjetaMarketing({ oferta, esAdmin, onEliminar }:{
+  oferta: Oferta
+  esAdmin: boolean
+  onEliminar: ()=>void
+}) {
+  const tipo = oferta.tipo.toLowerCase()
+  return (
+    <Card className={`${fondoPorTipo[tipo]} shadow-md rounded-2xl text-black`}>
+      <CardContent className="p-4 flex flex-col justify-between h-full">
+        <div>
+          <div className={`text-xs px-2 py-1 inline-block rounded-full font-semibold mb-2 ${colorEtiqueta(tipo)}`}>
+            {obtenerIcono(tipo)}
+            {tipo.toUpperCase()}
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1">{oferta.titulo}</h3>
+          <p className="text-sm text-gray-800">{oferta.descripcionCorta || oferta.descripcion}</p>
+          {oferta.destacada && <div className="mt-1 text-orange-600 font-bold text-sm">⭐ Destacada</div>}
+          {!oferta.activa && <div className="text-red-600 text-sm font-bold">❌ Inactiva</div>}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <Button
+            onClick={() => alert('Más información disponible próximamente')}
+            className="bg-black text-white hover:bg-gray-800 text-sm px-3 py-1"
+          >
+            Ir a la oferta
+          </Button>
+          {esAdmin && (
+            <>
+              <Button
+                variant="outline"
+                className="text-blue-600 border-blue-600 hover:bg-blue-50 text-sm px-2"
+                onClick={() => alert('Función de edición en desarrollo')}
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-600 hover:bg-red-50 text-sm px-2"
+                onClick={onEliminar}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
