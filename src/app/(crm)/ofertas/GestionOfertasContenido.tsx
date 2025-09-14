@@ -85,37 +85,38 @@ function ImportadorTarifas() {
 
     try {
       const fd = new FormData();
-      fd.append('file', file, file.name);   // 👈 añade nombre del fichero
+      fd.append('file', file, file.name);   // adjunta nombre del fichero
       fd.append('tipo', tipo);
       fd.append('subtipo', subtipo);
       fd.append('replace', String(replace));
 
       const res = await fetch('/api/oferta-tarifa/import', { method: 'POST', body: fd });
 
-      // Intenta parsear JSON de forma segura
+      // 🔒 Leer SOLO UNA VEZ el cuerpo
+      const bodyText = await res.text();
       let data: any = null;
       try {
-        data = await res.json();
+        data = JSON.parse(bodyText);
       } catch {
-        // respuesta no-JSON (p.ej. HTML de error)
-        const text = await res.text();
-        throw new Error(`Respuesta inesperada del servidor (${res.status}): ${text.slice(0,200)}`);
+        // cuerpo no es JSON; usamos el texto tal cual para el error
       }
 
       if (!res.ok) {
-        throw new Error(data?.error || `Error ${res.status}`);
+        const msg = (data && data.error) ? data.error : (bodyText || `Error ${res.status}`);
+        throw new Error(msg);
       }
 
-      setMsg(`Importadas ${data.ofertas} ofertas y ${data.tramos} tramos`);
-      // Notificar a la tabla que recargue
+      // Éxito
+      setMsg(`Importadas ${data?.ofertas ?? 0} ofertas y ${data?.tramos ?? 0} tramos`);
       window.dispatchEvent(new CustomEvent('tarifas-importadas'));
     } catch (err: any) {
       console.error('Error importando Excel:', err);
       setMsg(`❌ ${err?.message || 'Error al importar'}`);
     } finally {
-      setLoading(false); // 👈 garantía de que se apaga el estado “Importando…”
+      setLoading(false); // siempre apagamos el estado de carga
     }
   };
+
 
 
   return (
