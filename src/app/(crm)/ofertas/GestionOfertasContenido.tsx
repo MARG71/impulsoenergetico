@@ -79,23 +79,44 @@ function ImportadorTarifas() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) { setMsg('Selecciona un Excel'); return; }
-    setLoading(true); setMsg(null);
 
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('tipo', tipo);
-    fd.append('subtipo', subtipo);
-    fd.append('replace', String(replace));
+    setLoading(true);
+    setMsg(null);
 
-    // OJO: esta ruta existe en tu proyecto (singular: oferta-tarifa/import)
-    const res = await fetch('/api/oferta-tarifa/import', { method: 'POST', body: fd });
-    const data = await res.json();
-    setLoading(false);
-    setMsg(res.ok ? `Importadas ${data.ofertas} ofertas y ${data.tramos} tramos` : (data?.error || 'Error al importar'));
+    try {
+      const fd = new FormData();
+      fd.append('file', file, file.name);   // 👈 añade nombre del fichero
+      fd.append('tipo', tipo);
+      fd.append('subtipo', subtipo);
+      fd.append('replace', String(replace));
 
-    // Notificar a la tabla que recargue
-    window.dispatchEvent(new CustomEvent('tarifas-importadas'));
+      const res = await fetch('/api/oferta-tarifa/import', { method: 'POST', body: fd });
+
+      // Intenta parsear JSON de forma segura
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // respuesta no-JSON (p.ej. HTML de error)
+        const text = await res.text();
+        throw new Error(`Respuesta inesperada del servidor (${res.status}): ${text.slice(0,200)}`);
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Error ${res.status}`);
+      }
+
+      setMsg(`Importadas ${data.ofertas} ofertas y ${data.tramos} tramos`);
+      // Notificar a la tabla que recargue
+      window.dispatchEvent(new CustomEvent('tarifas-importadas'));
+    } catch (err: any) {
+      console.error('Error importando Excel:', err);
+      setMsg(`❌ ${err?.message || 'Error al importar'}`);
+    } finally {
+      setLoading(false); // 👈 garantía de que se apaga el estado “Importando…”
+    }
   };
+
 
   return (
     <div className="bg-white p-4 rounded-xl shadow text-black space-y-3">
