@@ -1,24 +1,47 @@
-// src/app/registro/RegistroLandingContenido.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronRight, Zap, Check, Clock } from 'lucide-react';
+import {
+  ChevronRight,
+  Bolt,
+  Flame,
+  Phone,
+  Sun,
+  Thermometer,
+  BatteryCharging,
+  Building2,
+  Plane,
+  Wrench,
+  Hammer,
+  Package,
+  Plus,
+  Check,
+} from 'lucide-react';
 import RegistroFormulario from './RegistroFormulario';
 
+// === Paleta basada en el logo adjunto ===
 const brand = {
-  primary: '#16a34a',   // verde
-  secondary: '#f97316', // naranja
-  accent: '#2563eb',    // azul
+  bg: '#0E2631',         // azul petróleo oscuro (fondo)
+  text: '#F6EED1',       // crema para títulos/textos sobre oscuro
+  accent: '#FF7A3B',     // neón naranja
+  accent2: '#FF4D7E',    // neón magenta/rosa
+  card: '#0f2b38',       // variantes del fondo para tarjetas
 };
 
-const serviciosBase = [
-  { key: 'luz', titulo: 'Luz', desc: 'Comparador y optimización de tarifas eléctricas.', status: 'activo', icon: Zap },
-  { key: 'gas', titulo: 'Gas', desc: 'Ahorro en suministro de gas natural.', status: 'activo', icon: Zap },
-  { key: 'telefonia', titulo: 'Telefonía', desc: 'Fibra y móvil para empresas y particulares.', status: 'activo', icon: Zap },
-  { key: 'ganaderia', titulo: 'Ganadería', desc: 'Suministros y soluciones agrícolas.', status: 'activo', icon: Zap },
-  { key: 'fv', titulo: 'Fotovoltaica', desc: 'Instalación llave en mano y PPA.', status: 'proximo', icon: Zap },
-  { key: 'baterias', titulo: 'Baterías HERMES-IA', desc: 'Acumulación inteligente y gestión IA.', status: 'proximo', icon: Zap },
+const SECCIONES = [
+  { key: 'luz', label: 'Luz', icon: Bolt },
+  { key: 'gas', label: 'Gas', icon: Flame },
+  { key: 'telefonia', label: 'Telefonía', icon: Phone },
+  { key: 'solar', label: 'Solar', icon: Sun },
+  { key: 'aerotermia', label: 'Aerotermia', icon: Thermometer },
+  { key: 'bateria', label: 'Batería HERMES IA', icon: BatteryCharging },
+  { key: 'inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
+  { key: 'viajes', label: 'Viajes', icon: Plane },
+  { key: 'repuestos', label: 'Repuestos coche', icon: Wrench },
+  { key: 'ferreteria', label: 'Ferretería', icon: Hammer },
+  { key: 'ganaderos', label: 'Productos ganaderos', icon: Package },
+  { key: 'mas', label: 'Más pronto…', icon: Plus },
 ];
 
 export default function RegistroLandingContenido() {
@@ -26,80 +49,92 @@ export default function RegistroLandingContenido() {
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [lugarId, setLugarId] = useState<string | null>(null);
 
-  // Leer IDs de URL (QR/redes) y persistirlos
+  // 1) Leer IDs de URL y persistirlos (QR / redes)
   useEffect(() => {
-    const urlAgente = searchParams.get('agenteId');
-    const urlLugar = searchParams.get('lugarId');
+    const a = searchParams.get('agenteId');
+    const l = searchParams.get('lugarId');
 
-    if (urlAgente && urlLugar) {
-      setAgenteId(urlAgente);
-      setLugarId(urlLugar);
+    if (a && l) {
+      setAgenteId(a);
+      setLugarId(l);
       try {
-        localStorage.setItem('agenteId', urlAgente);
-        localStorage.setItem('lugarId', urlLugar);
+        localStorage.setItem('agenteId', a);
+        localStorage.setItem('lugarId', l);
       } catch {}
     } else {
       try {
-        const storedAgenteId = localStorage.getItem('agenteId');
-        const storedLugarId = localStorage.getItem('lugarId');
-        setAgenteId(storedAgenteId);
-        setLugarId(storedLugarId);
+        const sa = localStorage.getItem('agenteId');
+        const sl = localStorage.getItem('lugarId');
+        setAgenteId(sa);
+        setLugarId(sl);
       } catch {}
     }
   }, [searchParams]);
 
-  const activos = useMemo(() => serviciosBase.filter(s => s.status === 'activo'), []);
-  const proximos = useMemo(() => serviciosBase.filter(s => s.status === 'proximo'), []);
+  const secciones = useMemo(() => SECCIONES, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen text-gray-100" style={{ backgroundColor: brand.bg }}>
       {/* HERO agresivo */}
       <section className="relative overflow-hidden">
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 opacity-70"
           style={{
-            background: `radial-gradient(80rem 40rem at 20% -10%, ${brand.primary}18, transparent),
-                         radial-gradient(70rem 35rem at 120% 20%, ${brand.accent}15, transparent)`
+            background: `radial-gradient(60rem 28rem at 15% -10%, ${brand.accent}22, transparent),
+                         radial-gradient(50rem 24rem at 120% 20%, ${brand.accent2}22, transparent)`,
           }}
         />
-        <div className="container mx-auto px-6 pt-24 pb-16 relative">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
-              Impulso Energético
-              <span className="block text-gray-700 font-semibold mt-2">
-                ¡Ahorra YA en Luz, Gas, Telefonía y más!
-              </span>
+        <div className="container mx-auto px-6 pt-20 pb-12 relative">
+          <div className="max-w-4xl">
+            <div className="flex items-center gap-4">
+              <img
+                src="/logo-impulso.png"
+                alt="Impulso Energético"
+                className="h-14 w-auto"
+              />
+              <span className="sr-only">Impulso Energético</span>
+            </div>
+
+            <h1
+              className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight"
+              style={{ color: brand.text }}
+            >
+              Ofertas **REALES** y **EXCLUSIVAS** para ahorrar YA
             </h1>
-            <p className="mt-5 text-lg text-gray-800 max-w-2xl">
-              Ofertas exclusivas solo para clientes registrados. 60 segundos para darte de alta y ver tus descuentos reales.
+
+            <p className="mt-4 text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
+              Luz, Gas, Telefonía, Solar, Aerotermia, Baterías HERMES-IA, Inmobiliaria, Viajes,
+              Repuestos, Ferretería y más. <b>Desbloquea tus descuentos en 60 segundos.</b>
             </p>
 
-            {/* CTA: baja al formulario */}
             <div className="mt-8 flex flex-wrap gap-3">
               <a
                 href="#form"
-                className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold text-white text-lg"
-                style={{ backgroundColor: brand.primary }}
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg"
+                style={{
+                  background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
+                  color: '#0b1e27',
+                }}
               >
                 Acceder a las ofertas <ChevronRight size={18} />
               </a>
               <a
                 href="#form"
-                className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold"
-                style={{ border: `2px solid ${brand.primary}`, color: brand.primary }}
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold"
+                style={{ border: `2px solid ${brand.text}`, color: brand.text }}
                 title="Sin registro no se muestran precios ni promos"
               >
                 Ver ahorro estimado
               </a>
             </div>
 
-            {/* Pruebas sociales rápidas */}
-            <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-gray-700">
+            {/* badges rápidas */}
+            <div className="mt-6 flex flex-wrap items-center gap-4 text-sm" style={{ color: '#d9d2b5' }}>
               <span className="inline-flex items-center gap-2">
                 <Check size={16} /> Estudio gratuito
               </span>
               <span className="inline-flex items-center gap-2">
-                <Check size={16} /> Ofertas reales y actualizadas
+                <Check size={16} /> Ofertas negociadas y actualizadas
               </span>
               <span className="inline-flex items-center gap-2">
                 <Check size={16} /> Sin compromiso
@@ -107,7 +142,7 @@ export default function RegistroLandingContenido() {
             </div>
 
             {(agenteId || lugarId) && (
-              <div className="mt-3 text-xs text-gray-500">
+              <div className="mt-3 text-xs" style={{ color: '#c9c2a5' }}>
                 {agenteId && <>Agente: <b>{agenteId}</b>{' '}</>}
                 {lugarId && <>· Lugar: <b>{lugarId}</b></>}
               </div>
@@ -116,103 +151,101 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* SERVICIOS */}
-      <section id="servicios" className="container mx-auto px-6 py-16">
-        <h2 className="text-3xl md:text-4xl font-bold">Servicios</h2>
-        <p className="text-gray-600 mt-2">Activos y próximos lanzamientos</p>
+      {/* Secciones tipo WakeUp: botones redondos */}
+      <section className="container mx-auto px-6 pb-6">
+        <h2 className="text-2xl md:text-3xl font-extrabold mb-6" style={{ color: brand.text }}>
+          Elige tu sección y empieza a ahorrar
+        </h2>
 
-        {/* Activos */}
-        <div className="mt-8 grid md:grid-cols-3 gap-6">
-          {activos.map((s) => (
-            <div key={s.key} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <s.icon />
-                  <h3 className="text-xl font-bold">{s.titulo}</h3>
-                </div>
-                <span
-                  className="inline-flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded-full"
-                  style={{ backgroundColor: `#16a34a22`, color: brand.primary }}
-                >
-                  <Check size={16} /> Activo
-                </span>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-5">
+          {secciones.map(({ key, label, icon: Icon }) => (
+            <a
+              key={key}
+              href="#form"
+              className="group flex flex-col items-center justify-center gap-2"
+              title={`${label} · Accede y desbloquea ofertas`}
+            >
+              <div
+                className="h-28 w-28 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:scale-105"
+                style={{
+                  background: `radial-gradient(60% 60% at 50% 40%, ${brand.card}, ${brand.bg})`,
+                  boxShadow: `0 0 0 3px ${brand.bg}, 0 0 0 6px ${brand.accent}33, 0 6px 18px #00000080`,
+                }}
+              >
+                <Icon size={34} style={{ color: brand.text }} />
               </div>
-              <p className="mt-3 text-gray-700">{s.desc}</p>
-              <a href="#form" className="mt-5 inline-flex items-center gap-2 font-semibold" style={{ color: brand.accent }}>
-                Ver ofertas <ChevronRight size={16} />
-              </a>
-            </div>
+              <span className="text-sm font-semibold text-center" style={{ color: brand.text }}>
+                {label}
+              </span>
+            </a>
           ))}
         </div>
 
-        {/* Próximos */}
-        {proximos.length > 0 && (
-          <div className="mt-12">
-            <h3 className="text-xl font-bold text-gray-800">Próximamente</h3>
-            <div className="mt-4 grid md:grid-cols-3 gap-6">
-              {proximos.map((s) => (
-                <div key={s.key} className="bg-white rounded-2xl p-6 border border-dashed">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3 opacity-80">
-                      <s.icon />
-                      <h4 className="text-lg font-bold">{s.titulo}</h4>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded-full text-gray-600 bg-gray-100">
-                      <Clock size={16} /> Próximo
-                    </span>
-                  </div>
-                  <p className="mt-3 text-gray-600">{s.desc}</p>
-                  <span className="mt-4 inline-block text-sm text-gray-500">Apúntate y te avisamos al activar.</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <p className="mt-4 text-sm" style={{ color: '#c9c2a5' }}>
+          Seguimos añadiendo más servicios. Déjanos tus datos y te avisamos de nuevas ofertas.
+        </p>
       </section>
 
-      {/* CÓMO FUNCIONA */}
-      <section className="bg-white border-y border-gray-100">
-        <div className="container mx-auto px-6 py-16">
-          <h2 className="text-3xl md:text-4xl font-bold">Cómo consigues el ahorro</h2>
-          <div className="mt-8 grid md:grid-cols-4 gap-6">
-            {[
-              { n: '01', t: 'Regístrate', d: 'Déjanos tu nombre, email y teléfono.' },
-              { n: '02', t: 'Accede a ofertas', d: 'Promos reales y negociadas.' },
-              { n: '03', t: 'Contrata fácil', d: 'Altas, portabilidades o instalaciones.' },
-              { n: '04', t: 'Mejora continua', d: 'Revisamos y optimizamos tus condiciones.' },
-            ].map((step) => (
-              <div key={step.n} className="rounded-2xl p-6 border border-gray-100">
-                <div className="text-sm font-extrabold text-gray-400">{step.n}</div>
-                <div className="mt-2 text-xl font-bold">{step.t}</div>
-                <p className="mt-2 text-gray-700">{step.d}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8">
-            <a
-              href="#form"
-              className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 font-semibold text-white text-lg"
-              style={{ backgroundColor: brand.primary }}
+      {/* Banda con promesa de valor */}
+      <section className="py-8" style={{ background: `linear-gradient(90deg, ${brand.accent}22, ${brand.accent2}22)` }}>
+        <div className="container mx-auto px-6">
+          <p className="text-lg md:text-xl font-bold" style={{ color: brand.text }}>
+            <span className="mr-2">💥</span>
+            <b>Sin trucos</b>: precios reales, atención cercana y gestión completa (altas, portabilidades e instalaciones).
+          </p>
+        </div>
+      </section>
+
+      {/* Cómo funciona */}
+      <section className="container mx-auto px-6 py-14">
+        <h2 className="text-2xl md:text-3xl font-extrabold" style={{ color: brand.text }}>
+          ¿Cómo desbloqueas tus descuentos?
+        </h2>
+        <div className="mt-7 grid md:grid-cols-4 gap-6">
+          {[
+            { n: '01', t: 'Regístrate', d: 'Nombre, email y teléfono. 60 segundos.' },
+            { n: '02', t: 'Accede a ofertas', d: 'Verás promos reales y negociadas.' },
+            { n: '03', t: 'Contrata fácil', d: 'Nos ocupamos de altas y portabilidades.' },
+            { n: '04', t: 'Ahorro constante', d: 'Seguimiento y optimización continua.' },
+          ].map((s) => (
+            <div
+              key={s.n}
+              className="rounded-2xl p-6 border"
+              style={{ borderColor: '#26404b', backgroundColor: '#112e3c' }}
             >
-              Acceder a las ofertas <ChevronRight size={18} />
-            </a>
-          </div>
+              <div className="text-sm font-extrabold" style={{ color: '#8fb0bd' }}>{s.n}</div>
+              <div className="mt-2 text-lg font-bold" style={{ color: brand.text }}>{s.t}</div>
+              <p className="mt-2 text-sm" style={{ color: '#c9c2a5' }}>{s.d}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8">
+          <a
+            href="#form"
+            className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg"
+            style={{
+              background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
+              color: '#0b1e27',
+            }}
+          >
+            Acceder a las ofertas <ChevronRight size={18} />
+          </a>
         </div>
       </section>
 
       {/* FORMULARIO (tu componente actual) */}
-      <section id="form" className="container mx-auto px-6 py-16">
+      <section id="form" className="container mx-auto px-6 py-12">
         <RegistroFormulario />
       </section>
 
-      {/* FOOTER simple */}
-      <footer className="border-t border-gray-200">
-        <div className="container mx-auto px-6 py-8 text-sm text-gray-600 flex flex-col md:flex-row items-center justify-between gap-3">
-          <div>© {new Date().getFullYear()} Impulso Energético</div>
+      {/* Footer */}
+      <footer className="border-t" style={{ borderColor: '#1f3a45' }}>
+        <div className="container mx-auto px-6 py-8 text-sm flex flex-col md:flex-row items-center justify-between gap-3">
+          <div style={{ color: '#b7b099' }}>© {new Date().getFullYear()} Impulso Energético</div>
           <div className="flex items-center gap-3">
-            <a href="#form" className="hover:underline">Ver ofertas</a>
-            <a href="#" className="hover:underline">Aviso legal</a>
-            <a href="#" className="hover:underline">Privacidad</a>
+            <a href="#form" className="hover:underline" style={{ color: brand.text }}>Ver ofertas</a>
+            <a href="#" className="hover:underline" style={{ color: brand.text }}>Aviso legal</a>
+            <a href="#" className="hover:underline" style={{ color: brand.text }}>Privacidad</a>
           </div>
         </div>
       </footer>
