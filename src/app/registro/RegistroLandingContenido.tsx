@@ -141,10 +141,10 @@ export default function RegistroLandingContenido() {
                          radial-gradient(50rem 24rem at 120% 20%, ${brand.accent2}22, transparent)`,
           }}
         />
-        <div className="container mx-auto px-6 pt-20 pb-12 relative">
+        <div className="container mx-auto px-6 pt-8 md:pt-10 pb-8 relative">
           <div className="max-w-4xl">
-            <img src="/logo-impulso.png" alt="Impulso Energético" className="h-14 w-auto" />
-            <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
+            <img src="/logo-impulso.png" alt="Impulso Energético" className="h-16 md:h-20 w-auto" />
+            <h1 className="mt-4 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
               Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
             </h1>
           </div>
