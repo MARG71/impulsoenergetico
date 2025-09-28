@@ -48,7 +48,7 @@ const SECCIONES = [
   { key: 'mas',          label: 'Más pronto…',         icon: Plus },
 ];
 
-// Fallback estático si falla la API
+// Fallback si falla la API
 const FALLBACK_TEASERS = [
   { k: 'luz', t: 'Luz empresa • Precio fijo estable', b: 'Top ahorro', tag: 'Hasta -22%', copy: 'Tarifa fija negociada para pymes. Sin sustos.' },
   { k: 'telefonia', t: 'Fibra + Móvil ilimitado', b: 'Pack pro', tag: 'Desde 29€/mes', copy: 'Cobertura nacional y portabilidad asistida.' },
@@ -61,12 +61,11 @@ type OfertaAPI = {
   titulo?: string;
   descripcionCorta?: string;
   descripcionLarga?: string;
-  tipo?: string;         // 'luz' | 'gas' | ...
+  tipo?: string;
   destacada?: boolean;
   activa?: boolean;
-  etiqueta?: string;     // opcional
+  etiqueta?: string;
   creadaEn?: string;
-  // otros campos no usados aquí
 };
 
 export default function RegistroLandingContenido() {
@@ -75,11 +74,18 @@ export default function RegistroLandingContenido() {
   const [lugarId, setLugarId] = useState<string | null>(null);
   const [leadOK, setLeadOK] = useState(false);
 
-  // Teasers dinámicos
   const [teasers, setTeasers] = useState(FALLBACK_TEASERS);
   const [loadingTeasers, setLoadingTeasers] = useState(true);
 
-  // IDs desde URL/localStorage (QR, redes) + flag de lead registrado
+  // estilos para subrayado ondulado (EXCLUSIVAS / AHORRAR / GANAR COMISIONES YA)
+  const wavy: React.CSSProperties = {
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'wavy',
+    textDecorationThickness: '3px',
+    textUnderlineOffset: '6px',
+  };
+
+  // IDs desde URL/localStorage (QR, redes) + flag de lead
   useEffect(() => {
     const a = searchParams.get('agenteId');
     const l = searchParams.get('lugarId');
@@ -87,10 +93,7 @@ export default function RegistroLandingContenido() {
       setAgenteId(a); setLugarId(l);
       try { localStorage.setItem('agenteId', a); localStorage.setItem('lugarId', l); } catch {}
     } else {
-      try {
-        setAgenteId(localStorage.getItem('agenteId'));
-        setLugarId(localStorage.getItem('lugarId'));
-      } catch {}
+      try { setAgenteId(localStorage.getItem('agenteId')); setLugarId(localStorage.getItem('lugarId')); } catch {}
     }
     try { setLeadOK(localStorage.getItem('leadOK') === '1'); } catch {}
   }, [searchParams]);
@@ -103,11 +106,8 @@ export default function RegistroLandingContenido() {
         const res = await fetch('/api/ofertas', { cache: 'no-store' });
         if (!res.ok) throw new Error('bad status');
         const data: OfertaAPI[] = await res.json();
-
-        // Filtrar destacadas + activas y normalizar
         const destacados = (data || [])
           .filter(o => o.activa && o.destacada)
-          // orden más reciente primero (si viene creadaEn)
           .sort((a, b) => (new Date(b.creadaEn || 0).getTime() - new Date(a.creadaEn || 0).getTime()))
           .slice(0, 6)
           .map(o => ({
@@ -117,15 +117,9 @@ export default function RegistroLandingContenido() {
             tag: o.etiqueta || 'Exclusiva',
             copy: o.descripcionCorta || (o.descripcionLarga ? (o.descripcionLarga.length > 120 ? o.descripcionLarga.slice(0, 117) + '…' : o.descripcionLarga) : 'Condiciones especiales disponibles.'),
           }));
-
-        if (!cancel && destacados.length) {
-          setTeasers(destacados);
-        }
-      } catch {
-        // fallback silencioso
-      } finally {
-        if (!cancel) setLoadingTeasers(false);
-      }
+        if (!cancel && destacados.length) setTeasers(destacados);
+      } catch { /* fallback */ }
+      finally { if (!cancel) setLoadingTeasers(false); }
     })();
     return () => { cancel = true; };
   }, []);
@@ -150,13 +144,16 @@ export default function RegistroLandingContenido() {
         <div className="container mx-auto px-6 pt-20 pb-12 relative">
           <div className="max-w-4xl">
             <img src="/logo-impulso.png" alt="Impulso Energético" className="h-14 w-auto" />
+
             <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
-              Ofertas <span className="underline decoration-wavy">REALES</span> y <b>EXCLUSIVAS</b> para ahorrar YA
+              Ofertas REALES y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
             </h1>
+
             <p className="mt-4 text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
-              Luz, Gas, Telefonía, Solar, Aerotermia, Baterías HERMES-IA, Inmobiliaria, Viajes, Repuestos, Ferretería y <b>Seguros</b>.
+              <b>Y mucho más:</b> Telefonía, Viajes, Inmobiliaria, Seguros, Repuestos y otros servicios para tu día a día.
               <br /><b>Desbloquea tus descuentos en 60 segundos.</b>
             </p>
+
             <div className="mt-8 flex flex-wrap gap-3">
               <a
                 href="#form"
@@ -178,11 +175,13 @@ export default function RegistroLandingContenido() {
                 Ver ahorro estimado
               </a>
             </div>
+
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm" style={{ color: '#d9d2b5' }}>
               <span className="inline-flex items-center gap-2"><Check size={16} /> Estudio gratuito</span>
               <span className="inline-flex items-center gap-2"><Check size={16} /> Ofertas negociadas y actualizadas</span>
               <span className="inline-flex items-center gap-2"><Check size={16} /> Sin compromiso</span>
             </div>
+
             {(agenteId || lugarId) && (
               <div className="mt-3 text-xs" style={{ color: '#c9c2a5' }}>
                 {agenteId && <>Agente: <b>{agenteId}</b>{' '}</>}
@@ -190,6 +189,29 @@ export default function RegistroLandingContenido() {
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* BANNER FULL-WIDTH (después del gancho) */}
+      <section className="relative isolate mt-6 md:mt-8">
+        <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] max-h-[720px] overflow-hidden">
+          <picture>
+            <source media="(max-width: 768px)" srcSet="/banner-innovacion-mobile.jpg" />
+            <img
+              src="/banner-innovacion-desktop.jpg"
+              alt="Innovación energética para tu hogar y tu empresa"
+              className="block w-full h-auto"
+              loading="eager"
+              fetchPriority="high"
+            />
+          </picture>
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              boxShadow:
+                'inset 0 -40px 60px rgba(14,38,49,0.60), inset 0 40px 60px rgba(14,38,49,0.35)',
+            }}
+          />
         </div>
       </section>
 
@@ -203,9 +225,7 @@ export default function RegistroLandingContenido() {
             <a key={key} href="#form" className="group flex flex-col items-center justify-center gap-2" title={`${label} · Accede y desbloquea ofertas`}>
               <div
                 className="h-28 w-28 rounded-full flex items-center justify-center transition-transform duration-200 group-hover:scale-105 neon-glow"
-                style={{
-                  background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`,
-                }}
+                style={{ background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})` }}
               >
                 <Icon size={34} style={{ color: brand.bg }} />
               </div>
@@ -229,15 +249,13 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* TEASERS (dinámicos si hay; con overlay de bloqueo si no está leadOK) */}
+      {/* TEASERS (dinámicos) */}
       <section className="container mx-auto px-6 py-10">
         <h2 className="text-2xl md:text-3xl font-extrabold mb-6" style={{ color: brand.text }}>
           Ofertas destacadas {leadOK ? '(desbloqueadas)' : '(bloqueadas)'}
         </h2>
 
-        {loadingTeasers && (
-          <div className="text-sm" style={{ color: '#c9c2a5' }}>Cargando ofertas…</div>
-        )}
+        {loadingTeasers && <div className="text-sm" style={{ color: '#c9c2a5' }}>Cargando ofertas…</div>}
 
         {!loadingTeasers && (
           <div className="grid md:grid-cols-2 gap-6">
@@ -347,7 +365,7 @@ export default function RegistroLandingContenido() {
         </div>
       </footer>
 
-      {/* Animaciones (lock beat + glow) */}
+      {/* Animaciones */}
       <style jsx>{`
         @keyframes lockBeat {
           0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255,122,59,0.0)); }
