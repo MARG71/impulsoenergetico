@@ -149,6 +149,30 @@ export default function RegistroLandingContenido() {
               Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
             </h1>
 
+            {/* BANNER FULL-WIDTH (justo tras el gancho) con MENOR ALTURA */}
+                <section className="relative isolate mt-4 md:mt-6">
+                    <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
+                    <picture>
+                        <source media="(max-width: 768px)" srcSet="/banner-innovacion-mobile.jpg" />
+                        <img
+                        src="/banner-innovacion-desktop.jpg"
+                        alt="Innovación energética para tu hogar y tu empresa"
+                        className="block w-full h-[220px] md:h-[300px] lg:h-[360px] object-cover"
+                        loading="eager"
+                        fetchPriority="high"
+                        />
+                    </picture>
+                    {/* Sombra interior suave para integrar con el fondo */}
+                    <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                        boxShadow:
+                            'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)',
+                        }}
+                    />
+                    </div>
+                </section>
+
             <p className="mt-4 text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
               <b>Y mucho más:</b> Telefonía, Viajes, Inmobiliaria, Seguros, Repuestos y otros servicios para tu día a día.
               <br /><b>Desbloquea tus descuentos en 60 segundos.</b>
@@ -192,29 +216,7 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* BANNER FULL-WIDTH (justo tras el gancho) con MENOR ALTURA */}
-      <section className="relative isolate mt-4 md:mt-6">
-        <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
-          <picture>
-            <source media="(max-width: 768px)" srcSet="/banner-innovacion-mobile.jpg" />
-            <img
-              src="/banner-innovacion-desktop.jpg"
-              alt="Innovación energética para tu hogar y tu empresa"
-              className="block w-full h-[220px] md:h-[300px] lg:h-[360px] object-cover"
-              loading="eager"
-              fetchPriority="high"
-            />
-          </picture>
-          {/* Sombra interior suave para integrar con el fondo */}
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              boxShadow:
-                'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)',
-            }}
-          />
-        </div>
-      </section>
+      
 
       {/* Secciones: BOTONES ROJOS con glow neón */}
       <section className="container mx-auto px-6 pb-6">
