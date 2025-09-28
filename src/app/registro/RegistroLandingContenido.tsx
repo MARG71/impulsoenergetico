@@ -31,7 +31,7 @@ const SPECIAL_PLACES: Record<string, SpecialPlace> = {
   '101': {
     id: '101',
     nombre: 'Club Deportivo Impulso',
-    logo: '/clubs/club-demo.png', // crea esta imagen en /public/clubs/
+    logo: '/clubs/club-demo.png',
     color: '#FF7A3B',
     mensajeCorto: 'AYUDA A TU CLUB',
   },
@@ -177,52 +177,77 @@ export default function RegistroLandingContenido() {
                          radial-gradient(50rem 24rem at 120% 20%, ${brand.accent2}22, transparent)`,
           }}
         />
-        <div className="container mx-auto px-6 pt-8 md:pt-10 pb-8 relative">
-          {/* ESCUDO del lugar especial (arriba derecha) */}
-          {club && (
-            <div className="absolute top-3 md:top-4 right-4 z-20">
+        <div className="container mx-auto px-6 pt-8 md:pt-10 pb-6 md:pb-8 relative">
+          {/* Fila superior: logo Impulso (izq) · Píldora central · Escudo club (dcha) */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Logo Impulso */}
+            <img src="/logo-impulso.png" alt="Impulso Energético" className="h-16 md:h-20 w-auto" />
+
+            {/* Píldora central (desktop) */}
+            {club && (
+              <div className="hidden md:flex flex-1 justify-center">
+                <div
+                  className="mega-pill"
+                  style={{
+                    border: `2px solid ${clubColor}`,
+                    color: brand.text,
+                    boxShadow: `0 0 0 2px ${clubColor}22, 0 0 26px ${clubColor}77, inset 0 0 10px rgba(255,255,255,0.06)`,
+                    background: 'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))',
+                  }}
+                >
+                  <span className="text-xl">🏆</span>
+                  <span className="font-extrabold uppercase tracking-wide text-lg lg:text-xl">
+                    {club.mensajeCorto || 'AYUDA A TU CLUB'}
+                  </span>
+                  <span className="opacity-90 text-base lg:text-lg">· {club.nombre}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Escudo club con marco neón */}
+            {club && (
               <div
-                className="rounded-2xl p-2 md:p-3 backdrop-blur-md"
+                className="neon-frame rounded-2xl p-2 md:p-3"
                 style={{
+                  boxShadow: `0 0 0 3px ${clubColor}, 0 0 22px ${clubColor}, 0 0 44px ${clubColor}AA`,
                   background: 'rgba(0,0,0,0.25)',
                   border: '1px solid rgba(255,255,255,0.12)',
-                  boxShadow: `0 0 0 2px ${clubColor}22, 0 0 22px ${clubColor}66`,
                 }}
                 title={club.nombre}
               >
                 <img
                   src={club.logo}
                   alt={`Escudo ${club.nombre}`}
-                  className="h-12 md:h-16 w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+                  className="h-20 md:h-28 lg:h-32 w-auto object-contain drop-shadow-[0_3px_10px_rgba(0,0,0,0.45)]"
                 />
+              </div>
+            )}
+          </div>
+
+          {/* Píldora central (móvil) */}
+          {club && (
+            <div className="md:hidden mt-3 flex justify-center">
+              <div
+                className="mega-pill"
+                style={{
+                  border: `2px solid ${clubColor}`,
+                  color: brand.text,
+                  boxShadow: `0 0 0 2px ${clubColor}22, 0 0 20px ${clubColor}66, inset 0 0 10px rgba(255,255,255,0.06)`,
+                  background: 'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))',
+                }}
+              >
+                <span className="text-lg">🏆</span>
+                <span className="font-extrabold uppercase tracking-wide text-base">
+                  {club.mensajeCorto || 'AYUDA A TU CLUB'}
+                </span>
               </div>
             </div>
           )}
 
-          <div className="max-w-4xl">
-            <img src="/logo-impulso.png" alt="Impulso Energético" className="h-16 md:h-20 w-auto" />
-
-            {/* Píldora “AYUDA A TU CLUB” al lado del logo */}
-            {club && (
-              <div
-                className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full"
-                style={{
-                  border: `1.5px solid ${clubColor}`,
-                  color: brand.text,
-                  background: 'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))',
-                  boxShadow: `0 0 12px ${clubColor}77, inset 0 0 10px rgba(255,255,255,0.06)`,
-                }}
-              >
-                <span>🏆</span>
-                <b>{club.mensajeCorto || 'AYUDA A TU CLUB'}</b>
-                <span className="hidden sm:inline">· {club.nombre}</span>
-              </div>
-            )}
-
-            <h1 className="mt-3 md:mt-4 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
-              Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
-            </h1>
-          </div>
+          {/* Título */}
+          <h1 className="mt-4 md:mt-5 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
+            Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
+          </h1>
         </div>
       </section>
 
@@ -415,7 +440,7 @@ export default function RegistroLandingContenido() {
         </div>
       </footer>
 
-      {/* Animaciones */}
+      {/* Animaciones extra para escudo y píldora */}
       <style jsx>{`
         @keyframes lockBeat {
           0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255,122,59,0.0)); }
@@ -425,8 +450,21 @@ export default function RegistroLandingContenido() {
           0%, 100% { box-shadow: 0 0 10px rgba(255,122,59,0.4), 0 0 22px rgba(255,77,126,0.3); }
           50% { box-shadow: 0 0 16px rgba(255,122,59,0.8), 0 0 32px rgba(255,77,126,0.6); }
         }
+        @keyframes neonPulse {
+          0%, 100% { box-shadow: inherit; transform: translateZ(0); }
+          50% { box-shadow: 0 0 0 3px rgba(255,255,255,0.6); }
+        }
         .lock-anim { animation: lockBeat 1.4s ease-in-out infinite; }
         .neon-glow { animation: glowPulse 2.4s ease-in-out infinite; }
+        .neon-frame { animation: glowPulse 2.6s ease-in-out infinite; }
+        .mega-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: .6rem;
+          padding: .55rem 1rem;
+          border-radius: 9999px;
+          text-shadow: 0 2px 10px rgba(0,0,0,.35);
+        }
       `}</style>
     </div>
   );
