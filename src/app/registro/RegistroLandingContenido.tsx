@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ChevronRight,
@@ -85,6 +85,12 @@ export default function RegistroLandingContenido() {
   // Info especial del lugar (club/ONG/etc)
   const [club, setClub] = useState<SpecialPlace | null>(null);
 
+  // € aportados (target desde API; animación al entrar en viewport)
+  const [aportTarget, setAportTarget] = useState<number | null>(null);
+  const [aportDisplay, setAportDisplay] = useState<number>(0);
+  const counterRef = useRef<HTMLDivElement | null>(null);
+  const [counterVisible, setCounterVisible] = useState(false);
+
   // subrayado ondulado en palabras clave
   const wavy: CSSProperties = {
     textDecorationLine: 'underline',
@@ -123,16 +129,54 @@ export default function RegistroLandingContenido() {
               color: data.color || SPECIAL_PLACES[lugarId]?.color || brand.accent,
               mensajeCorto: data.mensajeCorto || 'AYUDA A TU CLUB',
             });
+            // contador (si API lo trae)
+            if (typeof data.aportacionAcumulada === 'number') {
+              setAportTarget(Math.max(0, Math.floor(data.aportacionAcumulada)));
+            } else {
+              // fallback demo
+              setAportTarget(12500);
+            }
             return;
           }
         }
       } catch {}
-      if (!cancel && SPECIAL_PLACES[lugarId]) setClub(SPECIAL_PLACES[lugarId]);
+      if (!cancel && SPECIAL_PLACES[lugarId]) {
+        setClub(SPECIAL_PLACES[lugarId]);
+        setAportTarget(12500); // fallback demo
+      }
     })();
     return () => { cancel = true; };
   }, [lugarId]);
 
-  // 3) Ofertas destacadas
+  // 3) Animar contador cuando entra en viewport
+  useEffect(() => {
+    if (!counterRef.current) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => entry.isIntersecting && setCounterVisible(true),
+      { threshold: 0.3 }
+    );
+    obs.observe(counterRef.current);
+    return () => obs.disconnect();
+  }, [counterRef]);
+
+  useEffect(() => {
+    if (!counterVisible || aportTarget == null) return;
+    let raf = 0;
+    const start = performance.now();
+    const dur = 1200; // ms
+    const from = 0;
+    const to = aportTarget;
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / dur);
+      setAportDisplay(Math.floor(from + (to - from) * ease(p)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [counterVisible, aportTarget]);
+
+  // 4) Ofertas destacadas
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -166,6 +210,8 @@ export default function RegistroLandingContenido() {
 
   const clubColor = club?.color || brand.accent;
 
+  const fmt = (n: number) => new Intl.NumberFormat('es-ES').format(n);
+
   return (
     <div className="min-h-screen text-gray-100" style={{ backgroundColor: brand.bg }}>
       {/* HERO */}
@@ -180,8 +226,18 @@ export default function RegistroLandingContenido() {
         <div className="container mx-auto px-6 pt-8 md:pt-10 pb-6 md:pb-8 relative">
           {/* Fila superior: logo Impulso (izq) · Píldora central · Escudo club (dcha) */}
           <div className="flex items-center justify-between gap-3">
-            {/* Logo Impulso */}
-            <img src="/logo-impulso.png" alt="Impulso Energético" className="h-16 md:h-20 w-auto" />
+            {/* Logo Impulso con marco neón */}
+            <div
+              className="neon-frame-impulso rounded-2xl p-2 md:p-3"
+              style={{
+                boxShadow: `0 0 0 3px ${brand.accent}, 0 0 22px ${brand.accent}, 0 0 44px ${brand.accent2}AA`,
+                background: 'rgba(0,0,0,0.20)',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }}
+              title="Impulso Energético"
+            >
+              <img src="/logo-impulso.png" alt="Impulso Energético" className="h-14 md:h-18 lg:h-20 w-auto" />
+            </div>
 
             {/* Píldora central (desktop) */}
             {club && (
@@ -196,10 +252,10 @@ export default function RegistroLandingContenido() {
                   }}
                 >
                   <span className="text-xl">🏆</span>
-                  <span className="font-extrabold uppercase tracking-wide text-lg lg:text-xl">
+                  <span className="font-extrabold uppercase tracking-wide text-xl">
                     {club.mensajeCorto || 'AYUDA A TU CLUB'}
                   </span>
-                  <span className="opacity-90 text-base lg:text-lg">· {club.nombre}</span>
+                  <span className="opacity-90 text-lg">· {club.nombre}</span>
                 </div>
               </div>
             )}
@@ -239,6 +295,26 @@ export default function RegistroLandingContenido() {
                 <span className="text-lg">🏆</span>
                 <span className="font-extrabold uppercase tracking-wide text-base">
                   {club.mensajeCorto || 'AYUDA A TU CLUB'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Contador de aportación */}
+          {club && (
+            <div ref={counterRef} className="mt-3 md:mt-4 flex justify-center">
+              <div
+                className="counter-pill"
+                style={{
+                  border: `2px solid ${clubColor}`,
+                  color: brand.text,
+                  boxShadow: `0 0 0 2px ${clubColor}22, 0 0 22px ${clubColor}77`,
+                  background: 'linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                }}
+              >
+                <span className="text-sm md:text-base opacity-85">Aportados al club</span>
+                <span className="text-xl md:text-2xl font-extrabold tabular-nums">
+                  € {fmt(aportDisplay)}
                 </span>
               </div>
             </div>
@@ -440,7 +516,7 @@ export default function RegistroLandingContenido() {
         </div>
       </footer>
 
-      {/* Animaciones extra para escudo y píldora */}
+      {/* Animaciones */}
       <style jsx>{`
         @keyframes lockBeat {
           0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255,122,59,0.0)); }
@@ -450,20 +526,27 @@ export default function RegistroLandingContenido() {
           0%, 100% { box-shadow: 0 0 10px rgba(255,122,59,0.4), 0 0 22px rgba(255,77,126,0.3); }
           50% { box-shadow: 0 0 16px rgba(255,122,59,0.8), 0 0 32px rgba(255,77,126,0.6); }
         }
-        @keyframes neonPulse {
-          0%, 100% { box-shadow: inherit; transform: translateZ(0); }
-          50% { box-shadow: 0 0 0 3px rgba(255,255,255,0.6); }
-        }
         .lock-anim { animation: lockBeat 1.4s ease-in-out infinite; }
         .neon-glow { animation: glowPulse 2.4s ease-in-out infinite; }
         .neon-frame { animation: glowPulse 2.6s ease-in-out infinite; }
+        .neon-frame-impulso { animation: glowPulse 2.2s ease-in-out infinite; }
+
         .mega-pill {
           display: inline-flex;
           align-items: center;
-          gap: .6rem;
-          padding: .55rem 1rem;
+          gap: .7rem;
+          padding: .6rem 1.1rem;
           border-radius: 9999px;
           text-shadow: 0 2px 10px rgba(0,0,0,.35);
+          backdrop-filter: blur(2px);
+        }
+        .counter-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: .8rem;
+          padding: .4rem .9rem;
+          border-radius: 9999px;
+          backdrop-filter: blur(2px);
         }
       `}</style>
     </div>
