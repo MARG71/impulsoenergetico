@@ -144,68 +144,26 @@ export default function RegistroLandingContenido() {
         <div className="container mx-auto px-6 pt-20 pb-12 relative">
           <div className="max-w-4xl">
             <img src="/logo-impulso.png" alt="Impulso Energético" className="h-14 w-auto" />
-
             <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
               Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
             </h1>
-
-            <p className="mt-4 text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
-              <b>Y mucho más:</b> Telefonía, Viajes, Inmobiliaria, Seguros, Repuestos y otros servicios para tu día a día.
-              <br /><b>Desbloquea tus descuentos en 60 segundos.</b>
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="#form"
-                className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg transition-transform"
-                style={{
-                  background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-                  color: '#0b1e27',
-                  boxShadow: `0 0 0 2px ${brand.text}11, 0 0 14px ${brand.accent}aa, 0 0 28px ${brand.accent2}77`,
-                }}
-              >
-                Acceder a las ofertas <ChevronRight size={18} />
-              </a>
-              <a
-                href="#form"
-                className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold"
-                style={{ border: `2px solid ${brand.text}`, color: brand.text }}
-                title="Sin registro no se muestran precios ni promos"
-              >
-                Ver ahorro estimado
-              </a>
-            </div>
-
-            <div className="mt-6 flex flex-wrap items-center gap-4 text-sm" style={{ color: '#d9d2b5' }}>
-              <span className="inline-flex items-center gap-2"><Check size={16} /> Estudio gratuito</span>
-              <span className="inline-flex items-center gap-2"><Check size={16} /> Ofertas negociadas y actualizadas</span>
-              <span className="inline-flex items-center gap-2"><Check size={16} /> Sin compromiso</span>
-            </div>
-
-            {(agenteId || lugarId) && (
-              <div className="mt-3 text-xs" style={{ color: '#c9c2a5' }}>
-                {agenteId && <>Agente: <b>{agenteId}</b>{' '}</>}
-                {lugarId && <>· Lugar: <b>{lugarId}</b></>}
-              </div>
-            )}
           </div>
         </div>
       </section>
 
-      {/* BANNER FULL-WIDTH (justo tras el gancho) con MENOR ALTURA */}
-      <section className="relative isolate mt-4 md:mt-6">
+      {/* BANNER FULL-WIDTH */}
+      <section className="relative isolate mt-2 md:mt-4">
         <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
           <picture>
             <source media="(max-width: 768px)" srcSet="/banner-innovacion-mobile.jpg" />
             <img
               src="/banner-innovacion-desktop.jpg"
               alt="Innovación energética para tu hogar y tu empresa"
-              className="block w-full h-[220px] md:h-[300px] lg:h-[360px] object-cover"
+              className="block w-full h-[200px] md:h-[260px] lg:h-[320px] object-cover"
               loading="eager"
               fetchPriority="high"
             />
           </picture>
-          {/* Sombra interior suave para integrar con el fondo */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{
@@ -213,6 +171,42 @@ export default function RegistroLandingContenido() {
                 'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)',
             }}
           />
+        </div>
+      </section>
+
+      {/* BLOQUE TEXTO + CTAS + TICKS (entre banner y botones de servicios) */}
+      <section className="container mx-auto px-6 pt-6 pb-8">
+        <p className="text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
+          <b>Y mucho más:</b> Telefonía, Viajes, Inmobiliaria, Seguros, Repuestos y otros servicios para tu día a día.
+          <br /><b>Desbloquea tus descuentos en 60 segundos.</b>
+        </p>
+
+        <div className="mt-6 flex flex-wrap gap-4 items-center">
+          <a
+            href="#form"
+            className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg neon-glow"
+            style={{
+              background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
+              color: '#0b1e27',
+              boxShadow: `0 0 0 2px ${brand.text}11, 0 0 14px ${brand.accent}aa, 0 0 28px ${brand.accent2}77`,
+            }}
+          >
+            Acceder a las ofertas <ChevronRight size={18} />
+          </a>
+          <a
+            href="#form"
+            className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold"
+            style={{ border: `2px solid ${brand.text}`, color: brand.text }}
+            title="Sin registro no se muestran precios ni promos"
+          >
+            Ver ahorro estimado
+          </a>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-8 text-sm" style={{ color: '#d9d2b5' }}>
+          <span className="inline-flex items-center gap-2"><Check size={16} /> Estudio gratuito</span>
+          <span className="inline-flex items-center gap-2"><Check size={16} /> Ofertas negociadas y actualizadas</span>
+          <span className="inline-flex items-center gap-2"><Check size={16} /> Sin compromiso</span>
         </div>
       </section>
 
