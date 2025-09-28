@@ -4,21 +4,8 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ChevronRight,
-  Bolt,
-  Flame,
-  Phone,
-  Sun,
-  Thermometer,
-  BatteryCharging,
-  Building2,
-  Plane,
-  Wrench,
-  Hammer,
-  Shield,
-  Plus,
-  Check,
-  Lock,
-  Tag,
+  Bolt, Flame, Phone, Sun, Thermometer, BatteryCharging,
+  Building2, Plane, Wrench, Hammer, Shield, Plus, Check, Lock, Tag,
 } from 'lucide-react';
 import RegistroFormulario from './RegistroFormulario';
 
@@ -32,7 +19,25 @@ const brand = {
   cardAlt: '#143a48',
 };
 
-// Secciones (tipo WakeUp)
+// -------- LUGARES ESPECIALES (fallback local para probar) --------
+type SpecialPlace = {
+  id: string;
+  nombre: string;
+  logo: string;          // ruta en /public
+  color?: string;        // color acento
+  mensajeCorto?: string; // texto de la píldora
+};
+const SPECIAL_PLACES: Record<string, SpecialPlace> = {
+  '101': {
+    id: '101',
+    nombre: 'Club Deportivo Impulso',
+    logo: '/clubs/club-demo.png', // crea esta imagen en /public/clubs/
+    color: '#FF7A3B',
+    mensajeCorto: 'AYUDA A TU CLUB',
+  },
+};
+
+// Secciones
 const SECCIONES = [
   { key: 'luz',          label: 'Luz',                 icon: Bolt },
   { key: 'gas',          label: 'Gas',                 icon: Flame },
@@ -48,7 +53,7 @@ const SECCIONES = [
   { key: 'mas',          label: 'Más pronto…',         icon: Plus },
 ];
 
-// Fallback si falla la API
+// Fallback de ofertas si falla la API
 const FALLBACK_TEASERS = [
   { k: 'luz', t: 'Luz empresa • Precio fijo estable', b: 'Top ahorro', tag: 'Hasta -22%', copy: 'Tarifa fija negociada para pymes. Sin sustos.' },
   { k: 'telefonia', t: 'Fibra + Móvil ilimitado', b: 'Pack pro', tag: 'Desde 29€/mes', copy: 'Cobertura nacional y portabilidad asistida.' },
@@ -77,7 +82,10 @@ export default function RegistroLandingContenido() {
   const [teasers, setTeasers] = useState(FALLBACK_TEASERS);
   const [loadingTeasers, setLoadingTeasers] = useState(true);
 
-  // estilo subrayado ondulado
+  // Info especial del lugar (club/ONG/etc)
+  const [club, setClub] = useState<SpecialPlace | null>(null);
+
+  // subrayado ondulado en palabras clave
   const wavy: CSSProperties = {
     textDecorationLine: 'underline',
     textDecorationStyle: 'wavy',
@@ -85,7 +93,7 @@ export default function RegistroLandingContenido() {
     textUnderlineOffset: '6px',
   };
 
-  // IDs desde URL/localStorage (QR, redes) + flag de lead
+  // 1) Coger IDs de URL/localStorage + flag lead
   useEffect(() => {
     const a = searchParams.get('agenteId');
     const l = searchParams.get('lugarId');
@@ -98,7 +106,33 @@ export default function RegistroLandingContenido() {
     try { setLeadOK(localStorage.getItem('leadOK') === '1'); } catch {}
   }, [searchParams]);
 
-  // Cargar ofertas destacadas y activas desde /api/ofertas
+  // 2) Cargar datos del lugar especial (API -> fallback local)
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!lugarId) return;
+      try {
+        const r = await fetch(`/api/lugares/${lugarId}`, { cache: 'no-store' });
+        if (r.ok) {
+          const data = await r.json();
+          if (!cancel && data?.especial) {
+            setClub({
+              id: String(lugarId),
+              nombre: data.nombre || `Lugar ${lugarId}`,
+              logo: data.logo || SPECIAL_PLACES[lugarId]?.logo || '/clubs/club-demo.png',
+              color: data.color || SPECIAL_PLACES[lugarId]?.color || brand.accent,
+              mensajeCorto: data.mensajeCorto || 'AYUDA A TU CLUB',
+            });
+            return;
+          }
+        }
+      } catch {}
+      if (!cancel && SPECIAL_PLACES[lugarId]) setClub(SPECIAL_PLACES[lugarId]);
+    })();
+    return () => { cancel = true; };
+  }, [lugarId]);
+
+  // 3) Ofertas destacadas
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -118,7 +152,7 @@ export default function RegistroLandingContenido() {
             copy: o.descripcionCorta || (o.descripcionLarga ? (o.descripcionLarga.length > 120 ? o.descripcionLarga.slice(0, 117) + '…' : o.descripcionLarga) : 'Condiciones especiales disponibles.'),
           }));
         if (!cancel && destacados.length) setTeasers(destacados);
-      } catch { /* fallback */ }
+      } catch {}
       finally { if (!cancel) setLoadingTeasers(false); }
     })();
     return () => { cancel = true; };
@@ -129,6 +163,8 @@ export default function RegistroLandingContenido() {
     const qs = (agenteId && lugarId) ? `?agenteId=${agenteId}&lugarId=${lugarId}` : '';
     return `/comparador${qs}`;
   }, [agenteId, lugarId]);
+
+  const clubColor = club?.color || brand.accent;
 
   return (
     <div className="min-h-screen text-gray-100" style={{ backgroundColor: brand.bg }}>
@@ -142,16 +178,55 @@ export default function RegistroLandingContenido() {
           }}
         />
         <div className="container mx-auto px-6 pt-8 md:pt-10 pb-8 relative">
+          {/* ESCUDO del lugar especial (arriba derecha) */}
+          {club && (
+            <div className="absolute top-3 md:top-4 right-4 z-20">
+              <div
+                className="rounded-2xl p-2 md:p-3 backdrop-blur-md"
+                style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  boxShadow: `0 0 0 2px ${clubColor}22, 0 0 22px ${clubColor}66`,
+                }}
+                title={club.nombre}
+              >
+                <img
+                  src={club.logo}
+                  alt={`Escudo ${club.nombre}`}
+                  className="h-12 md:h-16 w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="max-w-4xl">
             <img src="/logo-impulso.png" alt="Impulso Energético" className="h-16 md:h-20 w-auto" />
-            <h1 className="mt-4 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
+
+            {/* Píldora “AYUDA A TU CLUB” al lado del logo */}
+            {club && (
+              <div
+                className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full"
+                style={{
+                  border: `1.5px solid ${clubColor}`,
+                  color: brand.text,
+                  background: 'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))',
+                  boxShadow: `0 0 12px ${clubColor}77, inset 0 0 10px rgba(255,255,255,0.06)`,
+                }}
+              >
+                <span>🏆</span>
+                <b>{club.mensajeCorto || 'AYUDA A TU CLUB'}</b>
+                <span className="hidden sm:inline">· {club.nombre}</span>
+              </div>
+            )}
+
+            <h1 className="mt-3 md:mt-4 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
               Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
             </h1>
           </div>
         </div>
       </section>
 
-      {/* BANNER FULL-WIDTH */}
+      {/* BANNER full-width */}
       <section className="relative isolate mt-2 md:mt-4">
         <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
           <picture>
@@ -166,20 +241,23 @@ export default function RegistroLandingContenido() {
           </picture>
           <div
             className="pointer-events-none absolute inset-0"
-            style={{
-              boxShadow:
-                'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)',
-            }}
+            style={{ boxShadow: 'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)' }}
           />
         </div>
       </section>
 
-      {/* BLOQUE TEXTO + CTAS + TICKS (entre banner y botones de servicios) */}
+      {/* BLOQUE texto + CTAs + ticks */}
       <section className="container mx-auto px-6 pt-6 pb-8">
         <p className="text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
           <b>Y mucho más:</b> Telefonía, Viajes, Inmobiliaria, Seguros, Repuestos y otros servicios para tu día a día.
           <br /><b>Desbloquea tus descuentos en 60 segundos.</b>
         </p>
+
+        {club && (
+          <p className="mt-2 text-sm" style={{ color: '#f0ead0' }}>
+            <b>Impacto directo:</b> con cada servicio contratado, <b>{club.nombre}</b> recibe una aportación económica.
+          </p>
+        )}
 
         <div className="mt-6 flex flex-wrap gap-4 items-center">
           <a
@@ -210,7 +288,7 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* Secciones: BOTONES ROJOS con glow neón */}
+      {/* Secciones */}
       <section className="container mx-auto px-6 pb-6">
         <h2 className="text-2xl md:text-3xl font-extrabold mb-6" style={{ color: brand.text }}>
           Elige tu sección y empieza a ahorrar
@@ -224,9 +302,7 @@ export default function RegistroLandingContenido() {
               >
                 <Icon size={34} style={{ color: brand.bg }} />
               </div>
-              <span className="text-sm font-semibold text-center" style={{ color: brand.text }}>
-                {label}
-              </span>
+              <span className="text-sm font-semibold text-center" style={{ color: brand.text }}>{label}</span>
             </a>
           ))}
         </div>
@@ -244,25 +320,18 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* TEASERS (dinámicos) */}
+      {/* TEASERS */}
       <section className="container mx-auto px-6 py-10">
         <h2 className="text-2xl md:text-3xl font-extrabold mb-6" style={{ color: brand.text }}>
           Ofertas destacadas {leadOK ? '(desbloqueadas)' : '(bloqueadas)'}
         </h2>
-
         {loadingTeasers && <div className="text-sm" style={{ color: '#c9c2a5' }}>Cargando ofertas…</div>}
-
         {!loadingTeasers && (
           <div className="grid md:grid-cols-2 gap-6">
             {teasers.map((o, i) => (
-              <div
-                key={i}
-                className="group relative rounded-2xl p-[2px]"
-                style={{
-                  background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`,
-                  boxShadow: `0 0 10px ${brand.accent}66, 0 0 24px ${brand.accent2}55`,
-                }}
-              >
+              <div key={i} className="group relative rounded-2xl p-[2px]"
+                   style={{ background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`,
+                            boxShadow: `0 0 10px ${brand.accent}66, 0 0 24px ${brand.accent2}55` }}>
                 <div className="rounded-2xl p-6 h-full" style={{ backgroundColor: brand.card }}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: '#1a3c4a', color: brand.text }}>
@@ -272,36 +341,25 @@ export default function RegistroLandingContenido() {
                       <Tag size={14} /> {o.tag || 'Exclusiva'}
                     </span>
                   </div>
-
                   <div className="mt-4">
                     <h3 className="text-lg md:text-xl font-extrabold" style={{ color: brand.text }}>{o.t}</h3>
                     <p className="mt-2 text-sm" style={{ color: '#d9d2b5' }}>{o.copy}</p>
                   </div>
-
-                  {/* Overlay bloqueo / desbloqueado */}
                   {!leadOK ? (
-                    <div
-                      className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center text-center p-6"
-                      style={{ background: '#0E2631dd', backdropFilter: 'blur(2px)', color: brand.text }}
-                    >
+                    <div className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center text-center p-6"
+                         style={{ background: '#0E2631dd', backdropFilter: 'blur(2px)', color: brand.text }}>
                       <Lock size={32} className="lock-anim" />
                       <div className="font-bold mt-2">Contenido exclusivo</div>
                       <div className="text-sm opacity-90 mt-1">Regístrate para ver precio, condiciones y contratar</div>
-                      <a
-                        href="#form"
-                        className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
-                        style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}
-                      >
+                      <a href="#form" className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
+                         style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}>
                         Desbloquear ahora <ChevronRight size={16} />
                       </a>
                     </div>
                   ) : (
                     <div className="mt-5">
-                      <a
-                        href={comparadorHref}
-                        className="inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
-                        style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}
-                      >
+                      <a href={comparadorHref} className="inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
+                         style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}>
                         Ver detalle y contratar <ChevronRight size={16} />
                       </a>
                     </div>
@@ -333,11 +391,8 @@ export default function RegistroLandingContenido() {
           ))}
         </div>
         <div className="mt-8">
-          <a
-            href="#form"
-            className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg neon-glow"
-            style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}
-          >
+          <a href="#form" className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg neon-glow"
+             style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}>
             Acceder a las ofertas <ChevronRight size={18} />
           </a>
         </div>
