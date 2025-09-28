@@ -60,7 +60,8 @@ export default function RegistroFormulario() {
       if (res.ok) {
         localStorage.setItem('agenteId', agenteId);
         localStorage.setItem('lugarId', lugarId);
-
+        localStorage.setItem('leadOK', '1');
+        
         // Redirigir a la nueva pantalla de bienvenida
         router.push(`/bienvenida?nombre=${encodeURIComponent(nombre)}&agenteId=${agenteId}&lugarId=${lugarId}`);
       } else {
