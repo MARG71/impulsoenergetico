@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ChevronRight,
@@ -77,8 +77,8 @@ export default function RegistroLandingContenido() {
   const [teasers, setTeasers] = useState(FALLBACK_TEASERS);
   const [loadingTeasers, setLoadingTeasers] = useState(true);
 
-  // estilos para subrayado ondulado (EXCLUSIVAS / AHORRAR / GANAR COMISIONES YA)
-  const wavy: React.CSSProperties = {
+  // estilo subrayado ondulado
+  const wavy: CSSProperties = {
     textDecorationLine: 'underline',
     textDecorationStyle: 'wavy',
     textDecorationThickness: '3px',
@@ -146,7 +146,7 @@ export default function RegistroLandingContenido() {
             <img src="/logo-impulso.png" alt="Impulso Energético" className="h-14 w-auto" />
 
             <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
-              Ofertas REALES y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
+              Ofertas <span style={wavy}>REALES</span> y <span style={wavy}>EXCLUSIVAS</span> para <span style={wavy}>AHORRAR</span> y <span style={wavy}>GANAR COMISIONES YA</span>
             </h1>
 
             <p className="mt-4 text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
@@ -192,24 +192,25 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* BANNER FULL-WIDTH (después del gancho) */}
-      <section className="relative isolate mt-6 md:mt-8">
-        <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] max-h-[720px] overflow-hidden">
+      {/* BANNER FULL-WIDTH (justo tras el gancho) con MENOR ALTURA */}
+      <section className="relative isolate mt-4 md:mt-6">
+        <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
           <picture>
             <source media="(max-width: 768px)" srcSet="/banner-innovacion-mobile.jpg" />
             <img
               src="/banner-innovacion-desktop.jpg"
               alt="Innovación energética para tu hogar y tu empresa"
-              className="block w-full h-auto"
+              className="block w-full h-[220px] md:h-[300px] lg:h-[360px] object-cover"
               loading="eager"
               fetchPriority="high"
             />
           </picture>
+          {/* Sombra interior suave para integrar con el fondo */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               boxShadow:
-                'inset 0 -40px 60px rgba(14,38,49,0.60), inset 0 40px 60px rgba(14,38,49,0.35)',
+                'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)',
             }}
           />
         </div>
