@@ -14,34 +14,36 @@ import {
   Plane,
   Wrench,
   Hammer,
-  Package,
+  Shield,
   Plus,
   Check,
 } from 'lucide-react';
 import RegistroFormulario from './RegistroFormulario';
 
-// === Paleta basada en el logo adjunto ===
+// Paleta basada en el logo
 const brand = {
-  bg: '#0E2631',         // azul petróleo oscuro (fondo)
-  text: '#F6EED1',       // crema para títulos/textos sobre oscuro
-  accent: '#FF7A3B',     // neón naranja
-  accent2: '#FF4D7E',    // neón magenta/rosa
-  card: '#0f2b38',       // variantes del fondo para tarjetas
+  bg: '#0E2631',     // fondo azul petróleo
+  text: '#F6EED1',   // crema
+  accent: '#FF7A3B', // rojo/naranja neón (CTA)
+  accent2: '#FF4D7E',// rosa neón (CTA)
+  card: '#112e3c',   // tarjetas sobre fondo
+  cardAlt: '#143a48' // tarjetas destacadas
 };
 
+// Secciones tipo WakeUp
 const SECCIONES = [
-  { key: 'luz', label: 'Luz', icon: Bolt },
-  { key: 'gas', label: 'Gas', icon: Flame },
-  { key: 'telefonia', label: 'Telefonía', icon: Phone },
-  { key: 'solar', label: 'Solar', icon: Sun },
-  { key: 'aerotermia', label: 'Aerotermia', icon: Thermometer },
-  { key: 'bateria', label: 'Batería HERMES IA', icon: BatteryCharging },
-  { key: 'inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
-  { key: 'viajes', label: 'Viajes', icon: Plane },
-  { key: 'repuestos', label: 'Repuestos coche', icon: Wrench },
-  { key: 'ferreteria', label: 'Ferretería', icon: Hammer },
-  { key: 'ganaderos', label: 'Productos ganaderos', icon: Package },
-  { key: 'mas', label: 'Más pronto…', icon: Plus },
+  { key: 'luz',          label: 'Luz',                 icon: Bolt },
+  { key: 'gas',          label: 'Gas',                 icon: Flame },
+  { key: 'telefonia',    label: 'Telefonía',           icon: Phone },
+  { key: 'solar',        label: 'Solar',               icon: Sun },
+  { key: 'aerotermia',   label: 'Aerotermia',          icon: Thermometer },
+  { key: 'bateria',      label: 'Batería HERMES IA',   icon: BatteryCharging },
+  { key: 'inmobiliaria', label: 'Inmobiliaria',        icon: Building2 },
+  { key: 'viajes',       label: 'Viajes',              icon: Plane },
+  { key: 'repuestos',    label: 'Repuestos coche',     icon: Wrench },
+  { key: 'ferreteria',   label: 'Ferretería',          icon: Hammer },
+  { key: 'seguros',      label: 'Seguros',             icon: Shield }, // <-- cambiado
+  { key: 'mas',          label: 'Más pronto…',         icon: Plus },
 ];
 
 export default function RegistroLandingContenido() {
@@ -49,25 +51,15 @@ export default function RegistroLandingContenido() {
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [lugarId, setLugarId] = useState<string | null>(null);
 
-  // 1) Leer IDs de URL y persistirlos (QR / redes)
+  // IDs desde URL/localStorage (QR, WhatsApp, redes)
   useEffect(() => {
     const a = searchParams.get('agenteId');
     const l = searchParams.get('lugarId');
-
     if (a && l) {
-      setAgenteId(a);
-      setLugarId(l);
-      try {
-        localStorage.setItem('agenteId', a);
-        localStorage.setItem('lugarId', l);
-      } catch {}
+      setAgenteId(a); setLugarId(l);
+      try { localStorage.setItem('agenteId', a); localStorage.setItem('lugarId', l); } catch {}
     } else {
-      try {
-        const sa = localStorage.getItem('agenteId');
-        const sl = localStorage.getItem('lugarId');
-        setAgenteId(sa);
-        setLugarId(sl);
-      } catch {}
+      try { setAgenteId(localStorage.getItem('agenteId')); setLugarId(localStorage.getItem('lugarId')); } catch {}
     }
   }, [searchParams]);
 
@@ -75,7 +67,7 @@ export default function RegistroLandingContenido() {
 
   return (
     <div className="min-h-screen text-gray-100" style={{ backgroundColor: brand.bg }}>
-      {/* HERO agresivo */}
+      {/* HERO */}
       <section className="relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-70"
@@ -86,35 +78,19 @@ export default function RegistroLandingContenido() {
         />
         <div className="container mx-auto px-6 pt-20 pb-12 relative">
           <div className="max-w-4xl">
-            <div className="flex items-center gap-4">
-              <img
-                src="/logo-impulso.png"
-                alt="Impulso Energético"
-                className="h-14 w-auto"
-              />
-              <span className="sr-only">Impulso Energético</span>
-            </div>
-
-            <h1
-              className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight"
-              style={{ color: brand.text }}
-            >
-              Ofertas **REALES** y **EXCLUSIVAS** para ahorrar YA
+            <img src="/logo-impulso.png" alt="Impulso Energético" className="h-14 w-auto" />
+            <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight" style={{ color: brand.text }}>
+              Ofertas <span className="underline decoration-wavy">REALES</span> y <b>EXCLUSIVAS</b> para ahorrar YA
             </h1>
-
             <p className="mt-4 text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
-              Luz, Gas, Telefonía, Solar, Aerotermia, Baterías HERMES-IA, Inmobiliaria, Viajes,
-              Repuestos, Ferretería y más. <b>Desbloquea tus descuentos en 60 segundos.</b>
+              Luz, Gas, Telefonía, Solar, Aerotermia, Baterías HERMES-IA, Inmobiliaria, Viajes, Repuestos, Ferretería y <b>Seguros</b>.
+              <br /><b>Desbloquea tus descuentos en 60 segundos.</b>
             </p>
-
             <div className="mt-8 flex flex-wrap gap-3">
               <a
                 href="#form"
                 className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg"
-                style={{
-                  background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-                  color: '#0b1e27',
-                }}
+                style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}
               >
                 Acceder a las ofertas <ChevronRight size={18} />
               </a>
@@ -127,20 +103,11 @@ export default function RegistroLandingContenido() {
                 Ver ahorro estimado
               </a>
             </div>
-
-            {/* badges rápidas */}
             <div className="mt-6 flex flex-wrap items-center gap-4 text-sm" style={{ color: '#d9d2b5' }}>
-              <span className="inline-flex items-center gap-2">
-                <Check size={16} /> Estudio gratuito
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <Check size={16} /> Ofertas negociadas y actualizadas
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <Check size={16} /> Sin compromiso
-              </span>
+              <span className="inline-flex items-center gap-2"><Check size={16} /> Estudio gratuito</span>
+              <span className="inline-flex items-center gap-2"><Check size={16} /> Ofertas negociadas y actualizadas</span>
+              <span className="inline-flex items-center gap-2"><Check size={16} /> Sin compromiso</span>
             </div>
-
             {(agenteId || lugarId) && (
               <div className="mt-3 text-xs" style={{ color: '#c9c2a5' }}>
                 {agenteId && <>Agente: <b>{agenteId}</b>{' '}</>}
@@ -151,28 +118,22 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* Secciones tipo WakeUp: botones redondos */}
+      {/* Secciones tipo WakeUp: BOTONES ROJOS */}
       <section className="container mx-auto px-6 pb-6">
         <h2 className="text-2xl md:text-3xl font-extrabold mb-6" style={{ color: brand.text }}>
           Elige tu sección y empieza a ahorrar
         </h2>
-
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-5">
           {secciones.map(({ key, label, icon: Icon }) => (
-            <a
-              key={key}
-              href="#form"
-              className="group flex flex-col items-center justify-center gap-2"
-              title={`${label} · Accede y desbloquea ofertas`}
-            >
+            <a key={key} href="#form" className="group flex flex-col items-center justify-center gap-2" title={`${label} · Accede y desbloquea ofertas`}>
               <div
                 className="h-28 w-28 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:scale-105"
                 style={{
-                  background: `radial-gradient(60% 60% at 50% 40%, ${brand.card}, ${brand.bg})`,
-                  boxShadow: `0 0 0 3px ${brand.bg}, 0 0 0 6px ${brand.accent}33, 0 6px 18px #00000080`,
+                  background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`, // <-- rojo como CTA
+                  boxShadow: `0 0 0 4px ${brand.bg}, 0 10px 22px rgba(0,0,0,.5)`,
                 }}
               >
-                <Icon size={34} style={{ color: brand.text }} />
+                <Icon size={34} style={{ color: brand.bg }} />
               </div>
               <span className="text-sm font-semibold text-center" style={{ color: brand.text }}>
                 {label}
@@ -180,23 +141,21 @@ export default function RegistroLandingContenido() {
             </a>
           ))}
         </div>
-
         <p className="mt-4 text-sm" style={{ color: '#c9c2a5' }}>
           Seguimos añadiendo más servicios. Déjanos tus datos y te avisamos de nuevas ofertas.
         </p>
       </section>
 
-      {/* Banda con promesa de valor */}
+      {/* Banda promesa */}
       <section className="py-8" style={{ background: `linear-gradient(90deg, ${brand.accent}22, ${brand.accent2}22)` }}>
         <div className="container mx-auto px-6">
           <p className="text-lg md:text-xl font-bold" style={{ color: brand.text }}>
-            <span className="mr-2">💥</span>
-            <b>Sin trucos</b>: precios reales, atención cercana y gestión completa (altas, portabilidades e instalaciones).
+            💥 <b>Sin trucos</b>: precios reales, atención cercana y gestión completa (altas, portabilidades e instalaciones).
           </p>
         </div>
       </section>
 
-      {/* Cómo funciona */}
+      {/* CÓMO FUNCIONA — BLOQUES CON COLOR DISTINTO AL FONDO */}
       <section className="container mx-auto px-6 py-14">
         <h2 className="text-2xl md:text-3xl font-extrabold" style={{ color: brand.text }}>
           ¿Cómo desbloqueas tus descuentos?
@@ -204,18 +163,21 @@ export default function RegistroLandingContenido() {
         <div className="mt-7 grid md:grid-cols-4 gap-6">
           {[
             { n: '01', t: 'Regístrate', d: 'Nombre, email y teléfono. 60 segundos.' },
-            { n: '02', t: 'Accede a ofertas', d: 'Verás promos reales y negociadas.' },
+            { n: '02', t: 'Accede a ofertas', d: 'Promos reales y negociadas.' },
             { n: '03', t: 'Contrata fácil', d: 'Nos ocupamos de altas y portabilidades.' },
             { n: '04', t: 'Ahorro constante', d: 'Seguimiento y optimización continua.' },
           ].map((s) => (
             <div
               key={s.n}
-              className="rounded-2xl p-6 border"
-              style={{ borderColor: '#26404b', backgroundColor: '#112e3c' }}
+              className="rounded-2xl p-6 border shadow-sm"
+              style={{
+                backgroundColor: brand.cardAlt, // <-- distinto al fondo
+                borderColor: '#2b5666'
+              }}
             >
               <div className="text-sm font-extrabold" style={{ color: '#8fb0bd' }}>{s.n}</div>
               <div className="mt-2 text-lg font-bold" style={{ color: brand.text }}>{s.t}</div>
-              <p className="mt-2 text-sm" style={{ color: '#c9c2a5' }}>{s.d}</p>
+              <p className="mt-2 text-sm" style={{ color: '#d9d2b5' }}>{s.d}</p>
             </div>
           ))}
         </div>
@@ -223,17 +185,14 @@ export default function RegistroLandingContenido() {
           <a
             href="#form"
             className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg"
-            style={{
-              background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-              color: '#0b1e27',
-            }}
+            style={{ background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`, color: '#0b1e27' }}
           >
             Acceder a las ofertas <ChevronRight size={18} />
           </a>
         </div>
       </section>
 
-      {/* FORMULARIO (tu componente actual) */}
+      {/* FORMULARIO */}
       <section id="form" className="container mx-auto px-6 py-12">
         <RegistroFormulario />
       </section>
