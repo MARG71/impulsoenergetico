@@ -77,7 +77,7 @@ export default function RegistroLandingContenido() {
   const [teasers, setTeasers] = useState(FALLBACK_TEASERS);
   const [loadingTeasers, setLoadingTeasers] = useState(true);
 
-  // subrayado ondulado (REALES / EXCLUSIVAS / AHORRAR / GANAR COMISIONES YA)
+  // estilo subrayado ondulado
   const wavy: CSSProperties = {
     textDecorationLine: 'underline',
     textDecorationStyle: 'wavy',
@@ -98,7 +98,7 @@ export default function RegistroLandingContenido() {
     try { setLeadOK(localStorage.getItem('leadOK') === '1'); } catch {}
   }, [searchParams]);
 
-  // Cargar ofertas destacadas
+  // Cargar ofertas destacadas y activas desde /api/ofertas
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -192,34 +192,20 @@ export default function RegistroLandingContenido() {
         </div>
       </section>
 
-      {/* BANNER FULL-WIDTH (sale del container y ocupa 100% del viewport) */}
+      {/* BANNER FULL-WIDTH (justo tras el gancho) con MENOR ALTURA */}
       <section className="relative isolate mt-4 md:mt-6">
-        <div className="relative left-1/2 right-1/2 -translate-x-1/2 w-screen overflow-hidden">
+        <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
           <picture>
             <source media="(max-width: 768px)" srcSet="/banner-innovacion-mobile.jpg" />
             <img
               src="/banner-innovacion-desktop.jpg"
               alt="Innovación energética para tu hogar y tu empresa"
-              className="block w-full"
-              style={{
-                height: '200px',        // móvil
-                objectFit: 'cover',
-                objectPosition: 'center 40%',
-              }}
+              className="block w-full h-[220px] md:h-[300px] lg:h-[360px] object-cover"
               loading="eager"
               fetchPriority="high"
             />
           </picture>
-          {/* alturas en md/lg */}
-          <style jsx>{`
-            @media (min-width: 768px) {
-              picture img { height: 260px !important; }
-            }
-            @media (min-width: 1024px) {
-              picture img { height: 320px !important; }
-            }
-          `}</style>
-          {/* sombra interior para integrarlo con el fondo */}
+          {/* Sombra interior suave para integrar con el fondo */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{
