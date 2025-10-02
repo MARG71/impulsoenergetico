@@ -10,10 +10,10 @@ function toId(v: string) {
   return id;
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+// ⚠️ OJO: NO tipar el 2º argumento (o usar : any) para evitar el error de Next 15
+export async function GET(_req: Request, { params }: any) {
   try {
     const id = toId(params.id);
-
     const lugar = await prisma.lugar.findUnique({
       where: { id },
       select: {
@@ -32,7 +32,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Lugar no encontrado' }, { status: 404 });
     }
 
-    // Solo lo público que necesita la landing
     return NextResponse.json({
       id: lugar.id,
       nombre: lugar.nombre,
