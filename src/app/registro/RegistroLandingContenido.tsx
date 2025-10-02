@@ -118,7 +118,7 @@ export default function RegistroLandingContenido() {
     (async () => {
       if (!lugarId) return;
       try {
-        const r = await fetch(`/api/lugares/${lugarId}`, { cache: 'no-store' });
+        const r = await fetch(`/api/lugares-public/${lugarId}`, { cache: 'no-store' });
         if (r.ok) {
           const data = await r.json();
           if (!cancel && data?.especial) {
