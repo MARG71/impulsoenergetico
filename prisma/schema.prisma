@@ -88,12 +88,11 @@ model Agente {
 
   creadoEn DateTime @default(now())
 }
-
 model Lugar {
-  id        Int    @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   nombre    String
   direccion String
-  qrCode    String @unique
+  qrCode    String  @unique
   agenteId  Int
 
   // % del POOL para el Cliente (0..1). Si es null, se usan defaults/overrides.
@@ -108,19 +107,19 @@ model Lugar {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
-  creadoEn DateTime @default(now())
+  creadoEn  DateTime @default(now())
 
-   // --- Personalización landing ---
-  especial          Boolean  @default(false)
-  especialLogoUrl   String?   // ej: /uploads/lugares/101.png o https://cdn/club.png
-  especialColor     String?   // ej: #FF7A3B
-  especialMensaje   String?   // ej: "AYUDA A TU CLUB"
+  // --- Personalización landing ---
+  especial         Boolean  @default(false)
+  especialLogoUrl  String?
+  especialColor    String?
+  especialMensaje  String?
 
   // --- Métrica para el contador de la landing ---
-  aportacionAcumulada Int     @default(0) // en euros (usa Int; si prefieres céntimos, dime y lo cambiamos a BigInt)
+  aportacionAcumulada Int   @default(0) // en euros
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) // <- PASO 1: poner default inicial (SIN @updatedAt aún)
 }
 
 model QR {
