@@ -48,6 +48,13 @@ export async function GET(req: Request) {
         pctLugar: true,
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
+
+        // 👇 añadimos campos de “modo especial” para la tabla y modal
+        especial: true,
+        especialLogoUrl: true,
+        especialColor: true,
+        especialMensaje: true,
+        aportacionAcumulada: true,
       },
     });
 
@@ -83,6 +90,13 @@ export async function POST(req: Request) {
         id: true, nombre: true, direccion: true, qrCode: true, agenteId: true,
         pctLugar: true, pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
+
+        // devolvemos también los “especial” (serán null/false por defecto)
+        especial: true,
+        especialLogoUrl: true,
+        especialColor: true,
+        especialMensaje: true,
+        aportacionAcumulada: true,
       },
     });
 

@@ -44,6 +44,28 @@ export default function RegistrarLugar() {
     pctLugar: '',   // string: lo normaliza la API
   });
 
+  // ⬇️ para subir logo del modal
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const subirLogoModal = async (file?: File) => {
+    if (!file || !lugarEditando) return;
+    try {
+      setSubiendoLogo(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      // reutilizamos preset de Cloudinary como en Fondos
+      fd.append('upload_preset', 'impulso_carteles');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (!data?.secure_url) throw new Error('Upload error');
+      setLugarEditando((s: any) => ({ ...s, especialLogoUrl: data.secure_url }));
+    } finally {
+      setSubiendoLogo(false);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       const [resAgentes, resLugares, resFondos] = await Promise.all([
@@ -85,7 +107,7 @@ export default function RegistrarLugar() {
 
   const handleGuardarEdicion = async () => {
     if (!lugarEditando) return;
-    // Enviamos tal cual; la API normaliza pctCliente/pctLugar
+    // Mandamos también los campos de “especial” (PUT ya los acepta)
     const res = await fetch(`/api/lugares/${lugarEditando.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -96,9 +118,18 @@ export default function RegistrarLugar() {
         agenteId: lugarEditando.agenteId,
         pctCliente: lugarEditando.pctCliente, // puede ser "15" o "0.15"
         pctLugar: lugarEditando.pctLugar,
+
+        // 👇 modo especial
+        especial: !!lugarEditando.especial,
+        logo: lugarEditando.especialLogoUrl,
+        color: lugarEditando.especialColor,
+        mensajeCorto: lugarEditando.especialMensaje,
+        aportacionAcumulada: lugarEditando.aportacionAcumulada,
       }),
     });
     const actualizado = await res.json();
+
+    // actualizamos la tabla
     setLugares((arr) => arr.map((l) => (l.id === actualizado.id ? actualizado : l)));
     setLugarEditando(null);
     setMostrarModal(false);
@@ -134,13 +165,13 @@ export default function RegistrarLugar() {
   };
 
   const lugaresFiltrados = lugares.filter((lugar) => {
-    const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre} ${fmtPct(lugar.pctCliente)} ${fmtPct(lugar.pctLugar)}`;
+    const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre} ${fmtPct(lugar.pctCliente)} ${fmtPct(lugar.pctLugar)} ${lugar.especial ? 'especial' : ''}`;
     return texto.toLowerCase().includes(busqueda.toLowerCase());
   });
 
   return (
     <div className="p-8 bg-[#B3E58C] min-h-screen">
-      {/* Header con logo y acceso al dashboard */}
+      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Image
@@ -245,6 +276,7 @@ export default function RegistrarLugar() {
                 <th className="p-2">% Cliente</th>
                 <th className="p-2">% Lugar</th>
                 <th className="p-2">QR</th>
+                <th className="p-2">Estado</th>
                 <th className="p-2">Acciones</th>
               </tr>
             </thead>
@@ -258,8 +290,20 @@ export default function RegistrarLugar() {
                   <td className="p-2 text-black">{fmtPct(lugar.pctCliente)}</td>
                   <td className="p-2 text-black">{fmtPct(lugar.pctLugar)}</td>
                   <td className="p-2 text-xs break-all text-black">{lugar.qrCode}</td>
+                  <td className="p-2">
+                    {lugar.especial ? (
+                      <span className="inline-block text-xs font-bold px-2 py-1 rounded-full bg-pink-100 text-pink-700 border border-pink-300">⭐ Especial</span>
+                    ) : (
+                      <span className="inline-block text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 border">Normal</span>
+                    )}
+                  </td>
                   <td className="p-2 flex flex-col md:flex-row gap-2">
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setLugarEditando(lugar); setMostrarModal(true); }}>Editar</Button>
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => { setLugarEditando(lugar); setMostrarModal(true); }}
+                    >
+                      Editar
+                    </Button>
                     <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => router.push(`/lugares/${lugar.id}/detalle`)}>Ver</Button>
                     <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}>Generar cartel</Button>
                     <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleEliminar(lugar.id)}>Eliminar</Button>
@@ -306,6 +350,81 @@ export default function RegistrarLugar() {
                   <option key={agente.id} value={agente.id}>{agente.nombre}</option>
                 ))}
               </select>
+
+              {/* ⚡ Bloque Modo Especial */}
+              <div className="mt-4 border-t pt-4">
+                <label className="text-sm flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!lugarEditando.especial}
+                    onChange={(e) => setLugarEditando({ ...lugarEditando, especial: e.target.checked })}
+                  />
+                  Activar “modo especial” (landing)
+                </label>
+
+                {lugarEditando.especial && (
+                  <div className="mt-3 grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm">Mensaje corto</label>
+                      <input
+                        className="w-full border rounded px-3 py-2 mt-1"
+                        value={lugarEditando.especialMensaje ?? ''}
+                        onChange={(e) => setLugarEditando({ ...lugarEditando, especialMensaje: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm">Color (HEX)</label>
+                      <div className="flex items-center gap-3 mt-1">
+                        <input
+                          type="color"
+                          value={lugarEditando.especialColor ?? '#FFC857'}
+                          onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })}
+                          className="h-10 w-16 border rounded"
+                        />
+                        <input
+                          className="flex-1 border rounded px-3 py-2"
+                          value={lugarEditando.especialColor ?? '#FFC857'}
+                          onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm">Aportación acumulada (€)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        className="w-full border rounded px-3 py-2 mt-1"
+                        value={Number(lugarEditando.aportacionAcumulada ?? 0)}
+                        onChange={(e) => setLugarEditando({ ...lugarEditando, aportacionAcumulada: Number(e.target.value || 0) })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm">Logo / Escudo</label>
+                      {lugarEditando.especialLogoUrl && (
+                        <div className="mt-2">
+                          <img src={lugarEditando.especialLogoUrl} alt="logo" className="h-16 rounded-xl border p-2 bg-white" />
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center gap-3">
+                        <input
+                          type="text"
+                          placeholder="https://…/logo.png"
+                          value={lugarEditando.especialLogoUrl ?? ''}
+                          onChange={(e) => setLugarEditando({ ...lugarEditando, especialLogoUrl: e.target.value })}
+                          className="flex-1 border rounded px-3 py-2"
+                        />
+                        <label className="inline-flex items-center gap-2 px-3 py-2 border rounded cursor-pointer bg-gray-50 hover:bg-gray-100">
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => subirLogoModal(e.target.files?.[0] || undefined)} />
+                          {subiendoLogo ? 'Subiendo…' : 'Subir'}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Button onClick={handleGuardarEdicion} className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Guardar Cambios</Button>
             </div>
