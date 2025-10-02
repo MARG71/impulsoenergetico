@@ -11,6 +11,25 @@ const toPct = (v: any) => {
   return Math.max(0, Math.min(1, p));
 };
 
+const toBool = (v: any) => {
+  if (v === undefined || v === null || v === '') return undefined;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['true', '1', 'yes', 'si', 'sí'].includes(s)) return true;
+    if (['false', '0', 'no'].includes(s)) return false;
+  }
+  return undefined;
+};
+
+const toInt = (v: any) => {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  if (Number.isNaN(n)) return undefined;
+  return Math.max(0, Math.floor(n));
+};
+
 // GET /api/lugares?take=6&skip=0&q=texto&agenteId=1
 export async function GET(req: Request) {
   try {
@@ -49,7 +68,7 @@ export async function GET(req: Request) {
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
 
-        // 👇 añadimos campos de “modo especial” para la tabla y modal
+        // 👇 añadimos campos “especial”
         especial: true,
         especialLogoUrl: true,
         especialColor: true,
@@ -65,17 +84,21 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/lugares  { nombre, direccion, qrCode, agenteId, pctCliente?, pctLugar? }
+// POST /api/lugares
+// { nombre, direccion, qrCode, agenteId, pctCliente?, pctLugar?,
+//   especial?, logo?/especialLogoUrl?, color?/especialColor?,
+//   mensajeCorto?/especialMensaje?, aportacionAcumulada? }
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const nombre = (body?.nombre ?? '').trim();
-    const direccion = (body?.direccion ?? '').trim();
-    const qrCode = (body?.qrCode ?? '').trim();
+
+    const nombre   = (body?.nombre ?? '').trim();
+    const direccion= (body?.direccion ?? '').trim();
+    const qrCode   = (body?.qrCode ?? '').trim();
     const agenteId = Number(body?.agenteId);
 
     const pctCliente = toPct(body?.pctCliente);
-    const pctLugar = toPct(body?.pctLugar);
+    const pctLugar   = toPct(body?.pctLugar);
 
     if (!nombre || !direccion || !qrCode || Number.isNaN(agenteId)) {
       return NextResponse.json({ error: 'nombre, direccion, qrCode y agenteId son obligatorios' }, { status: 400 });
@@ -84,19 +107,27 @@ export async function POST(req: Request) {
     const agente = await prisma.agente.findUnique({ where: { id: agenteId } });
     if (!agente) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
 
+    // Campos especiales (opcionales)
+    const especial = toBool(body?.especial);
+    const especialLogoUrl = (body?.logo ?? body?.especialLogoUrl) ? String(body?.logo ?? body?.especialLogoUrl).trim() : undefined;
+    const especialColor   = body?.color ?? body?.especialColor ? String(body?.color ?? body?.especialColor).trim() : undefined;
+    const especialMensaje = body?.mensajeCorto ?? body?.especialMensaje ? String(body?.mensajeCorto ?? body?.especialMensaje).trim() : undefined;
+    const aportacionAcumulada = toInt(body?.aportacionAcumulada);
+
+    const dataCreate: any = { nombre, direccion, qrCode, agenteId, pctCliente, pctLugar };
+    if (especial !== undefined) dataCreate.especial = especial;
+    if (especialLogoUrl) dataCreate.especialLogoUrl = especialLogoUrl;
+    if (especialColor)   dataCreate.especialColor   = especialColor;
+    if (especialMensaje) dataCreate.especialMensaje = especialMensaje;
+    if (aportacionAcumulada !== undefined) dataCreate.aportacionAcumulada = aportacionAcumulada;
+
     const lugar = await prisma.lugar.create({
-      data: { nombre, direccion, qrCode, agenteId, pctCliente, pctLugar },
+      data: dataCreate,
       select: {
         id: true, nombre: true, direccion: true, qrCode: true, agenteId: true,
         pctLugar: true, pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
-
-        // devolvemos también los “especial” (serán null/false por defecto)
-        especial: true,
-        especialLogoUrl: true,
-        especialColor: true,
-        especialMensaje: true,
-        aportacionAcumulada: true,
+        especial: true, especialLogoUrl: true, especialColor: true, especialMensaje: true, aportacionAcumulada: true,
       },
     });
 

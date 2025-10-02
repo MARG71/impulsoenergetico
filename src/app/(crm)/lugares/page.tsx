@@ -34,37 +34,26 @@ export default function RegistrarLugar() {
   const [fondos, setFondos] = useState<Fondo[]>([]);
   const [fondoSeleccionado, setFondoSeleccionado] = useState<string>('');
 
-  // Inputs de alta de lugar (pctCliente/pctLugar aceptan 15 o 0.15)
+  // Alta de lugar
   const [nuevoLugar, setNuevoLugar] = useState({
     nombre: '',
     direccion: '',
     qrCode: '',
     agenteId: '',
-    pctCliente: '', // string: lo normaliza la API
-    pctLugar: '',   // string: lo normaliza la API
+    pctCliente: '',
+    pctLugar: '',
   });
 
-  // ⬇️ para subir logo del modal
+  // Alta: modo especial
+  const [nuevoEspecial, setNuevoEspecial] = useState(false);
+  const [nuevoEspecialMensaje, setNuevoEspecialMensaje] = useState('');
+  const [nuevoEspecialColor, setNuevoEspecialColor] = useState('#FFC857');
+  const [nuevoAportacion, setNuevoAportacion] = useState<number>(0);
+  const [nuevoEspecialLogoUrl, setNuevoEspecialLogoUrl] = useState('');
+  const [subiendoLogoNuevo, setSubiendoLogoNuevo] = useState(false);
+
+  // Edición: subir logo
   const [subiendoLogo, setSubiendoLogo] = useState(false);
-  const subirLogoModal = async (file?: File) => {
-    if (!file || !lugarEditando) return;
-    try {
-      setSubiendoLogo(true);
-      const fd = new FormData();
-      fd.append('file', file);
-      // reutilizamos preset de Cloudinary como en Fondos
-      fd.append('upload_preset', 'impulso_carteles');
-      const res = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', {
-        method: 'POST',
-        body: fd,
-      });
-      const data = await res.json();
-      if (!data?.secure_url) throw new Error('Upload error');
-      setLugarEditando((s: any) => ({ ...s, especialLogoUrl: data.secure_url }));
-    } finally {
-      setSubiendoLogo(false);
-    }
-  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,14 +89,41 @@ export default function RegistrarLugar() {
   };
 
   const handleEliminar = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este lugar?')) return;
+    if (!confirm('¿Eliminar este lugar?')) return;
     await fetch(`/api/lugares/${id}`, { method: 'DELETE' });
     setLugares((arr) => arr.filter((l) => l.id !== id));
   };
 
+  const subirLogoModal = async (file?: File) => {
+    if (!file || !lugarEditando) return;
+    try {
+      setSubiendoLogo(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', 'impulso_carteles');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data?.secure_url) throw new Error('Upload error');
+      setLugarEditando((s: any) => ({ ...s, especialLogoUrl: data.secure_url }));
+    } finally { setSubiendoLogo(false); }
+  };
+
+  const subirLogoNuevoLugar = async (file?: File) => {
+    if (!file) return;
+    try {
+      setSubiendoLogoNuevo(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', 'impulso_carteles');
+      const res = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data?.secure_url) throw new Error('Upload error');
+      setNuevoEspecialLogoUrl(data.secure_url);
+    } finally { setSubiendoLogoNuevo(false); }
+  };
+
   const handleGuardarEdicion = async () => {
     if (!lugarEditando) return;
-    // Mandamos también los campos de “especial” (PUT ya los acepta)
     const res = await fetch(`/api/lugares/${lugarEditando.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -116,10 +132,9 @@ export default function RegistrarLugar() {
         direccion: lugarEditando.direccion,
         qrCode: lugarEditando.qrCode,
         agenteId: lugarEditando.agenteId,
-        pctCliente: lugarEditando.pctCliente, // puede ser "15" o "0.15"
+        pctCliente: lugarEditando.pctCliente,
         pctLugar: lugarEditando.pctLugar,
-
-        // 👇 modo especial
+        // especial
         especial: !!lugarEditando.especial,
         logo: lugarEditando.especialLogoUrl,
         color: lugarEditando.especialColor,
@@ -128,8 +143,6 @@ export default function RegistrarLugar() {
       }),
     });
     const actualizado = await res.json();
-
-    // actualizamos la tabla
     setLugares((arr) => arr.map((l) => (l.id === actualizado.id ? actualizado : l)));
     setLugarEditando(null);
     setMostrarModal(false);
@@ -137,22 +150,32 @@ export default function RegistrarLugar() {
 
   const handleRegistrarLugar = async (e: any) => {
     e.preventDefault();
+
+    const payload: any = { ...nuevoLugar };
+    if (nuevoEspecial) {
+      payload.especial = true;
+      payload.mensajeCorto = nuevoEspecialMensaje;
+      payload.color = nuevoEspecialColor;
+      payload.aportacionAcumulada = nuevoAportacion;
+      if (nuevoEspecialLogoUrl) payload.logo = nuevoEspecialLogoUrl;
+    }
+
     const res = await fetch('/api/lugares', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nuevoLugar), // API normaliza %
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     setLugares((arr) => [data, ...arr]);
-    setNuevoLugar({
-      nombre: '',
-      direccion: '',
-      qrCode: '',
-      agenteId: '',
-      pctCliente: '',
-      pctLugar: '',
-    });
+
+    // reset
+    setNuevoLugar({ nombre: '', direccion: '', qrCode: '', agenteId: '', pctCliente: '', pctLugar: '' });
     setCodigoQR('');
+    setNuevoEspecial(false);
+    setNuevoEspecialMensaje('');
+    setNuevoEspecialColor('#FFC857');
+    setNuevoAportacion(0);
+    setNuevoEspecialLogoUrl('');
   };
 
   const handleSeleccionarFondo = async (id: number, url: string) => {
@@ -184,10 +207,7 @@ export default function RegistrarLugar() {
           <span className="hidden md:inline text-[#1F1F1F]">CRM · Lugares</span>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => router.push('/dashboard')}
-            className="bg-[#F0C300] text-black hover:bg-yellow-400"
-          >
+          <Button onClick={() => router.push('/dashboard')} className="bg-[#F0C300] text-black hover:bg-yellow-400">
             🏠 Dashboard
           </Button>
         </div>
@@ -195,46 +215,110 @@ export default function RegistrarLugar() {
 
       <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Registrar Lugar</h1>
 
-      <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <Input placeholder="Nombre del lugar" value={nuevoLugar.nombre} onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })} className="bg-white text-black" />
-          <Input placeholder="Dirección" value={nuevoLugar.direccion} onChange={(e) => setNuevoLugar({ ...nuevoLugar, direccion: e.target.value })} className="bg-white text-black" />
+      {/* ====== ALTA DE LUGAR ====== */}
+      <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-5">
+        <div>
+          <h3 className="font-bold text-[#1F1F1F] mb-2">Datos básicos</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-semibold">Nombre del lugar</label>
+              <Input placeholder="Ej: Club Deportivo Impulso" value={nuevoLugar.nombre} onChange={(e) => setNuevoLugar({ ...nuevoLugar, nombre: e.target.value })} className="bg-white text-black" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Dirección</label>
+              <Input placeholder="Ciudad / Provincia" value={nuevoLugar.direccion} onChange={(e) => setNuevoLugar({ ...nuevoLugar, direccion: e.target.value })} className="bg-white text-black" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">% Cliente (ej. 15 o 0.15)</label>
+              <Input placeholder="15 o 0.15" value={nuevoLugar.pctCliente} onChange={(e) => setNuevoLugar({ ...nuevoLugar, pctCliente: e.target.value })} className="bg-white text-black" />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">% Lugar (ej. 10 o 0.10)</label>
+              <Input placeholder="10 o 0.10" value={nuevoLugar.pctLugar} onChange={(e) => setNuevoLugar({ ...nuevoLugar, pctLugar: e.target.value })} className="bg-white text-black" />
+            </div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="text-sm font-semibold">QR generado</label>
+                <Input readOnly placeholder="(genera un QR)" value={nuevoLugar.qrCode} className="bg-white text-black" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="button" onClick={generarQR} className="bg-blue-600 hover:bg-blue-700 text-white h-10 mt-6">
+                  Generar QR
+                </Button>
+                {codigoQR && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${codigoQR}`} size={56} />}
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-sm font-semibold">Agente asignado</label>
+              <select className="w-full border px-4 py-2 rounded bg-white text-black" value={nuevoLugar.agenteId} onChange={(e) => setNuevoLugar({ ...nuevoLugar, agenteId: e.target.value })}>
+                <option value="">Selecciona un agente</option>
+                {agentes.map((agente) => (
+                  <option key={agente.id} value={agente.id}>{agente.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          <Input
-            placeholder="% Cliente (ej. 15 o 0.15)"
-            value={nuevoLugar.pctCliente}
-            onChange={(e) => setNuevoLugar({ ...nuevoLugar, pctCliente: e.target.value })}
-            className="bg-white text-black"
-          />
-          <Input
-            placeholder="% Lugar (ej. 10 o 0.10)"
-            value={nuevoLugar.pctLugar}
-            onChange={(e) => setNuevoLugar({ ...nuevoLugar, pctLugar: e.target.value })}
-            className="bg-white text-black"
-          />
-        </div>
+        <hr className="border-dashed" />
 
-        <div className="flex items-center gap-4">
-          <Button type="button" onClick={generarQR} className="bg-blue-600 hover:bg-blue-700 text-white">Generar QR</Button>
-          {codigoQR && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${codigoQR}`} size={64} />}
-        </div>
+        <div>
+          <label className="text-sm flex items-center gap-2">
+            <input type="checkbox" checked={nuevoEspecial} onChange={(e) => setNuevoEspecial(e.target.checked)} />
+            Activar <b>modo especial</b> en la landing
+          </label>
 
-        <select className="w-full border px-4 py-2 rounded bg-white text-black" value={nuevoLugar.agenteId} onChange={(e) => setNuevoLugar({ ...nuevoLugar, agenteId: e.target.value })}>
-          <option value="">Selecciona un agente</option>
-          {agentes.map((agente) => (
-            <option key={agente.id} value={agente.id}>{agente.nombre}</option>
-          ))}
-        </select>
+          {nuevoEspecial && (
+            <div className="mt-3 grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold">Mensaje corto (ej. “AYUDA A TU CLUB”)</label>
+                <input className="w-full border rounded px-3 py-2 mt-1" value={nuevoEspecialMensaje} onChange={(e) => setNuevoEspecialMensaje(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Color (HEX)</label>
+                <div className="flex items-center gap-3 mt-1">
+                  <input type="color" value={nuevoEspecialColor} onChange={(e) => setNuevoEspecialColor(e.target.value)} className="h-10 w-16 border rounded" />
+                  <input className="flex-1 border rounded px-3 py-2" value={nuevoEspecialColor} onChange={(e) => setNuevoEspecialColor(e.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Aportación acumulada (€)</label>
+                <input type="number" min={0} className="w-full border rounded px-3 py-2 mt-1" value={Number(nuevoAportacion)} onChange={(e) => setNuevoAportacion(Number(e.target.value || 0))} />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold">Logo / Escudo</label>
+                {nuevoEspecialLogoUrl && (
+                  <div className="mt-2">
+                    <img src={nuevoEspecialLogoUrl} alt="logo" className="h-16 rounded-xl border p-2 bg-white" />
+                  </div>
+                )}
+                <div className="mt-2 flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="https://…/logo.png"
+                    value={nuevoEspecialLogoUrl}
+                    onChange={(e) => setNuevoEspecialLogoUrl(e.target.value)}
+                    className="flex-1 border rounded px-3 py-2"
+                  />
+                  <label className="inline-flex items-center gap-2 px-3 py-2 border rounded cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => subirLogoNuevoLugar(e.target.files?.[0] || undefined)} />
+                    {subiendoLogoNuevo ? 'Subiendo…' : 'Subir'}
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">Registrar Lugar</Button>
       </form>
 
-      {/* Fondo actual del cartel */}
+      {/* ====== FONDO ACTUAL DEL CARTEL ====== */}
       <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🎨 Fondo actual del cartel</h2>
-
         {esAdmin ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -261,7 +345,7 @@ export default function RegistrarLugar() {
         )}
       </div>
 
-      {/* Lista de lugares */}
+      {/* ====== LISTA ====== */}
       <div className="mt-10 bg-[#E5FFD5] p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-4 text-[#1F1F1F]">Lugares Registrados</h2>
         <Input placeholder="Buscar por cualquier campo..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="mb-4 bg-white text-black" />
@@ -298,12 +382,7 @@ export default function RegistrarLugar() {
                     )}
                   </td>
                   <td className="p-2 flex flex-col md:flex-row gap-2">
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => { setLugarEditando(lugar); setMostrarModal(true); }}
-                    >
-                      Editar
-                    </Button>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setLugarEditando(lugar); setMostrarModal(true); }}>Editar</Button>
                     <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => router.push(`/lugares/${lugar.id}/detalle`)}>Ver</Button>
                     <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}>Generar cartel</Button>
                     <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleEliminar(lugar.id)}>Eliminar</Button>
@@ -315,94 +394,83 @@ export default function RegistrarLugar() {
         </div>
       </div>
 
-      {/* Modal de edición */}
+      {/* ====== MODAL EDICIÓN ====== */}
       <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar Lugar</DialogTitle></DialogHeader>
           {lugarEditando && (
-            <div className="space-y-4">
-              <Input placeholder="Nombre" value={lugarEditando.nombre} onChange={(e) => setLugarEditando({ ...lugarEditando, nombre: e.target.value })} className="text-black" />
-              <Input placeholder="Dirección" value={lugarEditando.direccion} onChange={(e) => setLugarEditando({ ...lugarEditando, direccion: e.target.value })} className="text-black" />
-
+            <div className="space-y-5">
               <div className="grid md:grid-cols-2 gap-4">
-                <Input
-                  placeholder="% Cliente (ej. 15 o 0.15)"
-                  value={lugarEditando.pctCliente ?? ''} // dejamos raw, normaliza backend
-                  onChange={(e) => setLugarEditando({ ...lugarEditando, pctCliente: e.target.value })}
-                  className="text-black"
-                />
-                <Input
-                  placeholder="% Lugar (ej. 10 o 0.10)"
-                  value={lugarEditando.pctLugar ?? ''}
-                  onChange={(e) => setLugarEditando({ ...lugarEditando, pctLugar: e.target.value })}
-                  className="text-black"
-                />
+                <div>
+                  <label className="text-sm font-semibold">Nombre</label>
+                  <Input value={lugarEditando.nombre} onChange={(e) => setLugarEditando({ ...lugarEditando, nombre: e.target.value })} className="text-black" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Dirección</label>
+                  <Input value={lugarEditando.direccion} onChange={(e) => setLugarEditando({ ...lugarEditando, direccion: e.target.value })} className="text-black" />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold">% Cliente (15 o 0.15)</label>
+                  <Input value={lugarEditando.pctCliente ?? ''} onChange={(e) => setLugarEditando({ ...lugarEditando, pctCliente: e.target.value })} className="text-black" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">% Lugar (10 o 0.10)</label>
+                  <Input value={lugarEditando.pctLugar ?? ''} onChange={(e) => setLugarEditando({ ...lugarEditando, pctLugar: e.target.value })} className="text-black" />
+                </div>
               </div>
 
               <div className="flex items-center gap-4">
-                <Button onClick={generarQRModal} className="bg-blue-600 text-white">Generar QR</Button>
-                {lugarEditando.qrCode && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${lugarEditando.qrCode}`} size={64} />}
+                <div className="flex-1">
+                  <label className="text-sm font-semibold">QR</label>
+                  <Input value={lugarEditando.qrCode ?? ''} readOnly className="text-black" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button onClick={generarQRModal} className="bg-blue-600 text-white h-10 mt-6">Generar QR</Button>
+                  {lugarEditando.qrCode && <QRCode value={`https://impulsoenergetico.es/comparador?qr=${lugarEditando.qrCode}`} size={56} />}
+                </div>
               </div>
 
-              <select className="w-full border px-4 py-2 rounded bg-white text-black" value={lugarEditando.agenteId} onChange={(e) => setLugarEditando({ ...lugarEditando, agenteId: e.target.value })}>
-                <option value="">Selecciona un agente</option>
-                {agentes.map((agente) => (
-                  <option key={agente.id} value={agente.id}>{agente.nombre}</option>
-                ))}
-              </select>
+              <div>
+                <label className="text-sm font-semibold">Agente</label>
+                <select className="w-full border px-4 py-2 rounded bg-white text-black" value={lugarEditando.agenteId} onChange={(e) => setLugarEditando({ ...lugarEditando, agenteId: e.target.value })}>
+                  <option value="">Selecciona un agente</option>
+                  {agentes.map((agente) => (
+                    <option key={agente.id} value={agente.id}>{agente.nombre}</option>
+                  ))}
+                </select>
+              </div>
 
-              {/* ⚡ Bloque Modo Especial */}
-              <div className="mt-4 border-t pt-4">
+              <hr className="border-dashed" />
+
+              <div>
                 <label className="text-sm flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={!!lugarEditando.especial}
-                    onChange={(e) => setLugarEditando({ ...lugarEditando, especial: e.target.checked })}
-                  />
-                  Activar “modo especial” (landing)
+                  <input type="checkbox" checked={!!lugarEditando.especial} onChange={(e) => setLugarEditando({ ...lugarEditando, especial: e.target.checked })} />
+                  Activar <b>modo especial</b> en la landing
                 </label>
 
                 {lugarEditando.especial && (
                   <div className="mt-3 grid md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm">Mensaje corto</label>
-                      <input
-                        className="w-full border rounded px-3 py-2 mt-1"
-                        value={lugarEditando.especialMensaje ?? ''}
-                        onChange={(e) => setLugarEditando({ ...lugarEditando, especialMensaje: e.target.value })}
-                      />
+                      <label className="text-sm font-semibold">Mensaje corto</label>
+                      <input className="w-full border rounded px-3 py-2 mt-1" value={lugarEditando.especialMensaje ?? ''} onChange={(e) => setLugarEditando({ ...lugarEditando, especialMensaje: e.target.value })} />
                     </div>
 
                     <div>
-                      <label className="text-sm">Color (HEX)</label>
+                      <label className="text-sm font-semibold">Color (HEX)</label>
                       <div className="flex items-center gap-3 mt-1">
-                        <input
-                          type="color"
-                          value={lugarEditando.especialColor ?? '#FFC857'}
-                          onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })}
-                          className="h-10 w-16 border rounded"
-                        />
-                        <input
-                          className="flex-1 border rounded px-3 py-2"
-                          value={lugarEditando.especialColor ?? '#FFC857'}
-                          onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })}
-                        />
+                        <input type="color" value={lugarEditando.especialColor ?? '#FFC857'} onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })} className="h-10 w-16 border rounded" />
+                        <input className="flex-1 border rounded px-3 py-2" value={lugarEditando.especialColor ?? '#FFC857'} onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })} />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-sm">Aportación acumulada (€)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        className="w-full border rounded px-3 py-2 mt-1"
-                        value={Number(lugarEditando.aportacionAcumulada ?? 0)}
-                        onChange={(e) => setLugarEditando({ ...lugarEditando, aportacionAcumulada: Number(e.target.value || 0) })}
-                      />
+                      <label className="text-sm font-semibold">Aportación acumulada (€)</label>
+                      <input type="number" min={0} className="w-full border rounded px-3 py-2 mt-1" value={Number(lugarEditando.aportacionAcumulada ?? 0)} onChange={(e) => setLugarEditando({ ...lugarEditando, aportacionAcumulada: Number(e.target.value || 0) })} />
                     </div>
 
                     <div>
-                      <label className="text-sm">Logo / Escudo</label>
+                      <label className="text-sm font-semibold">Logo / Escudo</label>
                       {lugarEditando.especialLogoUrl && (
                         <div className="mt-2">
                           <img src={lugarEditando.especialLogoUrl} alt="logo" className="h-16 rounded-xl border p-2 bg-white" />
