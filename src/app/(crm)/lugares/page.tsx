@@ -10,23 +10,30 @@ import QRCode from 'react-qr-code';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 
-type Fondo = {
-  id: number;
-  nombre: string;
-  url: string;
-  activo?: boolean;
-};
+// ===== Utils
+type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 
 const fmtPct = (v: any) => (v == null ? '—' : `${(Number(v) * 100).toFixed(1)}%`);
+const pctToField = (v: any) => (v == null ? '' : String(v).trim());
 
-// 👇 Convierte lo que venga (Decimal | number | string | null) a string editable
-const pctToField = (v: any) => {
-  if (v === null || v === undefined) return '';
-  // Prisma Decimal puede venir como string: "0.15"
-  const s = String(v).trim();
-  return s;
-};
+// ===== Cloudinary (usa los mismos datos que “Fondos”)
+const CLOUD_NAME = 'dhkzxihjg';
+const UPLOAD_PRESET = 'impulso_carteles'; // si tienes un preset propio para logos, ponlo aquí
 
+async function uploadToCloudinary(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('upload_preset', UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: 'POST',
+    body: fd,
+  });
+  const json = await res.json();
+  if (!res.ok || !json.secure_url) throw new Error('Fallo subiendo imagen');
+  return json.secure_url as string;
+}
+
+// ===== Page
 export default function RegistrarLugar() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -34,25 +41,36 @@ export default function RegistrarLugar() {
 
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<any[]>([]);
-  const [codigoQR, setCodigoQR] = useState('');
-  const [busqueda, setBusqueda] = useState('');
-  const [lugarEditando, setLugarEditando] = useState<any | null>(null);
-  const [mostrarModal, setMostrarModal] = useState(false);
   const [fondos, setFondos] = useState<Fondo[]>([]);
   const [fondoSeleccionado, setFondoSeleccionado] = useState<string>('');
+  const [busqueda, setBusqueda] = useState('');
 
-  // 👉 Alta: todos como string para que el input sea siempre editable
+  // Alta
+  const [codigoQR, setCodigoQR] = useState('');
+  const [subiendoLogoNew, setSubiendoLogoNew] = useState(false);
   const [nuevoLugar, setNuevoLugar] = useState({
     nombre: '',
     direccion: '',
     qrCode: '',
     agenteId: '',
-    pctCliente: '', // acepta "15" o "0.15" (la API normaliza)
+    pctCliente: '',
     pctLugar: '',
+
+    // Especial
+    especial: false,
+    especialLogoUrl: '',
+    especialColor: '',
+    especialMensaje: '',
+    aportacionAcumulada: '', // euros (string para editar cómodo)
   });
 
+  // Modal edición
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [lugarEditando, setLugarEditando] = useState<any | null>(null);
+  const [subiendoLogoEdit, setSubiendoLogoEdit] = useState(false);
+
   useEffect(() => {
-    const fetchData = async () => {
+    (async () => {
       const [resAgentes, resLugares, resFondos] = await Promise.all([
         fetch('/api/agentes'),
         fetch('/api/lugares'),
@@ -69,40 +87,141 @@ export default function RegistrarLugar() {
 
       const fondoActivo = dataFondos.find((f: Fondo) => f.activo);
       if (fondoActivo) setFondoSeleccionado(fondoActivo.url);
-    };
-    fetchData();
+    })();
   }, []);
 
+  // ==== Alta ====
   const generarQR = () => {
-    const nuevoQR = uuidv4();
-    setCodigoQR(nuevoQR);
-    setNuevoLugar((s) => ({ ...s, qrCode: nuevoQR }));
+    const nuevo = uuidv4();
+    setCodigoQR(nuevo);
+    setNuevoLugar((s) => ({ ...s, qrCode: nuevo }));
   };
 
-  const generarQRModal = () => {
-    const nuevoQR = uuidv4();
-    setLugarEditando((s: any) => (s ? { ...s, qrCode: nuevoQR } : s));
+  const handleUploadLogoNew = async (f?: File) => {
+    if (!f) return;
+    try {
+      setSubiendoLogoNew(true);
+      const url = await uploadToCloudinary(f);
+      setNuevoLugar((s) => ({ ...s, especialLogoUrl: url }));
+    } catch (e) {
+      alert('No se pudo subir el logo');
+    } finally {
+      setSubiendoLogoNew(false);
+    }
   };
+
+  const handleRegistrarLugar = async (e: any) => {
+    e.preventDefault();
+
+    // 1) Crea el lugar base (la API actual ya lo hace)
+    const res = await fetch('/api/lugares', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: nuevoLugar.nombre,
+        direccion: nuevoLugar.direccion,
+        qrCode: nuevoLugar.qrCode,
+        agenteId: nuevoLugar.agenteId,
+        pctCliente: nuevoLugar.pctCliente,
+        pctLugar: nuevoLugar.pctLugar,
+      }),
+    });
+    const creado = await res.json();
+    if (!res.ok) {
+      alert(creado?.error ?? 'Error creando lugar');
+      return;
+    }
+
+    // 2) Si hay datos especiales, los guardamos con PUT
+    if (
+      nuevoLugar.especial ||
+      nuevoLugar.especialLogoUrl ||
+      nuevoLugar.especialColor ||
+      nuevoLugar.especialMensaje ||
+      nuevoLugar.aportacionAcumulada
+    ) {
+      await fetch(`/api/lugares/${creado.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          especial: nuevoLugar.especial,
+          especialLogoUrl: nuevoLugar.especialLogoUrl,
+          especialColor: nuevoLugar.especialColor,
+          especialMensaje: nuevoLugar.especialMensaje,
+          aportacionAcumulada: nuevoLugar.aportacionAcumulada,
+        }),
+      });
+    }
+
+    // 3) Refrescamos lista y limpiamos
+    const lista = await (await fetch('/api/lugares')).json();
+    setLugares(lista);
+
+    setNuevoLugar({
+      nombre: '',
+      direccion: '',
+      qrCode: '',
+      agenteId: '',
+      pctCliente: '',
+      pctLugar: '',
+      especial: false,
+      especialLogoUrl: '',
+      especialColor: '',
+      especialMensaje: '',
+      aportacionAcumulada: '',
+    });
+    setCodigoQR('');
+  };
+
+  // ==== Lista / acciones ====
+  const lugaresFiltrados = lugares.filter((lugar) => {
+    const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre} ${fmtPct(
+      lugar.pctCliente,
+    )} ${fmtPct(lugar.pctLugar)}`;
+    return texto.toLowerCase().includes(busqueda.toLowerCase());
+  });
 
   const handleEliminar = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este lugar?')) return;
+    if (!confirm('¿Eliminar este lugar?')) return;
     await fetch(`/api/lugares/${id}`, { method: 'DELETE' });
     setLugares((arr) => arr.filter((l) => l.id !== id));
   };
 
-  // 👇 Abrir modal con los % convertidos a string editables
   const abrirEdicion = (lugar: any) => {
     setLugarEditando({
       ...lugar,
       pctCliente: pctToField(lugar.pctCliente),
       pctLugar: pctToField(lugar.pctLugar),
+      especial: !!lugar.especial,
+      especialLogoUrl: lugar.especialLogoUrl ?? '',
+      especialColor: lugar.especialColor ?? '',
+      especialMensaje: lugar.especialMensaje ?? '',
+      aportacionAcumulada: lugar.aportacionAcumulada != null ? String(lugar.aportacionAcumulada) : '',
     });
     setMostrarModal(true);
   };
 
+  // ==== Edición ====
+  const generarQRModal = () => {
+    const nuevo = uuidv4();
+    setLugarEditando((s: any) => (s ? { ...s, qrCode: nuevo } : s));
+  };
+
+  const handleUploadLogoEdit = async (f?: File) => {
+    if (!f || !lugarEditando) return;
+    try {
+      setSubiendoLogoEdit(true);
+      const url = await uploadToCloudinary(f);
+      setLugarEditando({ ...lugarEditando, especialLogoUrl: url });
+    } catch {
+      alert('No se pudo subir el logo');
+    } finally {
+      setSubiendoLogoEdit(false);
+    }
+  };
+
   const handleGuardarEdicion = async () => {
     if (!lugarEditando) return;
-
     const res = await fetch(`/api/lugares/${lugarEditando.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -111,42 +230,24 @@ export default function RegistrarLugar() {
         direccion: lugarEditando.direccion,
         qrCode: lugarEditando.qrCode,
         agenteId: lugarEditando.agenteId,
-        // 👇 enviamos tal cual; la API ya normaliza (0..1 / 0..100)
         pctCliente: lugarEditando.pctCliente,
         pctLugar: lugarEditando.pctLugar,
-        // especiales (si ya los tienes en tu backend)
+
         especial: lugarEditando.especial,
         especialLogoUrl: lugarEditando.especialLogoUrl,
         especialColor: lugarEditando.especialColor,
         especialMensaje: lugarEditando.especialMensaje,
-        aportacionAcumulada: lugarEditando.aportacionAcumulada ?? undefined,
+        aportacionAcumulada: lugarEditando.aportacionAcumulada,
       }),
     });
-
     const actualizado = await res.json();
+    if (!res.ok) {
+      alert(actualizado?.error ?? 'Error al guardar');
+      return;
+    }
     setLugares((arr) => arr.map((l) => (l.id === actualizado.id ? actualizado : l)));
     setLugarEditando(null);
     setMostrarModal(false);
-  };
-
-  const handleRegistrarLugar = async (e: any) => {
-    e.preventDefault();
-    const res = await fetch('/api/lugares', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nuevoLugar), // la API normaliza
-    });
-    const data = await res.json();
-    setLugares((arr) => [data, ...arr]);
-    setNuevoLugar({
-      nombre: '',
-      direccion: '',
-      qrCode: '',
-      agenteId: '',
-      pctCliente: '',
-      pctLugar: '',
-    });
-    setCodigoQR('');
   };
 
   const handleSeleccionarFondo = async (id: number, url: string) => {
@@ -157,11 +258,6 @@ export default function RegistrarLugar() {
     });
     setFondoSeleccionado(url);
   };
-
-  const lugaresFiltrados = lugares.filter((lugar) => {
-    const texto = `${lugar.id} ${lugar.nombre} ${lugar.direccion} ${lugar.qrCode} ${lugar.agente?.nombre} ${fmtPct(lugar.pctCliente)} ${fmtPct(lugar.pctLugar)}`;
-    return texto.toLowerCase().includes(busqueda.toLowerCase());
-  });
 
   return (
     <div className="p-8 bg-[#B3E58C] min-h-screen">
@@ -178,10 +274,7 @@ export default function RegistrarLugar() {
           <span className="hidden md:inline text-[#1F1F1F]">CRM · Lugares</span>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => router.push('/dashboard')}
-            className="bg-[#F0C300] text-black hover:bg-yellow-400"
-          >
+          <Button onClick={() => router.push('/dashboard')} className="bg-[#F0C300] text-black hover:bg-yellow-400">
             🏠 Dashboard
           </Button>
         </div>
@@ -189,11 +282,8 @@ export default function RegistrarLugar() {
 
       <h1 className="text-3xl font-bold text-[#1F1F1F] mb-6">Registrar Lugar</h1>
 
-      {/* Alta lugar */}
-      <form
-        onSubmit={handleRegistrarLugar}
-        className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-4"
-      >
+      {/* ===== Alta lugar ===== */}
+      <form onSubmit={handleRegistrarLugar} className="bg-[#F6FFEC] p-6 rounded-xl shadow-md space-y-6">
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-[#1F1F1F] mb-1">Nombre del lugar</label>
@@ -236,7 +326,7 @@ export default function RegistrarLugar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-end gap-4">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-[#1F1F1F] mb-1">Código QR</label>
             <Input
@@ -268,12 +358,94 @@ export default function RegistrarLugar() {
           </select>
         </div>
 
+        {/* ===== Especial (alta) ===== */}
+        <div className="rounded-xl border border-emerald-300 bg-white p-4">
+          <div className="flex items-center gap-3">
+            <input
+              id="chk-especial-new"
+              type="checkbox"
+              checked={nuevoLugar.especial}
+              onChange={(e) => setNuevoLugar({ ...nuevoLugar, especial: e.target.checked })}
+            />
+            <label htmlFor="chk-especial-new" className="font-semibold text-emerald-800">
+              Lugar especial (club, asociación, evento…)
+            </label>
+          </div>
+
+          {nuevoLugar.especial && (
+            <div className="grid md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Logo (subir imagen)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleUploadLogoNew(e.target.files?.[0] || undefined)}
+                    className="text-sm"
+                  />
+                  {subiendoLogoNew && <span className="text-sm text-gray-600">Subiendo…</span>}
+                  {nuevoLugar.especialLogoUrl && (
+                    <Button
+                      type="button"
+                      className="bg-gray-200 text-black"
+                      onClick={() => setNuevoLugar((s) => ({ ...s, especialLogoUrl: '' }))}
+                    >
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+                {nuevoLugar.especialLogoUrl && (
+                  <div className="mt-2">
+                    <Image
+                      src={nuevoLugar.especialLogoUrl}
+                      alt="Logo especial"
+                      width={120}
+                      height={120}
+                      className="rounded-md border"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Color destacado (hex)</label>
+                <Input
+                  placeholder="#FF7A3B"
+                  value={nuevoLugar.especialColor}
+                  onChange={(e) => setNuevoLugar({ ...nuevoLugar, especialColor: e.target.value })}
+                  className="bg-white text-black placeholder:text-gray-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold mb-1">Mensaje promocional</label>
+                <Input
+                  placeholder='Ej.: "AYUDA A TU CLUB"'
+                  value={nuevoLugar.especialMensaje}
+                  onChange={(e) => setNuevoLugar({ ...nuevoLugar, especialMensaje: e.target.value })}
+                  className="bg-white text-black placeholder:text-gray-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Aportación acumulada (EUR)</label>
+                <Input
+                  placeholder="0"
+                  value={nuevoLugar.aportacionAcumulada}
+                  onChange={(e) => setNuevoLugar({ ...nuevoLugar, aportacionAcumulada: e.target.value })}
+                  className="bg-white text-black placeholder:text-gray-500"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         <Button type="submit" className="bg-[#68B84B] hover:bg-green-700 text-white w-full">
           Registrar Lugar
         </Button>
       </form>
 
-      {/* Fondo actual del cartel */}
+      {/* ===== Fondo actual del cartel ===== */}
       <div className="mt-10 bg-[#D4FFD0] p-6 rounded-xl shadow-md">
         <h2 className="text-xl font-bold text-[#1F1F1F] mb-4">🎨 Fondo actual del cartel</h2>
 
@@ -288,13 +460,7 @@ export default function RegistrarLugar() {
                     fondo.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'
                   }`}
                 >
-                  <Image
-                    src={fondo.url}
-                    alt={fondo.nombre}
-                    width={350}
-                    height={220}
-                    className="object-cover w-full h-36"
-                  />
+                  <Image src={fondo.url} alt={fondo.nombre} width={350} height={220} className="object-cover w-full h-36" />
                   <div className="bg-white py-1 text-center font-medium text-black">{fondo.nombre}</div>
                 </div>
               ))}
@@ -302,32 +468,20 @@ export default function RegistrarLugar() {
             {fondoSeleccionado && (
               <div className="mt-4">
                 <p className="font-semibold text-[#1F1F1F]">Vista previa del fondo actual:</p>
-                <Image
-                  src={fondoSeleccionado}
-                  alt="Fondo seleccionado"
-                  width={700}
-                  height={460}
-                  className="rounded-lg mt-2 border"
-                />
+                <Image src={fondoSeleccionado} alt="Fondo seleccionado" width={700} height={460} className="rounded-lg mt-2 border" />
               </div>
             )}
           </>
         ) : (
           fondoSeleccionado && (
             <div className="text-center">
-              <Image
-                src={fondoSeleccionado}
-                alt="Fondo actual"
-                width={700}
-                height={460}
-                className="rounded-lg border mx-auto"
-              />
+              <Image src={fondoSeleccionado} alt="Fondo actual" width={700} height={460} className="rounded-lg border mx-auto" />
             </div>
           )
         )}
       </div>
 
-      {/* Lista de lugares */}
+      {/* ===== Lista ===== */}
       <div className="mt-10 bg-[#E5FFD5] p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-4 text-[#1F1F1F]">Lugares Registrados</h2>
         <Input
@@ -361,41 +515,26 @@ export default function RegistrarLugar() {
                   <td className="p-2 text-black">{fmtPct(lugar.pctLugar)}</td>
                   <td className="p-2 text-xs break-all text-black">{lugar.qrCode}</td>
                   <td className="p-2 flex flex-col md:flex-row gap-2">
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => abrirEdicion(lugar)}
-                    >
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => abrirEdicion(lugar)}>
                       Editar
                     </Button>
-                    <Button
-                      className="bg-yellow-500 hover:bg-yellow-600 text-black"
-                      onClick={() => router.push(`/lugares/${lugar.id}/detalle`)}
-                    >
+                    <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => router.push(`/lugares/${lugar.id}/detalle`)}>
                       Ver
                     </Button>
-                    <Button
-                      className="bg-orange-500 hover:bg-orange-600 text-white"
-                      onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}
-                    >
+                    <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => router.push(`/lugares/cartel/${lugar.id}`)}>
                       Generar cartel
                     </Button>
-
-                    {/* Botón rápido para probar la landing */}
                     <a
                       className="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700"
                       href={`https://impulsoenergetico.es/registro?agenteId=${encodeURIComponent(
-                        lugar.agenteId
+                        lugar.agenteId,
                       )}&lugarId=${encodeURIComponent(lugar.id)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       Probar landing
                     </a>
-
-                    <Button
-                      className="bg-red-600 hover:bg-red-700 text-white"
-                      onClick={() => handleEliminar(lugar.id)}
-                    >
+                    <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleEliminar(lugar.id)}>
                       Eliminar
                     </Button>
                   </td>
@@ -406,7 +545,7 @@ export default function RegistrarLugar() {
         </div>
       </div>
 
-      {/* Modal de edición */}
+      {/* ===== Modal edición ===== */}
       <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -414,7 +553,7 @@ export default function RegistrarLugar() {
           </DialogHeader>
 
           {lugarEditando && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[#1F1F1F] mb-1">Nombre</label>
@@ -490,7 +629,87 @@ export default function RegistrarLugar() {
                 </select>
               </div>
 
-              {/* Si usas campos especiales, déjalos aquí (opcional) */}
+              {/* ===== Especial (edición) ===== */}
+              <div className="rounded-xl border border-emerald-300 bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    id="chk-especial-edit"
+                    type="checkbox"
+                    checked={!!lugarEditando.especial}
+                    onChange={(e) => setLugarEditando({ ...lugarEditando, especial: e.target.checked })}
+                  />
+                  <label htmlFor="chk-especial-edit" className="font-semibold text-emerald-800">
+                    Lugar especial
+                  </label>
+                </div>
+
+                {!!lugarEditando.especial && (
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Logo (subir imagen)</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleUploadLogoEdit(e.target.files?.[0] || undefined)}
+                          className="text-sm"
+                        />
+                        {subiendoLogoEdit && <span className="text-sm text-gray-600">Subiendo…</span>}
+                        {lugarEditando.especialLogoUrl && (
+                          <Button
+                            type="button"
+                            className="bg-gray-200 text-black"
+                            onClick={() => setLugarEditando({ ...lugarEditando, especialLogoUrl: '' })}
+                          >
+                            Quitar
+                          </Button>
+                        )}
+                      </div>
+                      {lugarEditando.especialLogoUrl && (
+                        <div className="mt-2">
+                          <Image
+                            src={lugarEditando.especialLogoUrl}
+                            alt="Logo especial"
+                            width={120}
+                            height={120}
+                            className="rounded-md border"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Color destacado (hex)</label>
+                      <Input
+                        placeholder="#FF7A3B"
+                        value={lugarEditando.especialColor ?? ''}
+                        onChange={(e) => setLugarEditando({ ...lugarEditando, especialColor: e.target.value })}
+                        className="bg-white text-black placeholder:text-gray-500"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-1">Mensaje promocional</label>
+                      <Input
+                        placeholder='Ej.: "AYUDA A TU CLUB"'
+                        value={lugarEditando.especialMensaje ?? ''}
+                        onChange={(e) => setLugarEditando({ ...lugarEditando, especialMensaje: e.target.value })}
+                        className="bg-white text-black placeholder:text-gray-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Aportación acumulada (EUR)</label>
+                      <Input
+                        placeholder="0"
+                        value={lugarEditando.aportacionAcumulada ?? ''}
+                        onChange={(e) => setLugarEditando({ ...lugarEditando, aportacionAcumulada: e.target.value })}
+                        className="bg-white text-black placeholder:text-gray-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Button onClick={handleGuardarEdicion} className="bg-[#68B84B] hover:bg-green-700 text-white w-full">
                 Guardar Cambios
