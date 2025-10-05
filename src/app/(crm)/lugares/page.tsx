@@ -73,13 +73,22 @@ export default function RegistrarLugar() {
     })();
   }, []);
 
-  // ---- Listado filtrado ----
+  // ---- Listado filtrado (por cualquier campo visible) ----
   const lugaresFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     if (!q) return lugares;
-    return lugares.filter((l) => {
-      const t = `${l.id} ${l.nombre} ${l.direccion} ${l.qrCode} ${l.agente?.nombre} ${fmtPct(l.pctCliente)} ${fmtPct(l.pctLugar)}`;
-      return t.toLowerCase().includes(q);
+    return lugares.filter((l: any) => {
+      const estado = l.especial ? 'especial' : 'normal';
+      const txt = [
+        `#${l.id}`,
+        l.nombre ?? '',
+        l.direccion ?? '',
+        l.agente?.nombre ?? '',
+        fmtPct(l.pctCliente),
+        fmtPct(l.pctLugar),
+        estado,
+      ].join(' ');
+      return txt.toLowerCase().includes(q);
     });
   }, [lugares, busqueda]);
 
@@ -309,7 +318,12 @@ export default function RegistrarLugar() {
               <Button type="button" onClick={generarQR_nuevo} className="bg-blue-600 text-white">
                 Generar QR
               </Button>
-              {nuevoQR && <QRCode value={`https://impulsoenergetico.es/registro?agenteId=${nuevo.agenteId}&lugarId=__ID__`} size={44} />}
+              {nuevoQR && (
+                <QRCode
+                  value={`https://impulsoenergetico.es/registro?agenteId=${nuevo.agenteId}&lugarId=__ID__`}
+                  size={44}
+                />
+              )}
             </div>
           </div>
 
@@ -323,7 +337,9 @@ export default function RegistrarLugar() {
             >
               <option value="">Selecciona un agente…</option>
               {agentes.map((a) => (
-                <option key={a.id} value={a.id}>{a.nombre}</option>
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
               ))}
             </select>
           </div>
@@ -331,7 +347,9 @@ export default function RegistrarLugar() {
 
         {/* LUGAR ESPECIAL */}
         <fieldset className="mt-6 border rounded-xl p-4 bg-[#F6FFEC]">
-          <legend className="px-2 text-sm font-bold text-emerald-700">Lugar especial (club, asociación, evento…)</legend>
+          <legend className="px-2 text-sm font-bold text-emerald-700">
+            Lugar especial (club, asociación, evento…)
+          </legend>
 
           <div className="flex items-center gap-3 mb-3">
             <input
@@ -340,7 +358,9 @@ export default function RegistrarLugar() {
               checked={nuevo.especial}
               onChange={(e) => setNuevo((s) => ({ ...s, especial: e.target.checked }))}
             />
-            <label htmlFor="nuevo-especial" className="text-sm">Marcar como lugar especial</label>
+            <label htmlFor="nuevo-especial" className="text-sm">
+              Marcar como lugar especial
+            </label>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
@@ -406,7 +426,7 @@ export default function RegistrarLugar() {
       <div className="bg-[#E5FFD5] p-6 rounded-xl">
         <h2 className="text-2xl font-bold mb-3 text-[#1F1F1F]">Lugares Registrados</h2>
         <Input
-          placeholder="Buscar por cualquier campo…"
+          placeholder="Buscar por ID, nombre, dirección, agente, % o estado (especial/normal)…"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="mb-4 bg-white text-black"
@@ -422,11 +442,12 @@ export default function RegistrarLugar() {
                 <th className="p-2">Agente</th>
                 <th className="p-2">% Cliente</th>
                 <th className="p-2">% Lugar</th>
+                <th className="p-2">Estado</th> {/* NUEVO */}
                 <th className="p-2">Acciones</th>
               </tr>
             </thead>
             <tbody className="text-[#1F1F1F]">
-              {lugaresFiltrados.map((l) => (
+              {lugaresFiltrados.map((l: any) => (
                 <tr key={l.id} className="border-b hover:bg-[#f9f9f9]">
                   <td className="p-2 font-semibold">#{l.id}</td>
                   <td className="p-2">{l.nombre}</td>
@@ -434,12 +455,45 @@ export default function RegistrarLugar() {
                   <td className="p-2">{l.agente?.nombre || '-'}</td>
                   <td className="p-2">{fmtPct(l.pctCliente)}</td>
                   <td className="p-2">{fmtPct(l.pctLugar)}</td>
+
+                  {/* ESTADO (badge) */}
+                  <td className="p-2">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
+                        ${l.especial ? 'bg-pink-100 text-pink-700' : 'bg-slate-100 text-slate-700'}`}
+                      title={l.especial ? 'Lugar especial' : 'Lugar normal'}
+                    >
+                      {l.especial ? 'Especial' : 'Normal'}
+                    </span>
+                  </td>
+
                   <td className="p-2 flex flex-wrap gap-2">
-                    <Button className="bg-blue-600 text-white" onClick={() => abrirEdicion(l)}>Editar</Button>
-                    <Button className="bg-yellow-500 text-black" onClick={() => router.push(`/lugares/${l.id}/detalle`)}>Ver</Button>
-                    <Button className="bg-orange-500 text-white" onClick={() => router.push(`/lugares/cartel/${l.id}`)}>Generar cartel</Button>
-                    <Button className="bg-emerald-600 text-white" onClick={() => window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, '_blank')}>Probar landing</Button>
-                    <Button className="bg-red-600 text-white" onClick={() => eliminarLugar(l.id)}>Eliminar</Button>
+                    <Button className="bg-blue-600 text-white" onClick={() => abrirEdicion(l)}>
+                      Editar
+                    </Button>
+                    <Button
+                      className="bg-yellow-500 text-black"
+                      onClick={() => router.push(`/lugares/${l.id}/detalle`)}
+                    >
+                      Ver
+                    </Button>
+                    <Button
+                      className="bg-orange-500 text-white"
+                      onClick={() => router.push(`/lugares/cartel/${l.id}`)}
+                    >
+                      Generar cartel
+                    </Button>
+                    <Button
+                      className="bg-emerald-600 text-white"
+                      onClick={() =>
+                        window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, '_blank')
+                      }
+                    >
+                      Probar landing
+                    </Button>
+                    <Button className="bg-red-600 text-white" onClick={() => eliminarLugar(l.id)}>
+                      Eliminar
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -457,9 +511,17 @@ export default function RegistrarLugar() {
                   <div
                     key={f.id}
                     onClick={() => seleccionarFondo(f.id, f.url)}
-                    className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all hover:scale-105 ${f.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'}`}
+                    className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all hover:scale-105 ${
+                      f.url === fondoSeleccionado ? 'border-blue-600' : 'border-transparent'
+                    }`}
                   >
-                    <Image src={f.url} alt={f.nombre} width={400} height={200} className="w-full h-40 object-cover" />
+                    <Image
+                      src={f.url}
+                      alt={f.nombre}
+                      width={400}
+                      height={200}
+                      className="w-full h-40 object-cover"
+                    />
                     <div className="bg-white py-1 text-center font-medium">{f.nombre}</div>
                   </div>
                 ))}
@@ -467,14 +529,26 @@ export default function RegistrarLugar() {
               {fondoSeleccionado && (
                 <div className="mt-4">
                   <p className="font-semibold">Vista previa del fondo activo:</p>
-                  <Image src={fondoSeleccionado} alt="Fondo seleccionado" width={700} height={460} className="rounded-lg mt-2 border" />
+                  <Image
+                    src={fondoSeleccionado}
+                    alt="Fondo seleccionado"
+                    width={700}
+                    height={460}
+                    className="rounded-lg mt-2 border"
+                  />
                 </div>
               )}
             </>
           ) : (
             fondoSeleccionado && (
               <div className="text-center">
-                <Image src={fondoSeleccionado} alt="Fondo" width={700} height={460} className="rounded-lg border mx-auto" />
+                <Image
+                  src={fondoSeleccionado}
+                  alt="Fondo"
+                  width={700}
+                  height={460}
+                  className="rounded-lg border mx-auto"
+                />
               </div>
             )
           )}
@@ -493,11 +567,19 @@ export default function RegistrarLugar() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-semibold">Nombre</label>
-                  <Input value={edit.nombre} onChange={(e) => setEdit({ ...edit, nombre: e.target.value })} className="mt-1" />
+                  <Input
+                    value={edit.nombre}
+                    onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-semibold">Dirección</label>
-                  <Input value={edit.direccion} onChange={(e) => setEdit({ ...edit, direccion: e.target.value })} className="mt-1" />
+                  <Input
+                    value={edit.direccion}
+                    onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-semibold">% Cliente (ej. 15 o 0.15)</label>
@@ -520,9 +602,19 @@ export default function RegistrarLugar() {
                 <div className="md:col-span-2">
                   <label className="text-sm font-semibold">Código QR</label>
                   <div className="flex items-center gap-3 mt-1">
-                    <Input value={edit.qrCode ?? ''} onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })} />
-                    <Button type="button" onClick={generarQR_edit} className="bg-blue-600 text-white">Generar QR</Button>
-                    {edit.qrCode && <QRCode value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`} size={44} />}
+                    <Input
+                      value={edit.qrCode ?? ''}
+                      onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
+                    />
+                    <Button type="button" onClick={generarQR_edit} className="bg-blue-600 text-white">
+                      Generar QR
+                    </Button>
+                    {edit.qrCode && (
+                      <QRCode
+                        value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`}
+                        size={44}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -535,7 +627,9 @@ export default function RegistrarLugar() {
                   >
                     <option value="">Selecciona un agente…</option>
                     {agentes.map((a) => (
-                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                      <option key={a.id} value={a.id}>
+                        {a.nombre}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -552,16 +646,29 @@ export default function RegistrarLugar() {
                     checked={!!edit.especial}
                     onChange={(e) => setEdit({ ...edit, especial: e.target.checked })}
                   />
-                  <label htmlFor="edit-especial" className="text-sm">Marcar como especial</label>
+                  <label htmlFor="edit-especial" className="text-sm">
+                    Marcar como especial
+                  </label>
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="md:col-span-1">
                     <label className="text-sm font-semibold">Logo (subir para actualizar)</label>
                     <div className="mt-1 flex items-center gap-3">
-                      <input type="file" accept="image/*" onChange={(e) => setEditLogoFile(e.target.files?.[0] || null)} className="text-sm" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setEditLogoFile(e.target.files?.[0] || null)}
+                        className="text-sm"
+                      />
                       {edit.especialLogoUrl && (
-                        <Image src={edit.especialLogoUrl} alt="logo" width={48} height={48} className="rounded border" />
+                        <Image
+                          src={edit.especialLogoUrl}
+                          alt="logo"
+                          width={48}
+                          height={48}
+                          className="rounded border"
+                        />
                       )}
                     </div>
                   </div>
