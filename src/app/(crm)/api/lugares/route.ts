@@ -11,14 +11,14 @@ const toPct = (v: any) => {
   return Math.max(0, Math.min(1, p));
 };
 
-// Normaliza strings: undefined -> undefined (no tocar), '' -> null, resto -> "texto"
+// '' -> null, undefined -> undefined, otro -> string recortado
 const cleanStr = (v: any) => {
   if (v === undefined) return undefined;
   const s = String(v).trim();
   return s === '' ? null : s;
 };
 
-// GET /api/lugares?take=6&skip=0&q=texto&agenteId=1
+// GET /api/lugares
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -55,8 +55,6 @@ export async function GET(req: Request) {
         pctLugar: true,
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
-
-        // especiales
         especial: true,
         especialLogoUrl: true,
         especialColor: true,
@@ -73,7 +71,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/lugares  { ... + especialCartelUrl? }
+// POST /api/lugares
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -92,6 +90,9 @@ export async function POST(req: Request) {
     const agente = await prisma.agente.findUnique({ where: { id: agenteId } });
     if (!agente) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 });
 
+    // --- LOG entrada
+    console.log('[POST /api/lugares] IN.especialCartelUrl =', body?.especialCartelUrl);
+
     const lugar = await prisma.lugar.create({
       data: {
         nombre,
@@ -100,10 +101,9 @@ export async function POST(req: Request) {
         agenteId,
         pctCliente,
         pctLugar,
-
         especial: !!body?.especial,
         especialLogoUrl: cleanStr(body?.especialLogoUrl) ?? null,
-        especialColor: cleanStr(body?.especialColor) ?? null,
+        especialColor:   cleanStr(body?.especialColor)   ?? null,
         especialMensaje: cleanStr(body?.especialMensaje) ?? null,
         especialCartelUrl: cleanStr(body?.especialCartelUrl) ?? null,
         aportacionAcumulada: Number(body?.aportacionAcumulada ?? 0),
@@ -116,6 +116,9 @@ export async function POST(req: Request) {
         especialCartelUrl: true, aportacionAcumulada: true,
       },
     });
+
+    // --- LOG salida
+    console.log('[POST /api/lugares] OUT.especialCartelUrl =', lugar?.especialCartelUrl);
 
     return NextResponse.json(lugar, { status: 201 });
   } catch (error: any) {

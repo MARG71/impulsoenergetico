@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// Normaliza % a [0..1] aceptando 0-1 o 0-100
 const toPct = (v: any) => {
   if (v === undefined || v === null || v === '') return undefined;
   const n = Number(v);
@@ -35,7 +34,7 @@ const toInt = (v: any) => {
   return Math.max(0, Math.floor(n));
 };
 
-// Normaliza strings: undefined -> undefined (no tocar), '' -> null, resto -> "texto"
+// '' -> null, undefined -> undefined, otro -> string recortado
 const cleanStr = (v: any) => {
   if (v === undefined) return undefined;
   const s = String(v).trim();
@@ -57,15 +56,12 @@ export async function GET(_req: Request, context: any) {
         pctLugar: true,
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
-
-        // ---- ESPECIALES ----
         especial: true,
         especialLogoUrl: true,
         especialColor: true,
         especialMensaje: true,
         aportacionAcumulada: true,
         especialCartelUrl: true,
-
         updatedAt: true,
       },
     });
@@ -90,10 +86,8 @@ export async function PUT(req: Request, context: any) {
   try {
     const id = toId(context.params.id);
     const body = await req.json();
-
     const data: any = {};
 
-    // Campos base
     if (body?.nombre !== undefined) data.nombre = String(body.nombre).trim();
     if (body?.direccion !== undefined) data.direccion = String(body.direccion).trim();
     if (body?.qrCode !== undefined) data.qrCode = String(body.qrCode).trim();
@@ -111,20 +105,24 @@ export async function PUT(req: Request, context: any) {
     if (body?.pctCliente !== undefined) data.pctCliente = toPct(body.pctCliente);
     if (body?.pctLugar !== undefined) data.pctLugar = toPct(body.pctLugar);
 
-    // ---- ESPECIALES ----
     const especial = toBool(body?.especial);
     if (especial !== undefined) data.especial = especial;
 
     if (body?.especialLogoUrl !== undefined) data.especialLogoUrl = cleanStr(body.especialLogoUrl);
-    if (body?.especialColor !== undefined) data.especialColor = cleanStr(body.especialColor);
+    if (body?.especialColor   !== undefined) data.especialColor   = cleanStr(body.especialColor);
     if (body?.especialMensaje !== undefined) data.especialMensaje = cleanStr(body.especialMensaje);
 
     const aport = toInt(body?.aportacionAcumulada);
     if (aport !== undefined) data.aportacionAcumulada = aport;
 
-    // ** NUEVO: cartel especial **
+    // --- LOG entrada
+    console.log(`[PUT /api/lugares/${id}] IN.especialCartelUrl =`, body?.especialCartelUrl);
+
+    // Cartel especial: admite null, '', string
     if (body?.especialCartelUrl !== undefined) {
-      data.especialCartelUrl = cleanStr(body.especialCartelUrl); // '' -> null
+      data.especialCartelUrl = body.especialCartelUrl === null
+        ? null
+        : cleanStr(body.especialCartelUrl);
     }
 
     const updated = await prisma.lugar.update({
@@ -139,17 +137,18 @@ export async function PUT(req: Request, context: any) {
         pctLugar: true,
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
-
         especial: true,
         especialLogoUrl: true,
         especialColor: true,
         especialMensaje: true,
         aportacionAcumulada: true,
         especialCartelUrl: true,
-
         updatedAt: true,
       },
     });
+
+    // --- LOG salida
+    console.log(`[PUT /api/lugares/${id}] OUT.especialCartelUrl =`, updated?.especialCartelUrl);
 
     const out = {
       ...updated,
