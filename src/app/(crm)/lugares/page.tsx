@@ -195,6 +195,7 @@ export default function RegistrarLugar() {
       especialColor: l.especialColor ?? '#FF7A3B',
       especialMensaje: l.especialMensaje ?? '',
       aportacionAcumulada: l.aportacionAcumulada ?? 0,
+      especialCartelUrl: l.especialCartelUrl ?? '', // asegura que llegue
     });
     setModalAbierto(true);
   };
@@ -746,7 +747,6 @@ export default function RegistrarLugar() {
                     </div>
                     {(cartelPreview || edit.especialCartelUrl) && (
                       <div className="mt-2">
-                        {/* mini preview panorámica */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={cartelPreview || edit.especialCartelUrl}

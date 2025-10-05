@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// helpers
+// Normaliza % a [0..1] aceptando 0-1 o 0-100
 const toPct = (v: any) => {
   if (v === undefined || v === null || v === '') return undefined;
   const n = Number(v);
@@ -9,11 +9,13 @@ const toPct = (v: any) => {
   const p = n > 1 ? n / 100 : n;
   return Math.max(0, Math.min(1, p));
 };
-const toId = (v: string) => {
+
+function toId(v: string) {
   const id = Number(v);
   if (Number.isNaN(id)) throw new Error('ID inválido');
   return id;
-};
+}
+
 const toBool = (v: any) => {
   if (v === undefined) return undefined;
   if (typeof v === 'boolean') return v;
@@ -25,14 +27,13 @@ const toBool = (v: any) => {
   }
   return undefined;
 };
-// Reemplaza la versión con isNa por esta:
+
 const toInt = (v: any) => {
   if (v === undefined || v === null || v === '') return undefined;
   const n = Number(v);
   if (Number.isNaN(n)) return undefined;
   return Math.max(0, Math.floor(n));
 };
-
 
 // -------- GET /api/lugares/:id --------
 export async function GET(_req: Request, context: any) {
@@ -50,20 +51,26 @@ export async function GET(_req: Request, context: any) {
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
 
-        // especiales
+        // ---- ESPECIALES ----
         especial: true,
         especialLogoUrl: true,
         especialColor: true,
         especialMensaje: true,
-        especialCartelUrl: true,
         aportacionAcumulada: true,
+        especialCartelUrl: true,   // 👈 IMPORTANTE
 
         updatedAt: true,
       },
     });
     if (!lugar) return NextResponse.json({ error: 'Lugar no encontrado' }, { status: 404 });
 
-    return NextResponse.json(lugar);
+    const out = {
+      ...lugar,
+      logo: lugar.especialLogoUrl ?? null,
+      color: lugar.especialColor ?? null,
+      mensajeCorto: lugar.especialMensaje ?? null,
+    };
+    return NextResponse.json(out);
   } catch (error: any) {
     const msg = error?.message ?? 'Error al obtener lugar';
     const status = msg.includes('ID inválido') ? 400 : 500;
@@ -76,9 +83,10 @@ export async function PUT(req: Request, context: any) {
   try {
     const id = toId(context.params.id);
     const body = await req.json();
+
     const data: any = {};
 
-    // base
+    // Campos base
     if (body?.nombre !== undefined) data.nombre = String(body.nombre).trim();
     if (body?.direccion !== undefined) data.direccion = String(body.direccion).trim();
     if (body?.qrCode !== undefined) data.qrCode = String(body.qrCode).trim();
@@ -96,17 +104,21 @@ export async function PUT(req: Request, context: any) {
     if (body?.pctCliente !== undefined) data.pctCliente = toPct(body.pctCliente);
     if (body?.pctLugar !== undefined) data.pctLugar = toPct(body.pctLugar);
 
-    // especiales
+    // ---- ESPECIALES ----
     const especial = toBool(body?.especial);
     if (especial !== undefined) data.especial = especial;
 
     if (body?.especialLogoUrl !== undefined) data.especialLogoUrl = String(body.especialLogoUrl).trim();
     if (body?.especialColor !== undefined) data.especialColor = String(body.especialColor).trim();
     if (body?.especialMensaje !== undefined) data.especialMensaje = String(body.especialMensaje).trim();
-    if (body?.especialCartelUrl !== undefined) data.especialCartelUrl = String(body.especialCartelUrl).trim();
 
     const aport = toInt(body?.aportacionAcumulada);
     if (aport !== undefined) data.aportacionAcumulada = aport;
+
+    // ** NUEVO: cartel especial **
+    if (body?.especialCartelUrl !== undefined) {
+      data.especialCartelUrl = String(body.especialCartelUrl).trim();
+    }
 
     const updated = await prisma.lugar.update({
       where: { id },
@@ -120,17 +132,25 @@ export async function PUT(req: Request, context: any) {
         pctLugar: true,
         pctCliente: true,
         agente: { select: { id: true, nombre: true, email: true } },
+
         especial: true,
         especialLogoUrl: true,
         especialColor: true,
         especialMensaje: true,
-        especialCartelUrl: true,
         aportacionAcumulada: true,
+        especialCartelUrl: true, // 👈 IMPORTANTE
+
         updatedAt: true,
       },
     });
 
-    return NextResponse.json(updated);
+    const out = {
+      ...updated,
+      logo: updated.especialLogoUrl ?? null,
+      color: updated.especialColor ?? null,
+      mensajeCorto: updated.especialMensaje ?? null,
+    };
+    return NextResponse.json(out);
   } catch (error: any) {
     if (error?.code === 'P2025') return NextResponse.json({ error: 'Lugar no encontrado' }, { status: 404 });
     if (error?.code === 'P2002') return NextResponse.json({ error: 'qrCode ya existe' }, { status: 409 });
@@ -140,7 +160,7 @@ export async function PUT(req: Request, context: any) {
   }
 }
 
-// -------- DELETE /api/lugares/:id --------
+// -------- DELETE --------
 export async function DELETE(_req: Request, context: any) {
   try {
     const id = toId(context.params.id);
