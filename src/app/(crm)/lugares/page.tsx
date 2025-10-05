@@ -47,14 +47,19 @@ export default function RegistrarLugar() {
     especialColor: '#FF7A3B',
     especialMensaje: '',
     aportacionAcumulada: '0',
+    // archivos
     logoFile: null as File | null,
-    especialLogoUrl: '', // (se rellenará si subes logo)
+    cartelFile: null as File | null,
+    // urls resultantes (se autocompletarán tras subir)
+    especialLogoUrl: '',
+    especialCartelUrl: '',
   });
 
   // Edición
   const [modalAbierto, setModalAbierto] = useState(false);
   const [edit, setEdit] = useState<Lugar | null>(null);
   const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editCartelFile, setEditCartelFile] = useState<File | null>(null);
 
   // Carga inicial
   useEffect(() => {
@@ -92,12 +97,12 @@ export default function RegistrarLugar() {
     });
   }, [lugares, busqueda]);
 
-  // ---- Subida de ficheros (logo) ----
-  async function subirLogo(file: File): Promise<string | null> {
+  // ---- Subida de ficheros (logo/cartel) ----
+  async function subirArchivo(file: File): Promise<string | null> {
     try {
       const form = new FormData();
       form.append('file', file);
-      form.append('folder', 'logos-lugares');
+      form.append('folder', 'lugares-especiales'); // carpeta para ambos
 
       const r = await fetch('/api/upload', { method: 'POST', body: form });
       if (!r.ok) return null;
@@ -118,10 +123,18 @@ export default function RegistrarLugar() {
   const registrarLugar = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // logo
     let especialLogoUrl = nuevo.especialLogoUrl;
     if (nuevo.especial && nuevo.logoFile) {
-      const up = await subirLogo(nuevo.logoFile);
+      const up = await subirArchivo(nuevo.logoFile);
       if (up) especialLogoUrl = up;
+    }
+
+    // cartel especial
+    let especialCartelUrl = nuevo.especialCartelUrl;
+    if (nuevo.especial && nuevo.cartelFile) {
+      const up = await subirArchivo(nuevo.cartelFile);
+      if (up) especialCartelUrl = up;
     }
 
     const body = {
@@ -134,6 +147,7 @@ export default function RegistrarLugar() {
 
       especial: nuevo.especial,
       especialLogoUrl,
+      especialCartelUrl, // NUEVO
       especialColor: nuevo.especialColor,
       especialMensaje: nuevo.especialMensaje,
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
@@ -164,7 +178,9 @@ export default function RegistrarLugar() {
       especialMensaje: '',
       aportacionAcumulada: '0',
       logoFile: null,
+      cartelFile: null,
       especialLogoUrl: '',
+      especialCartelUrl: '',
     });
     setNuevoQR('');
   };
@@ -172,6 +188,7 @@ export default function RegistrarLugar() {
   // ---- Edición (modal) ----
   const abrirEdicion = (l: Lugar) => {
     setEditLogoFile(null);
+    setEditCartelFile(null);
     setEdit({
       ...l,
       especial: !!l.especial,
@@ -193,8 +210,14 @@ export default function RegistrarLugar() {
 
     let especialLogoUrl = edit.especialLogoUrl ?? '';
     if (edit.especial && editLogoFile) {
-      const up = await subirLogo(editLogoFile);
+      const up = await subirArchivo(editLogoFile);
       if (up) especialLogoUrl = up;
+    }
+
+    let especialCartelUrl = edit.especialCartelUrl ?? '';
+    if (edit.especial && editCartelFile) {
+      const up = await subirArchivo(editCartelFile);
+      if (up) especialCartelUrl = up;
     }
 
     const r = await fetch(`/api/lugares/${edit.id}`, {
@@ -210,6 +233,7 @@ export default function RegistrarLugar() {
 
         especial: !!edit.especial,
         especialLogoUrl,
+        especialCartelUrl, // NUEVO
         especialColor: edit.especialColor,
         especialMensaje: edit.especialMensaje,
         aportacionAcumulada: toNumberOr(edit.aportacionAcumulada, 0),
@@ -376,6 +400,18 @@ export default function RegistrarLugar() {
               </div>
             </div>
 
+            <div className="md:col-span-1">
+              <label className="text-sm font-semibold">Cartel especial (opcional)</label>
+              <div className="mt-1 flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="text-sm font-semibold">Color de acento</label>
               <div className="mt-1 flex items-center gap-3">
@@ -392,7 +428,7 @@ export default function RegistrarLugar() {
               </div>
             </div>
 
-            <div className="md:col-span-1">
+            <div>
               <label className="text-sm font-semibold">Aportación acumulada (€)</label>
               <Input
                 inputMode="numeric"
@@ -442,7 +478,7 @@ export default function RegistrarLugar() {
                 <th className="p-2">Agente</th>
                 <th className="p-2">% Cliente</th>
                 <th className="p-2">% Lugar</th>
-                <th className="p-2">Estado</th> {/* NUEVO */}
+                <th className="p-2">Estado</th>
                 <th className="p-2">Acciones</th>
               </tr>
             </thead>
@@ -483,6 +519,17 @@ export default function RegistrarLugar() {
                     >
                       Generar cartel
                     </Button>
+
+                    {/* Cartel especial solo si es especial */}
+                    {l.especial && (
+                      <Button
+                        className="bg-teal-600 text-white"
+                        onClick={() => router.push(`/lugares/cartel-especial/${l.id}`)}
+                      >
+                        Cartel especial
+                      </Button>
+                    )}
+
                     <Button
                       className="bg-emerald-600 text-white"
                       onClick={() =>
@@ -667,7 +714,28 @@ export default function RegistrarLugar() {
                           alt="logo"
                           width={48}
                           height={48}
-                          className="rounded border"
+                          className="rounded border object-cover"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="text-sm font-semibold">Cartel especial (reemplazar)</label>
+                    <div className="mt-1 flex items-center gap-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setEditCartelFile(e.target.files?.[0] || null)}
+                        className="text-sm"
+                      />
+                      {edit.especialCartelUrl && (
+                        <Image
+                          src={edit.especialCartelUrl}
+                          alt="cartel"
+                          width={64}
+                          height={48}
+                          className="rounded border object-cover"
                         />
                       )}
                     </div>
