@@ -25,12 +25,14 @@ const toBool = (v: any) => {
   }
   return undefined;
 };
+// Reemplaza la versión con isNa por esta:
 const toInt = (v: any) => {
   if (v === undefined || v === null || v === '') return undefined;
   const n = Number(v);
-  if (Number.isNa(n)) return undefined;
+  if (Number.isNaN(n)) return undefined;
   return Math.max(0, Math.floor(n));
 };
+
 
 // -------- GET /api/lugares/:id --------
 export async function GET(_req: Request, context: any) {
