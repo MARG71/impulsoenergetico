@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import QRCode from 'react-qr-code';
 import { v4 as uuidv4 } from 'uuid';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -41,25 +40,27 @@ export default function RegistrarLugar() {
     direccion: '',
     qrCode: '',
     agenteId: '',
-    pctCliente: '', // aceptamos "15" o "0.15" (la API lo normaliza)
+    pctCliente: '',
     pctLugar: '',
     especial: false,
     especialColor: '#FF7A3B',
     especialMensaje: '',
     aportacionAcumulada: '0',
-    // archivos
     logoFile: null as File | null,
-    cartelFile: null as File | null,
-    // urls resultantes (se autocompletarán tras subir)
     especialLogoUrl: '',
-    especialCartelUrl: '',
+    cartelFile: null as File | null,           // << nuevo (alta)
+    especialCartelUrl: '',                     // << nuevo (alta)
   });
 
-  // Edición
+  // Edición (modal)
   const [modalAbierto, setModalAbierto] = useState(false);
   const [edit, setEdit] = useState<Lugar | null>(null);
   const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
-  const [editCartelFile, setEditCartelFile] = useState<File | null>(null);
+  const [editCartelFile, setEditCartelFile] = useState<File | null>(null); // << nuevo (edición)
+
+  // Previews en edición
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [cartelPreview, setCartelPreview] = useState<string | null>(null);
 
   // Carga inicial
   useEffect(() => {
@@ -97,13 +98,12 @@ export default function RegistrarLugar() {
     });
   }, [lugares, busqueda]);
 
-  // ---- Subida de ficheros (logo/cartel) ----
-  async function subirArchivo(file: File): Promise<string | null> {
+  // ---- Subida de ficheros (upload genérico) ----
+  async function subirFichero(file: File, folder: string): Promise<string | null> {
     try {
       const form = new FormData();
       form.append('file', file);
-      form.append('folder', 'lugares-especiales'); // carpeta para ambos
-
+      form.append('folder', folder);
       const r = await fetch('/api/upload', { method: 'POST', body: form });
       if (!r.ok) return null;
       const data = await r.json();
@@ -123,17 +123,15 @@ export default function RegistrarLugar() {
   const registrarLugar = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // logo
     let especialLogoUrl = nuevo.especialLogoUrl;
     if (nuevo.especial && nuevo.logoFile) {
-      const up = await subirArchivo(nuevo.logoFile);
+      const up = await subirFichero(nuevo.logoFile, 'logos-lugares');
       if (up) especialLogoUrl = up;
     }
 
-    // cartel especial
     let especialCartelUrl = nuevo.especialCartelUrl;
     if (nuevo.especial && nuevo.cartelFile) {
-      const up = await subirArchivo(nuevo.cartelFile);
+      const up = await subirFichero(nuevo.cartelFile, 'carteles-especiales');
       if (up) especialCartelUrl = up;
     }
 
@@ -144,13 +142,12 @@ export default function RegistrarLugar() {
       agenteId: nuevo.agenteId,
       pctCliente: nuevo.pctCliente,
       pctLugar: nuevo.pctLugar,
-
       especial: nuevo.especial,
       especialLogoUrl,
-      especialCartelUrl, // NUEVO
       especialColor: nuevo.especialColor,
       especialMensaje: nuevo.especialMensaje,
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
+      especialCartelUrl, // << nuevo
     };
 
     const r = await fetch('/api/lugares', {
@@ -178,8 +175,8 @@ export default function RegistrarLugar() {
       especialMensaje: '',
       aportacionAcumulada: '0',
       logoFile: null,
-      cartelFile: null,
       especialLogoUrl: '',
+      cartelFile: null,
       especialCartelUrl: '',
     });
     setNuevoQR('');
@@ -189,6 +186,9 @@ export default function RegistrarLugar() {
   const abrirEdicion = (l: Lugar) => {
     setEditLogoFile(null);
     setEditCartelFile(null);
+    setLogoPreview(null);
+    setCartelPreview(null);
+
     setEdit({
       ...l,
       especial: !!l.especial,
@@ -210,13 +210,13 @@ export default function RegistrarLugar() {
 
     let especialLogoUrl = edit.especialLogoUrl ?? '';
     if (edit.especial && editLogoFile) {
-      const up = await subirArchivo(editLogoFile);
+      const up = await subirFichero(editLogoFile, 'logos-lugares');
       if (up) especialLogoUrl = up;
     }
 
     let especialCartelUrl = edit.especialCartelUrl ?? '';
     if (edit.especial && editCartelFile) {
-      const up = await subirArchivo(editCartelFile);
+      const up = await subirFichero(editCartelFile, 'carteles-especiales');
       if (up) especialCartelUrl = up;
     }
 
@@ -230,13 +230,12 @@ export default function RegistrarLugar() {
         agenteId: edit.agenteId,
         pctCliente: edit.pctCliente,
         pctLugar: edit.pctLugar,
-
         especial: !!edit.especial,
         especialLogoUrl,
-        especialCartelUrl, // NUEVO
         especialColor: edit.especialColor,
         especialMensaje: edit.especialMensaje,
         aportacionAcumulada: toNumberOr(edit.aportacionAcumulada, 0),
+        especialCartelUrl, // << nuevo
       }),
     });
     const d = await r.json();
@@ -388,28 +387,30 @@ export default function RegistrarLugar() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
-            <div className="md:col-span-1">
+            <div>
               <label className="text-sm font-semibold">Logo del club / asociación</label>
-              <div className="mt-1 flex items-center gap-3">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))}
-                  className="text-sm"
-                />
-              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))}
+                className="mt-1 text-sm"
+              />
+              {nuevo.logoFile && (
+                <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>
+              )}
             </div>
 
-            <div className="md:col-span-1">
-              <label className="text-sm font-semibold">Cartel especial (opcional)</label>
-              <div className="mt-1 flex items-center gap-3">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))}
-                  className="text-sm"
-                />
-              </div>
+            <div>
+              <label className="text-sm font-semibold">Cartel especial (reemplazar)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))}
+                className="mt-1 text-sm"
+              />
+              {nuevo.cartelFile && (
+                <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>
+              )}
             </div>
 
             <div>
@@ -439,7 +440,7 @@ export default function RegistrarLugar() {
               />
             </div>
 
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <label className="text-sm font-semibold">Mensaje / gancho</label>
               <Input
                 value={nuevo.especialMensaje}
@@ -492,7 +493,6 @@ export default function RegistrarLugar() {
                   <td className="p-2">{fmtPct(l.pctCliente)}</td>
                   <td className="p-2">{fmtPct(l.pctLugar)}</td>
 
-                  {/* ESTADO (badge) */}
                   <td className="p-2">
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
@@ -520,15 +520,15 @@ export default function RegistrarLugar() {
                       Generar cartel
                     </Button>
 
-                    {/* Cartel especial solo si es especial */}
-                    {l.especial && (
-                      <Button
-                        className="bg-teal-600 text-white"
-                        onClick={() => router.push(`/lugares/cartel-especial/${l.id}`)}
-                      >
-                        Cartel especial
-                      </Button>
-                    )}
+                    {/* Cartel especial sólo si es especial */}
+                    <Button
+                      className={`text-white ${l.especial ? 'bg-teal-600 hover:bg-teal-700' : 'bg-teal-600/40 cursor-not-allowed'}`}
+                      disabled={!l.especial}
+                      onClick={() => router.push(`/lugares/cartel-especial/${l.id}`)}
+                      title={l.especial ? 'Abrir cartel especial' : 'Sólo disponible para lugares especiales'}
+                    >
+                      Cartel especial
+                    </Button>
 
                     <Button
                       className="bg-emerald-600 text-white"
@@ -602,17 +602,18 @@ export default function RegistrarLugar() {
         </div>
       </div>
 
-      {/* MODAL EDICIÓN */}
+      {/* MODAL EDICIÓN (más ancho, con scroll interno) */}
       <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Editar lugar</DialogTitle>
+        <DialogContent className="w-[95vw] max-w-[1100px] p-0">
+          <DialogHeader className="sticky top-0 z-10 bg-white border-b">
+            <DialogTitle className="p-4">Editar lugar</DialogTitle>
           </DialogHeader>
 
           {!!edit && (
-            <div className="space-y-5 text-[#1F1F1F]">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
+            <div className="max-h-[82vh] overflow-y-auto p-6 text-[#1F1F1F]">
+              {/* grid 12 para mejor distribución */}
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-12 md:col-span-6">
                   <label className="text-sm font-semibold">Nombre</label>
                   <Input
                     value={edit.nombre}
@@ -620,7 +621,8 @@ export default function RegistrarLugar() {
                     className="mt-1"
                   />
                 </div>
-                <div>
+
+                <div className="col-span-12 md:col-span-6">
                   <label className="text-sm font-semibold">Dirección</label>
                   <Input
                     value={edit.direccion}
@@ -628,7 +630,8 @@ export default function RegistrarLugar() {
                     className="mt-1"
                   />
                 </div>
-                <div>
+
+                <div className="col-span-6">
                   <label className="text-sm font-semibold">% Cliente (ej. 15 o 0.15)</label>
                   <Input
                     inputMode="decimal"
@@ -637,7 +640,8 @@ export default function RegistrarLugar() {
                     className="mt-1"
                   />
                 </div>
-                <div>
+
+                <div className="col-span-6">
                   <label className="text-sm font-semibold">% Lugar (ej. 10 o 0.10)</label>
                   <Input
                     inputMode="decimal"
@@ -646,7 +650,8 @@ export default function RegistrarLugar() {
                     className="mt-1"
                   />
                 </div>
-                <div className="md:col-span-2">
+
+                <div className="col-span-12">
                   <label className="text-sm font-semibold">Código QR</label>
                   <div className="flex items-center gap-3 mt-1">
                     <Input
@@ -665,7 +670,7 @@ export default function RegistrarLugar() {
                   </div>
                 </div>
 
-                <div>
+                <div className="col-span-12 md:col-span-6">
                   <label className="text-sm font-semibold">Agente</label>
                   <select
                     className="mt-1 w-full border rounded p-2 bg-white"
@@ -683,10 +688,10 @@ export default function RegistrarLugar() {
               </div>
 
               {/* ESPECIAL */}
-              <fieldset className="border rounded-xl p-4 bg-[#F6FFEC]">
+              <fieldset className="border rounded-xl p-4 bg-[#F6FFEC] mt-5">
                 <legend className="px-2 text-sm font-bold text-emerald-700">Lugar especial</legend>
 
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-4">
                   <input
                     id="edit-especial"
                     type="checkbox"
@@ -698,50 +703,62 @@ export default function RegistrarLugar() {
                   </label>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="md:col-span-1">
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-12 md:col-span-4">
                     <label className="text-sm font-semibold">Logo (subir para actualizar)</label>
                     <div className="mt-1 flex items-center gap-3">
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setEditLogoFile(e.target.files?.[0] || null)}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          setEditLogoFile(f);
+                          setLogoPreview(f ? URL.createObjectURL(f) : null);
+                        }}
                         className="text-sm"
                       />
-                      {edit.especialLogoUrl && (
+                      {(logoPreview || edit.especialLogoUrl) && (
                         <Image
-                          src={edit.especialLogoUrl}
+                          src={logoPreview || edit.especialLogoUrl}
                           alt="logo"
-                          width={48}
-                          height={48}
-                          className="rounded border object-cover"
+                          width={56}
+                          height={56}
+                          className="rounded border"
                         />
                       )}
                     </div>
+                    {editLogoFile && <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>}
                   </div>
 
-                  <div className="md:col-span-1">
+                  <div className="col-span-12 md:col-span-4">
                     <label className="text-sm font-semibold">Cartel especial (reemplazar)</label>
                     <div className="mt-1 flex items-center gap-3">
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setEditCartelFile(e.target.files?.[0] || null)}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          setEditCartelFile(f);
+                          setCartelPreview(f ? URL.createObjectURL(f) : null);
+                        }}
                         className="text-sm"
                       />
-                      {edit.especialCartelUrl && (
-                        <Image
-                          src={edit.especialCartelUrl}
-                          alt="cartel"
-                          width={64}
-                          height={48}
-                          className="rounded border object-cover"
-                        />
-                      )}
                     </div>
+                    {(cartelPreview || edit.especialCartelUrl) && (
+                      <div className="mt-2">
+                        {/* mini preview panorámica */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={cartelPreview || edit.especialCartelUrl}
+                          alt="cartel"
+                          className="w-40 h-24 object-cover rounded border"
+                        />
+                      </div>
+                    )}
+                    {editCartelFile && <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>}
                   </div>
 
-                  <div>
+                  <div className="col-span-12 md:col-span-4">
                     <label className="text-sm font-semibold">Color de acento</label>
                     <div className="mt-1 flex items-center gap-3">
                       <input
@@ -757,7 +774,7 @@ export default function RegistrarLugar() {
                     </div>
                   </div>
 
-                  <div>
+                  <div className="col-span-12 md:col-span-4">
                     <label className="text-sm font-semibold">Aportación acumulada (€)</label>
                     <Input
                       inputMode="numeric"
@@ -767,7 +784,7 @@ export default function RegistrarLugar() {
                     />
                   </div>
 
-                  <div className="md:col-span-3">
+                  <div className="col-span-12 md:col-span-8">
                     <label className="text-sm font-semibold">Mensaje / gancho</label>
                     <Input
                       value={edit.especialMensaje ?? ''}
@@ -779,7 +796,7 @@ export default function RegistrarLugar() {
                 </div>
               </fieldset>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end mt-6">
                 <Button onClick={guardarEdicion} className="bg-[#68B84B] text-white hover:bg-green-700">
                   Guardar cambios
                 </Button>
