@@ -59,11 +59,11 @@ export default function CartelEspecial() {
         </div>
       </div>
 
-      {/* Lienzo del cartel: formato 1080x1350 (ideal redes) */}
+      {/* Lienzo del cartel: formato 1080x1350 (ideal redes) escalado a /2 para pantalla */}
       <div
         ref={posterRef}
         className="relative border rounded-xl shadow-xl overflow-hidden"
-        style={{ width: 540, height: 675 /* = 1080x1350 /2 para pantalla */ }}
+        style={{ width: 540, height: 675 }}
       >
         {/* Fondo del cartel especial */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
