@@ -35,6 +35,13 @@ const toInt = (v: any) => {
   return Math.max(0, Math.floor(n));
 };
 
+// Normaliza strings: undefined -> undefined (no tocar), '' -> null, resto -> "texto"
+const cleanStr = (v: any) => {
+  if (v === undefined) return undefined;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+};
+
 // -------- GET /api/lugares/:id --------
 export async function GET(_req: Request, context: any) {
   try {
@@ -57,7 +64,7 @@ export async function GET(_req: Request, context: any) {
         especialColor: true,
         especialMensaje: true,
         aportacionAcumulada: true,
-        especialCartelUrl: true,   // 👈 IMPORTANTE
+        especialCartelUrl: true,
 
         updatedAt: true,
       },
@@ -108,16 +115,16 @@ export async function PUT(req: Request, context: any) {
     const especial = toBool(body?.especial);
     if (especial !== undefined) data.especial = especial;
 
-    if (body?.especialLogoUrl !== undefined) data.especialLogoUrl = String(body.especialLogoUrl).trim();
-    if (body?.especialColor !== undefined) data.especialColor = String(body.especialColor).trim();
-    if (body?.especialMensaje !== undefined) data.especialMensaje = String(body.especialMensaje).trim();
+    if (body?.especialLogoUrl !== undefined) data.especialLogoUrl = cleanStr(body.especialLogoUrl);
+    if (body?.especialColor !== undefined) data.especialColor = cleanStr(body.especialColor);
+    if (body?.especialMensaje !== undefined) data.especialMensaje = cleanStr(body.especialMensaje);
 
     const aport = toInt(body?.aportacionAcumulada);
     if (aport !== undefined) data.aportacionAcumulada = aport;
 
     // ** NUEVO: cartel especial **
     if (body?.especialCartelUrl !== undefined) {
-      data.especialCartelUrl = String(body.especialCartelUrl).trim();
+      data.especialCartelUrl = cleanStr(body.especialCartelUrl); // '' -> null
     }
 
     const updated = await prisma.lugar.update({
@@ -138,7 +145,7 @@ export async function PUT(req: Request, context: any) {
         especialColor: true,
         especialMensaje: true,
         aportacionAcumulada: true,
-        especialCartelUrl: true, // 👈 IMPORTANTE
+        especialCartelUrl: true,
 
         updatedAt: true,
       },

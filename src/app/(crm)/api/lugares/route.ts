@@ -11,6 +11,13 @@ const toPct = (v: any) => {
   return Math.max(0, Math.min(1, p));
 };
 
+// Normaliza strings: undefined -> undefined (no tocar), '' -> null, resto -> "texto"
+const cleanStr = (v: any) => {
+  if (v === undefined) return undefined;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+};
+
 // GET /api/lugares?take=6&skip=0&q=texto&agenteId=1
 export async function GET(req: Request) {
   try {
@@ -95,10 +102,10 @@ export async function POST(req: Request) {
         pctLugar,
 
         especial: !!body?.especial,
-        especialLogoUrl: body?.especialLogoUrl ?? null,
-        especialColor: body?.especialColor ?? null,
-        especialMensaje: body?.especialMensaje ?? null,
-        especialCartelUrl: body?.especialCartelUrl ?? null,
+        especialLogoUrl: cleanStr(body?.especialLogoUrl) ?? null,
+        especialColor: cleanStr(body?.especialColor) ?? null,
+        especialMensaje: cleanStr(body?.especialMensaje) ?? null,
+        especialCartelUrl: cleanStr(body?.especialCartelUrl) ?? null,
         aportacionAcumulada: Number(body?.aportacionAcumulada ?? 0),
       },
       select: {

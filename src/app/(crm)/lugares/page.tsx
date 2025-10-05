@@ -104,7 +104,8 @@ export default function RegistrarLugar() {
       const form = new FormData();
       form.append('file', file);
       form.append('folder', folder);
-      const r = await fetch('/api/upload', { method: 'POST', body: form });
+      // Endpoint correcto: /api/uploads (plural)
+      const r = await fetch('/api/uploads', { method: 'POST', body: form });
       if (!r.ok) return null;
       const data = await r.json();
       return data.url || null;
@@ -135,7 +136,7 @@ export default function RegistrarLugar() {
       if (up) especialCartelUrl = up;
     }
 
-    const body = {
+    const body: any = {
       nombre: nuevo.nombre.trim(),
       direccion: nuevo.direccion.trim(),
       qrCode: nuevo.qrCode.trim(),
@@ -147,8 +148,10 @@ export default function RegistrarLugar() {
       especialColor: nuevo.especialColor,
       especialMensaje: nuevo.especialMensaje,
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
-      especialCartelUrl, // << nuevo
     };
+
+    // Solo incluir si hay URL real (evita enviar '')
+    if (especialCartelUrl?.trim()) body.especialCartelUrl = especialCartelUrl.trim();
 
     const r = await fetch('/api/lugares', {
       method: 'POST',
@@ -221,23 +224,27 @@ export default function RegistrarLugar() {
       if (up) especialCartelUrl = up;
     }
 
+    const payload: any = {
+      nombre: edit.nombre,
+      direccion: edit.direccion,
+      qrCode: edit.qrCode,
+      agenteId: edit.agenteId,
+      pctCliente: edit.pctCliente,
+      pctLugar: edit.pctLugar,
+      especial: !!edit.especial,
+      especialLogoUrl,
+      especialColor: edit.especialColor,
+      especialMensaje: edit.especialMensaje,
+      aportacionAcumulada: toNumberOr(edit.aportacionAcumulada, 0),
+    };
+
+    // Solo enviar si hay URL real (para no borrar el valor existente con '')
+    if (especialCartelUrl?.trim()) payload.especialCartelUrl = especialCartelUrl.trim();
+
     const r = await fetch(`/api/lugares/${edit.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nombre: edit.nombre,
-        direccion: edit.direccion,
-        qrCode: edit.qrCode,
-        agenteId: edit.agenteId,
-        pctCliente: edit.pctCliente,
-        pctLugar: edit.pctLugar,
-        especial: !!edit.especial,
-        especialLogoUrl,
-        especialColor: edit.especialColor,
-        especialMensaje: edit.especialMensaje,
-        aportacionAcumulada: toNumberOr(edit.aportacionAcumulada, 0),
-        especialCartelUrl, // << nuevo
-      }),
+      body: JSON.stringify(payload),
     });
     const d = await r.json();
     if (!r.ok) {
@@ -610,199 +617,199 @@ export default function RegistrarLugar() {
             <DialogTitle className="p-4">Editar lugar</DialogTitle>
           </DialogHeader>
 
-          {!!edit && (
-            <div className="max-h-[82vh] overflow-y-auto p-6 text-[#1F1F1F]">
-              {/* grid 12 para mejor distribución */}
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-12 md:col-span-6">
-                  <label className="text-sm font-semibold">Nombre</label>
-                  <Input
-                    value={edit.nombre}
-                    onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
+        {!!edit && (
+          <div className="max-h-[82vh] overflow-y-auto p-6 text-[#1F1F1F]">
+            {/* grid 12 para mejor distribución */}
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-6">
+                <label className="text-sm font-semibold">Nombre</label>
+                <Input
+                  value={edit.nombre}
+                  onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
 
-                <div className="col-span-12 md:col-span-6">
-                  <label className="text-sm font-semibold">Dirección</label>
-                  <Input
-                    value={edit.direccion}
-                    onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
+              <div className="col-span-12 md:col-span-6">
+                <label className="text-sm font-semibold">Dirección</label>
+                <Input
+                  value={edit.direccion}
+                  onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
 
-                <div className="col-span-6">
-                  <label className="text-sm font-semibold">% Cliente (ej. 15 o 0.15)</label>
-                  <Input
-                    inputMode="decimal"
-                    value={edit.pctCliente ?? ''}
-                    onChange={(e) => setEdit({ ...edit, pctCliente: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
+              <div className="col-span-6">
+                <label className="text-sm font-semibold">% Cliente (ej. 15 o 0.15)</label>
+                <Input
+                  inputMode="decimal"
+                  value={edit.pctCliente ?? ''}
+                  onChange={(e) => setEdit({ ...edit, pctCliente: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
 
-                <div className="col-span-6">
-                  <label className="text-sm font-semibold">% Lugar (ej. 10 o 0.10)</label>
-                  <Input
-                    inputMode="decimal"
-                    value={edit.pctLugar ?? ''}
-                    onChange={(e) => setEdit({ ...edit, pctLugar: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
+              <div className="col-span-6">
+                <label className="text-sm font-semibold">% Lugar (ej. 10 o 0.10)</label>
+                <Input
+                  inputMode="decimal"
+                  value={edit.pctLugar ?? ''}
+                  onChange={(e) => setEdit({ ...edit, pctLugar: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
 
-                <div className="col-span-12">
-                  <label className="text-sm font-semibold">Código QR</label>
-                  <div className="flex items-center gap-3 mt-1">
-                    <Input
-                      value={edit.qrCode ?? ''}
-                      onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
+              <div className="col-span-12">
+                <label className="text-sm font-semibold">Código QR</label>
+                <div className="flex items-center gap-3 mt-1">
+                  <Input
+                    value={edit.qrCode ?? ''}
+                    onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
+                  />
+                  <Button type="button" onClick={generarQR_edit} className="bg-blue-600 text-white">
+                    Generar QR
+                  </Button>
+                  {edit.qrCode && (
+                    <QRCode
+                      value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`}
+                      size={44}
                     />
-                    <Button type="button" onClick={generarQR_edit} className="bg-blue-600 text-white">
-                      Generar QR
-                    </Button>
-                    {edit.qrCode && (
-                      <QRCode
-                        value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`}
-                        size={44}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="col-span-12 md:col-span-6">
-                  <label className="text-sm font-semibold">Agente</label>
-                  <select
-                    className="mt-1 w-full border rounded p-2 bg-white"
-                    value={edit.agenteId}
-                    onChange={(e) => setEdit({ ...edit, agenteId: Number(e.target.value) })}
-                  >
-                    <option value="">Selecciona un agente…</option>
-                    {agentes.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  )}
                 </div>
               </div>
 
-              {/* ESPECIAL */}
-              <fieldset className="border rounded-xl p-4 bg-[#F6FFEC] mt-5">
-                <legend className="px-2 text-sm font-bold text-emerald-700">Lugar especial</legend>
-
-                <div className="flex items-center gap-3 mb-4">
-                  <input
-                    id="edit-especial"
-                    type="checkbox"
-                    checked={!!edit.especial}
-                    onChange={(e) => setEdit({ ...edit, especial: e.target.checked })}
-                  />
-                  <label htmlFor="edit-especial" className="text-sm">
-                    Marcar como especial
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-12 gap-4">
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-sm font-semibold">Logo (subir para actualizar)</label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0] || null;
-                          setEditLogoFile(f);
-                          setLogoPreview(f ? URL.createObjectURL(f) : null);
-                        }}
-                        className="text-sm"
-                      />
-                      {(logoPreview || edit.especialLogoUrl) && (
-                        <Image
-                          src={logoPreview || edit.especialLogoUrl}
-                          alt="logo"
-                          width={56}
-                          height={56}
-                          className="rounded border"
-                        />
-                      )}
-                    </div>
-                    {editLogoFile && <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>}
-                  </div>
-
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-sm font-semibold">Cartel especial (reemplazar)</label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0] || null;
-                          setEditCartelFile(f);
-                          setCartelPreview(f ? URL.createObjectURL(f) : null);
-                        }}
-                        className="text-sm"
-                      />
-                    </div>
-                    {(cartelPreview || edit.especialCartelUrl) && (
-                      <div className="mt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={cartelPreview || edit.especialCartelUrl}
-                          alt="cartel"
-                          className="w-40 h-24 object-cover rounded border"
-                        />
-                      </div>
-                    )}
-                    {editCartelFile && <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>}
-                  </div>
-
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-sm font-semibold">Color de acento</label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={edit.especialColor ?? '#FF7A3B'}
-                        onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
-                        className="h-10 w-16 rounded"
-                      />
-                      <Input
-                        value={edit.especialColor ?? ''}
-                        onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-sm font-semibold">Aportación acumulada (€)</label>
-                    <Input
-                      inputMode="numeric"
-                      value={String(edit.aportacionAcumulada ?? 0)}
-                      onChange={(e) => setEdit({ ...edit, aportacionAcumulada: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div className="col-span-12 md:col-span-8">
-                    <label className="text-sm font-semibold">Mensaje / gancho</label>
-                    <Input
-                      value={edit.especialMensaje ?? ''}
-                      onChange={(e) => setEdit({ ...edit, especialMensaje: e.target.value })}
-                      placeholder='Ej.: "AYUDA A TU CLUB"'
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </fieldset>
-
-              <div className="flex justify-end mt-6">
-                <Button onClick={guardarEdicion} className="bg-[#68B84B] text-white hover:bg-green-700">
-                  Guardar cambios
-                </Button>
+              <div className="col-span-12 md:col-span-6">
+                <label className="text-sm font-semibold">Agente</label>
+                <select
+                  className="mt-1 w-full border rounded p-2 bg-white"
+                  value={edit.agenteId}
+                  onChange={(e) => setEdit({ ...edit, agenteId: Number(e.target.value) })}
+                >
+                  <option value="">Selecciona un agente…</option>
+                  {agentes.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          )}
+
+            {/* ESPECIAL */}
+            <fieldset className="border rounded-xl p-4 bg-[#F6FFEC] mt-5">
+              <legend className="px-2 text-sm font-bold text-emerald-700">Lugar especial</legend>
+
+              <div className="flex items-center gap-3 mb-4">
+                <input
+                  id="edit-especial"
+                  type="checkbox"
+                  checked={!!edit.especial}
+                  onChange={(e) => setEdit({ ...edit, especial: e.target.checked })}
+                />
+                <label htmlFor="edit-especial" className="text-sm">
+                  Marcar como especial
+                </label>
+              </div>
+
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-12 md:col-span-4">
+                  <label className="text-sm font-semibold">Logo (subir para actualizar)</label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        setEditLogoFile(f);
+                        setLogoPreview(f ? URL.createObjectURL(f) : null);
+                      }}
+                      className="text-sm"
+                    />
+                    {(logoPreview || edit.especialLogoUrl) && (
+                      <Image
+                        src={logoPreview || edit.especialLogoUrl}
+                        alt="logo"
+                        width={56}
+                        height={56}
+                        className="rounded border"
+                      />
+                    )}
+                  </div>
+                  {editLogoFile && <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>}
+                </div>
+
+                <div className="col-span-12 md:col-span-4">
+                  <label className="text-sm font-semibold">Cartel especial (reemplazar)</label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        setEditCartelFile(f);
+                        setCartelPreview(f ? URL.createObjectURL(f) : null);
+                      }}
+                      className="text-sm"
+                    />
+                  </div>
+                  {(cartelPreview || edit.especialCartelUrl) && (
+                    <div className="mt-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={cartelPreview || edit.especialCartelUrl}
+                        alt="cartel"
+                        className="w-40 h-24 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                  {editCartelFile && <p className="text-xs text-emerald-700 mt-1">Se subirá al guardar</p>}
+                </div>
+
+                <div className="col-span-12 md:col-span-4">
+                  <label className="text-sm font-semibold">Color de acento</label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={edit.especialColor ?? '#FF7A3B'}
+                      onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
+                      className="h-10 w-16 rounded"
+                    />
+                    <Input
+                      value={edit.especialColor ?? ''}
+                      onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="col-span-12 md:col-span-4">
+                  <label className="text-sm font-semibold">Aportación acumulada (€)</label>
+                  <Input
+                    inputMode="numeric"
+                    value={String(edit.aportacionAcumulada ?? 0)}
+                    onChange={(e) => setEdit({ ...edit, aportacionAcumulada: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+
+                <div className="col-span-12 md:col-span-8">
+                  <label className="text-sm font-semibold">Mensaje / gancho</label>
+                  <Input
+                    value={edit.especialMensaje ?? ''}
+                    onChange={(e) => setEdit({ ...edit, especialMensaje: e.target.value })}
+                    placeholder='Ej.: "AYUDA A TU CLUB"'
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            </fieldset>
+
+            <div className="flex justify-end mt-6">
+              <Button onClick={guardarEdicion} className="bg-[#68B84B] text-white hover:bg-green-700">
+                Guardar cambios
+              </Button>
+            </div>
+          </div>
+        )}
         </DialogContent>
       </Dialog>
     </div>
