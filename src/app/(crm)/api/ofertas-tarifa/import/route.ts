@@ -36,6 +36,8 @@ function toNum(v: any) {
   return Number.isFinite(n) ? n : null;
 }
 
+type Key = string;
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
@@ -80,7 +82,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // MAPEOS de tu Excel (Tarifa, Nombre, Compañía, Consumo, CO cons., COMISION COMPARADOR, P.C.1..3, Comisión MIA…)
+    // MAPEOS de tu Excel
     const LABELS = {
       tarifa: ["tarifa", "subtipo"],
       nombre: ["nombre", "nombre tarifa", "tarifa"],
@@ -100,7 +102,6 @@ export async function POST(req: Request) {
       consumo: ["consumo", "consumo mensual", "consumo_desde_mensual"],
     };
 
-    type Key = string;
     const group: Record<Key, { base: any; tramos: any[] }> = {};
 
     for (const r of rows) {
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
             tipo,
             subtipo,
             compania,
-            anexoPrecio: null, // ojo: puede ser null
+            anexoPrecio: null, // puede ser null
             nombre,
             descripcion: null,
             descripcionCorta: null,
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
         };
       }
 
-      // Tramo: consumo mensual → anual (×12); después cerraremos [desde, hasta)
+      // Tramo: consumo mensual → anual (×12); luego cerraremos [desde, hasta)
       const consumoMes = toNum(pick(r, LABELS.consumo));
       const comTramoKwh = toNum(pick(r, LABELS.comTramoKwh));
       const comTramoFija = toNum(pick(r, LABELS.comTramoFija));
@@ -173,67 +174,72 @@ export async function POST(req: Request) {
       }
     }
 
-    // === CREAR/ACTUALIZAR tarifas respetando anexoPrecio NULL ===
-    // Si anexoPrecio es null, NO podemos usar upsert con la clave compuesta (Prisma no permite null ahí).
-    const ops = Object.values(group).map(async (g) => {
-      const updateFields = {
-        descripcion: g.base.descripcion,
-        activa: true,
-        precioKwhP1: g.base.precioKwhP1,
-        precioKwhP2: g.base.precioKwhP2,
-        precioKwhP3: g.base.precioKwhP3,
-        precioKwhP4: g.base.precioKwhP4,
-        precioKwhP5: g.base.precioKwhP5,
-        precioKwhP6: g.base.precioKwhP6,
-        comisionKwhAdminBase: g.base.comisionKwhAdminBase,
-        payload: g.base.payload,
-        tramos: { deleteMany: {} }, // limpiaremos tramos antes de recrear
-      };
+    // ==== Transacción funcional (evita el error de tipos) ====
+    const upserts = await prisma.$transaction(async (tx) => {
+      const results: any[] = [];
 
-      if (g.base.anexoPrecio) {
-        // Con valor → sí podemos usar upsert
-        return prisma.ofertaTarifa.upsert({
-          where: {
-            // @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
-            // @ts-ignore
-            tipo_subtipo_compania_nombre_anexoPrecio: {
-              tipo: g.base.tipo,
+      for (const g of Object.values(group)) {
+        const updateFields = {
+          descripcion: g.base.descripcion,
+          activa: true,
+          precioKwhP1: g.base.precioKwhP1,
+          precioKwhP2: g.base.precioKwhP2,
+          precioKwhP3: g.base.precioKwhP3,
+          precioKwhP4: g.base.precioKwhP4,
+          precioKwhP5: g.base.precioKwhP5,
+          precioKwhP6: g.base.precioKwhP6,
+          comisionKwhAdminBase: g.base.comisionKwhAdminBase,
+          payload: g.base.payload,
+          tramos: { deleteMany: {} },
+        };
+
+        let row;
+        if (g.base.anexoPrecio) {
+          // anexoPrecio con valor → usar upsert sobre la clave compuesta
+          row = await tx.ofertaTarifa.upsert({
+            where: {
+              // @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
+              // @ts-ignore
+              tipo_subtipo_compania_nombre_anexoPrecio: {
+                tipo: g.base.tipo,
+                subtipo: g.base.subtipo,
+                compania: g.base.compania,
+                nombre: g.base.nombre,
+                anexoPrecio: g.base.anexoPrecio,
+              },
+            },
+            update: updateFields,
+            create: { ...g.base },
+          });
+        } else {
+          // anexoPrecio == null → buscar y actualizar o crear
+          const existing = await tx.ofertaTarifa.findFirst({
+            where: {
+              tipo: g.base.tipo as any,
               subtipo: g.base.subtipo,
               compania: g.base.compania,
               nombre: g.base.nombre,
-              anexoPrecio: g.base.anexoPrecio,
+              anexoPrecio: null,
             },
-          },
-          update: updateFields,
-          create: { ...g.base },
-        });
+          });
+
+          if (existing) {
+            row = await tx.ofertaTarifa.update({
+              where: { id: existing.id },
+              data: updateFields,
+            });
+          } else {
+            row = await tx.ofertaTarifa.create({ data: { ...g.base } });
+          }
+        }
+
+        results.push(row);
       }
 
-      // anexoPrecio == null → buscar y actualizar o crear
-      const existing = await prisma.ofertaTarifa.findFirst({
-        where: {
-          tipo: g.base.tipo as any,
-          subtipo: g.base.subtipo,
-          compania: g.base.compania,
-          nombre: g.base.nombre,
-          anexoPrecio: null,
-        },
-      });
-
-      if (existing) {
-        return prisma.ofertaTarifa.update({
-          where: { id: existing.id },
-          data: updateFields,
-        });
-      }
-
-      return prisma.ofertaTarifa.create({ data: { ...g.base } });
+      return results;
     });
 
-    // Ejecutar en transacción
-    const upserts = await prisma.$transaction(ops);
-
-    // Recrear tramos
+    // Recrear tramos fuera (otra transacción para los creates)
     let tramos = 0;
     const creates: any[] = [];
     for (const up of upserts) {
