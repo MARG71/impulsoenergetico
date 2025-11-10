@@ -5,18 +5,19 @@ import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// export const maxDuration = 60; // si lo necesitas en Vercel para ficheros grandes
+// export const maxDuration = 60;
 
 /** Normaliza nombres de columna (quita tildes, NBSPs, mayúsculas, signos, puntos) */
 function normKey(s: any) {
   return String(s || "")
-    .replace(/\u00A0/g, " ")                // NBSP -> espacio
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // sin acentos
+    .replace(/\u00A0/g, " ") // NBSP -> espacio
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // sin acentos
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/[^\w %/().-]/g, "")           // fuera raros
-    .replace(/\s*\(([^)]*)\)/g, " ($1)");   // normaliza paréntesis
+    .replace(/[^\w %/().-]/g, "")
+    .replace(/\s*\(([^)]*)\)/g, " ($1)");
 }
 
 /** Devuelve el primer campo existente del row que case con alguna etiqueta prevista */
@@ -33,11 +34,6 @@ function toNum(v: any) {
   if (typeof v === "string") v = v.replace(",", ".").trim();
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-function toInt(v: any) {
-  const n = toNum(v);
-  return n === null ? null : Math.round(n);
 }
 
 export async function POST(req: Request) {
@@ -67,26 +63,24 @@ export async function POST(req: Request) {
     const ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return NextResponse.json({ error: "El Excel no tiene hojas" }, { status: 400 });
 
-    // Normalizamos todas las keys del row
     const rawRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: null });
     if (!rawRows.length) return NextResponse.json({ error: "El Excel está vacío" }, { status: 400 });
 
+    // Normalizamos todas las keys del row
     const rows = rawRows.map((r) => {
       const n: Record<string, any> = {};
       for (const [k, v] of Object.entries(r)) n[normKey(k)] = v;
       return n;
     });
 
-    // Si pidieron reemplazar el subtipo entero, borraremos primero
+    // Reemplazar subtipo completo si lo piden
     if (replace && subtipoGlobal) {
       await prisma.ofertaTarifa.deleteMany({
         where: { tipo: tipoGlobal as any, subtipo: subtipoGlobal },
       });
     }
 
-    // === MAPEOS ESPECÍFICOS DE TU EXCEL 2.0TD ===
-    // Cabeceras reales que hemos visto: "Tarifa", "Nombre", "Compañía", "Consumo", "CO cons.", "COMISION COMPARADOR",
-    // "P.C.1 (€/kWh)", "P.C.2 (€/kWh)", "P.C.3 (€/kWh)", "Comisión MIA", etc.
+    // MAPEOS de tu Excel (Tarifa, Nombre, Compañía, Consumo, CO cons., COMISION COMPARADOR, P.C.1..3, Comisión MIA…)
     const LABELS = {
       tarifa: ["tarifa", "subtipo"],
       nombre: ["nombre", "nombre tarifa", "tarifa"],
@@ -102,7 +96,7 @@ export async function POST(req: Request) {
       comBase: ["comision mia", "comisión mia", "comision €/kwh", "comisión €/kwh", "comision_kwh_admin_base"],
       comTramoKwh: ["co cons.", "comision_kwh_admin_tramo", "comision_kwh_admin", "comisión_kwh_admin_tramo"],
       comTramoFija: ["comision comparador", "comision_fija_admin", "comisión fija admin"],
-      // consumo (en tu Excel parece mensual)
+      // consumo (tu Excel parece mensual)
       consumo: ["consumo", "consumo mensual", "consumo_desde_mensual"],
     };
 
@@ -133,7 +127,7 @@ export async function POST(req: Request) {
             tipo,
             subtipo,
             compania,
-            anexoPrecio: null,
+            anexoPrecio: null, // ojo: puede ser null
             nombre,
             descripcion: null,
             descripcionCorta: null,
@@ -152,26 +146,25 @@ export async function POST(req: Request) {
         };
       }
 
-      // Tramo: consumo mensual → anual
+      // Tramo: consumo mensual → anual (×12); después cerraremos [desde, hasta)
       const consumoMes = toNum(pick(r, LABELS.consumo));
       const comTramoKwh = toNum(pick(r, LABELS.comTramoKwh));
       const comTramoFija = toNum(pick(r, LABELS.comTramoFija));
 
       if (consumoMes !== null || comTramoKwh !== null || comTramoFija !== null) {
         const desdeAnual = consumoMes !== null ? Math.round(consumoMes * 12) : 0;
-        // En tu hoja solo viene un “punto” de consumo; montamos tramos encadenados al ordenar después
         group[key].tramos.push({
-          consumoDesdeKWh: desdeAnual,       // lo ordenaremos y cerraremos con el siguiente
-          consumoHastaKWh: null,            // se completará después
-          comisionKwhAdmin: comTramoKwh,    // €/kWh
-          comisionFijaAdmin: comTramoFija,  // €
+          consumoDesdeKWh: desdeAnual,
+          consumoHastaKWh: null, // se rellenará al ordenar
+          comisionKwhAdmin: comTramoKwh, // €/kWh
+          comisionFijaAdmin: comTramoFija, // €
           activo: true,
           notas: null,
         });
       }
     }
 
-    // Ordena tramos por consumo y cierra los rangos [desde, hasta)
+    // Ordenar tramos y cerrar rangos [desde, hasta)
     for (const g of Object.values(group)) {
       g.tramos.sort((a, b) => (a.consumoDesdeKWh ?? 0) - (b.consumoDesdeKWh ?? 0));
       for (let i = 0; i < g.tramos.length; i++) {
@@ -180,10 +173,26 @@ export async function POST(req: Request) {
       }
     }
 
-    // Upserts de tarifas
-    const upserts = await prisma.$transaction(
-      Object.values(group).map((g) =>
-        prisma.ofertaTarifa.upsert({
+    // === CREAR/ACTUALIZAR tarifas respetando anexoPrecio NULL ===
+    // Si anexoPrecio es null, NO podemos usar upsert con la clave compuesta (Prisma no permite null ahí).
+    const ops = Object.values(group).map(async (g) => {
+      const updateFields = {
+        descripcion: g.base.descripcion,
+        activa: true,
+        precioKwhP1: g.base.precioKwhP1,
+        precioKwhP2: g.base.precioKwhP2,
+        precioKwhP3: g.base.precioKwhP3,
+        precioKwhP4: g.base.precioKwhP4,
+        precioKwhP5: g.base.precioKwhP5,
+        precioKwhP6: g.base.precioKwhP6,
+        comisionKwhAdminBase: g.base.comisionKwhAdminBase,
+        payload: g.base.payload,
+        tramos: { deleteMany: {} }, // limpiaremos tramos antes de recrear
+      };
+
+      if (g.base.anexoPrecio) {
+        // Con valor → sí podemos usar upsert
+        return prisma.ofertaTarifa.upsert({
           where: {
             // @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
             // @ts-ignore
@@ -195,23 +204,34 @@ export async function POST(req: Request) {
               anexoPrecio: g.base.anexoPrecio,
             },
           },
-          update: {
-            descripcion: g.base.descripcion,
-            activa: true,
-            precioKwhP1: g.base.precioKwhP1,
-            precioKwhP2: g.base.precioKwhP2,
-            precioKwhP3: g.base.precioKwhP3,
-            precioKwhP4: g.base.precioKwhP4,
-            precioKwhP5: g.base.precioKwhP5,
-            precioKwhP6: g.base.precioKwhP6,
-            comisionKwhAdminBase: g.base.comisionKwhAdminBase,
-            payload: g.base.payload,
-            tramos: { deleteMany: {} }, // limpiamos tramos para recrear
-          },
+          update: updateFields,
           create: { ...g.base },
-        })
-      )
-    );
+        });
+      }
+
+      // anexoPrecio == null → buscar y actualizar o crear
+      const existing = await prisma.ofertaTarifa.findFirst({
+        where: {
+          tipo: g.base.tipo as any,
+          subtipo: g.base.subtipo,
+          compania: g.base.compania,
+          nombre: g.base.nombre,
+          anexoPrecio: null,
+        },
+      });
+
+      if (existing) {
+        return prisma.ofertaTarifa.update({
+          where: { id: existing.id },
+          data: updateFields,
+        });
+      }
+
+      return prisma.ofertaTarifa.create({ data: { ...g.base } });
+    });
+
+    // Ejecutar en transacción
+    const upserts = await prisma.$transaction(ops);
 
     // Recrear tramos
     let tramos = 0;
