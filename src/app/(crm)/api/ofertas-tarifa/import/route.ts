@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -195,7 +196,7 @@ export async function POST(req: Request) {
             precioKwhP4: p4, precioKwhP5: p5, precioKwhP6: p6,
             // comisión base (no se usa)
             comisionKwhAdminBase: null,
-            payload: null,
+            payload: undefined,
           },
         });
       }
