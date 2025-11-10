@@ -90,8 +90,10 @@ function ImportadorTarifas() {
       fd.append('subtipo', subtipo);
       fd.append('replace', String(replace));
 
-      const res = await fetch('/api/oferta-tarifa/import', { method: 'POST', body: fd });
+      // 👇 CAMBIO 1: URL correcta (ofertas-tarifa, con “s”)
+      const res = await fetch('/api/ofertas-tarifa/import', { method: 'POST', body: fd });
 
+      
       // 🔒 Leer SOLO UNA VEZ el cuerpo
       const bodyText = await res.text();
       let data: any = null;
@@ -139,9 +141,13 @@ function ImportadorTarifas() {
           <input type="checkbox" checked={replace} onChange={e=>setReplace(e.target.checked)} />
           Reemplazar subtipo
         </label>
-        <Button disabled={loading} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
+
+        {/* 👇 CAMBIO 2: añadir type="submit" */}
+        <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
           <Upload className="w-4 h-4" /> {loading ? 'Importando…' : 'Importar'}
         </Button>
+
+
       </form>
       {msg && <div className="text-sm text-gray-700">{msg}</div>}
       <div className="text-xs text-gray-600">

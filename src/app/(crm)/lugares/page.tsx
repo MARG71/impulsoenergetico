@@ -104,15 +104,26 @@ export default function RegistrarLugar() {
       const form = new FormData();
       form.append('file', file);
       form.append('folder', folder);
-      // Endpoint correcto: /api/uploads (plural)
       const r = await fetch('/api/uploads', { method: 'POST', body: form });
-      if (!r.ok) return null;
+      if (!r.ok) {
+        const msg = await r.text().catch(() => '');
+        alert(`Error al subir fichero (${r.status}): ${msg || 'sin detalle'}`);
+        return null;
+      }
       const data = await r.json();
-      return data.url || null;
-    } catch {
+      const url = data?.url?.toString() ?? '';
+      // Validación muy simple de URL
+      if (!/^https?:\/\//i.test(url)) {
+        alert('La subida no devolvió una URL válida.');
+        return null;
+      }
+      return url;
+    } catch (e: any) {
+      alert(`Excepción subiendo fichero: ${e?.message || e}`);
       return null;
     }
   }
+
 
   // ---- Alta (nuevo) ----
   const generarQR_nuevo = () => {
@@ -149,9 +160,10 @@ export default function RegistrarLugar() {
       especialMensaje: nuevo.especialMensaje,
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
     };
-
-    // Solo incluir si hay URL real (evita enviar '')
-    if (especialCartelUrl?.trim()) body.especialCartelUrl = especialCartelUrl.trim();
+    // 👇 solo si hay URL real
+    if (especialCartelUrl && especialCartelUrl.trim()) {
+      body.especialCartelUrl = especialCartelUrl.trim();
+    }
 
     const r = await fetch('/api/lugares', {
       method: 'POST',
@@ -163,6 +175,9 @@ export default function RegistrarLugar() {
       alert(d?.error || 'Error al crear lugar');
       return;
     }
+    // DEBUG visual rápido
+    console.log('POST /api/lugares -> especialCartelUrl guardada:', d?.especialCartelUrl);
+
     setLugares((arr) => [d, ...arr]);
 
     // reset
@@ -239,18 +254,26 @@ export default function RegistrarLugar() {
     };
 
     // Solo enviar si hay URL real (para no borrar el valor existente con '')
-    if (especialCartelUrl?.trim()) payload.especialCartelUrl = especialCartelUrl.trim();
+    // 👇 solo si hay URL real
+    if (especialCartelUrl && especialCartelUrl.trim()) {
+      payload.especialCartelUrl = especialCartelUrl.trim();
+    }
 
     const r = await fetch(`/api/lugares/${edit.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+
     const d = await r.json();
     if (!r.ok) {
       alert(d?.error || 'Error al guardar');
       return;
     }
+
+    // DEBUG visual rápido
+    console.log('PUT /api/lugares/:id -> especialCartelUrl guardada:', d?.especialCartelUrl);
+    
     setLugares((arr) => arr.map((x) => (x.id === d.id ? d : x)));
     setModalAbierto(false);
   };
