@@ -327,6 +327,14 @@ model OfertaTarifa {
   precioKwhP5 Decimal? @db.Decimal(10, 6)
   precioKwhP6 Decimal? @db.Decimal(10, 6)
 
+   // 🔥 POTENCIA (€/kW·año) — NUEVO
+  precioPotenciaP1 Decimal? @db.Decimal(10, 6)
+  precioPotenciaP2 Decimal? @db.Decimal(10, 6)
+  precioPotenciaP3 Decimal? @db.Decimal(10, 6)
+  precioPotenciaP4 Decimal? @db.Decimal(10, 6)
+  precioPotenciaP5 Decimal? @db.Decimal(10, 6)
+  precioPotenciaP6 Decimal? @db.Decimal(10, 6)
+
   // Comisión base (€/kWh) cuando no encaja ningún tramo
   comisionKwhAdminBase Decimal? @db.Decimal(10, 6)
 
