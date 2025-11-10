@@ -30,6 +30,20 @@ function toNum(v: any) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+/** Convierte "0-2000" / "0 – 2.000" / "0 a 2000" a [0,2000]. Si no hay “hasta”, devuelve [desde, null] */
+function parseRangeToInts(s: any): [number, number|null] | null {
+  if (!s && s !== 0) return null;
+  const txt = String(s).replace(/\./g, "").replace(",", ".").toLowerCase().trim();
+  // separadores típicos: "-", "–", "a", "hasta"
+  const parts = txt.split(/-|–|a|hasta/).map(t => t.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const desde = parseInt(parts[0], 10);
+  const hasta = parts.length > 1 ? parseInt(parts[1], 10) : null;
+  if (!Number.isFinite(desde)) return null;
+  if (hasta !== null && !Number.isFinite(hasta)) return [desde, null];
+  return [desde, hasta];
+}
+
 type Key = string;
 
 export async function POST(req: Request) {
@@ -58,6 +72,7 @@ export async function POST(req: Request) {
     const rawRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: null });
     if (!rawRows.length) return NextResponse.json({ error: "El Excel está vacío" }, { status: 400 });
 
+    // Normaliza keys
     const rows = rawRows.map((r) => {
       const n: Record<string, any> = {};
       for (const [k, v] of Object.entries(r)) n[normKey(k)] = v;
@@ -71,14 +86,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // Mapear cabeceras
+    // Mapeo de cabeceras (ajustado a tu Excel)
     const LABELS = {
-      tarifa: ["tarifa", "subtipo"],
-      nombre: ["nombre", "nombre tarifa", "tarifa"],
+      // Claves básicas
       compania: ["compañia", "compania"],
-      anexo: ["anexo", "anexo precio", "epigrafe", "epígrafe", "epigrafe precios", "anexo de precios"],
+      subtipo: ["tarifa", "subtipo"], // por si el Excel trae la tarifa explícita
+      // ⚠️ NOMBRE = ANEXO DE PRECIOS (la clave que nos das)
+      anexoNombre: ["nombre", "nombre anexo", "anexo", "anexo precio", "epigrafe", "epígrafe"],
 
-      // ENERGÍA (€/kWh)
+      // Energía (€/kWh)
       p1: ["p.c.1 (€/kwh)", "pc1", "precio p1", "p1"],
       p2: ["p.c.2 (€/kwh)", "pc2", "precio p2", "p2"],
       p3: ["p.c.3 (€/kwh)", "pc3", "precio p3", "p3"],
@@ -86,50 +102,34 @@ export async function POST(req: Request) {
       p5: ["p.c.5 (€/kwh)", "pc5", "precio p5", "p5"],
       p6: ["p.c.6 (€/kwh)", "pc6", "precio p6", "p6"],
 
-      // POTENCIA (€/kW·año) — intenta cubrir distintas nomenclaturas
-      pot1: ["pot.1", "potencia p1", "potencia (p1)", "término potencia p1", "p1 potencia", "potencia 1", "pt1", "p.c.1 (€/kw/año)", "p.c.1 (€/kw/ano)"],
-      pot2: ["pot.2", "potencia p2", "potencia (p2)", "término potencia p2", "p2 potencia", "potencia 2", "pt2", "p.c.2 (€/kw/año)", "p.c.2 (€/kw/ano)"],
-      pot3: ["pot.3", "potencia p3", "pt3"],
-      pot4: ["pot.4", "potencia p4", "pt4"],
-      pot5: ["pot.5", "potencia p5", "pt5"],
-      pot6: ["pot.6", "potencia p6", "pt6"],
+      // Columna F “POTENCIA” → guardamos literal en tramo.notas
+      potenciaEtiqueta: ["potencia"],
 
-      // COMISIONES
-      // ✅ Base por kWh: queremos "COMISION COMPARADOR"
-      comBase: ["comision comparador", "comisión comparador", "comision €/kwh comparador", "comisión €/kwh comparador"],
-      // (opcional) MIA la guardamos en payload por auditoría
-      comMia:  ["comision mia", "comisión mia"],
+      // Columna H “CONSUMO” → rango “x-y”
+      consumoRango: ["consumo", "consumo rango", "rango consumo"],
 
-      // consumo (tu Excel parece mensual)
-      consumo: ["consumo", "consumo mensual", "consumo_desde_mensual"],
-      // por si hay comisión por tramo:
-      comTramoKwh: ["co cons.", "comision_kwh_admin_tramo", "comision_kwh_admin", "comisión_kwh_admin_tramo"],
-      comTramoFija: ["comision fija admin", "comision_admin_fija", "comisión comparador fija", "comision comparador fija"],
+      // Columna S “COMISION COMPARADOR”
+      comisionComparador: ["comision comparador", "comisión comparador", "comision €/kwh comparador", "comisión €/kwh comparador"],
     };
 
-    // Agrupar por tarifa-base (SEPARANDO POR ANEXO)
-    const group: Record<Key, { base: any; tramos: any[]; _stats: { rows: number } }> = {};
     const summary = {
       rowsRead: rows.length,
-      offersGrouped: 0,
-      tramosBuilt: 0,
-      skipped: { noCompaniaNombre: 0, noSubtipo: 0 },
+      ofertasToque: 0,
+      tramosInsertados: 0,
+      tramosDuplicadosSaltados: 0,
+      saltadosSinClave: 0,
+      saltadosSinConsumo: 0,
     };
 
+    // Sin agrupaciones: para cada fila, upsert de la OfertaTarifa (clave por compania+subtipo+NOMBRE) y create del tramo.
     for (const r of rows) {
       const tipo = (tipoGlobal || "LUZ").toUpperCase();
-      const subtipo = (subtipoGlobal || String(pick(r, LABELS.tarifa, "2.0TD"))).toUpperCase();
-
+      const subtipo = (subtipoGlobal || String(pick(r, LABELS.subtipo, "2.0TD"))).toUpperCase();
       const compania = String(pick(r, LABELS.compania, "") ?? "").trim();
-      const nombre = String(pick(r, LABELS.nombre, "") ?? "").trim();
-      if (!compania || !nombre) { summary.skipped.noCompaniaNombre++; continue; }
+      const anexoNombre = String(pick(r, LABELS.anexoNombre, "") ?? "").trim();
+      if (!compania || !anexoNombre) { summary.saltadosSinClave++; continue; }
 
-      const anexoRaw = pick(r, LABELS.anexo, null);
-      const anexoPrecio = (anexoRaw === null || anexoRaw === undefined || anexoRaw === "")
-        ? null
-        : String(anexoRaw).trim();
-
-      // ENERGÍA
+      // Energía
       const p1 = toNum(pick(r, LABELS.p1));
       const p2 = toNum(pick(r, LABELS.p2));
       const p3 = toNum(pick(r, LABELS.p3));
@@ -137,165 +137,97 @@ export async function POST(req: Request) {
       const p5 = toNum(pick(r, LABELS.p5));
       const p6 = toNum(pick(r, LABELS.p6));
 
-      // POTENCIA
-      const pot1 = toNum(pick(r, LABELS.pot1));
-      const pot2 = toNum(pick(r, LABELS.pot2));
-      const pot3 = toNum(pick(r, LABELS.pot3));
-      const pot4 = toNum(pick(r, LABELS.pot4));
-      const pot5 = toNum(pick(r, LABELS.pot5));
-      const pot6 = toNum(pick(r, LABELS.pot6));
+      // Consumo (rango)
+      const consumoTxt = pick(r, LABELS.consumoRango, null);
+      const rango = parseRangeToInts(consumoTxt);
+      if (!rango) { summary.saltadosSinConsumo++; continue; }
+      const [desde, hasta] = rango;
 
-      // COMISIÓN BASE = COMISION COMPARADOR
-      const comisionKwhAdminBase = toNum(pick(r, LABELS.comBase));
-      const comisionMia = toNum(pick(r, LABELS.comMia)); // opcional para payload
+      // Comisión por tramo = COMISION COMPARADOR
+      const comTramo = toNum(pick(r, LABELS.comisionComparador));
+      // Etiqueta de potencia (columna F) → guardamos literal en 'notas'
+      const potenciaEtiqueta = pick(r, LABELS.potenciaEtiqueta, null);
+      const notas = potenciaEtiqueta ? `POTENCIA: ${String(potenciaEtiqueta).trim()}` : null;
 
-      const k: Key = JSON.stringify([tipo, subtipo, compania, nombre, anexoPrecio ?? null]);
-
-      if (!group[k]) {
-        group[k] = {
-          base: {
-            tipo, subtipo, compania, nombre,
-            anexoPrecio: anexoPrecio,
-            descripcion: null, descripcionCorta: null,
-            activa: true, destacada: false,
-            // ENERGÍA
-            precioKwhP1: p1, precioKwhP2: p2, precioKwhP3: p3,
-            precioKwhP4: p4, precioKwhP5: p5, precioKwhP6: p6,
-            // POTENCIA
-            precioPotenciaP1: pot1, precioPotenciaP2: pot2, precioPotenciaP3: pot3,
-            precioPotenciaP4: pot4, precioPotenciaP5: pot5, precioPotenciaP6: pot6,
-            // COMISIÓN BASE (comparador)
-            comisionKwhAdminBase,
-            // Guarda MIA en payload para auditoría si venía
-            payload: comisionMia != null ? { comisionMia } : null,
-          },
-          tramos: [],
-          _stats: { rows: 0 },
-        };
-        summary.offersGrouped++;
-      }
-      group[k]._stats.rows++;
-
-      // tramo: consumo mensual → anual
-      const consumoMes   = toNum(pick(r, LABELS.consumo));
-      const comTramoKwh  = toNum(pick(r, LABELS.comTramoKwh));
-      const comTramoFija = toNum(pick(r, LABELS.comTramoFija));
-
-      if (consumoMes !== null || comTramoKwh !== null || comTramoFija !== null) {
-        const desdeAnual = consumoMes !== null ? Math.round(consumoMes * 12) : 0;
-        group[k].tramos.push({
-          consumoDesdeKWh: desdeAnual,
-          consumoHastaKWh: null, // se rellena al ordenar
-          comisionKwhAdmin: comTramoKwh,   // €/kWh (si existe por tramo)
-          comisionFijaAdmin: comTramoFija, // € (si existe por tramo)
-          activo: true,
-          notas: null,
-        });
-      }
-    }
-
-    // Dedupe por consumoDesde dentro de CADA (compañía/nombre/anexo)
-    for (const g of Object.values(group)) {
-      const byDesde = new Map<number, any>();
-      for (const t of g.tramos) {
-        const d = t.consumoDesdeKWh ?? 0;
-        if (!byDesde.has(d)) byDesde.set(d, { ...t });
-        else {
-          const prev = byDesde.get(d);
-          byDesde.set(d, {
-            ...prev,
-            comisionKwhAdmin: t.comisionKwhAdmin ?? prev.comisionKwhAdmin,
-            comisionFijaAdmin: t.comisionFijaAdmin ?? prev.comisionFijaAdmin,
-          });
-        }
-      }
-      g.tramos = [...byDesde.values()];
-    }
-
-    // Ordenar y cerrar rangos [desde, hasta)
-    for (const g of Object.values(group)) {
-      g.tramos.sort((a, b) => (a.consumoDesdeKWh ?? 0) - (b.consumoDesdeKWh ?? 0));
-      for (let i = 0; i < g.tramos.length; i++) {
-        g.tramos[i].consumoHastaKWh =
-          i < g.tramos.length - 1 ? g.tramos[i + 1].consumoDesdeKWh : null;
-      }
-    }
-
-    // Dedupe (desde,hasta)
-    for (const g of Object.values(group)) {
-      const seen = new Set<string>();
-      g.tramos = g.tramos.filter((t) => {
-        const kk = `${t.consumoDesdeKWh}-${t.consumoHastaKWh ?? "inf"}`;
-        if (seen.has(kk)) return false;
-        seen.add(kk);
-        return true;
-      });
-      summary.tramosBuilt += g.tramos.length;
-    }
-
-    // === Guardar en BD (sin transacciones largas) ===
-    const resultados: any[] = [];
-    let totalTramos = 0;
-
-    for (const g of Object.values(group)) {
-      // buscar existente por clave (incluye anexoPrecio)
+      // Upsert de la Tarifa (clave por tipo, subtipo, compañia, nombre, anexoPrecio)
+      // Como “clave es el anexo de precios”, usaremos anexoPrecio = anexoNombre y también nombre = anexoNombre
       const existing = await prisma.ofertaTarifa.findFirst({
         where: {
-          tipo: g.base.tipo as any,
-          subtipo: g.base.subtipo,
-          compania: g.base.compania,
-          nombre: g.base.nombre,
-          anexoPrecio: g.base.anexoPrecio ?? null,
+          tipo: tipo as any,
+          subtipo,
+          compania,
+          nombre: anexoNombre,
+          anexoPrecio: anexoNombre,
         },
       });
 
-      let row;
+      let oferta;
       if (existing) {
-        row = await prisma.ofertaTarifa.update({
+        oferta = await prisma.ofertaTarifa.update({
           where: { id: existing.id },
           data: {
-            descripcion: g.base.descripcion,
             activa: true,
-            // ENERGÍA
-            precioKwhP1: g.base.precioKwhP1,
-            precioKwhP2: g.base.precioKwhP2,
-            precioKwhP3: g.base.precioKwhP3,
-            precioKwhP4: g.base.precioKwhP4,
-            precioKwhP5: g.base.precioKwhP5,
-            precioKwhP6: g.base.precioKwhP6,
-            // POTENCIA
-            precioPotenciaP1: g.base.precioPotenciaP1,
-            precioPotenciaP2: g.base.precioPotenciaP2,
-            precioPotenciaP3: g.base.precioPotenciaP3,
-            precioPotenciaP4: g.base.precioPotenciaP4,
-            precioPotenciaP5: g.base.precioPotenciaP5,
-            precioPotenciaP6: g.base.precioPotenciaP6,
-            // COMISIÓN BASE (comparador)
-            comisionKwhAdminBase: g.base.comisionKwhAdminBase,
-            payload: g.base.payload,
+            // energía (si cambian en nuevas filas, las vamos refrescando)
+            precioKwhP1: p1 ?? existing.precioKwhP1,
+            precioKwhP2: p2 ?? existing.precioKwhP2,
+            precioKwhP3: p3 ?? existing.precioKwhP3,
+            precioKwhP4: p4 ?? existing.precioKwhP4,
+            precioKwhP5: p5 ?? existing.precioKwhP5,
+            precioKwhP6: p6 ?? existing.precioKwhP6,
+            // comisión base sin usar (porque trabajamos por tramos)
+            comisionKwhAdminBase: null,
           },
         });
       } else {
-        row = await prisma.ofertaTarifa.create({ data: { ...g.base } });
-      }
-
-      // borrar tramos previos y crear nuevos
-      await prisma.ofertaTarifaTramo.deleteMany({ where: { ofertaTarifaId: row.id } });
-      if (g.tramos.length) {
-        await prisma.ofertaTarifaTramo.createMany({
-          data: g.tramos.map((t) => ({ ...t, ofertaTarifaId: row.id })),
-          skipDuplicates: true,
+        oferta = await prisma.ofertaTarifa.create({
+          data: {
+            tipo: tipo as any,
+            subtipo,
+            compania,
+            nombre: anexoNombre,
+            anexoPrecio: anexoNombre,            // <- clave anexo
+            descripcion: null,
+            descripcionCorta: null,
+            activa: true,
+            destacada: false,
+            // energía
+            precioKwhP1: p1, precioKwhP2: p2, precioKwhP3: p3,
+            precioKwhP4: p4, precioKwhP5: p5, precioKwhP6: p6,
+            // comisión base (no se usa)
+            comisionKwhAdminBase: null,
+            payload: null,
+          },
         });
-        totalTramos += g.tramos.length;
       }
+      summary.ofertasToque++;
 
-      resultados.push(row);
+      // Crear tramo para esta fila (sin borrar previos). Evitamos duplicados con UNIQUE + skipDuplicates.
+      try {
+        await prisma.ofertaTarifaTramo.create({
+          data: {
+            ofertaTarifaId: oferta.id,
+            consumoDesdeKWh: desde,
+            consumoHastaKWh: hasta,
+            comisionKwhAdmin: comTramo,   // €/kWh del COMPARADOR (columna S)
+            comisionFijaAdmin: null,
+            activo: true,
+            notas,
+          },
+        });
+        summary.tramosInsertados++;
+      } catch (e: any) {
+        // Si choca UNIQUE (mismo [desde,hasta] ya creado en import anterior), lo contamos como duplicado y seguimos
+        if (String(e?.code) === "P2002" || /Unique constraint/i.test(String(e?.message))) {
+          summary.tramosDuplicadosSaltados++;
+        } else {
+          throw e;
+        }
+      }
     }
 
     return NextResponse.json({
       ok: true,
-      ofertas: resultados.length,
-      tramos: totalTramos,
+      message: "Importación completada",
       summary,
     });
   } catch (err: any) {
