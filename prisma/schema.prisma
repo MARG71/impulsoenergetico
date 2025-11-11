@@ -314,6 +314,10 @@ model OfertaTarifa {
   compania         String
   anexoPrecio      String? // nombre/código del anexo de precios (si viene)
   nombre           String // nombre comercial de la tarifa en el Excel
+  
+  ref              String?                    // referencia interna de tu Excel (si existe)
+  ultimaActualizacion DateTime?               // fecha/hora del anexo precios (si existe)
+
   descripcion      String? // descripción de la oferta (del Excel)
   descripcionCorta String?
   activa           Boolean    @default(true)
