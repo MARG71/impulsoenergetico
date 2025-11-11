@@ -217,9 +217,6 @@ function ImportadorTarifas() {
       </div>
     </div>
   );
-}
-
-
 
   return (
     <div className="bg-white p-4 rounded-xl shadow text-black space-y-3">
