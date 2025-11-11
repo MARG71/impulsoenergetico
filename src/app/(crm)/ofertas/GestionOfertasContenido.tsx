@@ -123,10 +123,7 @@ function ImportadorTarifas() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setMsg('Selecciona un Excel');
-      return;
-    }
+    if (!file) { setMsg('Selecciona un Excel'); return; }
 
     setLoading(true);
     setMsg('Leyendo Excel…');
@@ -138,11 +135,7 @@ function ImportadorTarifas() {
       const wb = XLSX.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw: any[] = XLSX.utils.sheet_to_json(ws, { defval: null });
-      if (!raw.length) {
-        setMsg('El Excel está vacío');
-        setLoading(false);
-        return;
-      }
+      if (!raw.length) { setMsg('El Excel está vacío'); setLoading(false); return; }
 
       const rows = raw.map((r: any) => {
         const n: any = {};
@@ -220,8 +213,7 @@ function ImportadorTarifas() {
         </div>
       )}
       <div className="text-xs text-gray-600">
-        Cabeceras soportadas: <code>compañia</code>, <code>nombre (anexo)</code>, <code>tarifa/subtipo</code>, <code>potencia</code>,{' '}
-        <code>consumo</code>, precios <code>P1..P6</code>, y <code>COMISION COMPARADOR</code>.
+        Cabeceras soportadas: <code>compañia</code>, <code>nombre (anexo)</code>, <code>tarifa/subtipo</code>, <code>potencia</code>, <code>consumo</code>, precios <code>P1..P6</code>, y <code>COMISION COMPARADOR</code>.
       </div>
     </div>
   );
