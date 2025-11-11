@@ -132,8 +132,7 @@ function ImportadorTarifas() {
   const normKey = (s: any) =>
     String(s || '')
       .replace(/\u00A0/g, ' ')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/\s+/g, ' ')
       .trim()
@@ -181,7 +180,7 @@ function ImportadorTarifas() {
         });
         if (!res.ok) {
           const t = await res.text();
-          throw new Error(t || `Fallo en chunk ${i / CHUNK + 1}`);
+          throw new Error(t || `Fallo en bloque ${i / CHUNK + 1}`);
         }
         setProgress({ done: Math.min(i / CHUNK + 1, total), total });
         setMsg(`Importando… ${Math.min(i / CHUNK + 1, total)} / ${total}`);
@@ -225,49 +224,14 @@ function ImportadorTarifas() {
       {msg && <div className="text-sm text-gray-700">{msg}</div>}
       {progress.total > 0 && (
         <div className="text-xs text-gray-600">
-          Progreso: {progress.done} / {progress.total} chunks
+          Progreso: {progress.done} / {progress.total} bloques
           <div className="h-2 bg-gray-200 rounded mt-1 overflow-hidden">
             <div className="h-2" style={{ width: `${(progress.done / progress.total) * 100}%`, backgroundColor: '#16a34a' }} />
           </div>
         </div>
       )}
       <div className="text-xs text-gray-600">
-        Cabeceras soportadas: <code>compañia</code>, <code>nombre (anexo)</code>, <code>tarifa/subtipo</code>, <code>potencia</code>, <code>consumo</code>, precios <code>P1..P6</code>, y <code>COMISION COMPARADOR</code>.
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="bg-white p-4 rounded-xl shadow text-black space-y-3">
-      <h3 className="text-lg font-bold">Catálogo de Tarifas • Importar Excel</h3>
-      <form onSubmit={submit} className="flex flex-col md:flex-row gap-3 items-start">
-        <select value={tipo} onChange={e=>setTipo(e.target.value as any)} className="border rounded p-2">
-          <option value="LUZ">Luz</option>
-          <option value="GAS">Gas</option>
-          <option value="TELEFONIA">Telefonía</option>
-        </select>
-        <input
-          className="border rounded p-2"
-          placeholder="Subtipo (2.0TD, 3.0TD, 6.1TD...)"
-          value={subtipo}
-          onChange={e=>setSubtipo(e.target.value)}
-        />
-        <input type="file" accept=".xlsx,.xls" onChange={e=>setFile(e.target.files?.[0] || null)} />
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={replace} onChange={e=>setReplace(e.target.checked)} />
-          Reemplazar subtipo
-        </label>
-
-        {/* 👇 CAMBIO 2: añadir type="submit" */}
-        <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
-          <Upload className="w-4 h-4" /> {loading ? 'Importando…' : 'Importar'}
-        </Button>
-
-
-      </form>
-      {msg && <div className="text-sm text-gray-700">{msg}</div>}
-      <div className="text-xs text-gray-600">
-        Cabeceras soportadas: <code>tipo</code>, <code>subtipo</code>, <code>compania</code>, <code>anexo</code>, <code>nombre</code>, <code>descripcion</code>, <code>precio_kwh_p1..p6</code>, <code>comision_kwh_admin_base</code>, tramos: <code>consumo_desde_kwh</code>/<code>_mensual</code>, <code>consumo_hasta_kwh</code>/<code>_mensual</code>, <code>comision_kwh_admin_tramo</code>, <code>comision_fija_admin</code>, reparto: <code>pct_cliente</code>, <code>pct_lugar</code>, <code>pct_agente</code>.
+        Cabeceras soportadas: <code>compañia</code>, <code>nombre (anexo)</code>, <code>tarifa/subtipo</code>, <code>potencia</code>, <code>consumo</code>, precios <code>P1..P6</code> y <code>COMISION COMPARADOR</code>.
       </div>
     </div>
   );
