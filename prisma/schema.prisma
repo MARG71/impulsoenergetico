@@ -307,31 +307,32 @@ enum TipoOferta {
   TELEFONIA
 }
 
+enum TipoCliente {
+  RESIDENCIAL
+  PYME
+}
+
 model OfertaTarifa {
-  id               Int        @id @default(autoincrement())
-  tipo             TipoOferta // LUZ | GAS | TELEFONIA
-  subtipo          String // p.ej. '2.0TD' | '3.0TD' | '6.1TD'
+  id               Int         @id @default(autoincrement())
+  tipo             TipoOferta
+  subtipo          String
   compania         String
-  anexoPrecio      String? // nombre/código del anexo de precios (si viene)
-  nombre           String // nombre comercial de la tarifa en el Excel
-  
-  ref              String?                    // referencia interna de tu Excel (si existe)
-  ultimaActualizacion DateTime?               // fecha/hora del anexo precios (si existe)
-
-  descripcion      String? // descripción de la oferta (del Excel)
+  anexoPrecio      String?
+  nombre           String
+  descripcion      String?
   descripcionCorta String?
-  activa           Boolean    @default(true)
-  destacada        Boolean    @default(false)
+  activa           Boolean     @default(true)
+  destacada        Boolean     @default(false)
 
-  // PRECIOS ENERGÍA (€/kWh) por periodo. Para 2.0TD deja P4..P6 a 0
-  precioKwhP1 Decimal? @db.Decimal(10, 6)
-  precioKwhP2 Decimal? @db.Decimal(10, 6)
-  precioKwhP3 Decimal? @db.Decimal(10, 6)
-  precioKwhP4 Decimal? @db.Decimal(10, 6)
-  precioKwhP5 Decimal? @db.Decimal(10, 6)
-  precioKwhP6 Decimal? @db.Decimal(10, 6)
+  // ENERGÍA (€/kWh)
+  precioKwhP1      Decimal? @db.Decimal(10, 6)
+  precioKwhP2      Decimal? @db.Decimal(10, 6)
+  precioKwhP3      Decimal? @db.Decimal(10, 6)
+  precioKwhP4      Decimal? @db.Decimal(10, 6)
+  precioKwhP5      Decimal? @db.Decimal(10, 6)
+  precioKwhP6      Decimal? @db.Decimal(10, 6)
 
-   // 🔥 POTENCIA (€/kW·año) — NUEVO
+  // POTENCIA (€/kW·año)
   precioPotenciaP1 Decimal? @db.Decimal(10, 6)
   precioPotenciaP2 Decimal? @db.Decimal(10, 6)
   precioPotenciaP3 Decimal? @db.Decimal(10, 6)
@@ -339,23 +340,24 @@ model OfertaTarifa {
   precioPotenciaP5 Decimal? @db.Decimal(10, 6)
   precioPotenciaP6 Decimal? @db.Decimal(10, 6)
 
-  // Comisión base (€/kWh) cuando no encaja ningún tramo
   comisionKwhAdminBase Decimal? @db.Decimal(10, 6)
+  payload           Json?
 
-  // Extras (condiciones, URLs, etc.)
-  payload Json?
+  // 🔹 NUEVOS
+  referencia       String?           // columna "Ref." del Excel
+  tipoCliente      TipoCliente?      // "RESIDENCIAL" o "PYME"
 
-  // Relaciones
-  tramos  OfertaTarifaTramo[]
-  ofertas Oferta[]            @relation("TarifaAOferta") // 👈 back-rel a Oferta
+  tramos           OfertaTarifaTramo[]
+  ofertas          Oferta[]         @relation("TarifaAOferta")
 
-  creadaEn      DateTime @default(now())
-  actualizadaEn DateTime @updatedAt
+  creadaEn         DateTime @default(now())
+  actualizadaEn    DateTime @updatedAt
 
   @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
   @@index([tipo, subtipo, compania])
   @@index([tipo, subtipo, anexoPrecio])
 }
+
 
 model OfertaTarifaTramo {
   id             Int @id @default(autoincrement())

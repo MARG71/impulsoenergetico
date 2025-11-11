@@ -25,7 +25,7 @@ function toNum(v: any) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
-/** Convierte "0-2000" / "0 – 2.000" / "0 a 2000" a [0,2000]. Si no hay “hasta”, devuelve [desde,null] */
+/** "0-2000" | "0 – 2.000" | "0 a 2000" | "2000>" => [desde, hasta|null] */
 function parseRangeToInts(s: any): [number, number | null] | null {
   if (!s && s !== 0) return null;
   const txt = String(s).replace(/\./g, "").replace(",", ".").toLowerCase().trim();
@@ -38,16 +38,17 @@ function parseRangeToInts(s: any): [number, number | null] | null {
   return [desde, hasta];
 }
 
-/* Mapeo de cabeceras (tus nombres habituales) ----------------- */
+/* Mapeo de cabeceras (nombres habituales de tu Excel) --------- */
 const L = {
   compania: ["compañia", "compania"],
-  nombreAnexo: ["nombre", "anexo", "anexo precio", "epigrafe", "epígrafe"],
+  nombreAnexo: ["nombre", "nombre anexo", "anexo", "anexo precio", "epigrafe", "epígrafe"],
   subtipo: ["tarifa", "subtipo"],
 
-  /** NUEVO: ref y última actualización */
-  ref: ["ref", "referencia", "referencia anexo"],
-  ultimaAct: ["ultima actualización", "última actualización", "fecha actualización", "actualizacion"],
-
+  // NUEVOS METADATOS
+  referencia: ["ref", "referencia", "ref.", "referencia anexo"],
+  tipoCliente: ["tipo", "segmento", "cliente"], // RESIDENCIAL / PYME
+  // si en algún Excel aparece la fecha, la ignoramos a BD (usaremos actualizadaEn) pero la admitimos por si se quiere guardar en payload
+  ultimaAct: ["ultima actualización", "última actualización", "actualizacion", "fecha actualización"],
 
   // POTENCIA €/kW·año (P.P.1..P.P.6)
   pp1: ["p.p.1 (€/kw/año)", "pp1", "potencia p1"],
@@ -65,7 +66,7 @@ const L = {
   pc5: ["p.c.5 (€/kwh)", "pc5", "precio p5", "p5"],
   pc6: ["p.c.6 (€/kwh)", "pc6", "precio p6", "p6"],
 
-  // Rango de consumo y etiqueta textual de potencia
+  // Rango de consumo y etiqueta textual de potencia (para notas del tramo)
   consumoRango: ["consumo", "rango consumo"],
   potenciaEtiqueta: ["potencia"],
 
@@ -86,9 +87,9 @@ export const runtime = "nodejs";
  * {
  *   tipo: "LUZ"|"GAS"|"TELEFONIA",
  *   subtipo: "2.0TD" | "3.0TD" | "6.1TD",
- *   replace: boolean,          // si true y firstChunk => borra el subtipo antes de importar
- *   firstChunk: boolean,       // primer bloque
- *   rows: Array<object>        // filas normalizadas por el cliente
+ *   replace: boolean,
+ *   firstChunk: boolean,
+ *   rows: Array<object> // filas normalizadas por el cliente
  * }
  */
 export async function POST(req: Request) {
@@ -104,14 +105,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, summary: { rows: 0 } });
     }
 
-    // Si es el primer chunk y hay replace => limpiar previamente ese subtipo
+    // Si es el primer chunk y se pide replace => limpiar ese subtipo
     if (firstChunk && replace) {
       await prisma.ofertaTarifa.deleteMany({
         where: { tipo: tipoGlobal as any, subtipo: subtipoGlobal },
       });
     }
 
-    // Cada fila => upsert de la tarifa (anexo) + create del tramo
+    // Stats
     let ofertasToque = 0;
     let tramosInsertados = 0;
     let tramosDuplicados = 0;
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
     let saltadosSinConsumo = 0;
 
     for (const r0 of rawRows) {
-      // el cliente ya normalizó keys con normKey; por si acaso:
+      // normaliza keys por si acaso
       const r: Record<string, any> = {};
       for (const [k, v] of Object.entries(r0)) r[normKey(k)] = v;
 
@@ -127,17 +128,22 @@ export async function POST(req: Request) {
       const subtipo = subtipoGlobal || String(pick(r, L.subtipo, "2.0TD")).toUpperCase();
       const compania = String(pick(r, L.compania, "") ?? "").trim();
       const nombreAnexo = String(pick(r, L.nombreAnexo, "") ?? "").trim();
+      if (!compania || !nombreAnexo) { saltadosSinClave++; continue; }
 
-      const ref = String(pick(r, L.ref, "") ?? "").trim();
+      // referencia y tipo cliente
+      const referencia = String(pick(r, L.referencia, "") ?? "").trim() || null;
+      const tipoClienteTxt = String(pick(r, L.tipoCliente, "") ?? "").trim().toUpperCase();
+      const tipoCliente = tipoClienteTxt.includes("PYME")
+        ? "PYME"
+        : (tipoClienteTxt.includes("RES") || tipoClienteTxt.includes("HOGAR") ? "RESIDENCIAL" : null);
+
+      // Si viniera fecha en Excel, la guardamos en payload; la "última actualización" real será actualizadaEn
       const ultimaActRaw = pick(r, L.ultimaAct, null);
-      let ultimaActualizacion: Date | null = null;
+      let ultimaActISO: string | null = null;
       if (ultimaActRaw) {
         const t = new Date(ultimaActRaw);
-        if (!isNaN(t.getTime())) ultimaActualizacion = t;
+        if (!isNaN(t.getTime())) ultimaActISO = t.toISOString();
       }
-
-
-      if (!compania || !nombreAnexo) { saltadosSinClave++; continue; }
 
       // POTENCIA €/kW·año
       const pp1 = toNum(pick(r, L.pp1)); const pp2 = toNum(pick(r, L.pp2));
@@ -161,49 +167,74 @@ export async function POST(req: Request) {
       const potEtiqueta = pick(r, L.potenciaEtiqueta, null);
       const notas = potEtiqueta ? `POTENCIA: ${String(potEtiqueta).trim()}` : null;
 
-      // Upsert tarifa (clave: tipo+subtipo+compañía+nombre+anexoPrecio)
+      // Buscar si existe la tarifa (clave: tipo+subtipo+compañia+nombre+anexoPrecio)
       const existing = await prisma.ofertaTarifa.findFirst({
         where: { tipo: tipo as any, subtipo, compania, nombre: nombreAnexo, anexoPrecio: nombreAnexo },
-        select: { id: true },
+        select: {
+          id: true,
+          // para conservar valores si vienen vacíos en el Excel
+          precioKwhP1: true, precioKwhP2: true, precioKwhP3: true,
+          precioKwhP4: true, precioKwhP5: true, precioKwhP6: true,
+          precioPotenciaP1: true, precioPotenciaP2: true, precioPotenciaP3: true,
+          precioPotenciaP4: true, precioPotenciaP5: true, precioPotenciaP6: true,
+        },
       });
 
-      const baseData = {
+      const energyData = {
+        precioKwhP1: pc1, precioKwhP2: pc2, precioKwhP3: pc3,
+        precioKwhP4: pc4, precioKwhP5: pc5, precioKwhP6: pc6,
+      };
+      const powerData = {
+        precioPotenciaP1: pp1, precioPotenciaP2: pp2, precioPotenciaP3: pp3,
+        precioPotenciaP4: pp4, precioPotenciaP5: pp5, precioPotenciaP6: pp6,
+      };
+
+      const baseCommon = {
         tipo: tipo as any,
         subtipo,
         compania,
         nombre: nombreAnexo,
         anexoPrecio: nombreAnexo,
-        
-        /** NUEVO */
-        ref: ref || null,
-        ultimaActualizacion,
-
+        referencia,                          // 👈 schema: OfertaTarifa.referencia
+        tipoCliente: tipoCliente as any,      // 👈 schema: enum TipoCliente
         activa: true,
         destacada: false,
-
-        // Energía
-        precioKwhP1: pc1, precioKwhP2: pc2, precioKwhP3: pc3,
-        precioKwhP4: pc4, precioKwhP5: pc5, precioKwhP6: pc6,
-
-        // Potencia
-        precioPotenciaP1: pp1, precioPotenciaP2: pp2, precioPotenciaP3: pp3,
-        precioPotenciaP4: pp4, precioPotenciaP5: pp5, precioPotenciaP6: pp6,
-
-        // Comisión base no usada (trabajamos por tramos)
         comisionKwhAdminBase: null,
+        // Guardamos fecha de Excel (si llega) dentro de payload sin pisar otros datos
+        payload: ultimaActISO ? { ultimaActualizacionExcel: ultimaActISO } : undefined,
       };
 
       let ofertaId: number;
       if (existing) {
+        // merge: si en el Excel viene null, conservo el valor previo
         const up = await prisma.ofertaTarifa.update({
           where: { id: existing.id },
-          data: baseData,
+          data: {
+            ...baseCommon,
+            precioKwhP1: energyData.precioKwhP1 ?? (existing as any).precioKwhP1,
+            precioKwhP2: energyData.precioKwhP2 ?? (existing as any).precioKwhP2,
+            precioKwhP3: energyData.precioKwhP3 ?? (existing as any).precioKwhP3,
+            precioKwhP4: energyData.precioKwhP4 ?? (existing as any).precioKwhP4,
+            precioKwhP5: energyData.precioKwhP5 ?? (existing as any).precioKwhP5,
+            precioKwhP6: energyData.precioKwhP6 ?? (existing as any).precioKwhP6,
+
+            precioPotenciaP1: powerData.precioPotenciaP1 ?? (existing as any).precioPotenciaP1,
+            precioPotenciaP2: powerData.precioPotenciaP2 ?? (existing as any).precioPotenciaP2,
+            precioPotenciaP3: powerData.precioPotenciaP3 ?? (existing as any).precioPotenciaP3,
+            precioPotenciaP4: powerData.precioPotenciaP4 ?? (existing as any).precioPotenciaP4,
+            precioPotenciaP5: powerData.precioPotenciaP5 ?? (existing as any).precioPotenciaP5,
+            precioPotenciaP6: powerData.precioPotenciaP6 ?? (existing as any).precioPotenciaP6,
+          },
           select: { id: true },
         });
         ofertaId = up.id;
       } else {
         const cr = await prisma.ofertaTarifa.create({
-          data: baseData,
+          data: {
+            ...baseCommon,
+            ...energyData,
+            ...powerData,
+          },
           select: { id: true },
         });
         ofertaId = cr.id;
@@ -225,7 +256,6 @@ export async function POST(req: Request) {
         });
         tramosInsertados++;
       } catch (e: any) {
-        // P2002 => unique violation
         if (String(e?.code) === "P2002" || /Unique constraint/i.test(String(e?.message))) {
           tramosDuplicados++;
         } else {

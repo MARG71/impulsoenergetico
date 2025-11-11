@@ -68,19 +68,30 @@ type OfertaTarifa = {
   compania: string
   nombre: string
 
-  ref?: string | null
-  ultimaActualizacion?: string | Date | null
+  referencia?: string | null          // NUEVO
+  tipoCliente?: 'RESIDENCIAL'|'PYME' | null // NUEVO
 
   activa: boolean
   destacada?: boolean
+
   precioKwhP1?: number | string | null
   precioKwhP2?: number | string | null
   precioKwhP3?: number | string | null
   precioKwhP4?: number | string | null
   precioKwhP5?: number | string | null
   precioKwhP6?: number | string | null
+
+    // potencia
+  precioPotenciaP1?: number | string | null
+  precioPotenciaP2?: number | string | null
+  precioPotenciaP3?: number | string | null
+  precioPotenciaP4?: number | string | null
+  precioPotenciaP5?: number | string | null
+  precioPotenciaP6?: number | string | null
+
   comisionKwhAdminBase?: number | string | null
   tramos?: Tramo[]
+  actualizadaEn?: string              // viene como ISO
 }
 
 /* =========================
@@ -101,6 +112,10 @@ const obtenerIcono = (tipo: string) =>
   tipo === 'luz' ? <Sparkles className="w-4 h-4 inline mr-1" /> :
   tipo === 'gas' ? <Flame className="w-4 h-4 inline mr-1" /> :
   <Phone className="w-4 h-4 inline mr-1" />
+
+const rowClassByTipoCliente = (t?: 'RESIDENCIAL'|'PYME'|null) =>
+  t === 'PYME' ? 'bg-orange-50' : t === 'RESIDENCIAL' ? 'bg-green-50' : '';
+
 
 /* =========================
    Importador Excel (solo ADMIN)
@@ -382,11 +397,11 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.id} className="border-b">
-                <td className="p-2">{r.ref || '-'}</td>
+              <tr key={r.id} className={`border-b ${rowClassByTipoCliente(r.tipoCliente || null)}`}>
+                <td className="p-2">{r.referencia || '—'}</td>
                 <td className="p-2">{r.compania}</td>
                 <td className="p-2">{r.nombre}</td>
-                <td className="p-2 text-center">{r.tipo}</td>
+                <td className="p-2 text-center">{r.tipoCliente || '—'}</td> {/* si prefieres aquí el cliente y mover el tipo LUZ/GAS a otra col. */}
                 <td className="p-2 text-center">{r.subtipo}</td>
                 <td className="p-2 text-right">{fmt(r.precioKwhP1)}</td>
                 <td className="p-2 text-right">{fmt(r.precioKwhP2)}</td>
@@ -397,8 +412,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
                 <td className="p-2 text-right">{fmt(r.comisionKwhAdminBase)}</td>
                 <td className="p-2 text-right">{r.tramos?.length ?? 0}</td>
                 <td className="p-2">
-                  {r.ultimaActualizacion ? new Date(r.ultimaActualizacion as any).toLocaleDateString('es-ES') : '—'}
-                </td>
+                  {r.actualizadaEn ? new Date(r.actualizadaEn).toLocaleDateString('es-ES') : '—'}
                 <td className="p-2">
                   <div className="flex gap-2 justify-end">
                     <Button
@@ -447,6 +461,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
           <div className="space-y-3">
             <div className="text-sm text-gray-700">
               <div><strong>Tipo/Subtipo:</strong> {sel.tipo} / {sel.subtipo}</div>
+              <div><strong>Precios potencia:</strong> P1 {fmt(sel.precioPotenciaP1)} · P2 {fmt(sel.precioPotenciaP2)} · P3 {fmt(sel.precioPotenciaP3)} · P4 {fmt(sel.precioPotenciaP4)} · P5 {fmt(sel.precioPotenciaP5)} · P6 {fmt(sel.precioPotenciaP6)}</div>
               <div><strong>Precios energía:</strong> P1 {fmt(sel.precioKwhP1)} · P2 {fmt(sel.precioKwhP2)} · P3 {fmt(sel.precioKwhP3)} · P4 {fmt(sel.precioKwhP4)} · P5 {fmt(sel.precioKwhP5)} · P6 {fmt(sel.precioKwhP6)}</div>
             </div>
             <div className="overflow-auto border rounded-lg">
