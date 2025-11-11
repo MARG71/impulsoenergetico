@@ -44,6 +44,11 @@ const L = {
   nombreAnexo: ["nombre", "anexo", "anexo precio", "epigrafe", "epígrafe"],
   subtipo: ["tarifa", "subtipo"],
 
+  /** NUEVO: ref y última actualización */
+  ref: ["ref", "referencia", "referencia anexo"],
+  ultimaAct: ["ultima actualización", "última actualización", "fecha actualización", "actualizacion"],
+
+
   // POTENCIA €/kW·año (P.P.1..P.P.6)
   pp1: ["p.p.1 (€/kw/año)", "pp1", "potencia p1"],
   pp2: ["p.p.2 (€/kw/año)", "pp2", "potencia p2"],
@@ -122,6 +127,16 @@ export async function POST(req: Request) {
       const subtipo = subtipoGlobal || String(pick(r, L.subtipo, "2.0TD")).toUpperCase();
       const compania = String(pick(r, L.compania, "") ?? "").trim();
       const nombreAnexo = String(pick(r, L.nombreAnexo, "") ?? "").trim();
+
+      const ref = String(pick(r, L.ref, "") ?? "").trim();
+      const ultimaActRaw = pick(r, L.ultimaAct, null);
+      let ultimaActualizacion: Date | null = null;
+      if (ultimaActRaw) {
+        const t = new Date(ultimaActRaw);
+        if (!isNaN(t.getTime())) ultimaActualizacion = t;
+      }
+
+
       if (!compania || !nombreAnexo) { saltadosSinClave++; continue; }
 
       // POTENCIA €/kW·año
@@ -158,6 +173,11 @@ export async function POST(req: Request) {
         compania,
         nombre: nombreAnexo,
         anexoPrecio: nombreAnexo,
+        
+        /** NUEVO */
+        ref: ref || null,
+        ultimaActualizacion,
+
         activa: true,
         destacada: false,
 

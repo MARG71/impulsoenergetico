@@ -67,6 +67,10 @@ type OfertaTarifa = {
   subtipo: string
   compania: string
   nombre: string
+
+  ref?: string | null
+  ultimaActualizacion?: string | Date | null
+
   activa: boolean
   destacada?: boolean
   precioKwhP1?: number | string | null
@@ -359,6 +363,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
         <table className="w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
+              <th className="p-2 text-left">Ref.</th>
               <th className="p-2 text-left">Compañía</th>
               <th className="p-2 text-left">Anexo (Nombre)</th>
               <th className="p-2">Tipo</th>
@@ -372,11 +377,13 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
               <th className="p-2 text-right">Com. base €/kWh</th>
               <th className="p-2 text-right"># Tramos</th>
               <th className="p-2"></th>
+              <th className="p-2 text-left">Últ. actualización</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(r => (
               <tr key={r.id} className="border-b">
+                <td className="p-2">{r.ref || '-'}</td>
                 <td className="p-2">{r.compania}</td>
                 <td className="p-2">{r.nombre}</td>
                 <td className="p-2 text-center">{r.tipo}</td>
@@ -389,6 +396,9 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
                 <td className="p-2 text-right">{fmt(r.precioKwhP6)}</td>
                 <td className="p-2 text-right">{fmt(r.comisionKwhAdminBase)}</td>
                 <td className="p-2 text-right">{r.tramos?.length ?? 0}</td>
+                <td className="p-2">
+                  {r.ultimaActualizacion ? new Date(r.ultimaActualizacion as any).toLocaleDateString('es-ES') : '—'}
+                </td>
                 <td className="p-2">
                   <div className="flex gap-2 justify-end">
                     <Button
