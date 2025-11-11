@@ -58,6 +58,7 @@ type Tramo = {
   consumoHastaKWh: number | null
   comisionKwhAdmin: number | null
   comisionFijaAdmin: number | null
+  notas?: string | null
 }
 
 type OfertaTarifa = {
