@@ -316,6 +316,14 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
   const tramosOrdenados = (t: Tramo[] | undefined) =>
     (t || []).slice().sort((a, b) => (a.consumoDesdeKWh ?? 0) - (b.consumoDesdeKWh ?? 0));
 
+  // Color de fila por tipo de cliente; si no viene, inferir por nombre
+  const rowClassByTipoCliente = (tipoCliente: string | null | undefined, nombre: string | undefined) => {
+    const tc = (tipoCliente || '').toLowerCase();
+    const n = (nombre || '').toLowerCase();
+    const esPyme = /pyme|empresa|negocio/.test(tc) || (!tc && /pyme|empresa|negocio/.test(n));
+    return esPyme ? 'bg-orange-50' : 'bg-green-50';
+  };
+
   return (
     <div className="bg-white p-4 rounded-xl shadow text-black">
       <div className="flex flex-col md:flex-row gap-3 md:items-end md:justify-between">
@@ -355,17 +363,17 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
               <th className="p-2 text-right">P6</th>
               <th className="p-2 text-right">Com. base €/kWh</th>
               <th className="p-2 text-right"># Tramos</th>
+              <th className="p-2 text-left whitespace-nowrap">Últ. actualización</th>
               <th className="p-2"></th>
-              <th className="p-2 text-left">Últ. actualización</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
-              <tr key={r.id} className={`border-b ${rowClassByTipoCliente(r.tipoCliente || null)}`}>
-                <td className="p-2">{r.referencia || '—'}</td>
+            {rows.map((r) => (
+              <tr key={r.id} className={`border-b ${rowClassByTipoCliente((r as any).tipoCliente, r.nombre)}`}>
+                <td className="p-2">{(r as any).ref ?? '—'}</td>
                 <td className="p-2">{r.compania}</td>
                 <td className="p-2">{r.nombre}</td>
-                <td className="p-2 text-center">{r.tipoCliente || '—'}</td> {/* si prefieres aquí el cliente y mover el tipo LUZ/GAS a otra col. */}
+                <td className="p-2 text-center">{(r as any).tipoCliente ?? '—'}</td>
                 <td className="p-2 text-center">{r.subtipo}</td>
                 <td className="p-2 text-right">{fmt(r.precioKwhP1)}</td>
                 <td className="p-2 text-right">{fmt(r.precioKwhP2)}</td>
@@ -376,7 +384,10 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
                 <td className="p-2 text-right">{fmt(r.comisionKwhAdminBase)}</td>
                 <td className="p-2 text-right">{r.tramos?.length ?? 0}</td>
                 <td className="p-2">
-                  {r.actualizadaEn ? new Date(r.actualizadaEn).toLocaleDateString('es-ES') : '—'}
+                  {(r as any).ultimaActualizacion
+                    ? new Date((r as any).ultimaActualizacion as any).toLocaleDateString('es-ES')
+                    : '—'}
+                </td>
                 <td className="p-2">
                   <div className="flex gap-2 justify-end">
                     <Button
@@ -409,7 +420,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td className="p-4 text-center text-gray-500" colSpan={13}>Sin datos</td></tr>
+              <tr><td className="p-4 text-center text-gray-500" colSpan={15}>Sin datos</td></tr>
             )}
           </tbody>
         </table>
@@ -425,8 +436,8 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
           <div className="space-y-3">
             <div className="text-sm text-gray-700">
               <div><strong>Tipo/Subtipo:</strong> {sel.tipo} / {sel.subtipo}</div>
-              <div><strong>Precios potencia:</strong> P1 {fmt(sel.precioPotenciaP1)} · P2 {fmt(sel.precioPotenciaP2)} · P3 {fmt(sel.precioPotenciaP3)} · P4 {fmt(sel.precioPotenciaP4)} · P5 {fmt(sel.precioPotenciaP5)} · P6 {fmt(sel.precioPotenciaP6)}</div>
-              <div><strong>Precios energía:</strong> P1 {fmt(sel.precioKwhP1)} · P2 {fmt(sel.precioKwhP2)} · P3 {fmt(sel.precioKwhP3)} · P4 {fmt(sel.precioKwhP4)} · P5 {fmt(sel.precioKwhP5)} · P6 {fmt(sel.precioKwhP6)}</div>
+              <div><strong>Precios potencia (€/kW·año):</strong> P1 {fmt((sel as any).precioPotenciaP1)} · P2 {fmt((sel as any).precioPotenciaP2)} · P3 {fmt((sel as any).precioPotenciaP3)} · P4 {fmt((sel as any).precioPotenciaP4)} · P5 {fmt((sel as any).precioPotenciaP5)} · P6 {fmt((sel as any).precioPotenciaP6)}</div>
+              <div><strong>Precios energía (€/kWh):</strong> P1 {fmt(sel.precioKwhP1)} · P2 {fmt(sel.precioKwhP2)} · P3 {fmt(sel.precioKwhP3)} · P4 {fmt(sel.precioKwhP4)} · P5 {fmt(sel.precioKwhP5)} · P6 {fmt(sel.precioKwhP6)}</div>
             </div>
             <div className="overflow-auto border rounded-lg">
               <table className="w-full text-sm">
@@ -461,6 +472,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
     </div>
   );
 }
+
 
 
 /* =========================
