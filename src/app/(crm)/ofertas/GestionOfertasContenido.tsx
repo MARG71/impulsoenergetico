@@ -7,6 +7,38 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Sparkles, Flame, Phone, Trash2, Pencil, Upload, Download, Trash } from 'lucide-react'
 
+function SimpleModal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white text-black w-[95vw] max-w-3xl max-h-[80vh] rounded-2xl shadow-xl p-4 overflow-hidden">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-lg font-bold">{title}</h3>
+          <button
+            onClick={onClose}
+            className="px-3 py-1 rounded-md border hover:bg-gray-50"
+          >
+            Cerrar
+          </button>
+        </div>
+        <div className="mt-3 overflow-auto max-h-[65vh]">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+
 /* =========================
    Tipados
    ========================= */
@@ -166,12 +198,25 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
   const [subtipo, setSubtipo] = useState('2.0TD');
   const [loading, setLoading] = useState(false);
 
+  // Modal de tramos
+  const [openModal, setOpenModal] = useState(false);
+  const [sel, setSel] = useState<OfertaTarifa | null>(null);
+
   const load = async () => {
     setLoading(true);
     const url = `/api/ofertas-tarifa?tipo=${tipo}&subtipo=${encodeURIComponent(subtipo)}&activa=true`;
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json();
-    setRows(data.items || []);
+    const items: OfertaTarifa[] = data.items || [];
+
+    // Ordenar por compañía y luego por nombre (anexo)
+    items.sort((a, b) => {
+      const c = (a.compania || '').localeCompare(b.compania || '', 'es', { sensitivity: 'base' });
+      if (c !== 0) return c;
+      return (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
+    });
+
+    setRows(items);
     setLoading(false);
   };
 
@@ -201,16 +246,16 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
         titulo,
         descripcion,
         descripcionCorta,
-        tipo: 'luz',      // en catálogo de luz publicaríamos como 'luz'
+        tipo: 'luz',
         destacada: false,
         activa: true,
-        ofertaTarifaId: r.id, // enlace al catálogo
+        ofertaTarifaId: r.id,
       }),
     });
 
     if (res.ok) {
       alert('Publicada en Ofertas');
-      onPublicada(); // refresca las tarjetas de marketing
+      onPublicada();
     } else {
       const data = await res.json().catch(()=>({}));
       alert('Error al publicar: ' + (data?.error || res.statusText));
@@ -218,6 +263,10 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
   };
 
   const fmt = (v: any) => (v === null || v === undefined || v === '') ? '-' : String(v);
+
+  // Ordena tramos por consumo
+  const tramosOrdenados = (t: Tramo[] | undefined) =>
+    (t || []).slice().sort((a, b) => (a.consumoDesdeKWh ?? 0) - (b.consumoDesdeKWh ?? 0));
 
   return (
     <div className="bg-white p-4 rounded-xl shadow text-black">
@@ -246,7 +295,7 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
           <thead className="bg-gray-100">
             <tr>
               <th className="p-2 text-left">Compañía</th>
-              <th className="p-2 text-left">Nombre</th>
+              <th className="p-2 text-left">Anexo (Nombre)</th>
               <th className="p-2">Tipo</th>
               <th className="p-2">Subtipo</th>
               <th className="p-2 text-right">P1</th>
@@ -277,6 +326,13 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
                 <td className="p-2 text-right">{r.tramos?.length ?? 0}</td>
                 <td className="p-2">
                   <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      className="border-gray-300 hover:bg-gray-50"
+                      onClick={() => { setSel(r); setOpenModal(true); }}
+                    >
+                      Ver tramos
+                    </Button>
                     {esAdmin && (
                       <Button
                         variant="outline"
@@ -305,9 +361,53 @@ function TablaTarifas({ esAdmin, onPublicada }:{ esAdmin:boolean; onPublicada: (
           </tbody>
         </table>
       </div>
+
+      {/* Modal con los tramos de la tarifa seleccionada */}
+      <SimpleModal
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        title={sel ? `${sel.compania} · ${sel.nombre} — Tramos` : 'Tramos'}
+      >
+        {!sel ? null : (
+          <div className="space-y-3">
+            <div className="text-sm text-gray-700">
+              <div><strong>Tipo/Subtipo:</strong> {sel.tipo} / {sel.subtipo}</div>
+              <div><strong>Precios energía:</strong> P1 {fmt(sel.precioKwhP1)} · P2 {fmt(sel.precioKwhP2)} · P3 {fmt(sel.precioKwhP3)} · P4 {fmt(sel.precioKwhP4)} · P5 {fmt(sel.precioKwhP5)} · P6 {fmt(sel.precioKwhP6)}</div>
+            </div>
+            <div className="overflow-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2 text-right">Consumo desde (kWh/año)</th>
+                    <th className="p-2 text-right">Consumo hasta (kWh/año)</th>
+                    <th className="p-2 text-right">Comisión €/kWh</th>
+                    <th className="p-2 text-right">Comisión fija €</th>
+                    <th className="p-2 text-left">Notas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tramosOrdenados(sel.tramos).map(t => (
+                    <tr key={t.id} className="border-b">
+                      <td className="p-2 text-right">{t.consumoDesdeKWh}</td>
+                      <td className="p-2 text-right">{t.consumoHastaKWh ?? '—'}</td>
+                      <td className="p-2 text-right">{fmt(t.comisionKwhAdmin)}</td>
+                      <td className="p-2 text-right">{fmt(t.comisionFijaAdmin)}</td>
+                      <td className="p-2">{t.notas || '—'}</td>
+                    </tr>
+                  ))}
+                  {(!sel.tramos || sel.tramos.length === 0) && (
+                    <tr><td className="p-3 text-center text-gray-500" colSpan={5}>Sin tramos</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </SimpleModal>
     </div>
   );
 }
+
 
 /* =========================
    Página principal con pestañas

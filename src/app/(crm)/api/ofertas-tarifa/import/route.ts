@@ -2,10 +2,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
-import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60; // ⏱️ ampliar ventana de ejecución en Vercel
 
 /** Normaliza nombres de columna */
 function normKey(s: any) {
@@ -18,6 +18,7 @@ function normKey(s: any) {
     .replace(/[^\w %/().-]/g, "")
     .replace(/\s*\(([^)]*)\)/g, " ($1)");
 }
+
 function pick(r: Record<string, any>, labels: string[], def: any = null) {
   for (const lbl of labels) {
     const k = normKey(lbl);
@@ -25,14 +26,16 @@ function pick(r: Record<string, any>, labels: string[], def: any = null) {
   }
   return def;
 }
+
 function toNum(v: any) {
   if (v === null || v === undefined || v === "") return null;
   if (typeof v === "string") v = v.replace(",", ".").trim();
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+
 /** Convierte "0-2000" / "0 – 2.000" / "0 a 2000" a [0,2000]. Si no hay “hasta”, devuelve [desde, null] */
-function parseRangeToInts(s: any): [number, number|null] | null {
+function parseRangeToInts(s: any): [number, number | null] | null {
   if (!s && s !== 0) return null;
   const txt = String(s).replace(/\./g, "").replace(",", ".").toLowerCase().trim();
   // separadores típicos: "-", "–", "a", "hasta"
@@ -44,8 +47,6 @@ function parseRangeToInts(s: any): [number, number|null] | null {
   if (hasta !== null && !Number.isFinite(hasta)) return [desde, null];
   return [desde, hasta];
 }
-
-type Key = string;
 
 export async function POST(req: Request) {
   try {
@@ -113,22 +114,34 @@ export async function POST(req: Request) {
       comisionComparador: ["comision comparador", "comisión comparador", "comision €/kwh comparador", "comisión €/kwh comparador"],
     };
 
-    const summary = {
-      rowsRead: rows.length,
-      ofertasToque: 0,
-      tramosInsertados: 0,
-      tramosDuplicadosSaltados: 0,
-      saltadosSinClave: 0,
-      saltadosSinConsumo: 0,
+    // ---- Agrupar por anexo y acumular tramos (para insertar por lotes) ----
+    type Base = {
+      tipo: any; subtipo: string; compania: string; nombre: string; anexoPrecio: string;
+      descripcion: null; descripcionCorta: null; activa: true; destacada: false;
+      precioKwhP1: number | null; precioKwhP2: number | null; precioKwhP3: number | null;
+      precioKwhP4: number | null; precioKwhP5: number | null; precioKwhP6: number | null;
+      comisionKwhAdminBase: null;
+    };
+    type TramoIn = {
+      consumoDesdeKWh: number;
+      consumoHastaKWh: number | null;
+      comisionKwhAdmin: number | null;
+      comisionFijaAdmin: number | null;
+      activo: boolean;
+      notas: string | null;
     };
 
-    // Sin agrupaciones: para cada fila, upsert de la OfertaTarifa (clave por compania+subtipo+NOMBRE) y create del tramo.
+    const buckets = new Map<string, { base: Base; tramos: TramoIn[] }>();
+
+    let saltadosSinClave = 0;
+    let saltadosSinConsumo = 0;
+
     for (const r of rows) {
-      const tipo = (tipoGlobal || "LUZ").toUpperCase();
+      const tipo = (tipoGlobal || "LUZ").toUpperCase() as any;
       const subtipo = (subtipoGlobal || String(pick(r, LABELS.subtipo, "2.0TD"))).toUpperCase();
       const compania = String(pick(r, LABELS.compania, "") ?? "").trim();
       const anexoNombre = String(pick(r, LABELS.anexoNombre, "") ?? "").trim();
-      if (!compania || !anexoNombre) { summary.saltadosSinClave++; continue; }
+      if (!compania || !anexoNombre) { saltadosSinClave++; continue; }
 
       // Energía
       const p1 = toNum(pick(r, LABELS.p1));
@@ -141,87 +154,105 @@ export async function POST(req: Request) {
       // Consumo (rango)
       const consumoTxt = pick(r, LABELS.consumoRango, null);
       const rango = parseRangeToInts(consumoTxt);
-      if (!rango) { summary.saltadosSinConsumo++; continue; }
+      if (!rango) { saltadosSinConsumo++; continue; }
       const [desde, hasta] = rango;
 
       // Comisión por tramo = COMISION COMPARADOR
       const comTramo = toNum(pick(r, LABELS.comisionComparador));
+
       // Etiqueta de potencia (columna F) → guardamos literal en 'notas'
       const potenciaEtiqueta = pick(r, LABELS.potenciaEtiqueta, null);
       const notas = potenciaEtiqueta ? `POTENCIA: ${String(potenciaEtiqueta).trim()}` : null;
 
-      // Upsert de la Tarifa (clave por tipo, subtipo, compañia, nombre, anexoPrecio)
-      // Como “clave es el anexo de precios”, usaremos anexoPrecio = anexoNombre y también nombre = anexoNombre
-      const existing = await prisma.ofertaTarifa.findFirst({
-        where: {
-          tipo: tipo as any,
-          subtipo,
-          compania,
-          nombre: anexoNombre,
-          anexoPrecio: anexoNombre,
-        },
-      });
+      const key = `${tipo}|${subtipo}|${compania}|${anexoNombre}`;
 
-      let oferta;
-      if (existing) {
-        oferta = await prisma.ofertaTarifa.update({
-          where: { id: existing.id },
-          data: {
-            activa: true,
-            // energía (si cambian en nuevas filas, las vamos refrescando)
-            precioKwhP1: p1 ?? existing.precioKwhP1,
-            precioKwhP2: p2 ?? existing.precioKwhP2,
-            precioKwhP3: p3 ?? existing.precioKwhP3,
-            precioKwhP4: p4 ?? existing.precioKwhP4,
-            precioKwhP5: p5 ?? existing.precioKwhP5,
-            precioKwhP6: p6 ?? existing.precioKwhP6,
-            // comisión base sin usar (porque trabajamos por tramos)
-            comisionKwhAdminBase: null,
-          },
-        });
-      } else {
-        oferta = await prisma.ofertaTarifa.create({
-          data: {
-            tipo: tipo as any,
-            subtipo,
-            compania,
+      if (!buckets.has(key)) {
+        buckets.set(key, {
+          base: {
+            tipo, subtipo, compania,
             nombre: anexoNombre,
-            anexoPrecio: anexoNombre,            // <- clave anexo
+            anexoPrecio: anexoNombre,       // clave por anexo
             descripcion: null,
             descripcionCorta: null,
             activa: true,
             destacada: false,
-            // energía
             precioKwhP1: p1, precioKwhP2: p2, precioKwhP3: p3,
             precioKwhP4: p4, precioKwhP5: p5, precioKwhP6: p6,
-            // comisión base (no se usa)
             comisionKwhAdminBase: null,
-            payload: undefined,
           },
+          tramos: [],
         });
       }
-      summary.ofertasToque++;
 
-      // Crear tramo para esta fila (sin borrar previos). Evitamos duplicados con UNIQUE + skipDuplicates.
-      try {
-        await prisma.ofertaTarifaTramo.create({
-          data: {
-            ofertaTarifaId: oferta.id,
-            consumoDesdeKWh: desde,
-            consumoHastaKWh: hasta,
-            comisionKwhAdmin: comTramo,   // €/kWh del COMPARADOR (columna S)
-            comisionFijaAdmin: null,
-            activo: true,
-            notas,
-          },
-        });
-        summary.tramosInsertados++;
-      } catch (e: any) {
-        // Si choca UNIQUE (mismo [desde,hasta] ya creado en import anterior), lo contamos como duplicado y seguimos
-        if (String(e?.code) === "P2002" || /Unique constraint/i.test(String(e?.message))) {
-          summary.tramosDuplicadosSaltados++;
-        } else {
-          throw e;
+      buckets.get(key)!.tramos.push({
+        consumoDesdeKWh: desde,
+        consumoHastaKWh: hasta,
+        comisionKwhAdmin: comTramo,   // €/kWh del COMPARADOR (columna S)
+        comisionFijaAdmin: null,
+        activo: true,
+        notas,
+      });
+    }
+
+    // ---- Guardar por compañía (ordenado) y anexo ----
+    const CHUNK = 500;
+    let totalOfertas = 0;
+    let totalTramos = 0;
+    let duplicadosSaltados = 0;
+
+    const ordered = Array.from(buckets.values()).sort((a, b) =>
+      a.base.compania.localeCompare(b.base.compania, "es", { sensitivity: "base" })
+    );
+
+    for (const { base, tramos } of ordered) {
+      // upsert de la OfertaTarifa por la clave completa
+      const existing = await prisma.ofertaTarifa.findFirst({
+        where: {
+          tipo: base.tipo, subtipo: base.subtipo, compania: base.compania,
+          nombre: base.nombre, anexoPrecio: base.anexoPrecio
+        }
+      });
+
+      const oferta = existing
+        ? await prisma.ofertaTarifa.update({
+            where: { id: existing.id },
+            data: {
+              activa: true,
+              // refrescamos precios de energía por si cambian
+              precioKwhP1: base.precioKwhP1,
+              precioKwhP2: base.precioKwhP2,
+              precioKwhP3: base.precioKwhP3,
+              precioKwhP4: base.precioKwhP4,
+              precioKwhP5: base.precioKwhP5,
+              precioKwhP6: base.precioKwhP6,
+              comisionKwhAdminBase: null,
+            }
+          })
+        : await prisma.ofertaTarifa.create({ data: base as any });
+
+      totalOfertas++;
+
+      // Inserta tramos en lotes
+      for (let i = 0; i < tramos.length; i += CHUNK) {
+        const slice = tramos.slice(i, i + CHUNK).map(t => ({ ...t, ofertaTarifaId: oferta.id }));
+        if (!slice.length) continue;
+
+        try {
+          await prisma.ofertaTarifaTramo.createMany({
+            data: slice,
+            skipDuplicates: true, // respeta UNIQUE (ofertaTarifaId, desde, hasta)
+          });
+          totalTramos += slice.length;
+        } catch {
+          // Fallback fino a fino si hubiese algún choque raro
+          for (const t of slice) {
+            try {
+              await prisma.ofertaTarifaTramo.create({ data: t });
+              totalTramos++;
+            } catch {
+              duplicadosSaltados++;
+            }
+          }
         }
       }
     }
@@ -229,7 +260,14 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       message: "Importación completada",
-      summary,
+      summary: {
+        rowsRead: rows.length,
+        ofertasCreadasOActualizadas: totalOfertas,
+        tramosInsertadosTeoricos: totalTramos,
+        tramosDuplicadosSaltados: duplicadosSaltados,
+        saltadosSinClave,
+        saltadosSinConsumo,
+      },
     });
   } catch (err: any) {
     console.error("Import error:", err);
