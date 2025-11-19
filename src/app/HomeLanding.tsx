@@ -1,6 +1,5 @@
 // src/app/HomeLanding.tsx
-// src/app/HomeLanding.tsx
-"use client";
+'use client';
 
 import {
   useEffect,
@@ -8,8 +7,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
-} from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+} from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   ChevronRight,
   Bolt,
@@ -27,20 +26,19 @@ import {
   Check,
   Lock,
   Tag,
-} from "lucide-react";
+} from 'lucide-react';
 
-// 👇 Formulario de registro que ya usas al escanear el QR
-// IMPORTANTE: este archivo debe existir: src/app/registro/RegistroFormulario.tsx
-import RegistroFormulario from "./registro/RegistroFormulario";
+// 👇 Importamos el mismo formulario que usas al escanear el QR
+import RegistroFormulario from './registro/RegistroFormulario';
 
 // Paleta corporativa Impulso
 const brand = {
-  bg: "#0E2631",
-  text: "#F6EED1",
-  accent: "#FF7A3B",
-  accent2: "#FF4D7E",
-  card: "#112e3c",
-  cardAlt: "#143a48",
+  bg: '#0E2631',
+  text: '#F6EED1',
+  accent: '#FF7A3B',
+  accent2: '#FF4D7E',
+  card: '#112e3c',
+  cardAlt: '#143a48',
 };
 
 // -------- LUGARES ESPECIALES (fallback local para probar) --------
@@ -52,60 +50,60 @@ type SpecialPlace = {
   mensajeCorto?: string; // texto de la píldora
 };
 const SPECIAL_PLACES: Record<string, SpecialPlace> = {
-  "101": {
-    id: "101",
-    nombre: "Club Deportivo Impulso",
-    logo: "/clubs/club-demo.png",
-    color: "#FF7A3B",
-    mensajeCorto: "AYUDA A TU CLUB",
+  '101': {
+    id: '101',
+    nombre: 'Club Deportivo Impulso',
+    logo: '/clubs/club-demo.png',
+    color: '#FF7A3B',
+    mensajeCorto: 'AYUDA A TU CLUB',
   },
 };
 
 // Secciones (estilo Rastreator)
 const SECCIONES = [
-  { key: "luz", label: "Luz", icon: Bolt },
-  { key: "gas", label: "Gas", icon: Flame },
-  { key: "telefonia", label: "Telefonía", icon: Phone },
-  { key: "solar", label: "Solar", icon: Sun },
-  { key: "aerotermia", label: "Aerotermia", icon: Thermometer },
-  { key: "bateria", label: "Batería HERMES IA", icon: BatteryCharging },
-  { key: "inmobiliaria", label: "Inmobiliaria", icon: Building2 },
-  { key: "viajes", label: "Viajes", icon: Plane },
-  { key: "repuestos", label: "Repuestos coche", icon: Wrench },
-  { key: "ferreteria", label: "Ferretería", icon: Hammer },
-  { key: "seguros", label: "Seguros", icon: Shield },
-  { key: "mas", label: "Más pronto…", icon: Plus },
+  { key: 'luz', label: 'Luz', icon: Bolt },
+  { key: 'gas', label: 'Gas', icon: Flame },
+  { key: 'telefonia', label: 'Telefonía', icon: Phone },
+  { key: 'solar', label: 'Solar', icon: Sun },
+  { key: 'aerotermia', label: 'Aerotermia', icon: Thermometer },
+  { key: 'bateria', label: 'Batería HERMES IA', icon: BatteryCharging },
+  { key: 'inmobiliaria', label: 'Inmobiliaria', icon: Building2 },
+  { key: 'viajes', label: 'Viajes', icon: Plane },
+  { key: 'repuestos', label: 'Repuestos coche', icon: Wrench },
+  { key: 'ferreteria', label: 'Ferretería', icon: Hammer },
+  { key: 'seguros', label: 'Seguros', icon: Shield },
+  { key: 'mas', label: 'Más pronto…', icon: Plus },
 ];
 
 // Fallback de ofertas si falla la API
 const FALLBACK_TEASERS = [
   {
-    k: "luz",
-    t: "Luz empresa • Precio fijo estable",
-    b: "Top ahorro",
-    tag: "Hasta -22%",
-    copy: "Tarifa fija negociada para pymes. Sin sustos.",
+    k: 'luz',
+    t: 'Luz empresa • Precio fijo estable',
+    b: 'Top ahorro',
+    tag: 'Hasta -22%',
+    copy: 'Tarifa fija negociada para pymes. Sin sustos.',
   },
   {
-    k: "telefonia",
-    t: "Fibra + Móvil ilimitado",
-    b: "Pack pro",
-    tag: "Desde 29€/mes",
-    copy: "Cobertura nacional y portabilidad asistida.",
+    k: 'telefonia',
+    t: 'Fibra + Móvil ilimitado',
+    b: 'Pack pro',
+    tag: 'Desde 29€/mes',
+    copy: 'Cobertura nacional y portabilidad asistida.',
   },
   {
-    k: "seguros",
-    t: "Hogar + Auto • Multi",
-    b: "Bundle Smart",
-    tag: "Bonos -15%",
-    copy: "Bonificación por pólizas combinadas.",
+    k: 'seguros',
+    t: 'Hogar + Auto • Multi',
+    b: 'Bundle Smart',
+    tag: 'Bonos -15%',
+    copy: 'Bonificación por pólizas combinadas.',
   },
   {
-    k: "viajes",
-    t: "Escapadas energía cero",
-    b: "Eco Travel",
-    tag: "Hasta -35%",
-    copy: "Alojamiento eficiente y ventajas exclusivas.",
+    k: 'viajes',
+    t: 'Escapadas energía cero',
+    b: 'Eco Travel',
+    tag: 'Hasta -35%',
+    copy: 'Alojamiento eficiente y ventajas exclusivas.',
   },
 ];
 
@@ -143,31 +141,31 @@ export default function HomeLandingImpulso() {
 
   // subrayado ondulado en palabras clave
   const wavy: CSSProperties = {
-    textDecorationLine: "underline",
-    textDecorationStyle: "wavy",
-    textDecorationThickness: "3px",
-    textUnderlineOffset: "6px",
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'wavy',
+    textDecorationThickness: '3px',
+    textUnderlineOffset: '6px',
   };
 
   // 1) Coger IDs de URL/localStorage + flag lead
   useEffect(() => {
-    const a = searchParams.get("agenteId");
-    const l = searchParams.get("lugarId");
+    const a = searchParams.get('agenteId');
+    const l = searchParams.get('lugarId');
     if (a && l) {
       setAgenteId(a);
       setLugarId(l);
       try {
-        localStorage.setItem("agenteId", a);
-        localStorage.setItem("lugarId", l);
+        localStorage.setItem('agenteId', a);
+        localStorage.setItem('lugarId', l);
       } catch {}
     } else {
       try {
-        setAgenteId(localStorage.getItem("agenteId"));
-        setLugarId(localStorage.getItem("lugarId"));
+        setAgenteId(localStorage.getItem('agenteId'));
+        setLugarId(localStorage.getItem('lugarId'));
       } catch {}
     }
     try {
-      setLeadOK(localStorage.getItem("leadOK") === "1");
+      setLeadOK(localStorage.getItem('leadOK') === '1');
     } catch {}
   }, [searchParams]);
 
@@ -178,7 +176,7 @@ export default function HomeLandingImpulso() {
       if (!lugarId) return;
       try {
         const r = await fetch(`/api/lugares-public/${lugarId}`, {
-          cache: "no-store",
+          cache: 'no-store',
         });
         if (r.ok) {
           const data = await r.json();
@@ -189,12 +187,12 @@ export default function HomeLandingImpulso() {
               logo:
                 data.logo ||
                 SPECIAL_PLACES[lugarId]?.logo ||
-                "/clubs/club-demo.png",
+                '/clubs/club-demo.png',
               color: data.color || SPECIAL_PLACES[lugarId]?.color || brand.accent,
-              mensajeCorto: data.mensajeCorto || "AYUDA A TU CLUB",
+              mensajeCorto: data.mensajeCorto || 'AYUDA A TU CLUB',
             });
             // contador (si API lo trae)
-            if (typeof data.aportacionAcumulada === "number") {
+            if (typeof data.aportacionAcumulada === 'number') {
               setAportTarget(Math.max(0, Math.floor(data.aportacionAcumulada)));
             } else {
               // fallback demo
@@ -247,8 +245,8 @@ export default function HomeLandingImpulso() {
     let cancel = false;
     (async () => {
       try {
-        const res = await fetch("/api/ofertas", { cache: "no-store" });
-        if (!res.ok) throw new Error("bad status");
+        const res = await fetch('/api/ofertas', { cache: 'no-store' });
+        if (!res.ok) throw new Error('bad status');
         const data: OfertaAPI[] = await res.json();
         const destacados = (data || [])
           .filter((o) => o.activa && o.destacada)
@@ -257,19 +255,19 @@ export default function HomeLandingImpulso() {
               new Date(b.creadaEn || 0).getTime() -
               new Date(a.creadaEn || 0).getTime()
           )
-          .slice(0, 6)
+          .slice(0, 10)
           .map((o) => ({
-            k: (o.tipo || "oferta").toLowerCase(),
-            t: o.titulo || "Oferta destacada",
-            b: "Destacada",
-            tag: o.etiqueta || "Exclusiva",
+            k: (o.tipo || 'oferta').toLowerCase(),
+            t: o.titulo || 'Oferta destacada',
+            b: 'Destacada',
+            tag: o.etiqueta || 'Exclusiva',
             copy:
               o.descripcionCorta ||
               (o.descripcionLarga
                 ? o.descripcionLarga.length > 120
-                  ? o.descripcionLarga.slice(0, 117) + "…"
+                  ? o.descripcionLarga.slice(0, 117) + '…'
                   : o.descripcionLarga
-                : "Condiciones especiales disponibles."),
+                : 'Condiciones especiales disponibles.'),
           }));
         if (!cancel && destacados.length) setTeasers(destacados);
       } catch {}
@@ -285,13 +283,74 @@ export default function HomeLandingImpulso() {
   const secciones = useMemo(() => SECCIONES, []);
   const comparadorHref = useMemo(() => {
     const qs =
-      agenteId && lugarId ? `?agenteId=${agenteId}&lugarId=${lugarId}` : "";
+      agenteId && lugarId ? `?agenteId=${agenteId}&lugarId=${lugarId}` : '';
     return `/comparador${qs}`;
   }, [agenteId, lugarId]);
 
+  // helper para añadir tipo al comparador
+  const withTipo = (tipo: string) => {
+    const base = comparadorHref || '/comparador';
+    const sep = base.includes('?') ? '&' : '?';
+    return `${base}${sep}tipo=${tipo}`;
+  };
+
   const clubColor = club?.color || brand.accent;
 
-  const fmt = (n: number) => new Intl.NumberFormat("es-ES").format(n);
+  const fmt = (n: number) => new Intl.NumberFormat('es-ES').format(n);
+
+  // Tarjetas comparativas por producto (tipo Rastreator)
+  const comparadoresProducto = [
+    {
+      key: 'luz',
+      icon: Bolt,
+      title: 'Comparador de luz',
+      badge: 'Hogares y negocios',
+      desc: 'Revisamos potencias, peajes y tarifas para que pagues solo lo necesario.',
+      bullets: ['Precios negociados con varias comercializadoras', 'Estudio de potencia incluido', 'Sin permanencias ocultas'],
+      href: withTipo('luz'),
+      cta: 'Comparar luz ahora',
+    },
+    {
+      key: 'gas',
+      icon: Flame,
+      title: 'Comparador de gas',
+      badge: 'Calefacción y empresas',
+      desc: 'Optimizamos tu precio por kWh y término fijo según tu consumo real.',
+      bullets: ['Tarifas indexadas y fijas', 'Ideal para comunidades y negocios', 'Sin cambios técnicos en tu instalación'],
+      href: withTipo('gas'),
+      cta: 'Comparar gas',
+    },
+    {
+      key: 'telefonia',
+      icon: Phone,
+      title: 'Fibra + móvil',
+      badge: 'Telefonía profesional',
+      desc: 'Pack de líneas móviles y fibra estable para trabajar sin cortes.',
+      bullets: ['Cobertura nacional', 'Soporte en castellano', 'Portabilidad guiada'],
+      href: withTipo('telefonia'),
+      cta: 'Ver packs de telefonía',
+    },
+    {
+      key: 'solar',
+      icon: Sun,
+      title: 'Solar y autoconsumo',
+      badge: 'Hogar y empresa',
+      desc: 'Estudio de placas solares con batería HERMES-IA para máxima autonomía.',
+      bullets: ['Simulación de ahorro anual', 'Gestión de subvenciones', 'Integración con batería inteligente'],
+      href: withTipo('solar'),
+      cta: 'Estudiar mi instalación',
+    },
+    {
+      key: 'bateria',
+      icon: BatteryCharging,
+      title: 'Batería HERMES-IA',
+      badge: 'Almacenamiento inteligente',
+      desc: 'Acumula energía barata y úsala cuando más lo necesitas.',
+      bullets: ['Gestión inteligente con IA', 'Monitorización en tiempo real', 'Ahorro extra en tu factura'],
+      href: withTipo('bateria'),
+      cta: 'Ver estudio HERMES-IA',
+    },
+  ];
 
   return (
     <div
@@ -313,13 +372,13 @@ export default function HomeLandingImpulso() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => router.push("/login")}
+              onClick={() => router.push('/login')}
               className="px-4 py-1.5 rounded-full bg-amber-300 text-slate-900 font-semibold hover:bg-amber-200 transition shadow-sm shadow-amber-400/40"
             >
               Acceder al CRM
             </button>
             <button
-              onClick={() => router.push("/afiliados")}
+              onClick={() => router.push('/afiliados')}
               className="hidden sm:inline-flex px-4 py-1.5 rounded-full border border-amber-300 text-amber-100 font-semibold hover:bg-amber-300/10 transition"
             >
               Programa de afiliados
@@ -345,8 +404,8 @@ export default function HomeLandingImpulso() {
               className="neon-frame-impulso rounded-2xl p-2 md:p-3"
               style={{
                 boxShadow: `0 0 0 3px ${brand.accent}, 0 0 22px ${brand.accent}, 0 0 44px ${brand.accent2}AA`,
-                background: "rgba(0,0,0,0.20)",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: 'rgba(0,0,0,0.20)',
+                border: '1px solid rgba(255,255,255,0.12)',
               }}
               title="Impulso Energético"
             >
@@ -367,12 +426,12 @@ export default function HomeLandingImpulso() {
                     color: brand.text,
                     boxShadow: `0 0 0 2px ${clubColor}22, 0 0 26px ${clubColor}77, inset 0 0 10px rgba(255,255,255,0.06)`,
                     background:
-                      "linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
+                      'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))',
                   }}
                 >
                   <span className="text-xl">🏆</span>
                   <span className="font-extrabold uppercase tracking-wide text-xl">
-                    {club.mensajeCorto || "AYUDA A TU CLUB"}
+                    {club.mensajeCorto || 'AYUDA A TU CLUB'}
                   </span>
                   <span className="opacity-90 text-lg">· {club.nombre}</span>
                 </div>
@@ -385,8 +444,8 @@ export default function HomeLandingImpulso() {
                 className="neon-frame rounded-2xl p-2 md:p-3"
                 style={{
                   boxShadow: `0 0 0 3px ${clubColor}, 0 0 22px ${clubColor}, 0 0 44px ${clubColor}AA`,
-                  background: "rgba(0,0,0,0.25)",
-                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: 'rgba(0,0,0,0.25)',
+                  border: '1px solid rgba(255,255,255,0.12)',
                 }}
                 title={club.nombre}
               >
@@ -409,12 +468,12 @@ export default function HomeLandingImpulso() {
                   color: brand.text,
                   boxShadow: `0 0 0 2px ${clubColor}22, 0 0 20px ${clubColor}66, inset 0 0 10px rgba(255,255,255,0.06)`,
                   background:
-                    "linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
+                    'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))',
                 }}
               >
                 <span className="text-lg">🏆</span>
                 <span className="font-extrabold uppercase tracking-wide text-base">
-                  {club.mensajeCorto || "AYUDA A TU CLUB"}
+                  {club.mensajeCorto || 'AYUDA A TU CLUB'}
                 </span>
               </div>
             </div>
@@ -430,7 +489,7 @@ export default function HomeLandingImpulso() {
                   color: brand.text,
                   boxShadow: `0 0 0 2px ${clubColor}22, 0 0 22px ${clubColor}77`,
                   background:
-                    "linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+                    'linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
                 }}
               >
                 <span className="text-sm md:text-base opacity-85">
@@ -448,9 +507,9 @@ export default function HomeLandingImpulso() {
             className="mt-4 md:mt-5 text-4xl md:text-5xl font-extrabold leading-tight"
             style={{ color: brand.text }}
           >
-            Ofertas <span style={wavy}>REALES</span> y{" "}
-            <span style={wavy}>EXCLUSIVAS</span> para{" "}
-            <span style={wavy}>AHORRAR</span> y{" "}
+            Ofertas <span style={wavy}>REALES</span> y{' '}
+            <span style={wavy}>EXCLUSIVAS</span> para{' '}
+            <span style={wavy}>AHORRAR</span> y{' '}
             <span style={wavy}>GANAR COMISIONES YA</span>
           </h1>
         </div>
@@ -476,7 +535,7 @@ export default function HomeLandingImpulso() {
             className="pointer-events-none absolute inset-0"
             style={{
               boxShadow:
-                "inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)",
+                'inset 0 -24px 40px rgba(14,38,49,0.55), inset 0 24px 40px rgba(14,38,49,0.30)',
             }}
           />
         </div>
@@ -484,7 +543,7 @@ export default function HomeLandingImpulso() {
 
       {/* BLOQUE texto + CTAs + ticks */}
       <section className="container mx-auto px-6 pt-6 pb-8">
-        <p className="text-lg md:text-xl" style={{ color: "#d9d2b5" }}>
+        <p className="text-lg md:text-xl" style={{ color: '#d9d2b5' }}>
           <b>Y mucho más:</b> Telefonía, Viajes, Inmobiliaria, Seguros, Repuestos
           y otros servicios para tu día a día.
           <br />
@@ -492,8 +551,8 @@ export default function HomeLandingImpulso() {
         </p>
 
         {club && (
-          <p className="mt-2 text-sm" style={{ color: "#f0ead0" }}>
-            <b>Impacto directo:</b> con cada servicio contratado,{" "}
+          <p className="mt-2 text-sm" style={{ color: '#f0ead0' }}>
+            <b>Impacto directo:</b> con cada servicio contratado,{' '}
             <b>{club.nombre}</b> recibe una aportación económica.
           </p>
         )}
@@ -504,7 +563,7 @@ export default function HomeLandingImpulso() {
             className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg neon-glow"
             style={{
               background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-              color: "#0b1e27",
+              color: '#0b1e27',
               boxShadow: `0 0 0 2px ${brand.text}11, 0 0 14px ${brand.accent}aa, 0 0 28px ${brand.accent2}77`,
             }}
           >
@@ -525,7 +584,7 @@ export default function HomeLandingImpulso() {
 
         <div
           className="mt-6 flex flex-wrap items-center gap-8 text-sm"
-          style={{ color: "#d9d2b5" }}
+          style={{ color: '#d9d2b5' }}
         >
           <span className="inline-flex items-center gap-2">
             <Check size={16} /> Estudio gratuito
@@ -572,7 +631,7 @@ export default function HomeLandingImpulso() {
             </a>
           ))}
         </div>
-        <p className="mt-4 text-sm" style={{ color: "#c9c2a5" }}>
+        <p className="mt-4 text-sm" style={{ color: '#c9c2a5' }}>
           Seguimos añadiendo más servicios. Déjanos tus datos y te avisamos de
           nuevas ofertas.
         </p>
@@ -596,22 +655,22 @@ export default function HomeLandingImpulso() {
         </div>
       </section>
 
-      {/* TEASERS */}
-      <section className="container mx-auto px-6 py-10">
+      {/* TEASERS (grid estático) */}
+      <section className="container mx-auto px-6 pt-10 pb-6">
         <h2
           className="text-2xl md:text-3xl font-extrabold mb-6"
           style={{ color: brand.text }}
         >
-          Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
+          Ofertas destacadas {leadOK ? '(desbloqueadas)' : '(bloqueadas)'}
         </h2>
         {loadingTeasers && (
-          <div className="text-sm" style={{ color: "#c9c2a5" }}>
+          <div className="text-sm" style={{ color: '#c9c2a5' }}>
             Cargando ofertas…
           </div>
         )}
         {!loadingTeasers && (
           <div className="grid md:grid-cols-2 gap-6">
-            {teasers.map((o, i) => (
+            {teasers.slice(0, 4).map((o, i) => (
               <div
                 key={i}
                 className="group relative rounded-2xl p-[2px]"
@@ -628,20 +687,20 @@ export default function HomeLandingImpulso() {
                     <span
                       className="text-xs font-bold px-3 py-1 rounded-full"
                       style={{
-                        backgroundColor: "#1a3c4a",
+                        backgroundColor: '#1a3c4a',
                         color: brand.text,
                       }}
                     >
-                      {o.b || "Destacada"}
+                      {o.b || 'Destacada'}
                     </span>
                     <span
                       className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
                       style={{
-                        backgroundColor: "#1a3c4a",
+                        backgroundColor: '#1a3c4a',
                         color: brand.text,
                       }}
                     >
-                      <Tag size={14} /> {o.tag || "Exclusiva"}
+                      <Tag size={14} /> {o.tag || 'Exclusiva'}
                     </span>
                   </div>
                   <div className="mt-4">
@@ -653,7 +712,7 @@ export default function HomeLandingImpulso() {
                     </h3>
                     <p
                       className="mt-2 text-sm"
-                      style={{ color: "#d9d2b5" }}
+                      style={{ color: '#d9d2b5' }}
                     >
                       {o.copy}
                     </p>
@@ -662,8 +721,8 @@ export default function HomeLandingImpulso() {
                     <div
                       className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center text-center p-6"
                       style={{
-                        background: "#0E2631dd",
-                        backdropFilter: "blur(2px)",
+                        background: '#0E2631dd',
+                        backdropFilter: 'blur(2px)',
                         color: brand.text,
                       }}
                     >
@@ -677,7 +736,7 @@ export default function HomeLandingImpulso() {
                         className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
                         style={{
                           background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-                          color: "#0b1e27",
+                          color: '#0b1e27',
                         }}
                       >
                         Desbloquear ahora <ChevronRight size={16} />
@@ -690,7 +749,7 @@ export default function HomeLandingImpulso() {
                         className="inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
                         style={{
                           background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-                          color: "#0b1e27",
+                          color: '#0b1e27',
                         }}
                       >
                         Ver detalle y contratar <ChevronRight size={16} />
@@ -704,6 +763,200 @@ export default function HomeLandingImpulso() {
         )}
       </section>
 
+      {/* 🔥 CARRUSEL POTENTE DE OFERTAS */}
+      {!loadingTeasers && teasers.length > 0 && (
+        <section className="mt-4 py-10 border-y border-[#1f3a45] bg-[#05151f]">
+          <div className="container mx-auto px-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                className="text-2xl md:text-3xl font-extrabold"
+                style={{ color: brand.text }}
+              >
+                Ofertas especiales para ti
+              </h2>
+              <span className="text-xs md:text-sm" style={{ color: '#c9c2a5' }}>
+                Desliza para ver más
+              </span>
+            </div>
+
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[#05151f] to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#05151f] to-transparent" />
+
+              <div
+                className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-[#274554] scrollbar-track-transparent"
+                style={{ scrollBehavior: 'smooth' }}
+              >
+                {teasers.map((o, i) => (
+                  <div
+                    key={`carousel-${i}`}
+                    className="snap-start min-w-[260px] max-w-xs flex-shrink-0 rounded-2xl p-[2px]"
+                    style={{
+                      background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`,
+                      boxShadow: `0 0 12px ${brand.accent}66, 0 0 26px ${brand.accent2}55`,
+                    }}
+                  >
+                    <div
+                      className="rounded-2xl p-4 h-full flex flex-col justify-between"
+                      style={{ backgroundColor: brand.card }}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className="text-[11px] font-bold px-3 py-1 rounded-full"
+                            style={{
+                              backgroundColor: '#1a3c4a',
+                              color: brand.text,
+                            }}
+                          >
+                            {o.b || 'Destacada'}
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full"
+                            style={{
+                              backgroundColor: '#1a3c4a',
+                              color: brand.text,
+                            }}
+                          >
+                            <Tag size={13} /> {o.tag || 'Exclusiva'}
+                          </span>
+                        </div>
+                        <h3
+                          className="mt-3 text-base md:text-lg font-extrabold line-clamp-2"
+                          style={{ color: brand.text }}
+                        >
+                          {o.t}
+                        </h3>
+                        <p
+                          className="mt-2 text-xs md:text-sm line-clamp-3"
+                          style={{ color: '#d9d2b5' }}
+                        >
+                          {o.copy}
+                        </p>
+                      </div>
+
+                      <div className="mt-4">
+                        {!leadOK ? (
+                          <a
+                            href="#form"
+                            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm font-semibold w-full neon-glow"
+                            style={{
+                              background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
+                              color: '#0b1e27',
+                            }}
+                          >
+                            Desbloquear oferta <ChevronRight size={14} />
+                          </a>
+                        ) : (
+                          <a
+                            href={comparadorHref}
+                            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm font-semibold w-full neon-glow"
+                            style={{
+                              background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
+                              color: '#0b1e27',
+                            }}
+                          >
+                            Ver detalle y contratar <ChevronRight size={14} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 🔍 TARJETAS COMPARATIVAS POR PRODUCTO */}
+      <section className="container mx-auto px-6 py-12">
+        <h2
+          className="text-2xl md:text-3xl font-extrabold mb-6"
+          style={{ color: brand.text }}
+        >
+          Compara por tipo de producto
+        </h2>
+        <p className="text-sm md:text-base mb-6" style={{ color: '#d9d2b5' }}>
+          Elige el servicio que más te interesa y te guiamos paso a paso para encontrar la mejor opción.  
+          Puedes usarlo como cliente final o como comercial para tus propios clientes.
+        </p>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {comparadoresProducto.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.key}
+                className="rounded-2xl border shadow-sm flex flex-col h-full"
+                style={{
+                  backgroundColor: brand.cardAlt,
+                  borderColor: '#2b5666',
+                }}
+              >
+                <div className="flex items-start gap-3 p-5 border-b border-[#254655]">
+                  <div
+                    className="h-11 w-11 rounded-full flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`,
+                    }}
+                  >
+                    <Icon size={24} style={{ color: brand.bg }} />
+                  </div>
+                  <div className="flex-1">
+                    <div
+                      className="inline-flex items-center gap-2 text-[11px] font-semibold px-2 py-0.5 rounded-full mb-1"
+                      style={{
+                        backgroundColor: '#1a3c4a',
+                        color: brand.text,
+                      }}
+                    >
+                      {card.badge}
+                    </div>
+                    <h3
+                      className="text-lg font-extrabold"
+                      style={{ color: brand.text }}
+                    >
+                      {card.title}
+                    </h3>
+                    <p
+                      className="mt-1 text-xs md:text-sm"
+                      style={{ color: '#d9d2b5' }}
+                    >
+                      {card.desc}
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 pt-4 pb-5 flex-1 flex flex-col justify-between">
+                  <ul className="space-y-1.5 text-xs md:text-sm" style={{ color: '#d9d2b5' }}>
+                    {card.bullets.map((b, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="mt-[3px]">
+                          <Check size={14} />
+                        </span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-4">
+                    <a
+                      href={card.href}
+                      className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold w-full neon-glow"
+                      style={{
+                        background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
+                        color: '#0b1e27',
+                      }}
+                    >
+                      {card.cta} <ChevronRight size={16} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {/* CÓMO FUNCIONA */}
       <section className="container mx-auto px-6 py-14">
         <h2
@@ -715,24 +968,24 @@ export default function HomeLandingImpulso() {
         <div className="mt-7 grid md:grid-cols-4 gap-6">
           {[
             {
-              n: "01",
-              t: "Regístrate",
-              d: "Nombre, email y teléfono. 60 segundos.",
+              n: '01',
+              t: 'Regístrate',
+              d: 'Nombre, email y teléfono. 60 segundos.',
             },
             {
-              n: "02",
-              t: "Accede a ofertas",
-              d: "Promos reales y negociadas.",
+              n: '02',
+              t: 'Accede a ofertas',
+              d: 'Promos reales y negociadas.',
             },
             {
-              n: "03",
-              t: "Contrata fácil",
-              d: "Nos ocupamos de altas y portabilidades.",
+              n: '03',
+              t: 'Contrata fácil',
+              d: 'Nos ocupamos de altas y portabilidades.',
             },
             {
-              n: "04",
-              t: "Ahorro constante",
-              d: "Seguimiento y optimización continua.",
+              n: '04',
+              t: 'Ahorro constante',
+              d: 'Seguimiento y optimización continua.',
             },
           ].map((s) => (
             <div
@@ -740,12 +993,12 @@ export default function HomeLandingImpulso() {
               className="rounded-2xl p-6 border shadow-sm"
               style={{
                 backgroundColor: brand.cardAlt,
-                borderColor: "#2b5666",
+                borderColor: '#2b5666',
               }}
             >
               <div
                 className="text-sm font-extrabold"
-                style={{ color: "#8fb0bd" }}
+                style={{ color: '#8fb0bd' }}
               >
                 {s.n}
               </div>
@@ -757,7 +1010,7 @@ export default function HomeLandingImpulso() {
               </div>
               <p
                 className="mt-2 text-sm"
-                style={{ color: "#d9d2b5" }}
+                style={{ color: '#d9d2b5' }}
               >
                 {s.d}
               </p>
@@ -770,7 +1023,7 @@ export default function HomeLandingImpulso() {
             className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-lg neon-glow"
             style={{
               background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-              color: "#0b1e27",
+              color: '#0b1e27',
             }}
           >
             Acceder a las ofertas <ChevronRight size={18} />
@@ -786,10 +1039,10 @@ export default function HomeLandingImpulso() {
       {/* Footer */}
       <footer
         className="border-top"
-        style={{ borderTop: "1px solid #1f3a45" }}
+        style={{ borderTop: '1px solid #1f3a45' }}
       >
         <div className="container mx-auto px-6 py-8 text-sm flex flex-col md:flex-row items-center justify-between gap-3">
-          <div style={{ color: "#b7b099" }}>
+          <div style={{ color: '#b7b099' }}>
             © {new Date().getFullYear()} Impulso Energético
           </div>
           <div className="flex items-center gap-3">
@@ -800,10 +1053,18 @@ export default function HomeLandingImpulso() {
             >
               Ver ofertas
             </a>
-            <a href="#" className="hover:underline" style={{ color: brand.text }}>
+            <a
+              href="#"
+              className="hover:underline"
+              style={{ color: brand.text }}
+            >
               Aviso legal
             </a>
-            <a href="#" className="hover:underline" style={{ color: brand.text }}>
+            <a
+              href="#"
+              className="hover:underline"
+              style={{ color: brand.text }}
+            >
               Privacidad
             </a>
           </div>
