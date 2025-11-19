@@ -1,283 +1,660 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Flame, Phone, PartyPopper, ChevronLeft, ChevronRight, PiggyBank } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { motion } from "framer-motion";
-import Image from "next/image";
-import { useEffect, useState } from "react";
+type TipoOferta = "LUZ" | "GAS" | "TELEFONIA";
 
-
-type Oferta = {
-  id: number;
+interface Oferta {
+  id: string;
   titulo: string;
-  descripcion: string;
-  descripcionLarga?: string;
-  tipo: string;
+  descripcionCorta: string;
+  descripcionLarga: string;
+  tipo: TipoOferta;
   destacada: boolean;
-  activa?: boolean;
+  activa: boolean;
+  creadaEn?: string | null;
+}
+
+const tipoConfig: Record<
+  TipoOferta,
+  { label: string; bgPill: string; btn: string; border: string }
+> = {
+  LUZ: {
+    label: "Luz",
+    bgPill: "bg-emerald-100 text-emerald-800",
+    btn: "bg-emerald-600 hover:bg-emerald-500",
+    border: "border-emerald-200",
+  },
+  GAS: {
+    label: "Gas",
+    bgPill: "bg-orange-100 text-orange-800",
+    btn: "bg-orange-500 hover:bg-orange-400",
+    border: "border-orange-200",
+  },
+  TELEFONIA: {
+    label: "Telefonía",
+    bgPill: "bg-sky-100 text-sky-800",
+    btn: "bg-sky-600 hover:bg-sky-500",
+    border: "border-sky-200",
+  },
 };
 
-export default function BienvenidaContenido() {
+const BienvenidaContenido: React.FC = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nombre = searchParams.get("nombre") || "";
-  const agenteId = searchParams.get("agenteId") || "";
-  const lugarId = searchParams.get("lugarId") || "";
-  const [filtro, setFiltro] = useState("");
-
-
-  const secciones = [
-    {
-      nombre: "Luz",
-      icono: <Sparkles className="w-8 h-8 text-yellow-100" />,
-      ruta: `/comparador?seccion=luz&agenteId=${agenteId}&lugarId=${lugarId}`,
-      bg: "bg-green-500",
-    },
-    {
-      nombre: "Gas",
-      icono: <Flame className="w-8 h-8 text-yellow-100" />,
-      ruta: "#",
-      bg: "bg-orange-500",
-    },
-    {
-      nombre: "Telefonía",
-      icono: <Phone className="w-8 h-8 text-yellow-100" />,
-      ruta: "#",
-      bg: "bg-blue-600",
-    },
-    {
-      nombre: "Ganadería",
-      icono: <PiggyBank className="w-8 h-8 text-yellow-100" />,
-      ruta: `/ganaderia?agenteId=${agenteId}&lugarId=${lugarId}`,
-      bg: "bg-lime-600",
-    },
-
-  ];
-  
-  const [ofertasDestacadas, setOfertasDestacadas] = useState<Oferta[]>([]);
-  const [ofertasPorTipo, setOfertasPorTipo] = useState<{ luz: Oferta[]; gas: Oferta[]; telefonia: Oferta[] }>({
-    luz: [],
-    gas: [],
-    telefonia: [],
-  });
-  const [indiceOferta, setIndiceOferta] = useState(0);
+  const [ofertas, setOfertas] = useState<Oferta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [modoUsuario, setModoUsuario] = useState<"cliente" | "comercial">(
+    "cliente"
+  );
 
   useEffect(() => {
-    const fetchOfertas = async () => {
-      const [destacadas, luz, gas, telefonia] = await Promise.all([
-        fetch("/api/ofertas?destacada=true").then((r) => r.json()),
-        fetch("/api/ofertas?tipo=luz").then((r) => r.json()),
-        fetch("/api/ofertas?tipo=gas").then((r) => r.json()),
-        fetch("/api/ofertas?tipo=telefonia").then((r) => r.json()),
-      ]);
-      setOfertasDestacadas(destacadas);
-      setOfertasPorTipo({ luz, gas, telefonia });
+    const cargarOfertas = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch("/api/ofertas", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+
+        if (!res.ok) throw new Error("No se pudieron cargar las ofertas");
+        const data = await res.json();
+        const lista: Oferta[] = (data?.ofertas ?? data) || [];
+
+        const ordenadas = [...lista].sort((a, b) => {
+          const fechaA = a.creadaEn ? new Date(a.creadaEn).getTime() : 0;
+          const fechaB = b.creadaEn ? new Date(b.creadaEn).getTime() : 0;
+          return fechaB - fechaA;
+        });
+
+        setOfertas(ordenadas);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || "Error al cargar las ofertas");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchOfertas();
+    cargarOfertas();
   }, []);
 
-  useEffect(() => {
-    if (ofertasDestacadas.length === 0) return;
-    const intervalo = setInterval(() => {
-      setIndiceOferta((prev) => (prev + 1) % ofertasDestacadas.length);
-    }, 6000);
-    return () => clearInterval(intervalo);
-  }, [ofertasDestacadas]);
+  const ofertasFiltradas = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return ofertas;
 
-  const ofertaActual = ofertasDestacadas[indiceOferta];
+    return ofertas.filter((o) => {
+      const campos = [
+        o.titulo,
+        o.descripcionCorta,
+        o.descripcionLarga,
+        o.tipo,
+        o.destacada ? "destacada" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-  const avanzar = () => {
-    setIndiceOferta((prev) => (prev + 1) % ofertasDestacadas.length);
+      return campos.includes(texto);
+    });
+  }, [ofertas, busqueda]);
+
+  const ofertasDestacadas = useMemo(
+    () => ofertasFiltradas.filter((o) => o.destacada && o.activa),
+    [ofertasFiltradas]
+  );
+
+  const ofertasPorTipo = useMemo(() => {
+    const grupos: Record<TipoOferta, Oferta[]> = {
+      LUZ: [],
+      GAS: [],
+      TELEFONIA: [],
+    };
+
+    for (const oferta of ofertasFiltradas) {
+      if (!oferta.activa) continue;
+      if (grupos[oferta.tipo]) grupos[oferta.tipo].push(oferta);
+    }
+
+    return grupos;
+  }, [ofertasFiltradas]);
+
+  const formatearFecha = (fecha?: string | null) => {
+    if (!fecha) return "";
+    try {
+      return new Date(fecha).toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "";
+    }
   };
 
-  const retroceder = () => {
-    setIndiceOferta((prev) => (prev - 1 + ofertasDestacadas.length) % ofertasDestacadas.length);
+  const irAComparador = (tipo?: TipoOferta) => {
+    if (tipo === "LUZ") router.push("/comparador?tipo=luz");
+    else if (tipo === "GAS") router.push("/comparador?tipo=gas");
+    else if (tipo === "TELEFONIA") router.push("/comparador?tipo=telefonia");
+    else router.push("/comparador");
   };
 
-  const handleClick = (_seccion: string, ruta: string) => {
-  router.push(ruta);
-};
-
+  const irAGanaderia = () => router.push("/ganaderia");
+  const irARegistro = () => router.push("/registro");
+  const irALoginCRM = () => router.push("/login"); // o /dashboard si tienes login integrado ahí
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8 }}
-      className="min-h-screen w-full bg-gradient-to-br from-emerald-100 via-sky-100 to-blue-100 flex flex-col items-center px-4 py-8"
-    >
-      {/* Logo y saludo */}
-      <div className="w-full max-w-5xl flex flex-col sm:flex-row justify-between items-center mb-4 px-4 gap-4">
-        <Image
-          src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
-          alt="Logo Impulso Energético"
-          width={160}
-          height={50}
-          priority
-        />
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-          className="text-xl sm:text-2xl md:text-3xl text-green-600 text-center"
-        >
-          <PartyPopper className="inline-block w-6 h-6 mr-2 animate-bounce" />
-          ¡Bienvenido{nombre ? `, ${nombre}` : ""}!
-        </motion.div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+      <div className="max-w-6xl mx-auto px-4 py-8 md:py-10 space-y-10 md:space-y-12">
+        {/* CABECERA + HERO (inspirado en /registro) */}
+        <header className="flex flex-col gap-6 md:gap-8">
+          {/* Fila superior: logo + modo usuario */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              {/* Sustituye este bloque por tu logo real del registro */}
+              {/* <Image src="/ruta-a-tu-logo.png" alt="Impulso Energético" width={160} height={60} /> */}
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold tracking-[0.2em] text-emerald-300/80 uppercase">
+                  Impulso Energético
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  Innovación energética para tu hogar y tu empresa
+                </span>
+              </div>
+            </div>
 
-      <p className="text-center text-gray-600 mb-4 max-w-xl text-sm md:text-base">
-        Gracias por confiar en <strong>Impulso Energético</strong>. Elige el servicio que deseas comparar o consulta nuestras promociones exclusivas.
-      </p>
-
-      {/* Secciones */}
-      <div className="w-full max-w-5xl bg-gradient-to-r from-green-400 via-orange-400 to-blue-500 rounded-xl p-6 mb-6 shadow-lg">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {secciones.map((sec) => (
-            <Card
-              key={sec.nombre}
-              onClick={() => handleClick(sec.nombre, sec.ruta)}
-              className={`cursor-pointer text-white ${sec.bg} shadow-md hover:shadow-lg transition-transform hover:scale-105`}
-            >
-              <CardContent className="flex flex-col items-center py-4">
-                {sec.icono}
-                <span className="text-base md:text-lg font-medium mt-2">{sec.nombre}</span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-center text-white text-sm font-semibold bg-pink-600 px-4 py-1 rounded-xl shadow-lg animate-pulse mb-4">
-        🔜 Más servicios próximamente disponibles
-      </p>
-
-      {/* Carrusel dinámico */}
-      {ofertaActual && (
-        <div className="w-full py-6 px-4 rounded-xl shadow max-w-4xl mb-6 bg-gradient-to-r from-blue-100 to-indigo-100">
-          <h2 className="text-2xl font-semibold text-center text-gray-800 mb-4">Ofertas Especiales</h2>
-          <div className="relative mb-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              key={indiceOferta}
-              transition={{ duration: 0.4 }}
-              className="rounded-xl px-6 py-5 text-center bg-white shadow-md min-h-[160px]"
-            >
-              <h3 className="text-base md:text-lg font-semibold mb-2 text-green-800">{ofertaActual.titulo}</h3>
-              <p className="text-sm md:text-base mb-4 leading-relaxed text-gray-700">{ofertaActual.descripcion}</p>
+            <div className="inline-flex items-center rounded-full bg-slate-900/60 border border-slate-700/70 p-1 text-xs">
               <button
-                onClick={() => alert("Más información disponible próximamente")}
-                className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition text-sm"
+                onClick={() => setModoUsuario("cliente")}
+                className={`px-3 py-1 rounded-full font-semibold transition ${
+                  modoUsuario === "cliente"
+                    ? "bg-emerald-500 text-slate-950"
+                    : "text-slate-200"
+                }`}
               >
-                Ir a la oferta
+                Soy cliente
               </button>
-            </motion.div>
-            <button onClick={retroceder} className="absolute left-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition">
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
-            </button>
-            <button onClick={avanzar} className="absolute right-[-40px] top-1/2 transform -translate-y-1/2 bg-white border border-gray-300 rounded-full p-2 shadow hover:bg-gray-100 transition">
-              <ChevronRight className="w-4 h-4 text-gray-600" />
-            </button>
-          </div>
-          <div className="flex justify-center space-x-1">
-            {ofertasDestacadas.map((_, i) => (
-              <span
-                key={i}
-                className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${i === indiceOferta ? "bg-green-600 scale-125" : "bg-gray-300"}`}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Buscador general */}
-      <form
-        onSubmit={(e) => e.preventDefault()}
-        className="w-full max-w-5xl mb-4"
-      >
-        <input
-          type="text"
-          placeholder="🔍 Buscar ofertas por título, descripción..."
-          className="w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white text-black placeholder-gray-500"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-        />
-      </form>
-
-
-
-      {/* Ofertas por sección */}
-      {Object.entries(ofertasPorTipo).map(([seccion, items]) => {
-        const fondo =
-          seccion === "luz"
-            ? "bg-green-500"
-            : seccion === "gas"
-            ? "bg-orange-500"
-            : "bg-blue-600";
-
-        return (
-          <div key={seccion} className={`w-full max-w-5xl ${fondo} rounded-xl px-6 py-6 mb-6 text-white`}>
-            <h3 className="text-xl font-bold mb-4 capitalize">Ofertas en {seccion}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              
-              {items
-                .filter((oferta) =>
-                  [oferta.titulo, oferta.descripcion, oferta.descripcionLarga]
-                    .join(" ")
-                    .toLowerCase()
-                    .includes(filtro.toLowerCase())
-                )
-                .map((oferta) => (
-                  <div key={oferta.id} className="bg-white rounded-xl shadow p-4 text-sm text-center hover:shadow-lg transition transform hover:scale-[1.02] text-gray-700">
-                    <p className="font-bold text-lg text-black mb-1">{oferta.titulo}</p>
-                    <p className="text-sm text-gray-600 mb-2">{oferta.descripcion}</p>
-                    <p className="text-xs italic text-gray-500 mb-2">{oferta.descripcionLarga}</p>
-                    {oferta.destacada && (
-                      <span className="inline-block text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded mb-2">
-                        ⭐ Oferta destacada
-                      </span>
-                    )}
-                    {!oferta.activa && (
-                      <span className="inline-block text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded mb-2">
-                        🔒 Inactiva
-                      </span>
-                    )}
-                    <button
-                      className={`text-white px-3 py-1 rounded text-xs font-semibold transition ${
-                        seccion === "luz"
-                          ? "bg-green-600 hover:bg-green-700"
-                          : seccion === "gas"
-                          ? "bg-orange-500 hover:bg-orange-600"
-                          : "bg-blue-600 hover:bg-blue-700"
-                      }`}
-                      onClick={() => alert("Más información próximamente")}
-                    >
-                      Ver más
-                    </button>
-                  </div>
-                ))}
-
-              {items.filter((oferta) =>
-                [oferta.titulo, oferta.descripcion, oferta.descripcionLarga]
-                  .join(" ")
-                  .toLowerCase()
-                  .includes(filtro.toLowerCase())
-              ).length === 0 && (
-                <div className="col-span-full text-center text-white text-sm italic mt-2">
-                  ❌ No se encontraron ofertas para tu búsqueda.
-                </div>
-              )}
-  
+              <button
+                onClick={() => setModoUsuario("comercial")}
+                className={`px-3 py-1 rounded-full font-semibold transition ${
+                  modoUsuario === "comercial"
+                    ? "bg-sky-500 text-slate-950"
+                    : "text-slate-200"
+                }`}
+              >
+                Soy comercial
+              </button>
             </div>
           </div>
-        );
-      })}
-    </motion.div>
+
+          {/* Hero principal */}
+          <div className="grid gap-8 md:grid-cols-[1.8fr,1.2fr] items-center">
+            <div className="space-y-4">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
+                Ofertas{" "}
+                <span className="text-emerald-400">
+                  REALES y EXCLUSIVAS
+                </span>{" "}
+                para{" "}
+                <span className="underline decoration-emerald-500/70 decoration-2">
+                  ahorrar
+                </span>{" "}
+                y{" "}
+                <span className="text-amber-300">
+                  ganar comisiones
+                </span>{" "}
+                desde hoy
+              </h1>
+
+              <p className="text-sm md:text-base text-slate-200/85 max-w-xl">
+                Luz, gas, telefonía, solar, aerotermia, batería HERMES-IA,
+                inmobiliaria, viajes, seguros, repuestos y mucho más. Desbloquea
+                tus descuentos en menos de 60 segundos.
+              </p>
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                {modoUsuario === "cliente" ? (
+                  <>
+                    <button
+                      onClick={irARegistro}
+                      className="px-5 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/40 transition"
+                    >
+                      Acceder a las ofertas
+                    </button>
+                    <button
+                      onClick={() => irAComparador()}
+                      className="px-5 py-2.5 rounded-full border border-emerald-400/60 bg-transparent text-sm font-semibold text-emerald-300 hover:bg-emerald-500/10 transition"
+                    >
+                      Ver ahorro estimado
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={irALoginCRM}
+                      className="px-5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/40 transition"
+                    >
+                      Acceder a mi CRM
+                    </button>
+                    <button
+                      onClick={irARegistro}
+                      className="px-5 py-2.5 rounded-full border border-sky-400/60 bg-transparent text-sm font-semibold text-sky-300 hover:bg-sky-500/10 transition"
+                    >
+                      Invitar clientes a registrarse
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-4 pt-4 text-[11px] text-slate-300/80">
+                <span className="inline-flex items-center gap-1">
+                  ✅ Estudio gratuito
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  ✅ Ofertas negociadas y actualizadas
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  ✅ Sin compromiso
+                </span>
+              </div>
+            </div>
+
+            {/* Tarjeta lateral con “Elige tu sección y empieza a ahorrar” */}
+            <div className="rounded-3xl bg-slate-900/80 border border-slate-700/80 p-5 md:p-6 shadow-2xl shadow-slate-950/80 space-y-4">
+              <h2 className="text-base md:text-lg font-semibold">
+                Elige tu sección y empieza a ahorrar
+              </h2>
+              <p className="text-xs md:text-sm text-slate-300/85">
+                Selecciona la categoría que quieres optimizar. Seguimos
+                añadiendo más servicios: déjanos tus datos y te avisamos de
+                nuevas ofertas.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] md:text-xs">
+                <button
+                  onClick={() => irAComparador("LUZ")}
+                  className="rounded-xl bg-emerald-500/10 border border-emerald-500/40 px-3 py-2 text-left hover:bg-emerald-500/20 transition"
+                >
+                  💡 Luz
+                </button>
+                <button
+                  onClick={() => irAComparador("GAS")}
+                  className="rounded-xl bg-orange-500/10 border border-orange-500/40 px-3 py-2 text-left hover:bg-orange-500/20 transition"
+                >
+                  🔥 Gas
+                </button>
+                <button
+                  onClick={() => irAComparador("TELEFONIA")}
+                  className="rounded-xl bg-sky-500/10 border border-sky-500/40 px-3 py-2 text-left hover:bg-sky-500/20 transition"
+                >
+                  📶 Telefonía
+                </button>
+                <button
+                  onClick={() => router.push("/solar")}
+                  className="rounded-xl bg-yellow-500/10 border border-yellow-500/40 px-3 py-2 text-left hover:bg-yellow-500/20 transition"
+                >
+                  ☀️ Solar
+                </button>
+                <button
+                  onClick={() => router.push("/aerotermia")}
+                  className="rounded-xl bg-cyan-500/10 border border-cyan-500/40 px-3 py-2 text-left hover:bg-cyan-500/20 transition"
+                >
+                  🌬️ Aerotermia
+                </button>
+                <button
+                  onClick={() => router.push("/bateria-hermes")}
+                  className="rounded-xl bg-purple-500/10 border border-purple-500/40 px-3 py-2 text-left hover:bg-purple-500/20 transition"
+                >
+                  🔋 Batería HERMES IA
+                </button>
+                <button
+                  onClick={() => router.push("/inmobiliaria")}
+                  className="rounded-xl bg-rose-500/10 border border-rose-500/40 px-3 py-2 text-left hover:bg-rose-500/20 transition"
+                >
+                  🏡 Inmobiliaria
+                </button>
+                <button
+                  onClick={() => router.push("/viajes")}
+                  className="rounded-xl bg-indigo-500/10 border border-indigo-500/40 px-3 py-2 text-left hover:bg-indigo-500/20 transition"
+                >
+                  ✈️ Viajes
+                </button>
+                <button
+                  onClick={() => router.push("/repuestos")}
+                  className="rounded-xl bg-amber-500/10 border border-amber-500/40 px-3 py-2 text-left hover:bg-amber-500/20 transition"
+                >
+                  🚗 Repuestos coche
+                </button>
+                <button
+                  onClick={() => router.push("/ferreteria")}
+                  className="rounded-xl bg-lime-500/10 border border-lime-500/40 px-3 py-2 text-left hover:bg-lime-500/20 transition"
+                >
+                  🔩 Ferretería
+                </button>
+                <button
+                  onClick={() => router.push("/seguros")}
+                  className="rounded-xl bg-slate-500/10 border border-slate-500/40 px-3 py-2 text-left hover:bg-slate-500/20 transition"
+                >
+                  🛡️ Seguros
+                </button>
+                <div className="rounded-xl border border-dashed border-slate-600 px-3 py-2 text-[11px] text-slate-400 flex items-center">
+                  Más pronto…
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 pt-1">
+                Sin trucos: precios reales, atención cercana y gestión completa
+                (altas, portabilidades e instalaciones).
+              </p>
+            </div>
+          </div>
+        </header>
+
+        {/* BUSCADOR DE OFERTAS */}
+        <section className="space-y-2">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <h2 className="text-lg md:text-xl font-semibold">
+              Ofertas destacadas (bloqueadas)
+            </h2>
+            <div className="w-full md:w-80 relative">
+              <input
+                type="text"
+                placeholder="Buscar ofertas por nombre, tipo o texto..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full rounded-full bg-slate-900/70 border border-slate-700 px-4 py-2 pr-9 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                🔍
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-300/80">
+            {loading
+              ? "Cargando ofertas…"
+              : error
+              ? `Error: ${error}`
+              : ofertasFiltradas.length === 0
+              ? "No hay ofertas que coincidan con tu búsqueda."
+              : `${ofertasFiltradas.length} oferta(s) encontradas.`}
+          </p>
+        </section>
+
+        {/* ESTADO DE CARGA / ERROR */}
+        {loading && (
+          <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
+            Cargando ofertas, un momento…
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="rounded-2xl border border-red-700 bg-red-950/60 p-6 text-center text-sm text-red-200">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <>
+            {/* CARRUSEL DE OFERTAS DESTACADAS */}
+            {ofertasDestacadas.length > 0 && (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                    🌟 Ofertas especiales para ti
+                    <span className="text-[11px] font-normal text-slate-300">
+                      (visibles tras registrarte)
+                    </span>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                  {ofertasDestacadas.map((oferta) => {
+                    const cfg = tipoConfig[oferta.tipo];
+                    return (
+                      <div
+                        key={oferta.id}
+                        className={`min-w-[260px] max-w-xs rounded-2xl border ${cfg.border} bg-slate-900/85 p-4 shadow-lg shadow-slate-900/70 flex flex-col justify-between`}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                            >
+                              {cfg.label}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/15 text-yellow-300 border border-yellow-400/30">
+                              Destacada
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-semibold text-slate-50">
+                            {oferta.titulo}
+                          </h4>
+                          <p className="text-xs text-slate-200/85">
+                            {oferta.descripcionCorta}
+                          </p>
+                          {oferta.descripcionLarga && (
+                            <p className="mt-1 text-[11px] text-slate-300/85 line-clamp-4">
+                              {oferta.descripcionLarga}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                          <span>
+                            {formatearFecha(oferta.creadaEn)
+                              ? `Actualizada: ${formatearFecha(
+                                  oferta.creadaEn
+                                )}`
+                              : ""}
+                          </span>
+                          <button
+                            onClick={irARegistro}
+                            className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
+                          >
+                            Desbloquear
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* SECCIONES POR TIPO (mini-carrusel por tipo) */}
+            <section className="space-y-6">
+              {(Object.keys(ofertasPorTipo) as TipoOferta[]).map((tipo) => {
+                const lista = ofertasPorTipo[tipo];
+                if (!lista || lista.length === 0) return null;
+                const cfg = tipoConfig[tipo];
+
+                return (
+                  <div
+                    key={tipo}
+                    className="rounded-2xl bg-slate-900/70 border border-slate-700 p-4 md:p-5"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                      <div>
+                        <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                          {cfg.label}
+                          <span className="text-[11px] font-normal text-slate-300">
+                            ({lista.length} oferta(s) activas)
+                          </span>
+                        </h3>
+                        <p className="text-[11px] md:text-xs text-slate-300/85">
+                          Ofertas específicas de {cfg.label.toLowerCase()},
+                          ordenadas de la más reciente a la más antigua.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => irAComparador(tipo)}
+                        className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${cfg.btn} shadow-md shadow-slate-900/40`}
+                      >
+                        Ir al comparador de {cfg.label}
+                      </button>
+                    </div>
+
+                    <div className="flex gap-4 overflow-x-auto pb-1">
+                      {lista.map((oferta) => (
+                        <div
+                          key={oferta.id}
+                          className="min-w-[240px] max-w-xs rounded-2xl bg-slate-950/80 border border-slate-700 p-4 flex flex-col justify-between"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                              >
+                                {cfg.label}
+                              </span>
+                              {oferta.destacada && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-300 border border-yellow-200/40">
+                                  Destacada
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="text-sm font-semibold text-slate-50">
+                              {oferta.titulo}
+                            </h4>
+                            <p className="text-xs text-slate-200/80">
+                              {oferta.descripcionCorta}
+                            </p>
+                            {oferta.descripcionLarga && (
+                              <p className="mt-1 text-[11px] text-slate-300/85 line-clamp-4">
+                                {oferta.descripcionLarga}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                            <span>
+                              {formatearFecha(oferta.creadaEn)
+                                ? `Creada: ${formatearFecha(oferta.creadaEn)}`
+                                : ""}
+                            </span>
+                            <button
+                              onClick={() => irAComparador(tipo)}
+                              className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${cfg.btn}`}
+                            >
+                              Ver en comparador
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          </>
+        )}
+
+        {/* SECCIÓN “¿CÓMO DESBLOQUEAS TUS DESCUENTOS?” */}
+        <section className="grid gap-6 md:grid-cols-[1.3fr,1fr] items-center">
+          <div className="space-y-3">
+            <h2 className="text-lg md:text-xl font-semibold">
+              ¿Cómo desbloqueas tus descuentos?
+            </h2>
+            <p className="text-sm text-slate-200/85">
+              Es muy sencillo. Te acompañamos en todo el proceso y nos encargamos
+              de las gestiones para que solo te preocupes de ahorrar.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
+                <div className="text-emerald-400 text-sm font-bold">01</div>
+                <div className="font-semibold">Regístrate</div>
+                <p className="text-slate-300/85">
+                  Nombre, email y teléfono. 60 segundos.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
+                <div className="text-emerald-400 text-sm font-bold">02</div>
+                <div className="font-semibold">Accede a ofertas</div>
+                <p className="text-slate-300/85">
+                  Promos reales, negociadas y actualizadas.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
+                <div className="text-emerald-400 text-sm font-bold">03</div>
+                <div className="font-semibold">Contrata fácil</div>
+                <p className="text-slate-300/85">
+                  Nos ocupamos de altas, portabilidades e instalaciones.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
+                <div className="text-emerald-400 text-sm font-bold">04</div>
+                <div className="font-semibold">Ahorro constante</div>
+                <p className="text-slate-300/85">
+                  Seguimiento y optimización continua con nuestro equipo y HERMES-IA.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA final: ahorro + comisiones */}
+          <div className="rounded-3xl bg-emerald-500/10 border border-emerald-500/40 p-5 md:p-6 space-y-3">
+            <h3 className="text-lg font-semibold">
+              Ahorra en tus facturas y gana dinero con tus suministros
+            </h3>
+            <p className="text-sm text-emerald-50/90">
+              Compara ofertas de luz, gas, telefonía, seguros o energía solar.
+              Y si compartes, gana comisiones por cada contrato conseguido como
+              comercial o recomendador.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={irARegistro}
+                className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-slate-950 shadow-md shadow-emerald-500/40 transition"
+              >
+                Comenzar ahora
+              </button>
+              <button
+                onClick={irALoginCRM}
+                className="px-4 py-2.5 rounded-full border border-emerald-300/70 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/10 transition"
+              >
+                Soy comercial, acceder al CRM
+              </button>
+            </div>
+            <p className="text-[11px] text-emerald-100/80 pt-1">
+              Al enviar aceptas recibir comunicaciones comerciales sobre nuestras
+              ofertas y servicios.
+            </p>
+          </div>
+        </section>
+
+        {/* FOOTER SIMPLE */}
+        <footer className="pt-4 border-t border-slate-800 mt-4 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+          <span>© 2025 Impulso Energético</span>
+          <div className="flex gap-4">
+            <button
+              onClick={() => router.push("/ofertas")}
+              className="hover:text-emerald-300 transition"
+            >
+              Ver ofertas
+            </button>
+            <button
+              onClick={() => router.push("/legal")}
+              className="hover:text-emerald-300 transition"
+            >
+              Aviso legal
+            </button>
+            <button
+              onClick={() => router.push("/privacidad")}
+              className="hover:text-emerald-300 transition"
+            >
+              Privacidad
+            </button>
+          </div>
+        </footer>
+      </div>
+    </div>
   );
-}
+};
+
+export default BienvenidaContenido;
 
 
