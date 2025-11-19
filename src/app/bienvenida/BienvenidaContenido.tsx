@@ -55,13 +55,17 @@ const BienvenidaContenido: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+
         const res = await fetch("/api/ofertas", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
         });
 
-        if (!res.ok) throw new Error("No se pudieron cargar las ofertas");
+        if (!res.ok) {
+          throw new Error("No se pudieron cargar las ofertas");
+        }
+
         const data = await res.json();
         const lista: Oferta[] = (data?.ofertas ?? data) || [];
 
@@ -117,7 +121,9 @@ const BienvenidaContenido: React.FC = () => {
 
     for (const oferta of ofertasFiltradas) {
       if (!oferta.activa) continue;
-      if (grupos[oferta.tipo]) grupos[oferta.tipo].push(oferta);
+      if (grupos[oferta.tipo]) {
+        grupos[oferta.tipo].push(oferta);
+      }
     }
 
     return grupos;
@@ -145,18 +151,18 @@ const BienvenidaContenido: React.FC = () => {
 
   const irAGanaderia = () => router.push("/ganaderia");
   const irARegistro = () => router.push("/registro");
-  const irALoginCRM = () => router.push("/login"); // o /dashboard si tienes login integrado ahí
+  const irALoginCRM = () => router.push("/login"); // ajusta si tu login es otra ruta
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-10 space-y-10 md:space-y-12">
-        {/* CABECERA + HERO (inspirado en /registro) */}
+        {/* CABECERA + HERO */}
         <header className="flex flex-col gap-6 md:gap-8">
-          {/* Fila superior: logo + modo usuario */}
+          {/* Fila superior: logo + selector modo */}
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              {/* Sustituye este bloque por tu logo real del registro */}
-              {/* <Image src="/ruta-a-tu-logo.png" alt="Impulso Energético" width={160} height={60} /> */}
+              {/* Sustituye por tu logo real del registro */}
+              {/* <Image src="/LOGO-DEFINITIVO.png" alt="Impulso Energético" width={160} height={60} /> */}
               <div className="flex flex-col">
                 <span className="text-xs font-semibold tracking-[0.2em] text-emerald-300/80 uppercase">
                   Impulso Energético
@@ -204,9 +210,7 @@ const BienvenidaContenido: React.FC = () => {
                   ahorrar
                 </span>{" "}
                 y{" "}
-                <span className="text-amber-300">
-                  ganar comisiones
-                </span>{" "}
+                <span className="text-amber-300">ganar comisiones</span>{" "}
                 desde hoy
               </h1>
 
@@ -251,19 +255,13 @@ const BienvenidaContenido: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap gap-4 pt-4 text-[11px] text-slate-300/80">
-                <span className="inline-flex items-center gap-1">
-                  ✅ Estudio gratuito
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  ✅ Ofertas negociadas y actualizadas
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  ✅ Sin compromiso
-                </span>
+                <span>✅ Estudio gratuito</span>
+                <span>✅ Ofertas negociadas y actualizadas</span>
+                <span>✅ Sin compromiso</span>
               </div>
             </div>
 
-            {/* Tarjeta lateral con “Elige tu sección y empieza a ahorrar” */}
+            {/* Tarjeta lateral “elige tu sección” */}
             <div className="rounded-3xl bg-slate-900/80 border border-slate-700/80 p-5 md:p-6 shadow-2xl shadow-slate-950/80 space-y-4">
               <h2 className="text-base md:text-lg font-semibold">
                 Elige tu sección y empieza a ahorrar
@@ -384,7 +382,7 @@ const BienvenidaContenido: React.FC = () => {
           </p>
         </section>
 
-        {/* ESTADO DE CARGA / ERROR */}
+        {/* ESTADO CARGA / ERROR */}
         {loading && (
           <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
             Cargando ofertas, un momento…
@@ -399,7 +397,7 @@ const BienvenidaContenido: React.FC = () => {
 
         {!loading && !error && (
           <>
-            {/* CARRUSEL DE OFERTAS DESTACADAS */}
+            {/* CARRUSEL OFERTAS DESTACADAS */}
             {ofertasDestacadas.length > 0 && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
@@ -408,6 +406,7 @@ const BienvenidaContenido: React.FC = () => {
                     <span className="text-[11px] font-normal text-slate-300">
                       (visibles tras registrarte)
                     </span>
+                  </h3>
                 </div>
 
                 <div className="flex gap-4 overflow-x-auto pb-2">
@@ -464,7 +463,7 @@ const BienvenidaContenido: React.FC = () => {
               </section>
             )}
 
-            {/* SECCIONES POR TIPO (mini-carrusel por tipo) */}
+            {/* SECCIONES POR TIPO */}
             <section className="space-y-6">
               {(Object.keys(ofertasPorTipo) as TipoOferta[]).map((tipo) => {
                 const lista = ofertasPorTipo[tipo];
@@ -552,7 +551,7 @@ const BienvenidaContenido: React.FC = () => {
           </>
         )}
 
-        {/* SECCIÓN “¿CÓMO DESBLOQUEAS TUS DESCUENTOS?” */}
+        {/* BLOQUE “¿CÓMO DESBLOQUEAS TUS DESCUENTOS?” */}
         <section className="grid gap-6 md:grid-cols-[1.3fr,1fr] items-center">
           <div className="space-y-3">
             <h2 className="text-lg md:text-xl font-semibold">
@@ -589,13 +588,13 @@ const BienvenidaContenido: React.FC = () => {
                 <div className="text-emerald-400 text-sm font-bold">04</div>
                 <div className="font-semibold">Ahorro constante</div>
                 <p className="text-slate-300/85">
-                  Seguimiento y optimización continua con nuestro equipo y HERMES-IA.
+                  Seguimiento y optimización continua con nuestro equipo y
+                  HERMES-IA.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* CTA final: ahorro + comisiones */}
           <div className="rounded-3xl bg-emerald-500/10 border border-emerald-500/40 p-5 md:p-6 space-y-3">
             <h3 className="text-lg font-semibold">
               Ahorra en tus facturas y gana dinero con tus suministros
@@ -626,7 +625,7 @@ const BienvenidaContenido: React.FC = () => {
           </div>
         </section>
 
-        {/* FOOTER SIMPLE */}
+        {/* FOOTER */}
         <footer className="pt-4 border-t border-slate-800 mt-4 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
           <span>© 2025 Impulso Energético</span>
           <div className="flex gap-4">
@@ -656,5 +655,3 @@ const BienvenidaContenido: React.FC = () => {
 };
 
 export default BienvenidaContenido;
-
-
