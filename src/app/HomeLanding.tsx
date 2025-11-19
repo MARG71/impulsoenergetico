@@ -29,8 +29,8 @@ import {
   Tag,
 } from "lucide-react";
 
-// 👇 Importamos el mismo formulario que usas al escanear el QR
-// Asegúrate de que existe: src/app/registro/RegistroFormulario.tsx
+// 👇 Formulario de registro que ya usas al escanear el QR
+// IMPORTANTE: este archivo debe existir: src/app/registro/RegistroFormulario.tsx
 import RegistroFormulario from "./registro/RegistroFormulario";
 
 // Paleta corporativa Impulso

@@ -1,5 +1,4 @@
 // src/app/page.tsx
-// src/app/page.tsx
 import { Suspense } from "react";
 import HomeLanding from "./HomeLanding";
 
