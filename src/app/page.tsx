@@ -1,11 +1,12 @@
 // src/app/page.tsx
+// src/app/page.tsx
 import { Suspense } from "react";
-import HomeContenido from "./HomeContenido";
+import HomeLanding from "./HomeLanding";
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center">Cargando Impulso Energético...</div>}>
-      <HomeContenido />
+    <Suspense fallback={<div className="p-8 text-center text-slate-200">Cargando Impulso Energético...</div>}>
+      <HomeLanding />
     </Suspense>
   );
 }
