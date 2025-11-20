@@ -343,12 +343,12 @@ export default function HomeLandingImpulso() {
     {
       key: 'bateria',
       icon: BatteryCharging,
-      title: 'Batería HERMES-IA',
+      title: 'Batería IA',
       badge: 'Almacenamiento inteligente',
       desc: 'Acumula energía barata y úsala cuando más lo necesitas.',
       bullets: ['Gestión inteligente con IA', 'Monitorización en tiempo real', 'Ahorro extra en tu factura'],
       href: withTipo('bateria'),
-      cta: 'Ver estudio HERMES-IA',
+      cta: 'Ver estudio BATERIA-IA',
     },
   ];
 
@@ -358,19 +358,21 @@ export default function HomeLandingImpulso() {
       style={{ backgroundColor: brand.bg }}
     >
       {/* 🔹 TOP BAR: acceso CRM + afiliados */}
+      
       <header className="w-full border-b border-[#1f3a45] bg-[#081821]/90 backdrop-blur-sm">
-        <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4 text-[11px] md:text-sm">
-          <div className="flex items-center gap-2">
-            <img
-              src="/logo-impulso.png"
-              alt="Impulso Energético"
-              className="h-7 w-auto"
-            />
-            <span className="text-[#e6ddc0]">
-              Impulso Energético · Plataforma de ahorro y comisiones
+        <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4">
+          {/* Eslogan potente */}
+          <div className="flex flex-col md:flex-row md:items-baseline gap-1">
+            <span className="text-[11px] uppercase tracking-[0.25em] text-amber-200">
+              IMPULSO ENERGÉTICO
+            </span>
+            <span className="text-sm md:text-[15px] font-extrabold slogan-glow leading-snug md:ml-3">
+              Ahorra en tus facturas y gana comisiones con cada recomendación.
             </span>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Botones acceso */}
+          <div className="flex items-center gap-2 text-[11px] md:text-sm">
             <button
               onClick={() => router.push('/login')}
               className="px-4 py-1.5 rounded-full bg-amber-300 text-slate-900 font-semibold hover:bg-amber-200 transition shadow-sm shadow-amber-400/40"
@@ -386,6 +388,7 @@ export default function HomeLandingImpulso() {
           </div>
         </div>
       </header>
+
 
       {/* HERO */}
       <section className="relative overflow-hidden">
@@ -655,113 +658,9 @@ export default function HomeLandingImpulso() {
         </div>
       </section>
 
-      {/* TEASERS (grid estático) */}
-      <section className="container mx-auto px-6 pt-10 pb-6">
-        <h2
-          className="text-2xl md:text-3xl font-extrabold mb-6"
-          style={{ color: brand.text }}
-        >
-          Ofertas destacadas {leadOK ? '(desbloqueadas)' : '(bloqueadas)'}
-        </h2>
-        {loadingTeasers && (
-          <div className="text-sm" style={{ color: '#c9c2a5' }}>
-            Cargando ofertas…
-          </div>
-        )}
-        {!loadingTeasers && (
-          <div className="grid md:grid-cols-2 gap-6">
-            {teasers.slice(0, 4).map((o, i) => (
-              <div
-                key={i}
-                className="group relative rounded-2xl p-[2px]"
-                style={{
-                  background: `linear-gradient(135deg, ${brand.accent}, ${brand.accent2})`,
-                  boxShadow: `0 0 10px ${brand.accent}66, 0 0 24px ${brand.accent2}55`,
-                }}
-              >
-                <div
-                  className="rounded-2xl p-6 h-full"
-                  style={{ backgroundColor: brand.card }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-xs font-bold px-3 py-1 rounded-full"
-                      style={{
-                        backgroundColor: '#1a3c4a',
-                        color: brand.text,
-                      }}
-                    >
-                      {o.b || 'Destacada'}
-                    </span>
-                    <span
-                      className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
-                      style={{
-                        backgroundColor: '#1a3c4a',
-                        color: brand.text,
-                      }}
-                    >
-                      <Tag size={14} /> {o.tag || 'Exclusiva'}
-                    </span>
-                  </div>
-                  <div className="mt-4">
-                    <h3
-                      className="text-lg md:text-xl font-extrabold"
-                      style={{ color: brand.text }}
-                    >
-                      {o.t}
-                    </h3>
-                    <p
-                      className="mt-2 text-sm"
-                      style={{ color: '#d9d2b5' }}
-                    >
-                      {o.copy}
-                    </p>
-                  </div>
-                  {!leadOK ? (
-                    <div
-                      className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center text-center p-6"
-                      style={{
-                        background: '#0E2631dd',
-                        backdropFilter: 'blur(2px)',
-                        color: brand.text,
-                      }}
-                    >
-                      <Lock size={32} className="lock-anim" />
-                      <div className="font-bold mt-2">Contenido exclusivo</div>
-                      <div className="text-sm opacity-90 mt-1">
-                        Regístrate para ver precio, condiciones y contratar
-                      </div>
-                      <a
-                        href="#form"
-                        className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
-                        style={{
-                          background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-                          color: '#0b1e27',
-                        }}
-                      >
-                        Desbloquear ahora <ChevronRight size={16} />
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="mt-5">
-                      <a
-                        href={comparadorHref}
-                        className="inline-flex items-center gap-2 rounded-full px-5 py-2 font-semibold neon-glow"
-                        style={{
-                          background: `linear-gradient(90deg, ${brand.accent}, ${brand.accent2})`,
-                          color: '#0b1e27',
-                        }}
-                      >
-                        Ver detalle y contratar <ChevronRight size={16} />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      
+
+
 
       {/* 🔥 CARRUSEL POTENTE DE OFERTAS */}
       {!loadingTeasers && teasers.length > 0 && (
@@ -1107,6 +1006,33 @@ export default function HomeLandingImpulso() {
         .neon-frame-impulso {
           animation: glowPulse 2.2s ease-in-out infinite;
         }
+
+        @keyframes sloganPulse {
+          0%,
+          100% {
+            text-shadow: 0 0 8px rgba(255, 200, 120, 0.35),
+              0 0 16px rgba(255, 120, 80, 0.25);
+          }
+          50% {
+            text-shadow: 0 0 14px rgba(255, 220, 150, 0.8),
+              0 0 26px rgba(255, 140, 90, 0.7);
+          }
+        }
+
+        .slogan-glow {
+          background: linear-gradient(
+            90deg,
+            #ffecb3,
+            #ffb347,
+            #ffe5c4
+          );
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          text-shadow: 0 0 12px rgba(255, 186, 120, 0.4);
+          animation: sloganPulse 3s ease-in-out infinite;
+        }
+
 
         .mega-pill {
           display: inline-flex;
