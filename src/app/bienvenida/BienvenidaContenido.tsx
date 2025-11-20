@@ -224,6 +224,109 @@ export default function BienvenidaContenido() {
     router.push(`/comparador${buildQuery(extra)}`);
   };
 
+  // 🔹 Config de secciones para los botones tipo tarjeta (neón)
+  const secciones = [
+    {
+      id: "luz",
+      label: "Luz",
+      icon: "💡",
+      bgClass:
+        "bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-slate-950/90",
+      ringClass: "ring-emerald-400/70 group-hover:ring-emerald-200/90",
+      onClick: () => irAComparador("LUZ" as TipoOferta),
+    },
+    {
+      id: "gas",
+      label: "Gas",
+      icon: "🔥",
+      bgClass:
+        "bg-gradient-to-br from-orange-500/30 via-orange-500/10 to-slate-950/90",
+      ringClass: "ring-orange-400/70 group-hover:ring-orange-200/90",
+      onClick: () => irAComparador("GAS" as TipoOferta),
+    },
+    {
+      id: "telefonia",
+      label: "Telefonía",
+      icon: "📶",
+      bgClass:
+        "bg-gradient-to-br from-sky-500/30 via-sky-500/10 to-slate-950/90",
+      ringClass: "ring-sky-400/70 group-hover:ring-sky-200/90",
+      onClick: () => irAComparador("TELEFONIA" as TipoOferta),
+    },
+    {
+      id: "solar",
+      label: "Solar",
+      icon: "☀️",
+      bgClass:
+        "bg-gradient-to-br from-amber-400/35 via-amber-400/10 to-slate-950/90",
+      ringClass: "ring-amber-300/70 group-hover:ring-amber-100/90",
+      onClick: () => router.push(`/solar${buildQuery()}`),
+    },
+    {
+      id: "aerotermia",
+      label: "Aerotermia",
+      icon: "🌬️",
+      bgClass:
+        "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
+      ringClass: "ring-cyan-300/70 group-hover:ring-cyan-100/90",
+      onClick: () => router.push(`/aerotermia${buildQuery()}`),
+    },
+    {
+      id: "hermes",
+      label: "Batería HERMES IA",
+      icon: "🔋",
+      bgClass:
+        "bg-gradient-to-br from-purple-500/35 via-purple-500/10 to-slate-950/90",
+      ringClass: "ring-purple-400/70 group-hover:ring-purple-200/90",
+      onClick: () => router.push(`/bateria-hermes${buildQuery()}`),
+    },
+    {
+      id: "ferreteria",
+      label: "Ferretería",
+      icon: "🔩",
+      bgClass:
+        "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
+      ringClass: "ring-lime-300/70 group-hover:ring-lime-100/90",
+      onClick: () => router.push(`/ferreteria${buildQuery()}`),
+    },
+    {
+      id: "inmobiliaria",
+      label: "Inmobiliaria",
+      icon: "🏡",
+      bgClass:
+        "bg-gradient-to-br from-rose-500/35 via-rose-500/10 to-slate-950/90",
+      ringClass: "ring-rose-400/70 group-hover:ring-rose-200/90",
+      onClick: () => router.push(`/inmobiliaria${buildQuery()}`),
+    },
+    {
+      id: "viajes",
+      label: "Viajes",
+      icon: "✈️",
+      bgClass:
+        "bg-gradient-to-br from-indigo-500/35 via-indigo-500/10 to-slate-950/90",
+      ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
+      onClick: () => router.push(`/viajes${buildQuery()}`),
+    },
+    {
+      id: "repuestos",
+      label: "Repuestos coche",
+      icon: "🚗",
+      bgClass:
+        "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
+      ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
+      onClick: () => router.push(`/repuestos${buildQuery()}`),
+    },
+    {
+      id: "seguros",
+      label: "Seguros",
+      icon: "🛡️",
+      bgClass:
+        "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
+      ringClass: "ring-slate-300/70 group-hover:ring-slate-100/90",
+      onClick: () => router.push(`/seguros${buildQuery()}`),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       {/* ancho TOTAL de pantalla, con padding lateral mínimo */}
@@ -267,80 +370,41 @@ export default function BienvenidaContenido() {
               )}
             </div>
 
-            {/* Menú lateral secciones, fondo diferenciado */}
-            <nav className="rounded-3xl bg-slate-900/95 border border-slate-700/90 p-4 md:p-5 shadow-lg shadow-slate-950/50 space-y-4 text-sm">
-              <p className="text-[11px] font-semibold text-slate-100 uppercase tracking-[0.18em]">
+            {/* 🔸 SECCIONES: botones tipo tarjeta neón */}
+            <nav className="rounded-3xl bg-slate-950/90 border border-slate-700/80 p-5 shadow-[0_0_40px_rgba(15,23,42,0.9)] space-y-4">
+              <p className="text-sm md:text-lg font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-2">
+                <span className="h-[2px] w-4 bg-emerald-400 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
                 Secciones
               </p>
 
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => irAComparador("LUZ")}
-                  className="w-full rounded-2xl bg-emerald-500/12 border border-emerald-500/60 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-emerald-500/22 transition"
-                >
-                  💡 Luz
-                </button>
-                <button
-                  onClick={() => irAComparador("GAS")}
-                  className="w-full rounded-2xl bg-orange-500/12 border border-orange-500/60 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-orange-500/22 transition"
-                >
-                  🔥 Gas
-                </button>
-                <button
-                  onClick={() => irAComparador("TELEFONIA")}
-                  className="w-full rounded-2xl bg-sky-500/12 border border-sky-500/60 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-sky-500/22 transition"
-                >
-                  📶 Telefonía
-                </button>
+              {/* Grid de tarjetas redondeadas */}
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                {secciones.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={s.onClick}
+                    className={`group relative overflow-hidden rounded-3xl px-3 py-3 md:px-4 md:py-4 text-left text-xs md:text-sm font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
+                      ${s.bgClass} ${s.ringClass}
+                      hover:translate-y-[-1px] hover:shadow-[0_0_22px_rgba(15,23,42,0.9)]`}
+                  >
+                    {/* brillo suave en la esquina */}
+                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
 
-                <button
-                  onClick={() => router.push(`/solar${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-yellow-500/10 border border-yellow-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-yellow-500/20 transition"
-                >
-                  ☀️ Solar
-                </button>
-                <button
-                  onClick={() => router.push(`/aerotermia${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-cyan-500/10 border border-cyan-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-cyan-500/20 transition"
-                >
-                  🌬️ Aerotermia
-                </button>
-                <button
-                  onClick={() => router.push(`/bateria-hermes${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-purple-500/10 border border-purple-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-purple-500/20 transition"
-                >
-                  🔋 Batería HERMES IA
-                </button>
-                <button
-                  onClick={() => router.push(`/ferreteria${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-lime-500/10 border border-lime-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-lime-500/20 transition"
-                >
-                  🔩 Ferretería
-                </button>
-                <button
-                  onClick={() => router.push(`/inmobiliaria${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-rose-500/10 border border-rose-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-rose-500/20 transition"
-                >
-                  🏡 Inmobiliaria
-                </button>
-                <button
-                  onClick={() => router.push(`/viajes${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-indigo-500/10 border border-indigo-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-indigo-500/20 transition"
-                >
-                  ✈️ Viajes
-                </button>
-                <button
-                  onClick={() => router.push(`/repuestos${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-amber-500/10 border border-amber-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-amber-500/20 transition"
-                >
-                  🚗 Repuestos coche
-                </button>
-                <button
-                  onClick={() => router.push(`/seguros${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-slate-500/15 border border-slate-400/60 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-slate-500/25 transition"
-                >
-                  🛡️ Seguros
-                </button>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-lg shadow-[0_0_18px_rgba(255,255,255,0.25)]">
+                        {s.icon}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
+                          Servicio
+                        </span>
+                        <span className="text-xs md:text-sm font-bold">
+                          {s.label}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
             </nav>
           </aside>
@@ -447,7 +511,7 @@ export default function BienvenidaContenido() {
               </div>
             </header>
 
-            {/* BUSCADOR JUSTO DEBAJO DEL SALUDO */}
+            {/* BUSCADOR */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-lg md:text-xl font-semibold">
@@ -488,7 +552,7 @@ export default function BienvenidaContenido() {
               </div>
             )}
 
-            {/* CARRUSEL + BLOQUES POR TIPO DEBAJO DEL BUSCADOR */}
+            {/* CARRUSEL DESTACADAS */}
             {!loading && !error && ofertasDestacadas.length > 0 && (
               <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
                 <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
@@ -555,6 +619,7 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
+            {/* BLOQUES POR TIPO */}
             {!loading && !error && (
               <section className="space-y-6">
                 {(["LUZ", "GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
