@@ -238,23 +238,33 @@ export default function BienvenidaContenido() {
   // RENDER
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+      {/* ancho casi completo de pantalla */}
+      <div className="w-full max-w-7xl mx-auto px-3 md:px-6 lg:px-10 py-6 md:py-8">
         {/* GRID PRINCIPAL: SIDEBAR + CONTENIDO */}
-        <div className="grid gap-8 md:grid-cols-[260px,1fr] items-start">
+        <div className="grid gap-8 md:grid-cols-[320px,1fr] lg:grid-cols-[340px,1fr] items-start">
           {/* SIDEBAR IZQUIERDO */}
           <aside className="space-y-6">
             {/* Bloque logos */}
-            <div className="rounded-3xl bg-slate-950/80 border border-slate-800 p-4 flex flex-col items-start gap-3">
+            <div className="rounded-3xl bg-slate-900/95 border border-emerald-500/40 p-5 flex flex-col gap-4 shadow-lg shadow-emerald-500/20">
               <div className="flex items-center gap-3">
-                {/* Logo principal NEÓN */}
-                <div className="relative h-10 w-40">
+                {/* Logo principal (archivo nuevo) */}
+                <div className="relative h-12 w-52 md:h-14 md:w-64">
                   <Image
-                    src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO-NEON.png"
+                    src="/logo-impulso.png"
                     alt="Impulso Energético"
                     fill
-                    className="object-contain"
+                    className="object-contain drop-shadow-[0_0_16px_rgba(16,231,152,0.55)]"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm md:text-base font-semibold text-slate-50">
+                  Plataforma de ahorro y comisiones
+                </p>
+                <p className="text-[11px] tracking-[0.2em] uppercase text-emerald-300">
+                  Servicios y ventajas para socios
+                </p>
               </div>
 
               {clubNombre && (
@@ -267,78 +277,78 @@ export default function BienvenidaContenido() {
               )}
             </div>
 
-            {/* Menú lateral de secciones */}
-            <nav className="rounded-3xl bg-slate-950/80 border border-slate-800 p-4 space-y-3 text-xs">
+            {/* Menú lateral de secciones (fondo diferenciado) */}
+            <nav className="rounded-3xl bg-slate-900/90 border border-slate-700/90 p-4 md:p-5 shadow-lg shadow-slate-950/40 space-y-4 text-sm">
               <p className="text-[11px] font-semibold text-slate-200 uppercase tracking-[0.18em]">
-                SECCIONES
+                Secciones
               </p>
 
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => irAComparador("LUZ")}
-                  className="w-full rounded-xl bg-emerald-500/10 border border-emerald-500/40 px-3 py-2 text-left hover:bg-emerald-500/20 transition"
+                  className="w-full rounded-2xl bg-emerald-500/12 border border-emerald-500/50 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-emerald-500/22 transition"
                 >
                   💡 Luz
                 </button>
                 <button
                   onClick={() => irAComparador("GAS")}
-                  className="w-full rounded-xl bg-orange-500/10 border border-orange-500/40 px-3 py-2 text-left hover:bg-orange-500/20 transition"
+                  className="w-full rounded-2xl bg-orange-500/12 border border-orange-500/50 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-orange-500/22 transition"
                 >
                   🔥 Gas
                 </button>
                 <button
                   onClick={() => irAComparador("TELEFONIA")}
-                  className="w-full rounded-xl bg-sky-500/10 border border-sky-500/40 px-3 py-2 text-left hover:bg-sky-500/20 transition"
+                  className="w-full rounded-2xl bg-sky-500/12 border border-sky-500/50 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-sky-500/22 transition"
                 >
                   📶 Telefonía
                 </button>
 
-                {/* Resto de secciones futuras, de momento navegación placeholder */}
+                {/* Resto de secciones futuras */}
                 <button
                   onClick={() => router.push(`/solar${buildQuery()}`)}
-                  className="w-full rounded-xl bg-yellow-500/10 border border-yellow-500/40 px-3 py-2 text-left hover:bg-yellow-500/20 transition"
+                  className="w-full rounded-2xl bg-yellow-500/10 border border-yellow-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-yellow-500/20 transition"
                 >
                   ☀️ Solar
                 </button>
                 <button
                   onClick={() => router.push(`/aerotermia${buildQuery()}`)}
-                  className="w-full rounded-xl bg-cyan-500/10 border border-cyan-500/40 px-3 py-2 text-left hover:bg-cyan-500/20 transition"
+                  className="w-full rounded-2xl bg-cyan-500/10 border border-cyan-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-cyan-500/20 transition"
                 >
                   🌬️ Aerotermia
                 </button>
                 <button
                   onClick={() => router.push(`/bateria-hermes${buildQuery()}`)}
-                  className="w-full rounded-xl bg-purple-500/10 border border-purple-500/40 px-3 py-2 text-left hover:bg-purple-500/20 transition"
+                  className="w-full rounded-2xl bg-purple-500/10 border border-purple-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-purple-500/20 transition"
                 >
                   🔋 Batería HERMES IA
                 </button>
                 <button
                   onClick={() => router.push(`/inmobiliaria${buildQuery()}`)}
-                  className="w-full rounded-xl bg-rose-500/10 border border-rose-500/40 px-3 py-2 text-left hover:bg-rose-500/20 transition"
+                  className="w-full rounded-2xl bg-rose-500/10 border border-rose-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-rose-500/20 transition"
                 >
                   🏡 Inmobiliaria
                 </button>
                 <button
                   onClick={() => router.push(`/viajes${buildQuery()}`)}
-                  className="w-full rounded-xl bg-indigo-500/10 border border-indigo-500/40 px-3 py-2 text-left hover:bg-indigo-500/20 transition"
+                  className="w-full rounded-2xl bg-indigo-500/10 border border-indigo-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-indigo-500/20 transition"
                 >
                   ✈️ Viajes
                 </button>
                 <button
                   onClick={() => router.push(`/repuestos${buildQuery()}`)}
-                  className="w-full rounded-xl bg-amber-500/10 border border-amber-500/40 px-3 py-2 text-left hover:bg-amber-500/20 transition"
+                  className="w-full rounded-2xl bg-amber-500/10 border border-amber-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-amber-500/20 transition"
                 >
                   🚗 Repuestos coche
                 </button>
                 <button
                   onClick={() => router.push(`/ferreteria${buildQuery()}`)}
-                  className="w-full rounded-xl bg-lime-500/10 border border-lime-500/40 px-3 py-2 text-left hover:bg-lime-500/20 transition"
+                  className="w-full rounded-2xl bg-lime-500/10 border border-lime-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-lime-500/20 transition"
                 >
                   🔩 Ferretería
                 </button>
                 <button
                   onClick={() => router.push(`/seguros${buildQuery()}`)}
-                  className="w-full rounded-xl bg-slate-500/10 border border-slate-500/40 px-3 py-2 text-left hover:bg-slate-500/20 transition"
+                  className="w-full rounded-2xl bg-slate-500/15 border border-slate-400/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-slate-500/25 transition"
                 >
                   🛡️ Seguros
                 </button>
@@ -348,7 +358,7 @@ export default function BienvenidaContenido() {
 
           {/* COLUMNA DERECHA: CONTENIDO PRINCIPAL */}
           <main className="space-y-8 md:space-y-10">
-            {/* CABECERA */}
+            {/* CABECERA (alineada a la altura del logo) */}
             <header className="space-y-5">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-2">
@@ -358,13 +368,19 @@ export default function BienvenidaContenido() {
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
                     {nombre && (
                       <>
-                        Hola, <span className="text-emerald-400">{nombre}</span> 👋
+                        Hola,{" "}
+                        <span className="text-emerald-400 font-extrabold">
+                          {nombre}
+                        </span>{" "}
+                        👋
                         <br />
                       </>
                     )}
                     Ahorra en tus facturas y{" "}
-                    <span className="text-amber-300">gana comisiones</span> desde
-                    hoy.
+                    <span className="text-amber-300 font-extrabold">
+                      gana comisiones
+                    </span>{" "}
+                    desde hoy.
                   </h1>
                   {(agenteId || lugarId) && (
                     <p className="text-[11px] text-slate-400">
@@ -442,7 +458,7 @@ export default function BienvenidaContenido() {
               </div>
             </header>
 
-            {/* BUSCADOR (EN CAJÓN DIFERENCIADO) */}
+            {/* BUSCADOR (EN CAJÓN DIFERENCIADO, justo debajo del saludo) */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-lg md:text-xl font-semibold">
@@ -484,7 +500,7 @@ export default function BienvenidaContenido() {
               </div>
             )}
 
-            {/* CARRUSEL DESTACADAS EN SU PROPIO FONDO */}
+            {/* CARRUSEL DESTACADAS (debajo del buscador) */}
             {!loading && !error && ofertasDestacadas.length > 0 && (
               <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
                 <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
@@ -551,7 +567,7 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* SECCIONES POR TIPO CON COLORES DIFERENTES */}
+            {/* SECCIONES POR TIPO CON COLORES DIFERENTES (debajo del carrusel) */}
             {!loading && !error && (
               <section className="space-y-6">
                 {(["LUZ", "GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
