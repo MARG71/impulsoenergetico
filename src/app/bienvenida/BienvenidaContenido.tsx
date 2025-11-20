@@ -10,7 +10,7 @@ interface Oferta {
   titulo: string;
   descripcionCorta: string;
   descripcionLarga: string;
-  tipo: TipoOferta;
+  tipo: TipoOferta | string; // en la práctica puede venir en minúsculas
   destacada: boolean;
   activa: boolean;
   creadaEn?: string | null;
@@ -39,6 +39,14 @@ const tipoConfig: Record<
     border: "border-sky-200",
   },
 };
+
+// Normaliza cualquier valor de tipo a LUZ | GAS | TELEFONIA
+function normalizarTipoOferta(raw: string | undefined | null): TipoOferta {
+  const v = String(raw || "").toUpperCase();
+  if (v === "GAS") return "GAS";
+  if (v === "TELEFONIA" || v === "TELÉFONIA") return "TELEFONIA";
+  return "LUZ";
+}
 
 export default function BienvenidaContenido() {
   const router = useRouter();
@@ -123,7 +131,13 @@ export default function BienvenidaContenido() {
         if (!res.ok) throw new Error("No se pudieron cargar las ofertas");
 
         const data = await res.json();
-        const lista: Oferta[] = data?.ofertas ?? data ?? [];
+        const listaRaw: Oferta[] = (data?.ofertas ?? data ?? []) as Oferta[];
+
+        // Normalizamos tipos aquí
+        const lista = (listaRaw || []).map((o) => ({
+          ...o,
+          tipo: normalizarTipoOferta(o.tipo as string),
+        }));
 
         const ordenadas = [...lista].sort((a, b) => {
           const fechaA = a.creadaEn ? new Date(a.creadaEn).getTime() : 0;
@@ -148,21 +162,18 @@ export default function BienvenidaContenido() {
     if (!txt) return ofertas;
 
     return ofertas.filter((o) => {
-      const t = (
-        o.titulo +
+      const t =
+        (o.titulo || "") +
         " " +
-        o.descripcionCorta +
+        (o.descripcionCorta || "") +
         " " +
-        o.descripcionLarga +
+        (o.descripcionLarga || "") +
         " " +
-        o.tipo +
+        (o.tipo || "") +
         " " +
-        (o.destacada ? "destacada" : "")
-      )
-        .toLowerCase()
-        .trim();
+        (o.destacada ? "destacada" : "");
 
-      return t.includes(txt);
+      return t.toLowerCase().includes(txt);
     });
   }, [busqueda, ofertas]);
 
@@ -177,8 +188,10 @@ export default function BienvenidaContenido() {
       GAS: [],
       TELEFONIA: [],
     };
-    ofertasFiltradas.forEach((o) => {
-      if (o.activa) grupos[o.tipo].push(o);
+    (ofertasFiltradas || []).forEach((o) => {
+      if (!o.activa) return;
+      const key = normalizarTipoOferta(o.tipo as string);
+      grupos[key].push(o);
     });
     return grupos;
   }, [ofertasFiltradas]);
@@ -210,9 +223,10 @@ export default function BienvenidaContenido() {
       ofertaId: String(ofertaId),
     };
 
-    if (tipo === "LUZ") extra.tipo = "luz";
-    else if (tipo === "GAS") extra.tipo = "gas";
-    else if (tipo === "TELEFONIA") extra.tipo = "telefonia";
+    const key = normalizarTipoOferta(tipo);
+    if (key === "LUZ") extra.tipo = "luz";
+    else if (key === "GAS") extra.tipo = "gas";
+    else if (key === "TELEFONIA") extra.tipo = "telefonia";
 
     router.push(`/comparador${buildQuery(extra)}`);
   };
@@ -366,7 +380,9 @@ export default function BienvenidaContenido() {
 
             <div className="flex gap-4 overflow-x-auto pb-2">
               {ofertasDestacadas.map((oferta) => {
-                const cfg = tipoConfig[oferta.tipo];
+                const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
+                const cfg = tipoConfig[tipoNorm];
+
                 return (
                   <div
                     key={oferta.id}
@@ -400,7 +416,7 @@ export default function BienvenidaContenido() {
                       {leadOK ? (
                         <button
                           onClick={() =>
-                            irAComparadorConOferta(oferta.tipo, oferta.id)
+                            irAComparadorConOferta(tipoNorm, oferta.id)
                           }
                           className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                         >
@@ -483,7 +499,7 @@ export default function BienvenidaContenido() {
                           <span>{formFecha(oferta.creadaEn)}</span>
                           <button
                             onClick={() =>
-                              irAComparadorConOferta(oferta.tipo, oferta.id)
+                              irAComparadorConOferta(tipo, oferta.id)
                             }
                             className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${cfg.btn}`}
                           >
