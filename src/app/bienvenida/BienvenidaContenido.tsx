@@ -168,8 +168,22 @@ const BienvenidaContenido: React.FC = () => {
     return g;
   }, [ofertasFiltradas]);
 
-  const formFecha = (f?: string | null) =>
-    !f ? "" : new Date(f).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  const formFecha = (f?: string | null) => {
+    if (!f) return "";
+
+    try {
+      const d = new Date(f);
+      if (isNaN(d.getTime())) return ""; // fecha inválida, no pintamos nada
+
+      return d.toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "";
+    }
+  };
 
   // -----------------------------
   // NAVEGACIÓN
