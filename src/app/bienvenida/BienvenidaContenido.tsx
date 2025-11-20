@@ -238,67 +238,70 @@ export default function BienvenidaContenido() {
   // RENDER
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      {/* ancho casi completo de pantalla */}
-      <div className="w-full max-w-7xl mx-auto px-3 md:px-6 lg:px-10 py-6 md:py-8">
+      {/* Ancho casi completo de pantalla, sin max-width */}
+      <div className="w-full mx-auto px-3 sm:px-4 md:px-8 lg:px-10 py-6 md:py-8">
         {/* GRID PRINCIPAL: SIDEBAR + CONTENIDO */}
-        <div className="grid gap-8 md:grid-cols-[320px,1fr] lg:grid-cols-[340px,1fr] items-start">
+        <div className="grid gap-8 md:grid-cols-[360px,1fr] lg:grid-cols-[380px,1fr] items-start">
           {/* SIDEBAR IZQUIERDO */}
           <aside className="space-y-6">
             {/* Bloque logos */}
-            <div className="rounded-3xl bg-slate-900/95 border border-emerald-500/40 p-5 flex flex-col gap-4 shadow-lg shadow-emerald-500/20">
-              <div className="flex items-center gap-3">
-                {/* Logo principal (archivo nuevo) */}
-                <div className="relative h-12 w-52 md:h-14 md:w-64">
+            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col gap-5 shadow-xl shadow-emerald-500/30">
+              <div className="flex items-center gap-4">
+                {/* Logo principal (logo-impulso.png en /public) */}
+                <div className="relative h-16 w-64 md:h-20 md:w-72">
                   <Image
                     src="/logo-impulso.png"
                     alt="Impulso Energético"
                     fill
-                    className="object-contain drop-shadow-[0_0_16px_rgba(16,231,152,0.55)]"
+                    className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                    priority
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <p className="text-sm md:text-base font-semibold text-slate-50">
+                <p className="text-base md:text-lg font-bold text-slate-50">
                   Plataforma de ahorro y comisiones
                 </p>
-                <p className="text-[11px] tracking-[0.2em] uppercase text-emerald-300">
+                <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
                   Servicios y ventajas para socios
                 </p>
               </div>
 
               {clubNombre && (
-                <div className="mt-1 rounded-2xl bg-emerald-500/10 border border-emerald-500/40 px-3 py-2 text-xs text-emerald-100 w-full">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                <div className="mt-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/50 px-3 py-2.5 text-xs text-emerald-100 w-full">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-emerald-300 font-semibold">
                     Club / Asociación
                   </div>
-                  <div className="font-semibold text-sm">{clubNombre}</div>
+                  <div className="font-bold text-sm md:text-base">
+                    {clubNombre}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Menú lateral de secciones (fondo diferenciado) */}
-            <nav className="rounded-3xl bg-slate-900/90 border border-slate-700/90 p-4 md:p-5 shadow-lg shadow-slate-950/40 space-y-4 text-sm">
-              <p className="text-[11px] font-semibold text-slate-200 uppercase tracking-[0.18em]">
+            {/* Menú lateral de secciones (fondo diferenciado del fondo general) */}
+            <nav className="rounded-3xl bg-slate-900/95 border border-slate-700/90 p-4 md:p-5 shadow-lg shadow-slate-950/50 space-y-4 text-sm">
+              <p className="text-[11px] font-semibold text-slate-100 uppercase tracking-[0.18em]">
                 Secciones
               </p>
 
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => irAComparador("LUZ")}
-                  className="w-full rounded-2xl bg-emerald-500/12 border border-emerald-500/50 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-emerald-500/22 transition"
+                  className="w-full rounded-2xl bg-emerald-500/12 border border-emerald-500/60 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-emerald-500/22 transition"
                 >
                   💡 Luz
                 </button>
                 <button
                   onClick={() => irAComparador("GAS")}
-                  className="w-full rounded-2xl bg-orange-500/12 border border-orange-500/50 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-orange-500/22 transition"
+                  className="w-full rounded-2xl bg-orange-500/12 border border-orange-500/60 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-orange-500/22 transition"
                 >
                   🔥 Gas
                 </button>
                 <button
                   onClick={() => irAComparador("TELEFONIA")}
-                  className="w-full rounded-2xl bg-sky-500/12 border border-sky-500/50 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-sky-500/22 transition"
+                  className="w-full rounded-2xl bg-sky-500/12 border border-sky-500/60 px-3 py-2.5 text-left text-sm md:text-[0.9rem] font-semibold text-slate-50 hover:bg-sky-500/22 transition"
                 >
                   📶 Telefonía
                 </button>
@@ -306,49 +309,49 @@ export default function BienvenidaContenido() {
                 {/* Resto de secciones futuras */}
                 <button
                   onClick={() => router.push(`/solar${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-yellow-500/10 border border-yellow-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-yellow-500/20 transition"
+                  className="w-full rounded-2xl bg-yellow-500/10 border border-yellow-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-yellow-500/20 transition"
                 >
                   ☀️ Solar
                 </button>
                 <button
                   onClick={() => router.push(`/aerotermia${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-cyan-500/10 border border-cyan-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-cyan-500/20 transition"
+                  className="w-full rounded-2xl bg-cyan-500/10 border border-cyan-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-cyan-500/20 transition"
                 >
                   🌬️ Aerotermia
                 </button>
                 <button
                   onClick={() => router.push(`/bateria-hermes${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-purple-500/10 border border-purple-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-purple-500/20 transition"
+                  className="w-full rounded-2xl bg-purple-500/10 border border-purple-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-purple-500/20 transition"
                 >
                   🔋 Batería HERMES IA
                 </button>
                 <button
+                  onClick={() => router.push(`/ferreteria${buildQuery()}`)}
+                  className="w-full rounded-2xl bg-lime-500/10 border border-lime-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-lime-500/20 transition"
+                >
+                  🔩 Ferretería
+                </button>
+                <button
                   onClick={() => router.push(`/inmobiliaria${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-rose-500/10 border border-rose-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-rose-500/20 transition"
+                  className="w-full rounded-2xl bg-rose-500/10 border border-rose-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-rose-500/20 transition"
                 >
                   🏡 Inmobiliaria
                 </button>
                 <button
                   onClick={() => router.push(`/viajes${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-indigo-500/10 border border-indigo-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-indigo-500/20 transition"
+                  className="w-full rounded-2xl bg-indigo-500/10 border border-indigo-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-indigo-500/20 transition"
                 >
                   ✈️ Viajes
                 </button>
                 <button
                   onClick={() => router.push(`/repuestos${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-amber-500/10 border border-amber-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-amber-500/20 transition"
+                  className="w-full rounded-2xl bg-amber-500/10 border border-amber-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-amber-500/20 transition"
                 >
                   🚗 Repuestos coche
                 </button>
                 <button
-                  onClick={() => router.push(`/ferreteria${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-lime-500/10 border border-lime-500/40 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-lime-500/20 transition"
-                >
-                  🔩 Ferretería
-                </button>
-                <button
                   onClick={() => router.push(`/seguros${buildQuery()}`)}
-                  className="w-full rounded-2xl bg-slate-500/15 border border-slate-400/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-slate-500/25 transition"
+                  className="w-full rounded-2xl bg-slate-500/15 border border-slate-400/60 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-slate-500/25 transition"
                 >
                   🛡️ Seguros
                 </button>
@@ -361,8 +364,8 @@ export default function BienvenidaContenido() {
             {/* CABECERA (alineada a la altura del logo) */}
             <header className="space-y-5">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold tracking-[0.25em] text-emerald-300 uppercase">
+                <div className="space-y-3">
+                  <div className="text-xs md:text-sm font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
                   </div>
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
