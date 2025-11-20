@@ -428,7 +428,7 @@ export default function BienvenidaContenido() {
           <aside className="space-y-6">
             {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
-              {/* Columna izquierda: logo + subtítulo */}
+              {/* Columna izquierda: logo + contacto + subtítulo */}
               <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
                 <div className="flex items-center">
                   <div className="relative h-16 w-64 md:h-20 md:w-72">
@@ -442,7 +442,23 @@ export default function BienvenidaContenido() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                {/* Contacto */}
+                <div className="space-y-0.5 text-[11px] md:text-xs text-emerald-100">
+                  <p className="font-semibold tracking-wide">
+                    Tel. 692 13 70 48
+                  </p>
+                  <p className="font-medium">
+                    Email:{" "}
+                    <a
+                      href="mailto:info@impulsoenergetico.es"
+                      className="underline decoration-emerald-400/70 decoration-dotted hover:text-emerald-300"
+                    >
+                      info@impulsoenergetico.es
+                    </a>
+                  </p>
+                </div>
+
+                <div className="space-y-1 pt-1">
                   <p className="text-base md:text-lg font-bold text-slate-50">
                     Plataforma de ahorro y comisiones
                   </p>
@@ -494,19 +510,68 @@ export default function BienvenidaContenido() {
                     </p>
                   )}
 
-                  <div className="flex flex-wrap gap-3 pt-1">
-                    <button
-                      onClick={irARegistro}
-                      className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
-                    >
-                      Acceder / actualizar mis datos
-                    </button>
-                    <button
-                      onClick={() => irAComparador("LUZ")}
-                      className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
-                    >
-                      Ir al comparador de luz
-                    </button>
+                  {/* Botones principales + accesos rápidos */}
+                  <div className="space-y-3 pt-1">
+                    {/* Principal */}
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={irARegistro}
+                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                      >
+                        Acceder / actualizar mis datos
+                      </button>
+                      <button
+                        onClick={() => irAComparador("LUZ")}
+                        className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                      >
+                        Ir al comparador de luz
+                      </button>
+                    </div>
+
+                    {/* Accesos rápidos */}
+                    <div>
+                      <p className="text-[10px] md:text-xs uppercase tracking-[0.22em] text-slate-400 mb-2">
+                        Accesos rápidos a secciones
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => irAComparador("GAS")}
+                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
+                        >
+                          Gas
+                        </button>
+                        <button
+                          onClick={() => irAComparador("TELEFONIA")}
+                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
+                        >
+                          Telefonía
+                        </button>
+                        <button
+                          onClick={() => router.push(`/ferreteria${buildQuery()}`)}
+                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
+                        >
+                          Ferretería
+                        </button>
+                        <button
+                          onClick={() => router.push(`/viajes${buildQuery()}`)}
+                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
+                        >
+                          Viajes
+                        </button>
+                        <button
+                          onClick={() => router.push(`/repuestos${buildQuery()}`)}
+                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
+                        >
+                          Repuestos
+                        </button>
+                        <button
+                          onClick={() => router.push(`/seguros${buildQuery()}`)}
+                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
+                        >
+                          Seguros
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
