@@ -16,12 +16,12 @@ interface Oferta {
   creadaEn?: string | null;
 }
 
-type SpecialPlace = {
+interface SpecialPlace {
   id: string;
   nombre: string;
-  logo?: string;
-  mensajeCorto?: string;
-};
+  logo?: string | null;
+  mensajeCorto?: string | null;
+}
 
 const tipoConfig: Record<
   TipoOferta,
@@ -51,7 +51,7 @@ const BienvenidaContenido: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // --- estado principal ---
+  // Estado principal
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,17 +60,17 @@ const BienvenidaContenido: React.FC = () => {
     "cliente"
   );
 
-  // --- datos del cliente / trazabilidad QR ---
+  // Datos de cliente / trazabilidad QR
   const [nombre, setNombre] = useState<string | null>(null);
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [lugarId, setLugarId] = useState<string | null>(null);
   const [leadOK, setLeadOK] = useState(false);
 
-  // club / asociación (si el lugar es especial)
+  // Lugar especial (club / asociación)
   const [club, setClub] = useState<SpecialPlace | null>(null);
 
   // ==========================
-  // 1) LEER QUERY + LOCALSTORAGE
+  // 1) Leer query + localStorage
   // ==========================
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
@@ -100,7 +100,7 @@ const BienvenidaContenido: React.FC = () => {
     } catch {}
   }, [searchParams]);
 
-  // helper para mantener trazabilidad en las URLs
+  // Helper para construir query con trazabilidad
   const buildQuery = (extra?: Record<string, string>) => {
     const p = new URLSearchParams();
     if (nombre) p.set("nombre", nombre);
@@ -114,10 +114,11 @@ const BienvenidaContenido: React.FC = () => {
   };
 
   // ==========================
-  // 2) CARGAR DATOS DEL LUGAR (CLUB / ONG)
+  // 2) Cargar datos del lugar (club)
   // ==========================
   useEffect(() => {
     let cancel = false;
+
     (async () => {
       if (!lugarId) return;
       try {
@@ -127,25 +128,27 @@ const BienvenidaContenido: React.FC = () => {
         if (!res.ok) return;
         const data = await res.json();
         if (cancel) return;
+
         if (data?.especial) {
           setClub({
             id: String(lugarId),
             nombre: data.nombre || `Lugar ${lugarId}`,
-            logo: data.logo || undefined,
-            mensajeCorto: data.mensajeCorto || "Ayuda a tu club",
+            logo: data.logo ?? undefined,
+            mensajeCorto: data.mensajeCorto ?? "Ayuda a tu club",
           });
         }
       } catch {
         // si falla, simplemente no mostramos club
       }
     })();
+
     return () => {
       cancel = true;
     };
   }, [lugarId]);
 
   // ==========================
-  // 3) CARGAR OFERTAS DESDE LA API
+  // 3) Cargar ofertas desde la API
   // ==========================
   useEffect(() => {
     const cargarOfertas = async () => {
@@ -182,7 +185,7 @@ const BienvenidaContenido: React.FC = () => {
   }, []);
 
   // ==========================
-  // 4) FILTROS Y MEMOS
+  // 4) Filtros y memos
   // ==========================
   const ofertasFiltradas = useMemo(() => {
     const txt = busqueda.trim().toLowerCase();
@@ -213,12 +216,14 @@ const BienvenidaContenido: React.FC = () => {
   );
 
   const ofertasPorTipo = useMemo(() => {
-    const g = {
-      LUZ: [] as Oferta[],
-      GAS: [] as Oferta[],
-      TELEFONIA: [] as Oferta[],
+    const g: Record<TipoOferta, Oferta[]> = {
+      LUZ: [],
+      GAS: [],
+      TELEFONIA: [],
     };
-    ofertasFiltradas.forEach((o) => o.activa && g[o.tipo]?.push(o));
+    ofertasFiltradas.forEach((o) => {
+      if (o.activa) g[o.tipo].push(o);
+    });
     return g;
   }, [ofertasFiltradas]);
 
@@ -232,7 +237,7 @@ const BienvenidaContenido: React.FC = () => {
         });
 
   // ==========================
-  // 5) NAVEGACIÓN
+  // 5) Navegación
   // ==========================
   const irARegistro = () => router.push(`/registro${buildQuery()}`);
   const irALoginCRM = () => router.push(`/login${buildQuery()}`);
@@ -247,40 +252,37 @@ const BienvenidaContenido: React.FC = () => {
   };
 
   const irAComparadorConOferta = (tipo: TipoOferta, ofertaId: string) => {
-    // dejamos preparado ofertaId por si luego el comparador usa esa info
-    if (tipo === "LUZ")
+    if (tipo === "LUZ") {
       router.push(
         `/comparador${buildQuery({ tipo: "luz", ofertaId: String(ofertaId) })}`
       );
-    else if (tipo === "GAS")
+    } else if (tipo === "GAS") {
       router.push(
         `/comparador${buildQuery({ tipo: "gas", ofertaId: String(ofertaId) })}`
       );
-    else if (tipo === "TELEFONIA")
+    } else if (tipo === "TELEFONIA") {
       router.push(
         `/comparador${buildQuery({
           tipo: "telefonia",
           ofertaId: String(ofertaId),
         })}`
       );
+    }
   };
 
   // ==========================
-  // RENDER
+  // 6) Render
   // ==========================
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
         {/* GRID PRINCIPAL: SIDEBAR + CONTENIDO */}
         <div className="grid gap-8 md:grid-cols-[260px,1fr] items-start">
-          {/* ====================== */}
-          {/*  SIDEBAR LATERAL      */}
-          {/* ====================== */}
+          {/* SIDEBAR */}
           <aside className="space-y-6">
             {/* Logo Impulso + club */}
             <div className="rounded-3xl bg-slate-900/80 border border-slate-700 p-4 space-y-4 shadow-2xl shadow-black/40">
               <div className="flex items-center gap-3">
-                {/* Logo neón principal (usa el mismo que en el resto del proyecto) */}
                 <div
                   className="rounded-2xl p-2"
                   style={{
@@ -306,7 +308,6 @@ const BienvenidaContenido: React.FC = () => {
                 </div>
               </div>
 
-              {/* Club / asociación, si existe */}
               {club && (
                 <div className="mt-2 flex items-center gap-3 rounded-2xl bg-slate-950/80 border border-emerald-600/60 px-3 py-2">
                   {club.logo && (
@@ -394,19 +395,16 @@ const BienvenidaContenido: React.FC = () => {
               </nav>
           </aside>
 
-          {/* ====================== */}
-          {/*  ZONA PRINCIPAL        */}
-          {/* ====================== */}
+          {/* CONTENIDO PRINCIPAL */}
           <main className="space-y-10 md:space-y-12">
-            {/* CABECERA / HERO */}
+            {/* Cabecera / Hero */}
             <header className="space-y-6">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-2">
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
                     {nombre && (
                       <>
-                        Hola,{" "}
-                        <span className="text-emerald-400">{nombre}</span> 👋
+                        Hola, <span className="text-emerald-400">{nombre}</span> 👋
                         <br />
                       </>
                     )}
@@ -438,7 +436,6 @@ const BienvenidaContenido: React.FC = () => {
                   )}
                 </div>
 
-                {/* Selector cliente / comercial */}
                 <div className="inline-flex rounded-full bg-slate-900/70 border border-slate-700/80 p-1 text-[11px]">
                   <button
                     onClick={() => setModoUsuario("cliente")}
@@ -498,12 +495,11 @@ const BienvenidaContenido: React.FC = () => {
               </div>
             </header>
 
-            {/* BUSCADOR DE OFERTAS */}
+            {/* Buscador de ofertas */}
             <section className="space-y-2">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-lg md:text-xl font-semibold">
-                  Ofertas destacadas{" "}
-                  {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
+                  Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
                 </h2>
                 <div className="relative w-full md:w-80">
                   <input
@@ -528,7 +524,6 @@ const BienvenidaContenido: React.FC = () => {
               </p>
             </section>
 
-            {/* ESTADOS */}
             {loading && (
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
                 Cargando ofertas, un momento…
@@ -541,9 +536,9 @@ const BienvenidaContenido: React.FC = () => {
               </div>
             )}
 
+            {/* Carrusel destacadas + secciones por tipo */}
             {!loading && !error && (
               <>
-                {/* CARRUSEL DESTACADAS */}
                 {ofertasDestacadas.length > 0 && (
                   <section className="space-y-4" id="ofertas-destacadas">
                     <div className="flex items-center justify-between gap-2">
@@ -625,11 +620,11 @@ const BienvenidaContenido: React.FC = () => {
                   </section>
                 )}
 
-                {/* SECCIONES POR TIPO */}
+                {/* Secciones por tipo */}
                 <section className="space-y-6">
                   {(["LUZ", "GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
                     const lista = ofertasPorTipo[tipo];
-                    if (!lista?.length) return null;
+                    if (!lista || lista.length === 0) return null;
                     const cfg = tipoConfig[tipo];
 
                     return (
@@ -719,7 +714,7 @@ const BienvenidaContenido: React.FC = () => {
               </>
             )}
 
-            {/* BLOQUE “¿CÓMO DESBLOQUEAS TUS DESCUENTOS?” */}
+            {/* Bloque “¿Cómo funciona?” */}
             <section className="grid gap-6 md:grid-cols-[1.3fr,1fr] items-center">
               <div className="space-y-3">
                 <h2 className="text-lg md:text-xl font-semibold">
@@ -781,7 +776,7 @@ const BienvenidaContenido: React.FC = () => {
               </div>
             </section>
 
-            {/* FOOTER */}
+            {/* Footer */}
             <footer className="pt-4 border-t border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
               <span>© 2025 Impulso Energético</span>
               <div className="flex gap-4">
