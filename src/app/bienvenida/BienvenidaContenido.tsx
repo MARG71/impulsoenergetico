@@ -282,7 +282,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "ferreteria",
-      label: "Ferretería",
+      label: "Ferretería BRICOTITAN", // 👈 cambio de texto
       icon: "🔩",
       bgClass:
         "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
@@ -371,34 +371,34 @@ export default function BienvenidaContenido() {
             </div>
 
             {/* 🔸 SECCIONES: botones tipo tarjeta neón */}
-            <nav className="rounded-3xl bg-slate-950/90 border border-slate-700/80 p-5 shadow-[0_0_40px_rgba(15,23,42,0.9)] space-y-4">
-              <p className="text-sm md:text-lg font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-2">
-                <span className="h-[2px] w-4 bg-emerald-400 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+            <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
+              <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
+                <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
                 Secciones
               </p>
 
-              {/* Grid de tarjetas redondeadas */}
-              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+              {/* Grid de tarjetas redondeadas: 3 columnas en escritorio */}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                 {secciones.map((s) => (
                   <button
                     key={s.id}
                     onClick={s.onClick}
-                    className={`group relative overflow-hidden rounded-3xl px-3 py-3 md:px-4 md:py-4 text-left text-xs md:text-sm font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
+                    className={`group relative overflow-hidden rounded-3xl px-4 py-4 md:px-5 md:py-5 text-left text-sm md:text-base font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
                       ${s.bgClass} ${s.ringClass}
-                      hover:translate-y-[-1px] hover:shadow-[0_0_22px_rgba(15,23,42,0.9)]`}
+                      hover:translate-y-[-1px] hover:shadow-[0_0_26px_rgba(15,23,42,0.9)]`}
                   >
                     {/* brillo suave en la esquina */}
                     <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
 
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-lg shadow-[0_0_18px_rgba(255,255,255,0.25)]">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-xl shadow-[0_0_22px_rgba(255,255,255,0.25)]">
                         {s.icon}
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
                           Servicio
                         </span>
-                        <span className="text-xs md:text-sm font-bold">
+                        <span className="text-sm md:text-base font-bold leading-snug">
                           {s.label}
                         </span>
                       </div>
@@ -648,7 +648,7 @@ export default function BienvenidaContenido() {
                             </span>
                           </h3>
                         </div>
-                        <button
+                      <button
                           onClick={() => irAComparador(tipo)}
                           className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${cfg.btn} shadow-md shadow-slate-950/50`}
                         >
