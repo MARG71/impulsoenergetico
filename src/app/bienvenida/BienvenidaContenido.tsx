@@ -11,7 +11,7 @@ interface Oferta {
   titulo: string;
   descripcionCorta: string;
   descripcionLarga: string;
-  tipo: TipoOferta | string; // en la práctica puede venir en minúsculas
+  tipo: TipoOferta | string;
   destacada: boolean;
   activa: boolean;
   creadaEn?: string | null;
@@ -41,7 +41,6 @@ const tipoConfig: Record<
   },
 };
 
-// Normaliza cualquier valor de tipo a LUZ | GAS | TELEFONIA
 function normalizarTipoOferta(raw: string | undefined | null): TipoOferta {
   const v = String(raw || "").toUpperCase();
   if (v === "GAS") return "GAS";
@@ -53,10 +52,8 @@ export default function BienvenidaContenido() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Por si en el futuro quieres pasar el nombre del club por query (?club=…)
   const clubNombre = searchParams.get("club");
 
-  // Estado básico
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +62,11 @@ export default function BienvenidaContenido() {
     "cliente"
   );
 
-  // Datos de cliente / QR
   const [nombre, setNombre] = useState<string | null>(null);
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [lugarId, setLugarId] = useState<string | null>(null);
   const [leadOK, setLeadOK] = useState(false);
 
-  // Leer parámetros de la URL + localStorage
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
     const agenteURL = searchParams.get("agenteId");
@@ -106,7 +101,6 @@ export default function BienvenidaContenido() {
     }
   }, [searchParams]);
 
-  // Construir querystring para mantener trazabilidad
   const buildQuery = (extra?: Record<string, string>) => {
     const p = new URLSearchParams();
     if (nombre) p.set("nombre", nombre);
@@ -119,7 +113,6 @@ export default function BienvenidaContenido() {
     return qs ? `?${qs}` : "";
   };
 
-  // Cargar ofertas
   useEffect(() => {
     const cargarOfertas = async () => {
       try {
@@ -137,7 +130,6 @@ export default function BienvenidaContenido() {
         const data = await res.json();
         const listaRaw: Oferta[] = (data?.ofertas ?? data ?? []) as Oferta[];
 
-        // Normalizamos tipos aquí
         const lista = (listaRaw || []).map((o) => ({
           ...o,
           tipo: normalizarTipoOferta(o.tipo as string),
@@ -160,7 +152,6 @@ export default function BienvenidaContenido() {
     cargarOfertas();
   }, []);
 
-  // Filtros
   const ofertasFiltradas = useMemo(() => {
     const txt = busqueda.trim().toLowerCase();
     if (!txt) return ofertas;
@@ -176,7 +167,6 @@ export default function BienvenidaContenido() {
         (o.tipo || "") +
         " " +
         (o.destacada ? "destacada" : "");
-
       return t.toLowerCase().includes(txt);
     });
   }, [busqueda, ofertas]);
@@ -209,7 +199,6 @@ export default function BienvenidaContenido() {
           year: "numeric",
         });
 
-  // Navegación
   const irARegistro = () => router.push(`/registro${buildQuery()}`);
   const irALoginCRM = () => router.push(`/login${buildQuery()}`);
 
@@ -235,19 +224,17 @@ export default function BienvenidaContenido() {
     router.push(`/comparador${buildQuery(extra)}`);
   };
 
-  // RENDER
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      {/* Ancho casi completo de pantalla, sin max-width */}
-      <div className="w-full mx-auto px-3 sm:px-4 md:px-8 lg:px-10 py-6 md:py-8">
-        {/* GRID PRINCIPAL: SIDEBAR + CONTENIDO */}
-        <div className="grid gap-8 md:grid-cols-[360px,1fr] lg:grid-cols-[380px,1fr] items-start">
+      {/* ancho TOTAL de pantalla, con padding lateral mínimo */}
+      <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
+        {/* GRID PRINCIPAL: sidebar izquierda + contenido derecha */}
+        <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
           {/* SIDEBAR IZQUIERDO */}
           <aside className="space-y-6">
             {/* Bloque logos */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col gap-5 shadow-xl shadow-emerald-500/30">
               <div className="flex items-center gap-4">
-                {/* Logo principal (logo-impulso.png en /public) */}
                 <div className="relative h-16 w-64 md:h-20 md:w-72">
                   <Image
                     src="/logo-impulso.png"
@@ -280,7 +267,7 @@ export default function BienvenidaContenido() {
               )}
             </div>
 
-            {/* Menú lateral de secciones (fondo diferenciado del fondo general) */}
+            {/* Menú lateral secciones, fondo diferenciado */}
             <nav className="rounded-3xl bg-slate-900/95 border border-slate-700/90 p-4 md:p-5 shadow-lg shadow-slate-950/50 space-y-4 text-sm">
               <p className="text-[11px] font-semibold text-slate-100 uppercase tracking-[0.18em]">
                 Secciones
@@ -306,7 +293,6 @@ export default function BienvenidaContenido() {
                   📶 Telefonía
                 </button>
 
-                {/* Resto de secciones futuras */}
                 <button
                   onClick={() => router.push(`/solar${buildQuery()}`)}
                   className="w-full rounded-2xl bg-yellow-500/10 border border-yellow-500/50 px-3 py-2.5 text-left text-sm font-semibold text-slate-50 hover:bg-yellow-500/20 transition"
@@ -359,9 +345,9 @@ export default function BienvenidaContenido() {
             </nav>
           </aside>
 
-          {/* COLUMNA DERECHA: CONTENIDO PRINCIPAL */}
+          {/* COLUMNA DERECHA: bienvenida + buscador + ofertas */}
           <main className="space-y-8 md:space-y-10">
-            {/* CABECERA (alineada a la altura del logo) */}
+            {/* CABECERA ALINEADA A LA ALTURA DEL LOGO */}
             <header className="space-y-5">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-3">
@@ -461,7 +447,7 @@ export default function BienvenidaContenido() {
               </div>
             </header>
 
-            {/* BUSCADOR (EN CAJÓN DIFERENCIADO, justo debajo del saludo) */}
+            {/* BUSCADOR JUSTO DEBAJO DEL SALUDO */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-lg md:text-xl font-semibold">
@@ -490,7 +476,6 @@ export default function BienvenidaContenido() {
               </p>
             </section>
 
-            {/* ESTADOS */}
             {loading && (
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
                 Cargando ofertas, un momento…
@@ -503,7 +488,7 @@ export default function BienvenidaContenido() {
               </div>
             )}
 
-            {/* CARRUSEL DESTACADAS (debajo del buscador) */}
+            {/* CARRUSEL + BLOQUES POR TIPO DEBAJO DEL BUSCADOR */}
             {!loading && !error && ofertasDestacadas.length > 0 && (
               <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
                 <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
@@ -570,7 +555,6 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* SECCIONES POR TIPO CON COLORES DIFERENTES (debajo del carrusel) */}
             {!loading && !error && (
               <section className="space-y-6">
                 {(["LUZ", "GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
@@ -654,8 +638,7 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* FOOTER */}
-            <footer className="pt-4 border-t border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+            <footer className="pt-4 border-top border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
               <span>© 2025 Impulso Energético</span>
               <div className="flex gap-4">
                 <button className="hover:text-emerald-300 transition">
