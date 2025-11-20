@@ -58,9 +58,6 @@ export default function BienvenidaContenido() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [modoUsuario, setModoUsuario] = useState<"cliente" | "comercial">(
-    "cliente"
-  );
 
   const [nombre, setNombre] = useState<string | null>(null);
   const [agenteId, setAgenteId] = useState<string | null>(null);
@@ -280,7 +277,6 @@ export default function BienvenidaContenido() {
         });
 
   const irARegistro = () => router.push(`/registro${buildQuery()}`);
-  const irALoginCRM = () => router.push(`/login${buildQuery()}`);
 
   const irAComparador = (tipo?: TipoOferta) => {
     if (tipo === "LUZ") router.push(`/comparador${buildQuery({ tipo: "luz" })}`);
@@ -416,34 +412,35 @@ export default function BienvenidaContenido() {
         <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
           {/* COLUMNA IZQUIERDA (logo + bienvenida + buscador + secciones) */}
           <aside className="space-y-6">
-            {/* BLOQUE 2 + BLOQUE 1 INCRUSTADO */}
-            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col gap-5 shadow-xl shadow-emerald-500/30">
-              {/* Logo Impulso */}
-              <div className="flex items-center gap-4">
-                <div className="relative h-16 w-64 md:h-20 md:w-72">
-                  <Image
-                    src="/logo-impulso.png"
-                    alt="Impulso Energético"
-                    fill
-                    className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
-                    priority
-                  />
+            {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
+            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
+              {/* Columna izquierda: logo + subtítulo */}
+              <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
+                <div className="flex items-center">
+                  <div className="relative h-16 w-64 md:h-20 md:w-72">
+                    <Image
+                      src="/logo-impulso.png"
+                      alt="Impulso Energético"
+                      fill
+                      className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                      priority
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-base md:text-lg font-bold text-slate-50">
+                    Plataforma de ahorro y comisiones
+                  </p>
+                  <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
+                    Servicios y ventajas para socios
+                  </p>
                 </div>
               </div>
 
-              {/* Subtítulo plataforma */}
-              <div className="space-y-1">
-                <p className="text-base md:text-lg font-bold text-slate-50">
-                  Plataforma de ahorro y comisiones
-                </p>
-                <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
-                  Servicios y ventajas para socios
-                </p>
-              </div>
-
-              {/* === BLOQUE DE BIENVENIDA (antes pantallazo 1) === */}
-              <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                {/* Texto + botones */}
+              {/* Columna derecha: bienvenida + tarjeta club */}
+              <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
+                {/* Texto bienvenida + botones */}
                 <div className="flex-1 space-y-3">
                   <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
@@ -484,125 +481,79 @@ export default function BienvenidaContenido() {
                   )}
 
                   <div className="flex flex-wrap gap-3 pt-1">
-                    {modoUsuario === "cliente" ? (
-                      <>
-                        <button
-                          onClick={irARegistro}
-                          className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
-                        >
-                          Acceder / actualizar mis datos
-                        </button>
-                        <button
-                          onClick={() => irAComparador("LUZ")}
-                          className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
-                        >
-                          Ir al comparador de luz
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={irALoginCRM}
-                          className="px-4 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 font-semibold text-slate-950 shadow shadow-sky-500/40 text-xs md:text-sm"
-                        >
-                          Acceder al CRM
-                        </button>
-                        <button
-                          onClick={irARegistro}
-                          className="px-4 py-2.5 rounded-full border border-sky-300 text-sky-100 hover:bg-sky-500/10 text-xs md:text-sm"
-                        >
-                          Invitar clientes a registrarse
-                        </button>
-                      </>
-                    )}
+                    <button
+                      onClick={irARegistro}
+                      className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                    >
+                      Acceder / actualizar mis datos
+                    </button>
+                    <button
+                      onClick={() => irAComparador("LUZ")}
+                      className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                    >
+                      Ir al comparador de luz
+                    </button>
                   </div>
                 </div>
 
-                {/* Toggle + tarjeta de club */}
-                <div className="w-full lg:w-[260px] xl:w-[300px] flex flex-col gap-3 items-stretch">
-                  {/* Toggle cliente / comercial */}
-                  <div className="self-end inline-flex rounded-full bg-slate-950/70 border border-slate-700/80 p-1 text-[10px]">
-                    <button
-                      onClick={() => setModoUsuario("cliente")}
-                      className={`px-3 py-1 rounded-full font-semibold ${
-                        modoUsuario === "cliente"
-                          ? "bg-emerald-500 text-slate-950"
-                          : "text-slate-200"
-                      }`}
-                    >
-                      Soy cliente
-                    </button>
-                    <button
-                      onClick={() => setModoUsuario("comercial")}
-                      className={`px-3 py-1 rounded-full font-semibold ${
-                        modoUsuario === "comercial"
-                          ? "bg-sky-500 text-slate-950"
-                          : "text-slate-200"
-                      }`}
-                    >
-                      Soy comercial
-                    </button>
-                  </div>
+                {/* Tarjeta club a la derecha */}
+                {hayClubEspecial && (
+                  <div
+                    className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
+                    style={{
+                      borderColor: clubColorAcento || "#22c55e",
+                      boxShadow: `0 0 32px ${
+                        clubColorAcento || "rgba(34,197,94,0.55)"
+                      }`,
+                    }}
+                  >
+                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
 
-                  {/* Tarjeta especial club / asociación */}
-                  {hayClubEspecial && (
-                    <div
-                      className="relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
-                      style={{
-                        borderColor: clubColorAcento || "#22c55e",
-                        boxShadow: `0 0 32px ${
-                          clubColorAcento || "rgba(34,197,94,0.55)"
-                        }`,
-                      }}
-                    >
-                      <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
-
-                      <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
-                        {clubLogoUrl ? (
-                          <Image
-                            src={clubLogoUrl}
-                            alt={clubNombre || "Logo club"}
-                            fill
-                            className="object-contain"
-                          />
-                        ) : (
-                          <span className="text-2xl">🤝</span>
-                        )}
-                      </div>
-
-                      <div className="flex-1 space-y-1">
-                        <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
-                          Club / Asociación
-                        </div>
-                        <div className="text-xs md:text-sm font-bold">
-                          {clubNombre || "Programa solidario"}
-                        </div>
-                        {clubMensaje && (
-                          <p className="text-[10px] md:text-xs text-slate-200/90">
-                            {clubMensaje}
-                          </p>
-                        )}
-                        {clubAportacion != null &&
-                          !Number.isNaN(clubAportacion) && (
-                            <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
-                              💚 Aportación acumulada:{" "}
-                              <span className="ml-1">
-                                {clubAportacion.toLocaleString("es-ES", {
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                €
-                              </span>
-                            </div>
-                          )}
-                      </div>
+                    <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
+                      {clubLogoUrl ? (
+                        <Image
+                          src={clubLogoUrl}
+                          alt={clubNombre || "Logo club"}
+                          fill
+                          className="object-contain"
+                        />
+                      ) : (
+                        <span className="text-2xl">🤝</span>
+                      )}
                     </div>
-                  )}
-                </div>
+
+                    <div className="flex-1 space-y-1">
+                      <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
+                        Club / Asociación
+                      </div>
+                      <div className="text-xs md:text-sm font-bold">
+                        {clubNombre || "Programa solidario"}
+                      </div>
+                      {clubMensaje && (
+                        <p className="text-[10px] md:text-xs text-slate-200/90">
+                          {clubMensaje}
+                        </p>
+                      )}
+                      {clubAportacion != null &&
+                        !Number.isNaN(clubAportacion) && (
+                          <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
+                            💚 Aportación acumulada:{" "}
+                            <span className="ml-1">
+                              {clubAportacion.toLocaleString("es-ES", {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              €
+                            </span>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* === BUSCADOR (pantallazo 3) ENTRE BLOQUE SUPERIOR Y SECCIONES === */}
+            {/* === BUSCADOR ENTRE BLOQUE SUPERIOR Y SECCIONES === */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-sm md:text-base font-semibold">
@@ -631,7 +582,7 @@ export default function BienvenidaContenido() {
               </p>
             </section>
 
-            {/* SECCIONES (pantallazo “Secciones”) */}
+            {/* SECCIONES */}
             <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
               <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
                 <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
@@ -667,7 +618,7 @@ export default function BienvenidaContenido() {
             </nav>
           </aside>
 
-          {/* COLUMNA DERECHA: solo ofertas (ya sin cabecera) */}
+          {/* COLUMNA DERECHA: solo ofertas */}
           <main className="space-y-8 md:space-y-10">
             {loading && (
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
