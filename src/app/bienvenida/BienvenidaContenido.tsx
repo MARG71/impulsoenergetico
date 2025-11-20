@@ -73,6 +73,7 @@ export default function BienvenidaContenido() {
   const [clubAportacion, setClubAportacion] = useState<number | null>(null);
   const [clubColorAcento, setClubColorAcento] = useState<string>("#22c55e");
 
+  // Lee datos básicos y posibles params extra de club
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
     const agenteURL = searchParams.get("agenteId");
@@ -127,51 +128,64 @@ export default function BienvenidaContenido() {
     if (clubColorParam) setClubColorAcento(clubColorParam);
   }, [searchParams]);
 
-  // Si tenemos lugarId, intentamos cargar info especial del lugar (logo, mensaje, aportación…)
+  // Si tenemos lugarId, cargamos info especial REAL del lugar (según schema.prisma)
   useEffect(() => {
     if (!lugarId) return;
 
     const cargarLugar = async () => {
       try {
-        const res = await fetch(`/api/lugares/${lugarId}`);
+        const res = await fetch(`/api/lugares/${lugarId}`, {
+          cache: "no-store",
+        });
         if (!res.ok) return;
+
         const data = await res.json();
-        const lugar = (data && (data.lugar || data)) || {};
+        const lugar = (data && (data.lugar || data)) || null;
+        if (!lugar) return;
 
-        const posibleLogo =
-          lugar.logoEspecialUrl ||
-          lugar.logoEspecial ||
-          lugar.logoClub ||
-          lugar.logo ||
-          null;
-        const posibleMensaje =
-          lugar.mensajeGancho ||
-          lugar.mensajeEspecial ||
-          lugar.mensaje ||
-          null;
-        const posibleAportacion =
-          typeof lugar.aportacionAcumulada === "number"
-            ? lugar.aportacionAcumulada
-            : typeof lugar.aportacionAcumulada === "string"
-            ? Number(lugar.aportacionAcumulada)
-            : null;
-        const posibleColor = lugar.colorAcento || lugar.colorAccent || null;
+        // Solo mostramos la tarjeta si el lugar está marcado como especial
+        if (lugar.especial === false) return;
 
-        if (posibleLogo && !clubLogoUrl) setClubLogoUrl(posibleLogo as string);
-        if (posibleMensaje && !clubMensaje)
-          setClubMensaje(posibleMensaje as string);
-        if (posibleAportacion != null && !Number.isNaN(posibleAportacion)) {
-          if (clubAportacion == null) setClubAportacion(posibleAportacion);
+        // NOMBRES EXACTOS del modelo Lugar
+        const posibleLogo: string | null = lugar.especialLogoUrl ?? null;
+        const posibleMensaje: string | null = lugar.especialMensaje ?? null;
+
+        let posibleAportacion: number | null = null;
+        if (typeof lugar.aportacionAcumulada === "number") {
+          posibleAportacion = lugar.aportacionAcumulada;
+        } else if (typeof lugar.aportacionAcumulada === "string") {
+          const n = Number(lugar.aportacionAcumulada);
+          posibleAportacion = Number.isNaN(n) ? null : n;
         }
+
+        const posibleColor: string | null = lugar.especialColor ?? null;
+
+        if (posibleLogo && !clubLogoUrl) {
+          setClubLogoUrl(posibleLogo);
+        }
+
+        if (posibleMensaje && !clubMensaje) {
+          setClubMensaje(posibleMensaje);
+        }
+
+        if (
+          posibleAportacion != null &&
+          !Number.isNaN(posibleAportacion) &&
+          clubAportacion == null
+        ) {
+          setClubAportacion(posibleAportacion);
+        }
+
         if (posibleColor && !searchParams.get("clubColor")) {
-          setClubColorAcento(String(posibleColor));
+          setClubColorAcento(posibleColor);
         }
-      } catch {
-        // si falla, simplemente no mostramos la caja especial
+      } catch (err) {
+        console.error("Error cargando lugar especial", err);
       }
     };
 
     cargarLugar();
+    // incluimos deps para no pisar manualmente lo que venga por query
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lugarId]);
 
@@ -187,6 +201,7 @@ export default function BienvenidaContenido() {
     return qs ? `?${qs}` : "";
   };
 
+  // Carga de ofertas
   useEffect(() => {
     const cargarOfertas = async () => {
       try {
@@ -402,7 +417,7 @@ export default function BienvenidaContenido() {
   ];
 
   const hayClubEspecial =
-    clubNombre || clubLogoUrl || clubMensaje || clubAportacion !== null;
+    !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
@@ -622,18 +637,19 @@ export default function BienvenidaContenido() {
                             {clubMensaje}
                           </p>
                         )}
-                        {clubAportacion != null && !Number.isNaN(clubAportacion) && (
-                          <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 border border-emerald-300/50">
-                            💚 Aportación acumulada:{" "}
-                            <span className="ml-1">
-                              {clubAportacion.toLocaleString("es-ES", {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                              })}{" "}
-                              €
-                            </span>
-                          </div>
-                        )}
+                        {clubAportacion != null &&
+                          !Number.isNaN(clubAportacion) && (
+                            <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 border border-emerald-300/50">
+                              💚 Aportación acumulada:{" "}
+                              <span className="ml-1">
+                                {clubAportacion.toLocaleString("es-ES", {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                €
+                              </span>
+                            </div>
+                          )}
                       </div>
                     </div>
                   )}
