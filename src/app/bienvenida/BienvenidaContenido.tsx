@@ -128,7 +128,7 @@ export default function BienvenidaContenido() {
     if (clubColorParam) setClubColorAcento(clubColorParam);
   }, [searchParams]);
 
-  // Si tenemos lugarId, cargamos info especial REAL del lugar (según schema.prisma)
+  // Si tenemos lugarId, cargamos info especial REAL del lugar
   useEffect(() => {
     if (!lugarId) return;
 
@@ -146,7 +146,6 @@ export default function BienvenidaContenido() {
         // Solo mostramos la tarjeta si el lugar está marcado como especial
         if (lugar.especial === false) return;
 
-        // NOMBRES EXACTOS del modelo Lugar
         const posibleLogo: string | null = lugar.especialLogoUrl ?? null;
         const posibleMensaje: string | null = lugar.especialMensaje ?? null;
 
@@ -160,14 +159,8 @@ export default function BienvenidaContenido() {
 
         const posibleColor: string | null = lugar.especialColor ?? null;
 
-        if (posibleLogo && !clubLogoUrl) {
-          setClubLogoUrl(posibleLogo);
-        }
-
-        if (posibleMensaje && !clubMensaje) {
-          setClubMensaje(posibleMensaje);
-        }
-
+        if (posibleLogo && !clubLogoUrl) setClubLogoUrl(posibleLogo);
+        if (posibleMensaje && !clubMensaje) setClubMensaje(posibleMensaje);
         if (
           posibleAportacion != null &&
           !Number.isNaN(posibleAportacion) &&
@@ -175,7 +168,6 @@ export default function BienvenidaContenido() {
         ) {
           setClubAportacion(posibleAportacion);
         }
-
         if (posibleColor && !searchParams.get("clubColor")) {
           setClubColorAcento(posibleColor);
         }
@@ -185,7 +177,6 @@ export default function BienvenidaContenido() {
     };
 
     cargarLugar();
-    // incluimos deps para no pisar manualmente lo que venga por query
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lugarId]);
 
@@ -421,14 +412,13 @@ export default function BienvenidaContenido() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      {/* ancho TOTAL de pantalla, con padding lateral mínimo */}
       <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
-        {/* GRID PRINCIPAL: sidebar izquierda + contenido derecha */}
         <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
-          {/* SIDEBAR IZQUIERDO */}
+          {/* COLUMNA IZQUIERDA (logo + bienvenida + buscador + secciones) */}
           <aside className="space-y-6">
-            {/* Bloque logos Impulso */}
+            {/* BLOQUE 2 + BLOQUE 1 INCRUSTADO */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col gap-5 shadow-xl shadow-emerald-500/30">
+              {/* Logo Impulso */}
               <div className="flex items-center gap-4">
                 <div className="relative h-16 w-64 md:h-20 md:w-72">
                   <Image
@@ -441,6 +431,7 @@ export default function BienvenidaContenido() {
                 </div>
               </div>
 
+              {/* Subtítulo plataforma */}
               <div className="space-y-1">
                 <p className="text-base md:text-lg font-bold text-slate-50">
                   Plataforma de ahorro y comisiones
@@ -449,58 +440,16 @@ export default function BienvenidaContenido() {
                   Servicios y ventajas para socios
                 </p>
               </div>
-            </div>
 
-            {/* 🔸 SECCIONES: botones tipo tarjeta neón */}
-            <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
-              <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
-                <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
-                Secciones
-              </p>
-
-              {/* Grid de tarjetas: 3 columnas en escritorio */}
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-                {secciones.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={s.onClick}
-                    className={`group relative overflow-hidden rounded-3xl px-4 py-4 md:px-5 md:py-5 text-left text-sm md:text-base font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
-                      ${s.bgClass} ${s.ringClass}
-                      hover:translate-y-[-1px] hover:shadow-[0_0_26px_rgba(15,23,42,0.9)]`}
-                  >
-                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
-
-                    <div className="flex items-center gap-3 md:gap-4">
-                      <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-xl shadow-[0_0_22px_rgba(255,255,255,0.25)]">
-                        {s.icon}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
-                          Servicio
-                        </span>
-                        <span className="text-sm md:text-base font-bold leading-snug">
-                          {s.label}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </nav>
-          </aside>
-
-          {/* COLUMNA DERECHA: bienvenida + buscador + ofertas */}
-          <main className="space-y-8 md:space-y-10">
-            {/* CABECERA COMPACTA CON CLUB */}
-            <header>
-              <div className="rounded-3xl bg-slate-900/85 border border-slate-700/80 p-5 md:p-6 lg:p-7 shadow-[0_0_40px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-6 lg:gap-8 items-start justify-between">
-                {/* Texto de bienvenida */}
-                <div className="flex-1 space-y-4">
-                  <div className="text-[11px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
+              {/* === BLOQUE DE BIENVENIDA (antes pantallazo 1) === */}
+              <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
+                {/* Texto + botones */}
+                <div className="flex-1 space-y-3">
+                  <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
                   </div>
 
-                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold leading-tight">
+                  <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold leading-tight">
                     {nombre && (
                       <>
                         Hola,{" "}
@@ -534,19 +483,18 @@ export default function BienvenidaContenido() {
                     </p>
                   )}
 
-                  {/* Botones principales */}
                   <div className="flex flex-wrap gap-3 pt-1">
                     {modoUsuario === "cliente" ? (
                       <>
                         <button
                           onClick={irARegistro}
-                          className="px-5 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-sm"
+                          className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
                         >
                           Acceder / actualizar mis datos
                         </button>
                         <button
                           onClick={() => irAComparador("LUZ")}
-                          className="px-5 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-sm"
+                          className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
                         >
                           Ir al comparador de luz
                         </button>
@@ -555,13 +503,13 @@ export default function BienvenidaContenido() {
                       <>
                         <button
                           onClick={irALoginCRM}
-                          className="px-5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 font-semibold text-slate-950 shadow shadow-sky-500/40 text-sm"
+                          className="px-4 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 font-semibold text-slate-950 shadow shadow-sky-500/40 text-xs md:text-sm"
                         >
                           Acceder al CRM
                         </button>
                         <button
                           onClick={irARegistro}
-                          className="px-5 py-2.5 rounded-full border border-sky-300 text-sky-100 hover:bg-sky-500/10 text-sm"
+                          className="px-4 py-2.5 rounded-full border border-sky-300 text-sky-100 hover:bg-sky-500/10 text-xs md:text-sm"
                         >
                           Invitar clientes a registrarse
                         </button>
@@ -570,10 +518,10 @@ export default function BienvenidaContenido() {
                   </div>
                 </div>
 
-                {/* Lado derecho: selector de modo + tarjeta de club */}
-                <div className="w-full lg:w-[320px] xl:w-[360px] flex flex-col gap-4 items-stretch">
+                {/* Toggle + tarjeta de club */}
+                <div className="w-full lg:w-[260px] xl:w-[300px] flex flex-col gap-3 items-stretch">
                   {/* Toggle cliente / comercial */}
-                  <div className="self-end inline-flex rounded-full bg-slate-950/70 border border-slate-700/80 p-1 text-[11px]">
+                  <div className="self-end inline-flex rounded-full bg-slate-950/70 border border-slate-700/80 p-1 text-[10px]">
                     <button
                       onClick={() => setModoUsuario("cliente")}
                       className={`px-3 py-1 rounded-full font-semibold ${
@@ -596,7 +544,7 @@ export default function BienvenidaContenido() {
                     </button>
                   </div>
 
-                  {/* Tarjeta especial de club / asociación */}
+                  {/* Tarjeta especial club / asociación */}
                   {hayClubEspecial && (
                     <div
                       className="relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
@@ -607,10 +555,8 @@ export default function BienvenidaContenido() {
                         }`,
                       }}
                     >
-                      {/* Glow */}
                       <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
 
-                      {/* Logo del club */}
                       <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
                         {clubLogoUrl ? (
                           <Image
@@ -624,22 +570,21 @@ export default function BienvenidaContenido() {
                         )}
                       </div>
 
-                      {/* Texto club */}
                       <div className="flex-1 space-y-1">
-                        <div className="text-[10px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
+                        <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
                           Club / Asociación
                         </div>
-                        <div className="text-sm md:text-base font-bold">
+                        <div className="text-xs md:text-sm font-bold">
                           {clubNombre || "Programa solidario"}
                         </div>
                         {clubMensaje && (
-                          <p className="text-[11px] md:text-xs text-slate-200/90">
+                          <p className="text-[10px] md:text-xs text-slate-200/90">
                             {clubMensaje}
                           </p>
                         )}
                         {clubAportacion != null &&
                           !Number.isNaN(clubAportacion) && (
-                            <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 border border-emerald-300/50">
+                            <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
                               💚 Aportación acumulada:{" "}
                               <span className="ml-1">
                                 {clubAportacion.toLocaleString("es-ES", {
@@ -655,15 +600,15 @@ export default function BienvenidaContenido() {
                   )}
                 </div>
               </div>
-            </header>
+            </div>
 
-            {/* BUSCADOR */}
+            {/* === BUSCADOR (pantallazo 3) ENTRE BLOQUE SUPERIOR Y SECCIONES === */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <h2 className="text-lg md:text-xl font-semibold">
+                <h2 className="text-sm md:text-base font-semibold">
                   Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
                 </h2>
-                <div className="relative w-full md:w-80">
+                <div className="relative w-full">
                   <input
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
@@ -686,6 +631,44 @@ export default function BienvenidaContenido() {
               </p>
             </section>
 
+            {/* SECCIONES (pantallazo “Secciones”) */}
+            <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
+              <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
+                <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
+                Secciones
+              </p>
+
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+                {secciones.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={s.onClick}
+                    className={`group relative overflow-hidden rounded-3xl px-4 py-4 md:px-5 md:py-5 text-left text-sm md:text-base font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
+                      ${s.bgClass} ${s.ringClass}
+                      hover:translate-y-[-1px] hover:shadow-[0_0_26px_rgba(15,23,42,0.9)]`}
+                  >
+                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-xl shadow-[0_0_22px_rgba(255,255,255,0.25)]">
+                        {s.icon}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
+                          Servicio
+                        </span>
+                        <span className="text-sm md:text-base font-bold leading-snug">
+                          {s.label}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </nav>
+          </aside>
+
+          {/* COLUMNA DERECHA: solo ofertas (ya sin cabecera) */}
+          <main className="space-y-8 md:space-y-10">
             {loading && (
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
                 Cargando ofertas, un momento…
