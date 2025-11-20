@@ -58,6 +58,9 @@ export default function BienvenidaContenido() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [modoUsuario, setModoUsuario] = useState<"cliente" | "comercial">(
+    "cliente"
+  );
 
   const [nombre, setNombre] = useState<string | null>(null);
   const [agenteId, setAgenteId] = useState<string | null>(null);
@@ -267,6 +270,14 @@ export default function BienvenidaContenido() {
     return grupos;
   }, [ofertasFiltradas]);
 
+  // 🔍 SUGERENCIAS AUTOCOMPLETE
+  const sugerencias = useMemo(() => {
+    const txt = busqueda.trim();
+    if (txt.length < 2) return [];
+    // usamos las mismas filtradas para mantener coherencia
+    return ofertasFiltradas.slice(0, 8);
+  }, [busqueda, ofertasFiltradas]);
+
   const formFecha = (f?: string | null) =>
     !f
       ? ""
@@ -277,6 +288,7 @@ export default function BienvenidaContenido() {
         });
 
   const irARegistro = () => router.push(`/registro${buildQuery()}`);
+  const irALoginCRM = () => router.push(`/login${buildQuery()}`);
 
   const irAComparador = (tipo?: TipoOferta) => {
     if (tipo === "LUZ") router.push(`/comparador${buildQuery({ tipo: "luz" })}`);
@@ -298,6 +310,13 @@ export default function BienvenidaContenido() {
     else if (key === "TELEFONIA") extra.tipo = "telefonia";
 
     router.push(`/comparador${buildQuery(extra)}`);
+  };
+
+  // click en una sugerencia del desplegable
+  const manejarClickSugerencia = (oferta: Oferta) => {
+    const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
+    irAComparadorConOferta(tipoNorm, oferta.id);
+    setBusqueda(""); // limpiamos buscador para cerrar el dropdown
   };
 
   // 🔹 Config de secciones para los botones tipo tarjeta (neón)
@@ -412,35 +431,34 @@ export default function BienvenidaContenido() {
         <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
           {/* COLUMNA IZQUIERDA (logo + bienvenida + buscador + secciones) */}
           <aside className="space-y-6">
-            {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
-            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
-              {/* Columna izquierda: logo + subtítulo */}
-              <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
-                <div className="flex items-center">
-                  <div className="relative h-16 w-64 md:h-20 md:w-72">
-                    <Image
-                      src="/logo-impulso.png"
-                      alt="Impulso Energético"
-                      fill
-                      className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
-                      priority
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-base md:text-lg font-bold text-slate-50">
-                    Plataforma de ahorro y comisiones
-                  </p>
-                  <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
-                    Servicios y ventajas para socios
-                  </p>
+            {/* BLOQUE LOGO + BIENVENIDA + CLUB */}
+            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col gap-5 shadow-xl shadow-emerald-500/30">
+              {/* Logo Impulso */}
+              <div className="flex items-center gap-4">
+                <div className="relative h-16 w-64 md:h-20 md:w-72">
+                  <Image
+                    src="/logo-impulso.png"
+                    alt="Impulso Energético"
+                    fill
+                    className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                    priority
+                  />
                 </div>
               </div>
 
-              {/* Columna derecha: bienvenida + tarjeta club */}
-              <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                {/* Texto bienvenida + botones */}
+              {/* Subtítulo plataforma */}
+              <div className="space-y-1">
+                <p className="text-base md:text-lg font-bold text-slate-50">
+                  Plataforma de ahorro y comisiones
+                </p>
+                <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
+                  Servicios y ventajas para socios
+                </p>
+              </div>
+
+              {/* BLOQUE BIENVENIDA */}
+              <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
+                {/* Texto + botones */}
                 <div className="flex-1 space-y-3">
                   <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
@@ -481,79 +499,125 @@ export default function BienvenidaContenido() {
                   )}
 
                   <div className="flex flex-wrap gap-3 pt-1">
-                    <button
-                      onClick={irARegistro}
-                      className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
-                    >
-                      Acceder / actualizar mis datos
-                    </button>
-                    <button
-                      onClick={() => irAComparador("LUZ")}
-                      className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
-                    >
-                      Ir al comparador de luz
-                    </button>
+                    {modoUsuario === "cliente" ? (
+                      <>
+                        <button
+                          onClick={irARegistro}
+                          className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                        >
+                          Acceder / actualizar mis datos
+                        </button>
+                        <button
+                          onClick={() => irAComparador("LUZ")}
+                          className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                        >
+                          Ir al comparador de luz
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={irALoginCRM}
+                          className="px-4 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 font-semibold text-slate-950 shadow shadow-sky-500/40 text-xs md:text-sm"
+                        >
+                          Acceder al CRM
+                        </button>
+                        <button
+                          onClick={irARegistro}
+                          className="px-4 py-2.5 rounded-full border border-sky-300 text-sky-100 hover:bg-sky-500/10 text-xs md:text-sm"
+                        >
+                          Invitar clientes a registrarse
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Tarjeta club a la derecha */}
-                {hayClubEspecial && (
-                  <div
-                    className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
-                    style={{
-                      borderColor: clubColorAcento || "#22c55e",
-                      boxShadow: `0 0 32px ${
-                        clubColorAcento || "rgba(34,197,94,0.55)"
-                      }`,
-                    }}
-                  >
-                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
-
-                    <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
-                      {clubLogoUrl ? (
-                        <Image
-                          src={clubLogoUrl}
-                          alt={clubNombre || "Logo club"}
-                          fill
-                          className="object-contain"
-                        />
-                      ) : (
-                        <span className="text-2xl">🤝</span>
-                      )}
-                    </div>
-
-                    <div className="flex-1 space-y-1">
-                      <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
-                        Club / Asociación
-                      </div>
-                      <div className="text-xs md:text-sm font-bold">
-                        {clubNombre || "Programa solidario"}
-                      </div>
-                      {clubMensaje && (
-                        <p className="text-[10px] md:text-xs text-slate-200/90">
-                          {clubMensaje}
-                        </p>
-                      )}
-                      {clubAportacion != null &&
-                        !Number.isNaN(clubAportacion) && (
-                          <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
-                            💚 Aportación acumulada:{" "}
-                            <span className="ml-1">
-                              {clubAportacion.toLocaleString("es-ES", {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                              })}{" "}
-                              €
-                            </span>
-                          </div>
-                        )}
-                    </div>
+                {/* Toggle + tarjeta de club */}
+                <div className="w-full lg:w-[260px] xl:w-[300px] flex flex-col gap-3 items-stretch">
+                  {/* Toggle cliente / comercial */}
+                  <div className="self-end inline-flex rounded-full bg-slate-950/70 border border-slate-700/80 p-1 text-[10px]">
+                    <button
+                      onClick={() => setModoUsuario("cliente")}
+                      className={`px-3 py-1 rounded-full font-semibold ${
+                        modoUsuario === "cliente"
+                          ? "bg-emerald-500 text-slate-950"
+                          : "text-slate-200"
+                      }`}
+                    >
+                      Soy cliente
+                    </button>
+                    <button
+                      onClick={() => setModoUsuario("comercial")}
+                      className={`px-3 py-1 rounded-full font-semibold ${
+                        modoUsuario === "comercial"
+                          ? "bg-sky-500 text-slate-950"
+                          : "text-slate-200"
+                      }`}
+                    >
+                      Soy comercial
+                    </button>
                   </div>
-                )}
+
+                  {/* Tarjeta especial club / asociación */}
+                  {hayClubEspecial && (
+                    <div
+                      className="relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
+                      style={{
+                        borderColor: clubColorAcento || "#22c55e",
+                        boxShadow: `0 0 32px ${
+                          clubColorAcento || "rgba(34,197,94,0.55)"
+                        }`,
+                      }}
+                    >
+                      <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
+
+                      <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
+                        {clubLogoUrl ? (
+                          <Image
+                            src={clubLogoUrl}
+                            alt={clubNombre || "Logo club"}
+                            fill
+                            className="object-contain"
+                          />
+                        ) : (
+                          <span className="text-2xl">🤝</span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 space-y-1">
+                        <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
+                          Club / Asociación
+                        </div>
+                        <div className="text-xs md:text-sm font-bold">
+                          {clubNombre || "Programa solidario"}
+                        </div>
+                        {clubMensaje && (
+                          <p className="text-[10px] md:text-xs text-slate-200/90">
+                            {clubMensaje}
+                          </p>
+                        )}
+                        {clubAportacion != null &&
+                          !Number.isNaN(clubAportacion) && (
+                            <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
+                              💚 Aportación acumulada:{" "}
+                              <span className="ml-1">
+                                {clubAportacion.toLocaleString("es-ES", {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                €
+                              </span>
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* === BUSCADOR ENTRE BLOQUE SUPERIOR Y SECCIONES === */}
+            {/* === BUSCADOR CON AUTOCOMPLETE === */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-sm md:text-base font-semibold">
@@ -564,11 +628,47 @@ export default function BienvenidaContenido() {
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar ofertas por nombre, tipo o texto..."
-                    className="w-full rounded-full bg-slate-900/70 border border-slate-700 px-4 py-2 pr-9 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                    className="w-full rounded-full bg-slate-900/70 border border-emerald-500/70 px-4 py-2 pr-9 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
                     🔍
                   </span>
+
+                  {/* DROPDOWN DE SUGERENCIAS */}
+                  {sugerencias.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
+                      {sugerencias.map((oferta) => {
+                        const tipoNorm = normalizarTipoOferta(
+                          oferta.tipo as string
+                        );
+                        const cfg = tipoConfig[tipoNorm];
+
+                        return (
+                          <button
+                            key={oferta.id}
+                            type="button"
+                            onClick={() => manejarClickSugerencia(oferta)}
+                            className="w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-slate-900/90 text-xs md:text-sm border-b border-slate-800 last:border-b-0"
+                          >
+                            <span
+                              className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                            >
+                              {cfg.label}
+                            </span>
+                            <span className="flex-1">
+                              <span className="block font-semibold text-slate-50">
+                                {oferta.titulo}
+                              </span>
+                              <span className="block text-[11px] text-slate-300 line-clamp-1">
+                                {oferta.descripcionCorta ||
+                                  oferta.descripcionLarga}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="text-[11px] text-slate-300/80">
