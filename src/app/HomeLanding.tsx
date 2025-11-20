@@ -360,36 +360,38 @@ export default function HomeLandingImpulso() {
       {/* 🔹 TOP BAR: acceso CRM + afiliados */}
       
       <header className="w-full border-b border-[#1f3a45] bg-[#081821]/90 backdrop-blur-sm">
-        <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4">
+      <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4">
           {/* Eslogan potente */}
-          <div className="flex flex-col md:flex-row md:items-baseline gap-1">
-            <span className="text-[11px] uppercase tracking-[0.25em] text-amber-200">
+          <div className="flex flex-col">
+          <span className="text-[11px] uppercase tracking-[0.25em] text-amber-200">
               IMPULSO ENERGÉTICO
-            </span>
-            <span className="text-sm md:text-[15px] font-extrabold slogan-glow leading-snug md:ml-3">
+          </span>
+          <span
+              className="mt-1 text-lg md:text-2xl font-extrabold slogan-glow leading-snug max-w-3xl"
+          >
               Ahorra en tus facturas y gana comisiones con cada recomendación.
-            </span>
+          </span>
           </div>
 
           {/* Botones acceso */}
           <div className="flex items-center gap-2 text-[11px] md:text-sm">
-            <button
+          <button
               onClick={() => router.push('/login')}
               className="px-4 py-1.5 rounded-full bg-amber-300 text-slate-900 font-semibold hover:bg-amber-200 transition shadow-sm shadow-amber-400/40"
-            >
+          >
               Acceder al CRM
-            </button>
-            <button
+          </button>
+          <button
               onClick={() => router.push('/afiliados')}
               className="hidden sm:inline-flex px-4 py-1.5 rounded-full border border-amber-300 text-amber-100 font-semibold hover:bg-amber-300/10 transition"
-            >
+          >
               Programa de afiliados
-            </button>
+          </button>
           </div>
-        </div>
+      </div>
       </header>
 
-
+ 
       {/* HERO */}
       <section className="relative overflow-hidden">
         <div

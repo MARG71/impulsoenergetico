@@ -10,6 +10,11 @@ import {
 
 export default function ComparadorContenido() {
   const searchParams = useSearchParams();
+
+  const tipoURL = searchParams.get('tipo');           // luz | gas | telefonia
+  const ofertaId = searchParams.get('ofertaId');      // id de la oferta (opcional)
+  const ofertaNombre = searchParams.get('ofertaNombre'); // nombre de la oferta (opcional)
+
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [lugarId, setLugarId] = useState<string | null>(null);
 
@@ -63,6 +68,15 @@ export default function ComparadorContenido() {
   useEffect(() => {
     const urlAgente = searchParams.get('agenteId');
     const urlLugar = searchParams.get('lugarId');
+
+  // Ajustar el tipo de comparador según la URL (si viene desde la landing)
+  useEffect(() => {
+    if (!tipoURL) return;
+      if (tipoURL === 'luz' || tipoURL === 'gas' || tipoURL === 'telefonia') {
+        setTipoComparador(tipoURL as 'luz' | 'gas' | 'telefonia');
+      }
+    }, [tipoURL]);
+
 
     if (urlAgente && urlLugar) {
       localStorage.setItem('agenteId', urlAgente);
@@ -223,9 +237,75 @@ export default function ComparadorContenido() {
     }
   };
 
+  const tituloComparador =
+    tipoComparador === 'luz'
+      ? 'Comparador de luz'
+      : tipoComparador === 'gas'
+      ? 'Comparador de gas'
+      : 'Comparador de telefonía';
+
+
   return (
-    <div className="min-h-screen bg-white text-gray-800 p-4 md:p-6">
+    <div className="min-h-screen bg-[#0E2631] text-gray-100 p-4 md:p-6">
+
       {/* LOGO y NOMBRE */}
+
+      {/* CABECERA IMPULSO: LOGO + TITULO + INFO QR/OFER */}
+      <div className="w-full bg-[#081821] text-[#F6EED1] rounded-lg p-4 mb-6 shadow-lg border border-[#1f3a45]">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          {/* Logo + título */}
+          <div className="flex flex-col items-center md:items-start gap-3">
+            <Image
+              src="/logo-impulso.png"   // 👉 pon aquí el nombre del logo nuevo (renómbralo en /public si hace falta)
+              alt="Impulso Energético"
+              width={180}
+              height={180}
+              className="drop-shadow-[0_0_18px_rgba(255,200,120,0.6)]"
+            />
+            <div className="text-center md:text-left">
+              <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">
+                {tituloComparador}
+              </h1>
+              {ofertaNombre && (
+                <p className="mt-1 text-sm md:text-base text-[#e6ddc0]">
+                  Oferta seleccionada:{' '}
+                  <span className="font-semibold text-amber-300">
+                    {ofertaNombre}
+                  </span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Info de trazabilidad (agente / lugar / oferta) */}
+          <div className="text-xs md:text-sm text-[#c9c2a5] text-center md:text-right">
+            {(agenteId || lugarId) && (
+              <>
+                {agenteId && (
+                  <div>
+                    <span className="font-semibold">Agente ID:</span> {agenteId}
+                  </div>
+                )}
+                {lugarId && (
+                  <div>
+                    <span className="font-semibold">Lugar ID:</span> {lugarId}
+                  </div>
+                )}
+              </>
+            )}
+            {ofertaId && (
+              <div className="mt-1">
+                <span className="font-semibold">Oferta ID:</span> {ofertaId}
+              </div>
+            )}
+            <div className="mt-2 text-[10px] opacity-80">
+              Estudio para clientes y comerciales · Datos de QR guardados para
+              trazabilidad.
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       {/* SELECTOR DE PESTAÑAS CON BLOQUE VISUAL Y ANIMACIÓN */}
       <div className="w-full bg-[#4CAF50] text-white rounded-lg p-4 mb-6 flex flex-col md:flex-row justify-between items-center shadow">
@@ -263,7 +343,14 @@ export default function ComparadorContenido() {
           <div className="bg-[#4CAF50] text-white p-6 rounded shadow-lg space-y-4">
 
             <div className="flex flex-col items-center justify-center mb-4 space-y-2">
-              <Image src="/logo-impulso.jpeg" alt="Logo Impulso" width={120} height={120} />
+              <Image
+              src="/logo-impulso.png"  // el mismo logo neón
+              alt="Impulso Energético"
+              width={140}
+              height={140}
+              className="drop-shadow-[0_0_16px_rgba(255,200,120,0.7)]"
+            />
+
             </div>
 
             <h2 className="text-xl font-bold mb-2">Datos para la Comparativa</h2>
