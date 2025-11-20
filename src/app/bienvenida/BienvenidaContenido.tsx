@@ -47,7 +47,7 @@ const tipoConfig: Record<
   },
 };
 
-const BienvenidaContenido: React.FC = () => 
+const BienvenidaContenido: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
