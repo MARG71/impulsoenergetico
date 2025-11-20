@@ -67,6 +67,12 @@ export default function BienvenidaContenido() {
   const [lugarId, setLugarId] = useState<string | null>(null);
   const [leadOK, setLeadOK] = useState(false);
 
+  // Datos especiales de club / lugar
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [clubMensaje, setClubMensaje] = useState<string | null>(null);
+  const [clubAportacion, setClubAportacion] = useState<number | null>(null);
+  const [clubColorAcento, setClubColorAcento] = useState<string>("#22c55e");
+
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
     const agenteURL = searchParams.get("agenteId");
@@ -99,7 +105,75 @@ export default function BienvenidaContenido() {
     } catch {
       // ignore
     }
+
+    // Extra: datos de club que puedan venir por querystring
+    const clubLogoParam = searchParams.get("clubLogo");
+    const clubMensajeParam = searchParams.get("clubMensaje");
+    const clubAportacionParam = searchParams.get("clubAportacion");
+    const clubColorParam = searchParams.get("clubColor");
+
+    if (clubLogoParam) {
+      try {
+        setClubLogoUrl(decodeURIComponent(clubLogoParam));
+      } catch {
+        setClubLogoUrl(clubLogoParam);
+      }
+    }
+    if (clubMensajeParam) setClubMensaje(clubMensajeParam);
+    if (clubAportacionParam) {
+      const num = Number(clubAportacionParam);
+      if (!Number.isNaN(num)) setClubAportacion(num);
+    }
+    if (clubColorParam) setClubColorAcento(clubColorParam);
   }, [searchParams]);
+
+  // Si tenemos lugarId, intentamos cargar info especial del lugar (logo, mensaje, aportación…)
+  useEffect(() => {
+    if (!lugarId) return;
+
+    const cargarLugar = async () => {
+      try {
+        const res = await fetch(`/api/lugares/${lugarId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const lugar = (data && (data.lugar || data)) || {};
+
+        const posibleLogo =
+          lugar.logoEspecialUrl ||
+          lugar.logoEspecial ||
+          lugar.logoClub ||
+          lugar.logo ||
+          null;
+        const posibleMensaje =
+          lugar.mensajeGancho ||
+          lugar.mensajeEspecial ||
+          lugar.mensaje ||
+          null;
+        const posibleAportacion =
+          typeof lugar.aportacionAcumulada === "number"
+            ? lugar.aportacionAcumulada
+            : typeof lugar.aportacionAcumulada === "string"
+            ? Number(lugar.aportacionAcumulada)
+            : null;
+        const posibleColor = lugar.colorAcento || lugar.colorAccent || null;
+
+        if (posibleLogo && !clubLogoUrl) setClubLogoUrl(posibleLogo as string);
+        if (posibleMensaje && !clubMensaje)
+          setClubMensaje(posibleMensaje as string);
+        if (posibleAportacion != null && !Number.isNaN(posibleAportacion)) {
+          if (clubAportacion == null) setClubAportacion(posibleAportacion);
+        }
+        if (posibleColor && !searchParams.get("clubColor")) {
+          setClubColorAcento(String(posibleColor));
+        }
+      } catch {
+        // si falla, simplemente no mostramos la caja especial
+      }
+    };
+
+    cargarLugar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lugarId]);
 
   const buildQuery = (extra?: Record<string, string>) => {
     const p = new URLSearchParams();
@@ -282,7 +356,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "ferreteria",
-      label: "Ferretería BRICOTITAN", // 👈 cambio de texto
+      label: "Ferretería BRICOTITAN",
       icon: "🔩",
       bgClass:
         "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
@@ -327,6 +401,9 @@ export default function BienvenidaContenido() {
     },
   ];
 
+  const hayClubEspecial =
+    clubNombre || clubLogoUrl || clubMensaje || clubAportacion !== null;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       {/* ancho TOTAL de pantalla, con padding lateral mínimo */}
@@ -335,7 +412,7 @@ export default function BienvenidaContenido() {
         <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
           {/* SIDEBAR IZQUIERDO */}
           <aside className="space-y-6">
-            {/* Bloque logos */}
+            {/* Bloque logos Impulso */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col gap-5 shadow-xl shadow-emerald-500/30">
               <div className="flex items-center gap-4">
                 <div className="relative h-16 w-64 md:h-20 md:w-72">
@@ -357,17 +434,6 @@ export default function BienvenidaContenido() {
                   Servicios y ventajas para socios
                 </p>
               </div>
-
-              {clubNombre && (
-                <div className="mt-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/50 px-3 py-2.5 text-xs text-emerald-100 w-full">
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-emerald-300 font-semibold">
-                    Club / Asociación
-                  </div>
-                  <div className="font-bold text-sm md:text-base">
-                    {clubNombre}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* 🔸 SECCIONES: botones tipo tarjeta neón */}
@@ -377,7 +443,7 @@ export default function BienvenidaContenido() {
                 Secciones
               </p>
 
-              {/* Grid de tarjetas redondeadas: 3 columnas en escritorio */}
+              {/* Grid de tarjetas: 3 columnas en escritorio */}
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                 {secciones.map((s) => (
                   <button
@@ -387,7 +453,6 @@ export default function BienvenidaContenido() {
                       ${s.bgClass} ${s.ringClass}
                       hover:translate-y-[-1px] hover:shadow-[0_0_26px_rgba(15,23,42,0.9)]`}
                   >
-                    {/* brillo suave en la esquina */}
                     <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
 
                     <div className="flex items-center gap-3 md:gap-4">
@@ -411,14 +476,16 @@ export default function BienvenidaContenido() {
 
           {/* COLUMNA DERECHA: bienvenida + buscador + ofertas */}
           <main className="space-y-8 md:space-y-10">
-            {/* CABECERA ALINEADA A LA ALTURA DEL LOGO */}
-            <header className="space-y-5">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-3">
-                  <div className="text-xs md:text-sm font-semibold tracking-[0.28em] text-emerald-300 uppercase">
+            {/* CABECERA COMPACTA CON CLUB */}
+            <header>
+              <div className="rounded-3xl bg-slate-900/85 border border-slate-700/80 p-5 md:p-6 lg:p-7 shadow-[0_0_40px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-6 lg:gap-8 items-start justify-between">
+                {/* Texto de bienvenida */}
+                <div className="flex-1 space-y-4">
+                  <div className="text-[11px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
                   </div>
-                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
+
+                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold leading-tight">
                     {nombre && (
                       <>
                         Hola,{" "}
@@ -435,6 +502,7 @@ export default function BienvenidaContenido() {
                     </span>{" "}
                     desde hoy.
                   </h1>
+
                   {(agenteId || lugarId) && (
                     <p className="text-[11px] text-slate-400">
                       QR detectado ·{" "}
@@ -450,64 +518,126 @@ export default function BienvenidaContenido() {
                       )}
                     </p>
                   )}
+
+                  {/* Botones principales */}
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    {modoUsuario === "cliente" ? (
+                      <>
+                        <button
+                          onClick={irARegistro}
+                          className="px-5 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-sm"
+                        >
+                          Acceder / actualizar mis datos
+                        </button>
+                        <button
+                          onClick={() => irAComparador("LUZ")}
+                          className="px-5 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-sm"
+                        >
+                          Ir al comparador de luz
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={irALoginCRM}
+                          className="px-5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 font-semibold text-slate-950 shadow shadow-sky-500/40 text-sm"
+                        >
+                          Acceder al CRM
+                        </button>
+                        <button
+                          onClick={irARegistro}
+                          className="px-5 py-2.5 rounded-full border border-sky-300 text-sky-100 hover:bg-sky-500/10 text-sm"
+                        >
+                          Invitar clientes a registrarse
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="inline-flex rounded-full bg-slate-900/70 border border-slate-700/80 p-1 text-[11px]">
-                  <button
-                    onClick={() => setModoUsuario("cliente")}
-                    className={`px-3 py-1 rounded-full font-semibold ${
-                      modoUsuario === "cliente"
-                        ? "bg-emerald-500 text-slate-950"
-                        : "text-slate-200"
-                    }`}
-                  >
-                    Soy cliente
-                  </button>
-                  <button
-                    onClick={() => setModoUsuario("comercial")}
-                    className={`px-3 py-1 rounded-full font-semibold ${
-                      modoUsuario === "comercial"
-                        ? "bg-sky-500 text-slate-950"
-                        : "text-slate-200"
-                    }`}
-                  >
-                    Soy comercial
-                  </button>
-                </div>
-              </div>
+                {/* Lado derecho: selector de modo + tarjeta de club */}
+                <div className="w-full lg:w-[320px] xl:w-[360px] flex flex-col gap-4 items-stretch">
+                  {/* Toggle cliente / comercial */}
+                  <div className="self-end inline-flex rounded-full bg-slate-950/70 border border-slate-700/80 p-1 text-[11px]">
+                    <button
+                      onClick={() => setModoUsuario("cliente")}
+                      className={`px-3 py-1 rounded-full font-semibold ${
+                        modoUsuario === "cliente"
+                          ? "bg-emerald-500 text-slate-950"
+                          : "text-slate-200"
+                      }`}
+                    >
+                      Soy cliente
+                    </button>
+                    <button
+                      onClick={() => setModoUsuario("comercial")}
+                      className={`px-3 py-1 rounded-full font-semibold ${
+                        modoUsuario === "comercial"
+                          ? "bg-sky-500 text-slate-950"
+                          : "text-slate-200"
+                      }`}
+                    >
+                      Soy comercial
+                    </button>
+                  </div>
 
-              <div className="flex flex-wrap gap-3">
-                {modoUsuario === "cliente" ? (
-                  <>
-                    <button
-                      onClick={irARegistro}
-                      className="px-5 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-sm"
+                  {/* Tarjeta especial de club / asociación */}
+                  {hayClubEspecial && (
+                    <div
+                      className="relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
+                      style={{
+                        borderColor: clubColorAcento || "#22c55e",
+                        boxShadow: `0 0 32px ${
+                          clubColorAcento || "rgba(34,197,94,0.55)"
+                        }`,
+                      }}
                     >
-                      Acceder / actualizar mis datos
-                    </button>
-                    <button
-                      onClick={() => irAComparador("LUZ")}
-                      className="px-5 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-sm"
-                    >
-                      Ir al comparador de luz
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={irALoginCRM}
-                      className="px-5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 font-semibold text-slate-950 shadow shadow-sky-500/40 text-sm"
-                    >
-                      Acceder al CRM
-                    </button>
-                    <button
-                      onClick={irARegistro}
-                      className="px-5 py-2.5 rounded-full border border-sky-300 text-sky-100 hover:bg-sky-500/10 text-sm"
-                    >
-                      Invitar clientes a registrarse
-                    </button>
-                  </>
-                )}
+                      {/* Glow */}
+                      <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
+
+                      {/* Logo del club */}
+                      <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
+                        {clubLogoUrl ? (
+                          <Image
+                            src={clubLogoUrl}
+                            alt={clubNombre || "Logo club"}
+                            fill
+                            className="object-contain"
+                          />
+                        ) : (
+                          <span className="text-2xl">🤝</span>
+                        )}
+                      </div>
+
+                      {/* Texto club */}
+                      <div className="flex-1 space-y-1">
+                        <div className="text-[10px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
+                          Club / Asociación
+                        </div>
+                        <div className="text-sm md:text-base font-bold">
+                          {clubNombre || "Programa solidario"}
+                        </div>
+                        {clubMensaje && (
+                          <p className="text-[11px] md:text-xs text-slate-200/90">
+                            {clubMensaje}
+                          </p>
+                        )}
+                        {clubAportacion != null && !Number.isNaN(clubAportacion) && (
+                          <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 border border-emerald-300/50">
+                            💚 Aportación acumulada:{" "}
+                            <span className="ml-1">
+                              {clubAportacion.toLocaleString("es-ES", {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              €
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </header>
 
@@ -648,7 +778,7 @@ export default function BienvenidaContenido() {
                             </span>
                           </h3>
                         </div>
-                      <button
+                        <button
                           onClick={() => irAComparador(tipo)}
                           className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${cfg.btn} shadow-md shadow-slate-950/50`}
                         >
