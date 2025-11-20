@@ -360,7 +360,8 @@ const BienvenidaContenido: React.FC = () => {
 
             <div className="flex gap-4 overflow-x-auto pb-2">
               {ofertasDestacadas.map((o) => {
-                const cfg = tipoConfig[o.tipo];
+                // Fallback por si viene un tipo inesperado desde la API
+                const cfg = tipoConfig[o.tipo as TipoOferta] ?? tipoConfig.LUZ;
 
                 return (
                   <div
@@ -371,6 +372,7 @@ const BienvenidaContenido: React.FC = () => {
                       <span className={`px-2 py-1 rounded-full text-[10px] ${cfg.bgPill}`}>
                         {cfg.label}
                       </span>
+
                       <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-300 text-[10px] border border-yellow-500/30">
                         Destacada
                       </span>
