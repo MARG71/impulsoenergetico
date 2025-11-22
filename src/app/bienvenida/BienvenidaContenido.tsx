@@ -188,7 +188,7 @@ export default function BienvenidaContenido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lugarId]);
 
-  // ⚙️ Cuando cambia "nombre", lo usamos como valor inicial del formulario
+  // ⚙️ Inicializar formulario con nombre + localStorage
   useEffect(() => {
     setFormNombre(nombre || "");
 
@@ -488,6 +488,16 @@ export default function BienvenidaContenido() {
     },
   ];
 
+  // accesos rápidos como en el pantallazo 1
+  const accesosRapidos = [
+    { label: "Gas", onClick: () => irAComparador("GAS") },
+    { label: "Telefonía", onClick: () => irAComparador("TELEFONIA") },
+    { label: "Ferretería", onClick: () => router.push(`/ferreteria${buildQuery()}`) },
+    { label: "Viajes", onClick: () => router.push(`/viajes${buildQuery()}`) },
+    { label: "Repuestos", onClick: () => router.push(`/repuestos${buildQuery()}`) },
+    { label: "Seguros", onClick: () => router.push(`/seguros${buildQuery()}`) },
+  ];
+
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
@@ -499,21 +509,39 @@ export default function BienvenidaContenido() {
           <aside className="space-y-6">
             {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
-              {/* Columna izquierda: logo + subtítulo */}
+              {/* Columna izquierda: logo + contacto + subtítulo */}
               <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
-                <div className="flex items-center">
-                  <div className="relative h-16 w-64 md:h-20 md:w-72">
-                    <Image
-                      src="/logo-impulso.png"
-                      alt="Impulso Energético"
-                      fill
-                      className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
-                      priority
-                    />
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center">
+                    <div className="relative h-16 w-64 md:h-20 md:w-72">
+                      <Image
+                        src="/logo-impulso.png"
+                        alt="Impulso Energético"
+                        fill
+                        className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                        priority
+                      />
+                    </div>
+                  </div>
+
+                  {/* Teléfono + email (blanco, negrita, tamaño grande) */}
+                  <div className="space-y-1">
+                    <p className="text-base md:text-lg font-bold text-slate-50">
+                      Tel. 692 13 70 48
+                    </p>
+                    <p className="text-base md:text-lg font-bold text-slate-50">
+                      E-mail:{" "}
+                      <a
+                        href="mailto:info@impulsoenergetico.es"
+                        className="underline decoration-emerald-400/70 underline-offset-4"
+                      >
+                        info@impulsoenergetico.es
+                      </a>
+                    </p>
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 mt-2">
                   <p className="text-base md:text-lg font-bold text-slate-50">
                     Plataforma de ahorro y comisiones
                   </p>
@@ -525,7 +553,7 @@ export default function BienvenidaContenido() {
 
               {/* Columna derecha: bienvenida + tarjeta club */}
               <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                {/* Texto bienvenida + botones */}
+                {/* Texto bienvenida + botones + accesos rápidos */}
                 <div className="flex-1 space-y-3">
                   <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
@@ -565,19 +593,41 @@ export default function BienvenidaContenido() {
                     </p>
                   )}
 
-                  <div className="flex flex-wrap gap-3 pt-1">
-                    <button
-                      onClick={() => setModalAbierto(true)}
-                      className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
-                    >
-                      Acceder / actualizar mis datos
-                    </button>
-                    <button
-                      onClick={() => irAComparador("LUZ")}
-                      className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
-                    >
-                      Ir al comparador de luz
-                    </button>
+                  {/* Botones principales + accesos rápidos, lado a lado en escritorio */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-1">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => setModalAbierto(true)}
+                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                      >
+                        Acceder / actualizar mis datos
+                      </button>
+                      <button
+                        onClick={() => irAComparador("LUZ")}
+                        className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                      >
+                        LUZ
+                      </button>
+                    </div>
+
+                    {/* Accesos rápidos (pantallazo 1) */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] md:text-[11px] tracking-[0.22em] uppercase text-slate-300">
+                        ACCESOS RÁPIDOS A SECCIONES
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {accesosRapidos.map((a) => (
+                          <button
+                            key={a.label}
+                            type="button"
+                            onClick={a.onClick}
+                            className="px-3 py-1.5 rounded-full border border-slate-600 text-[11px] text-slate-100 hover:bg-slate-800/80"
+                          >
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
