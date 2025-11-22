@@ -1,21 +1,10 @@
 // src/app/api/leads/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { enviarEmail } from "@/lib/mailer";
 import bcrypt from "bcryptjs";
+import { enviarEmail } from "@/lib/email";
 
-// Genera una contraseña provisional aleatoria
-function generarPasswordProvisional(longitud: number = 10): string {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@$%";
-  let pass = "";
-  for (let i = 0; i < longitud; i++) {
-    pass += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return pass;
-}
-
-// GET -> listar leads (ya lo usas en el CRM)
+// 🔹 GET: devolver todos los leads (para el dashboard)
 export async function GET() {
   try {
     const leads = await prisma.lead.findMany({
@@ -26,18 +15,20 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ leads }, { status: 200 });
+    // 👇 Devolvemos SOLO el array, para que funcione tanto si el front hace
+    // data.leads || data || []  como si solo usa data
+    return NextResponse.json(leads);
   } catch (error) {
-    console.error("Error obteniendo leads:", error);
+    console.error("Error en GET /api/leads:", error);
     return NextResponse.json(
-      { error: "Error al obtener los leads" },
+      { error: "Error al cargar los leads" },
       { status: 500 }
     );
   }
 }
 
-// POST -> crear lead + (si no existe) crear Usuario + enviar email bienvenida
-export async function POST(req: Request) {
+// 🔹 POST: crear Lead, crear/actualizar Usuario y mandar email
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { nombre, email, telefono, agenteId, lugarId } = body;
@@ -49,123 +40,119 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1) Crear el lead
+    // Normalizamos IDs opcionales
+    const agenteIdNum =
+      typeof agenteId === "string" ? Number(agenteId) : agenteId ?? null;
+    const lugarIdNum =
+      typeof lugarId === "string" ? Number(lugarId) : lugarId ?? null;
+
+    // 1) Buscar si ya existe un usuario con ese email
+    let usuario = await prisma.usuario.findUnique({
+      where: { email },
+    });
+
+    let passwordProvisional: string | null = null;
+    const esUsuarioNuevo = !usuario;
+
+    // 2) Si NO existe, creamos usuario con contraseña provisional
+    if (!usuario) {
+      passwordProvisional = Math.random().toString(36).slice(-10); // 10 caracteres
+      const passwordHasheado = await bcrypt.hash(passwordProvisional, 10);
+
+      usuario = await prisma.usuario.create({
+        data: {
+          nombre,
+          email,
+          password: passwordHasheado,
+          rol: "LUGAR", // rol por defecto para clientes finales
+          agenteId: agenteIdNum,
+          lugarId: lugarIdNum,
+        },
+      });
+    } else {
+      // Si ya existe, actualizamos nombre/relaciones por si han cambiado
+      usuario = await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: {
+          nombre,
+          agenteId: agenteIdNum ?? usuario.agenteId,
+          lugarId: lugarIdNum ?? usuario.lugarId,
+        },
+      });
+    }
+
+    // 3) Crear el Lead
     const lead = await prisma.lead.create({
       data: {
         nombre,
         email,
         telefono,
-        agenteId: agenteId ? Number(agenteId) : null,
-        lugarId: lugarId ? Number(lugarId) : null,
+        estado: "pendiente",
+        agenteId: agenteIdNum,
+        lugarId: lugarIdNum,
       },
     });
 
-    // 2) Crear Usuario + enviar email SOLO si no existe ese email en Usuario
-    try {
-      const usuarioExistente = await prisma.usuario.findUnique({
-        where: { email },
-      });
-
-      if (!usuarioExistente) {
-        // Generamos contraseña provisional
-        const passwordPlano = generarPasswordProvisional();
-        const passwordHash = await bcrypt.hash(passwordPlano, 10);
-
-        // Creamos el usuario en la tabla Usuario
-        const usuario = await prisma.usuario.create({
-          data: {
-            nombre,
-            email,
-            password: passwordHash,
-            rol: "LUGAR", // de momento usamos rol LUGAR para clientes
-            agenteId: agenteId ? Number(agenteId) : null,
-            lugarId: lugarId ? Number(lugarId) : null,
-          },
-        });
-
-        console.log("Usuario cliente creado desde lead:", usuario.id);
-
-        // URL de login para el email
-        const baseUrl =
-          process.env.NEXT_PUBLIC_APP_URL ||
-          process.env.NEXTAUTH_URL ||
+    // 4) Mandar email de bienvenida SOLO si el usuario es nuevo
+    if (esUsuarioNuevo && passwordProvisional) {
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_BASE_URL ??
+          process.env.NEXTAUTH_URL ??
           "https://impulsoenergetico.es";
 
-        const loginUrl = `${baseUrl.replace(/\/$/, "")}/login`;
+        const loginUrl = base.replace(/\/+$/, "") + "/login";
 
-        // Enviar email de bienvenida
-        await enviarEmail({
-          to: email,
-          subject:
-            "Bienvenido a Impulso Energético – Acceso a tu área de cliente",
-          html: `
-          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a; line-height:1.5;">
-            <h1 style="color:#16a34a; font-size:22px;">Hola ${
-              nombre || ""
-            },</h1>
-            <p>Gracias por confiar en <strong>Impulso Energético</strong>.</p>
+        const asunto = "Bienvenido/a a Impulso Energético";
+        const html = `
+          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a;">
+            <h2 style="color:#10b981;">Hola ${nombre || ""}, ¡bienvenido/a!</h2>
             <p>
-              Hemos creado tu acceso personal para que puedas seguir tus 
-              <strong>comparativas</strong>, <strong>ofertas</strong> y 
-              <strong>ahorros</strong>.
+              Gracias por registrarte en <strong>Impulso Energético</strong>. 
+              Desde tu área privada podrás ver tus comparativas, ofertas y ventajas como socio.
             </p>
-            <p>
-              Estos son tus datos de acceso provisional:
-            </p>
-            <p style="background:#0f172a; color:#e5e7eb; padding:12px 16px; border-radius:12px;">
-              <strong>Usuario:</strong> ${email}<br/>
-              <strong>Contraseña provisional:</strong> ${passwordPlano}
-            </p>
+            <p>Hemos creado tu acceso provisional:</p>
+            <ul>
+              <li><strong>Usuario (email):</strong> ${email}</li>
+              <li><strong>Contraseña provisional:</strong> ${passwordProvisional}</li>
+            </ul>
+            <p>Te recomendamos cambiar la contraseña la primera vez que entres.</p>
             <p>
               Puedes acceder desde este enlace:<br/>
-              <a href="${loginUrl}" style="color:#16a34a; font-weight:bold;">
-                ${loginUrl}
-              </a>
+              <a href="${loginUrl}" style="color:#10b981;">${loginUrl}</a>
             </p>
-            <p style="margin-top:16px;">
-              Te recomendamos cambiar esta contraseña la primera vez que entres
-              en tu área de cliente.
-            </p>
-            <p style="margin-top:24px;font-size:12px;color:#64748b;">
-              Si tú no has solicitado este registro, puedes ignorar este mensaje.
+            <p style="margin-top:24px;">
+              Un saludo,<br/>
+              <strong>Equipo Impulso Energético</strong>
             </p>
           </div>
-        `,
-          text: `
-Hola ${nombre || ""},
+        `;
 
-Gracias por confiar en Impulso Energético.
-
-Hemos creado tu acceso personal para que puedas seguir tus comparativas, ofertas y ahorros.
-
-Usuario: ${email}
-Contraseña provisional: ${passwordPlano}
-
-Puedes acceder desde:
-${loginUrl}
-
-Te recomendamos cambiar esta contraseña la primera vez que entres en tu área de cliente.
-
-Si tú no has solicitado este registro, puedes ignorar este mensaje.
-          `.trim(),
+        await enviarEmail({
+          to: email,
+          subject: asunto,
+          html,
         });
-      } else {
-        // Ya hay usuario con ese email -> opcionalmente podríamos enviar otro tipo de email
-        console.log(
-          "Email ya registrado como usuario, no se crea usuario nuevo:",
-          email
-        );
+      } catch (error) {
+        console.error("Error enviando email de bienvenida:", error);
+        // No rompemos la creación del lead si el email falla
       }
-    } catch (error) {
-      console.error("Error creando usuario/enviando email desde lead:", error);
-      // Importante: NO rompemos la creación del lead aunque falle el email o usuario
     }
 
-    return NextResponse.json({ lead }, { status: 201 });
+    // El modal solo mira res.ok, así que con esto es suficiente
+    return NextResponse.json(
+      {
+        ok: true,
+        lead,
+        usuarioId: usuario.id,
+        usuarioNuevo: esUsuarioNuevo,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error en POST /api/leads:", error);
     return NextResponse.json(
-      { error: "Error al crear el lead" },
+      { error: "Error interno creando el lead" },
       { status: 500 }
     );
   }
