@@ -1,3 +1,4 @@
+// src/lib/email.ts
 import nodemailer from "nodemailer";
 
 const smtpHost = process.env.SMTP_HOST;
@@ -12,16 +13,48 @@ if (!smtpHost || !smtpUser || !smtpPass) {
   );
 }
 
+// Transporter compartido
 const transporter = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
-  secure: smtpPort === 465, // true si usas 465 (SSL)
+  secure: smtpPort === 465, // true si usas 465 (SSL); en 587 se usa STARTTLS
   auth: {
     user: smtpUser,
     pass: smtpPass,
   },
 });
 
+// ========= FUNCION GENÉRICA =========
+export async function enviarEmail(options: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}) {
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    console.warn("[email] No se envía email porque faltan variables SMTP.");
+    return;
+  }
+
+  const from = smtpFrom || smtpUser;
+
+  try {
+    const info = await transporter.sendMail({
+      from,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    });
+
+    console.log("[email] Enviado OK:", info.messageId);
+  } catch (err) {
+    console.error("[email] Error enviando correo:", err);
+    throw err;
+  }
+}
+
+// ========= EMAIL DE BIENVENIDA =========
 interface EmailBienvenidaParams {
   nombre: string;
   email: string;
@@ -35,12 +68,8 @@ export async function enviarEmailBienvenida({
   passwordProvisional,
   linkAcceso,
 }: EmailBienvenidaParams) {
-  if (!smtpHost || !smtpUser || !smtpPass) {
-    console.warn("[email] No se envía email porque faltan variables SMTP.");
-    return;
-  }
-
   const asunto = "Bienvenid@ a Impulso Energético";
+
   const textoPlano = `
 Hola ${nombre || ""},
 
@@ -92,11 +121,11 @@ Equipo de Impulso Energético
   </div>
 `;
 
-  await transporter.sendMail({
-    from: smtpFrom,
+  // reutilizamos la genérica
+  await enviarEmail({
     to: email,
     subject: asunto,
-    text: textoPlano,
     html,
+    text: textoPlano,
   });
 }
