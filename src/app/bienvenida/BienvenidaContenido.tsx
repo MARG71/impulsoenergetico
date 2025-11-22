@@ -64,6 +64,17 @@ export default function BienvenidaContenido() {
   const [lugarId, setLugarId] = useState<string | null>(null);
   const [leadOK, setLeadOK] = useState(false);
 
+  // 🔹 Estado para el modal de datos
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [formNombre, setFormNombre] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formTelefono, setFormTelefono] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [mensajeGuardarError, setMensajeGuardarError] = useState<string | null>(
+    null
+  );
+  const [mensajeGuardarOK, setMensajeGuardarOK] = useState<string | null>(null);
+
   // Datos especiales de club / lugar
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [clubMensaje, setClubMensaje] = useState<string | null>(null);
@@ -177,6 +188,23 @@ export default function BienvenidaContenido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lugarId]);
 
+  // ⚙️ Cuando cambia "nombre", lo usamos como valor inicial del formulario
+  useEffect(() => {
+    setFormNombre(nombre || "");
+
+    try {
+      const storedNombre = localStorage.getItem("clienteNombre");
+      const storedEmail = localStorage.getItem("clienteEmail");
+      const storedTel = localStorage.getItem("clienteTelefono");
+
+      if (storedNombre) setFormNombre(storedNombre);
+      if (storedEmail) setFormEmail(storedEmail);
+      if (storedTel) setFormTelefono(storedTel);
+    } catch {
+      // ignore
+    }
+  }, [nombre]);
+
   const buildQuery = (extra?: Record<string, string>) => {
     const p = new URLSearchParams();
     if (nombre) p.set("nombre", nombre);
@@ -283,8 +311,6 @@ export default function BienvenidaContenido() {
           year: "numeric",
         });
 
-  const irARegistro = () => router.push(`/registro${buildQuery()}`);
-
   const irAComparador = (tipo?: TipoOferta) => {
     if (tipo === "LUZ") router.push(`/comparador${buildQuery({ tipo: "luz" })}`);
     else if (tipo === "GAS")
@@ -307,11 +333,56 @@ export default function BienvenidaContenido() {
     router.push(`/comparador${buildQuery(extra)}`);
   };
 
-  // Click en una sugerencia
+  // Click en una sugerencia del buscador
   const manejarClickSugerencia = (oferta: Oferta) => {
     const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
     irAComparadorConOferta(tipoNorm, oferta.id);
     setBusqueda(""); // limpiar y cerrar desplegable
+  };
+
+  // Guardar datos del modal
+  const manejarGuardarDatos = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGuardando(true);
+    setMensajeGuardarError(null);
+    setMensajeGuardarOK(null);
+
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: formNombre,
+          email: formEmail,
+          telefono: formTelefono,
+          agenteId,
+          lugarId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("No se pudieron guardar los datos");
+      }
+
+      // Guardamos en localStorage para futuros accesos
+      try {
+        localStorage.setItem("clienteNombre", formNombre);
+        localStorage.setItem("clienteEmail", formEmail);
+        localStorage.setItem("clienteTelefono", formTelefono);
+        localStorage.setItem("leadOK", "1");
+      } catch {
+        // ignore
+      }
+
+      setLeadOK(true);
+      setMensajeGuardarOK("Datos guardados correctamente.");
+    } catch (err: any) {
+      setMensajeGuardarError(
+        err?.message || "Ha ocurrido un error al guardar los datos."
+      );
+    } finally {
+      setGuardando(false);
+    }
   };
 
   // 🔹 Config de secciones para los botones tipo tarjeta (neón)
@@ -417,20 +488,6 @@ export default function BienvenidaContenido() {
     },
   ];
 
-  // accesos rápidos (los que quieres en la línea de la derecha)
-  const accesosRapidosIds = [
-    "gas",
-    "telefonia",
-    "ferreteria",
-    "viajes",
-    "repuestos",
-    "seguros",
-  ] as const;
-
-  const accesosRapidos = secciones.filter((s) =>
-    accesosRapidosIds.includes(s.id as (typeof accesosRapidosIds)[number])
-  );
-
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
@@ -442,7 +499,7 @@ export default function BienvenidaContenido() {
           <aside className="space-y-6">
             {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
-              {/* Columna izquierda: logo + contacto + subtítulo */}
+              {/* Columna izquierda: logo + subtítulo */}
               <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
                 <div className="flex items-center">
                   <div className="relative h-16 w-64 md:h-20 md:w-72">
@@ -456,24 +513,7 @@ export default function BienvenidaContenido() {
                   </div>
                 </div>
 
-                {/* Teléfono + email más grandes y en negrita */}
                 <div className="space-y-1">
-                  <p className="text-sm md:text-base font-bold text-emerald-100">
-                    Tel. 692 13 70 48
-                  </p>
-                  <p className="text-sm md:text-base font-bold text-emerald-100">
-                    Email:{" "}
-                    <a
-                      href="mailto:info@impulsoenergetico.es"
-                      className="underline"
-                    >
-                      info@impulsoenergetico.es
-                    </a>
-                  </p>
-                </div>
-
-                {/* Subtítulo plataforma */}
-                <div className="space-y-1 pt-2">
                   <p className="text-base md:text-lg font-bold text-slate-50">
                     Plataforma de ahorro y comisiones
                   </p>
@@ -485,7 +525,7 @@ export default function BienvenidaContenido() {
 
               {/* Columna derecha: bienvenida + tarjeta club */}
               <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                {/* Texto bienvenida + botones + accesos rápidos */}
+                {/* Texto bienvenida + botones */}
                 <div className="flex-1 space-y-3">
                   <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
@@ -525,42 +565,19 @@ export default function BienvenidaContenido() {
                     </p>
                   )}
 
-                  {/* Botones principales + accesos rápidos en la misma línea */}
-                  <div className="pt-1 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    {/* Botones principales */}
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={irARegistro}
-                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
-                      >
-                        Acceder / actualizar mis datos
-                      </button>
-                      <button
-                        onClick={() => irAComparador("LUZ")}
-                        className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
-                      >
-                        LUZ
-                      </button>
-                    </div>
-
-                    {/* Accesos rápidos a secciones (a la derecha en desktop) */}
-                    <div className="mt-1 md:mt-0">
-                      <p className="text-[10px] md:text-xs tracking-[0.22em] uppercase text-slate-300 mb-2">
-                        Accesos rápidos a secciones
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {accesosRapidos.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={s.onClick}
-                            className="px-3 py-1 rounded-full border border-slate-600/80 text-[11px] md:text-xs text-slate-100 hover:border-emerald-400 hover:text-emerald-200 transition"
-                          >
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <button
+                      onClick={() => setModalAbierto(true)}
+                      className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                    >
+                      Acceder / actualizar mis datos
+                    </button>
+                    <button
+                      onClick={() => irAComparador("LUZ")}
+                      className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                    >
+                      Ir al comparador de luz
+                    </button>
                   </div>
                 </div>
 
@@ -789,7 +806,7 @@ export default function BienvenidaContenido() {
                             </button>
                           ) : (
                             <button
-                              onClick={irARegistro}
+                              onClick={() => setModalAbierto(true)}
                               className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                             >
                               Desbloquear
@@ -904,6 +921,97 @@ export default function BienvenidaContenido() {
           </main>
         </div>
       </div>
+
+      {/* MODAL: Acceder / actualizar mis datos */}
+      {modalAbierto && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-3">
+          <div className="w-full max-w-lg rounded-2xl bg-slate-950 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-5 md:p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg md:text-xl font-bold text-slate-50">
+                  Actualiza tus datos
+                </h2>
+                <p className="text-xs md:text-sm text-slate-300 mt-1">
+                  Revisa tu nombre, email y teléfono para poder enviarte ofertas
+                  y seguimiento de tus comparativas.
+                </p>
+              </div>
+              <button
+                onClick={() => setModalAbierto(false)}
+                className="text-slate-400 hover:text-slate-100 text-lg"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={manejarGuardarDatos} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Nombre completo
+                </label>
+                <input
+                  type="text"
+                  value={formNombre}
+                  onChange={(e) => setFormNombre(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  value={formTelefono}
+                  onChange={(e) => setFormTelefono(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                  required
+                />
+              </div>
+
+              {mensajeGuardarError && (
+                <p className="text-xs text-red-300">{mensajeGuardarError}</p>
+              )}
+              {mensajeGuardarOK && (
+                <p className="text-xs text-emerald-300">{mensajeGuardarOK}</p>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalAbierto(false)}
+                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
+                >
+                  Salir sin guardar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-xs md:text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {guardando ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
