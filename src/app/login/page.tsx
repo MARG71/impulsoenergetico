@@ -51,7 +51,9 @@ export default function LoginPage() {
         onSubmit={handleLogin}
         className="bg-white p-6 rounded shadow-md w-full max-w-sm"
       >
-        <h1 className="text-xl font-bold text-center mb-4 text-blue-900">Iniciar sesión</h1>
+        <h1 className="text-xl font-bold text-center mb-4 text-blue-900">
+          Iniciar sesión
+        </h1>
 
         {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
 
@@ -79,17 +81,19 @@ export default function LoginPage() {
         >
           Entrar
         </button>
+
+        {/* Bloque "¿Has olvidado tu contraseña?" dentro del formulario */}
+        <p className="mt-3 text-[11px] text-slate-600 text-center">
+          ¿Has olvidado tu contraseña?{' '}
+          <button
+            type="button"
+            onClick={() => router.push('/recuperar-clave')}
+            className="text-emerald-600 hover:text-emerald-500 underline-offset-2 hover:underline"
+          >
+            Recuperar acceso
+          </button>
+        </p>
       </form>
     </div>
   );
 }
-<p className="mt-3 text-[11px] text-slate-400 text-center">
-  ¿Has olvidado tu contraseña?{" "}
-  <button
-    type="button"
-    onClick={() => router.push("/recuperar-clave")}
-    className="text-emerald-300 hover:text-emerald-200 underline-offset-2 hover:underline"
-  >
-    Recuperar acceso
-  </button>
-</p>
