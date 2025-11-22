@@ -83,3 +83,13 @@ export default function LoginPage() {
     </div>
   );
 }
+<p className="mt-3 text-[11px] text-slate-400 text-center">
+  ¿Has olvidado tu contraseña?{" "}
+  <button
+    type="button"
+    onClick={() => router.push("/recuperar-clave")}
+    className="text-emerald-300 hover:text-emerald-200 underline-offset-2 hover:underline"
+  >
+    Recuperar acceso
+  </button>
+</p>
