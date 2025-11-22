@@ -417,6 +417,20 @@ export default function BienvenidaContenido() {
     },
   ];
 
+  // accesos rápidos (los que quieres en la línea de la derecha)
+  const accesosRapidosIds = [
+    "gas",
+    "telefonia",
+    "ferreteria",
+    "viajes",
+    "repuestos",
+    "seguros",
+  ] as const;
+
+  const accesosRapidos = secciones.filter((s) =>
+    accesosRapidosIds.includes(s.id as (typeof accesosRapidosIds)[number])
+  );
+
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
@@ -442,23 +456,24 @@ export default function BienvenidaContenido() {
                   </div>
                 </div>
 
-                {/* Contacto */}
-                <div className="space-y-0.5 text-[11px] md:text-xs text-emerald-100">
-                  <p className="font-semibold tracking-wide">
+                {/* Teléfono + email más grandes y en negrita */}
+                <div className="space-y-1">
+                  <p className="text-sm md:text-base font-bold text-emerald-100">
                     Tel. 692 13 70 48
                   </p>
-                  <p className="font-medium">
+                  <p className="text-sm md:text-base font-bold text-emerald-100">
                     Email:{" "}
                     <a
                       href="mailto:info@impulsoenergetico.es"
-                      className="underline decoration-emerald-400/70 decoration-dotted hover:text-emerald-300"
+                      className="underline"
                     >
                       info@impulsoenergetico.es
                     </a>
                   </p>
                 </div>
 
-                <div className="space-y-1 pt-1">
+                {/* Subtítulo plataforma */}
+                <div className="space-y-1 pt-2">
                   <p className="text-base md:text-lg font-bold text-slate-50">
                     Plataforma de ahorro y comisiones
                   </p>
@@ -470,7 +485,7 @@ export default function BienvenidaContenido() {
 
               {/* Columna derecha: bienvenida + tarjeta club */}
               <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                {/* Texto bienvenida + botones */}
+                {/* Texto bienvenida + botones + accesos rápidos */}
                 <div className="flex-1 space-y-3">
                   <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
@@ -510,9 +525,9 @@ export default function BienvenidaContenido() {
                     </p>
                   )}
 
-                  {/* Botones principales + accesos rápidos */}
-                  <div className="space-y-3 pt-1">
-                    {/* Principal */}
+                  {/* Botones principales + accesos rápidos en la misma línea */}
+                  <div className="pt-1 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    {/* Botones principales */}
                     <div className="flex flex-wrap gap-3">
                       <button
                         onClick={irARegistro}
@@ -524,52 +539,26 @@ export default function BienvenidaContenido() {
                         onClick={() => irAComparador("LUZ")}
                         className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
                       >
-                        Ir al comparador de luz
+                        LUZ
                       </button>
                     </div>
 
-                    {/* Accesos rápidos */}
-                    <div>
-                      <p className="text-[10px] md:text-xs uppercase tracking-[0.22em] text-slate-400 mb-2">
+                    {/* Accesos rápidos a secciones (a la derecha en desktop) */}
+                    <div className="mt-1 md:mt-0">
+                      <p className="text-[10px] md:text-xs tracking-[0.22em] uppercase text-slate-300 mb-2">
                         Accesos rápidos a secciones
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => irAComparador("GAS")}
-                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
-                        >
-                          Gas
-                        </button>
-                        <button
-                          onClick={() => irAComparador("TELEFONIA")}
-                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
-                        >
-                          Telefonía
-                        </button>
-                        <button
-                          onClick={() => router.push(`/ferreteria${buildQuery()}`)}
-                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
-                        >
-                          Ferretería
-                        </button>
-                        <button
-                          onClick={() => router.push(`/viajes${buildQuery()}`)}
-                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
-                        >
-                          Viajes
-                        </button>
-                        <button
-                          onClick={() => router.push(`/repuestos${buildQuery()}`)}
-                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
-                        >
-                          Repuestos
-                        </button>
-                        <button
-                          onClick={() => router.push(`/seguros${buildQuery()}`)}
-                          className="px-3 py-1.5 rounded-full border border-slate-600/70 text-[11px] text-slate-100 hover:bg-slate-800"
-                        >
-                          Seguros
-                        </button>
+                        {accesosRapidos.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={s.onClick}
+                            className="px-3 py-1 rounded-full border border-slate-600/80 text-[11px] md:text-xs text-slate-100 hover:border-emerald-400 hover:text-emerald-200 transition"
+                          >
+                            {s.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
