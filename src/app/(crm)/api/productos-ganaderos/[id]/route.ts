@@ -1,17 +1,17 @@
 // src/app/(crm)/api/productos-ganaderos/[id]/route.ts
+// src/app/(crm)/api/productos-ganaderos/[id]/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
-interface RouteParams {
-  params: { id: string };
-}
-
 // 🔹 Actualizar producto ganadero (solo ADMIN)
-export async function PATCH(req: Request, { params }: RouteParams) {
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    // 👇 forzamos el tipo a any para evitar el error de TS en build
+    // Forzamos tipo any para que TS no se queje en build
     const session = (await getServerSession(authOptions)) as any;
 
     if (!session || session.user?.role !== "ADMIN") {
@@ -60,9 +60,11 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
 }
 
-// 🔹 (Opcional) Borrar producto ganadero (solo ADMIN)
-// Si ya lo tienes definido, solo asegúrate de usar el mismo patrón de `session as any`
-export async function DELETE(req: Request, { params }: RouteParams) {
+// 🔹 Borrar producto ganadero (solo ADMIN)
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const session = (await getServerSession(authOptions)) as any;
 
