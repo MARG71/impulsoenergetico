@@ -1,43 +1,21 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import { JWT } from "next-auth/jwt"; // 👈 importar tipo JWT
-
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login",
-  },
+  session: { strategy: "jwt" },
+  pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-
+      // ...
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-
-        const user = await prisma.usuario.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user || !user.password) return null;
-
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) return null;
-
+        // normaliza email a lowerCase
+        const email = credentials.email.toString().trim().toLowerCase();
+        // busca usuario, compara contraseña y devuelve:
         return {
-          id: user.id.toString(), // 👈 obligatorio para NextAuth
+          id: user.id.toString(),
           name: user.nombre,
           email: user.email,
           role: user.rol,
+          agenteId: user.agenteId,
+          lugarId: user.lugarId,
         };
       },
     }),
@@ -45,15 +23,20 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
-        token.id = user.id;
+        const u = user as any;
+        (token as any).id = u.id;
+        (token as any).role = u.role;
+        (token as any).agenteId = u.agenteId;
+        (token as any).lugarId = u.lugarId;
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: JWT }) {
-      if (token && session.user) {
-        session.user.id = token.id?.toString(); // 👈 corregido
-        session.user.role = token.role as string;
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).id = (token as any).id;
+        (session.user as any).role = (token as any).role;
+        (session.user as any).agenteId = (token as any).agenteId;
+        (session.user as any).lugarId = (token as any).lugarId;
       }
       return session;
     },
