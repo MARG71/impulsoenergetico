@@ -6,19 +6,18 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
 // 🔹 Actualizar producto ganadero (solo ADMIN)
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: Request) {
   try {
-    // Forzamos tipo any para que TS no se queje en build
     const session = (await getServerSession(authOptions)) as any;
 
     if (!session || session.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const id = params.id;
+    // Sacamos el id de la URL: /api/productos-ganaderos/XYZ
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
     const body = await req.json();
     const {
@@ -61,10 +60,7 @@ export async function PATCH(
 }
 
 // 🔹 Borrar producto ganadero (solo ADMIN)
-export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: Request) {
   try {
     const session = (await getServerSession(authOptions)) as any;
 
@@ -72,7 +68,10 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const id = params.id;
+    // Sacamos el id de la URL: /api/productos-ganaderos/XYZ
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
     await prisma.productoGanadero.delete({
       where: { id },
