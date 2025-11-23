@@ -17,7 +17,14 @@ export default function DashboardPage() {
   const [busquedaAgentes, setBusquedaAgentes] = useState('')
   const [busquedaLugares, setBusquedaLugares] = useState('')
   const [busquedaLeads, setBusquedaLeads] = useState('')
-  const [busquedaOfertas, setBusquedaOfertas] = useState('') // NUEVO buscador para Ofertas
+  const [busquedaOfertas, setBusquedaOfertas] = useState('') // buscador para Ofertas
+
+  // 👇 Función auxiliar para normalizar respuestas {clave: []} o []
+  const normalizarLista = (data: any, key?: string) => {
+    if (key && Array.isArray(data?.[key])) return data[key]
+    if (Array.isArray(data)) return data
+    return []
+  }
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -29,6 +36,7 @@ export default function DashboardPage() {
           fetch('/api/leads'),
           fetch('/api/ofertas'),
         ])
+
         const [dataC, dataA, dataL, dataLeads, dataOfertas] = await Promise.all([
           resC.json(),
           resA.json(),
@@ -36,15 +44,18 @@ export default function DashboardPage() {
           resLeads.json(),
           resOfertas.json(),
         ])
-        setComparativas(Array.isArray(dataC) ? dataC : [])
-        setAgentes(Array.isArray(dataA) ? dataA : [])
-        setLugares(Array.isArray(dataL) ? dataL : [])
-        setLeads(Array.isArray(dataLeads) ? dataLeads : [])
-        setOfertas(Array.isArray(dataOfertas) ? dataOfertas : [])
+
+        // 👇 Aquí usamos normalizarLista con la clave correcta según el backend
+        setComparativas(normalizarLista(dataC, 'comparativas'))
+        setAgentes(normalizarLista(dataA, 'agentes'))
+        setLugares(normalizarLista(dataL, 'lugares'))
+        setLeads(normalizarLista(dataLeads, 'leads'))       // <- IMPORTANTE
+        setOfertas(normalizarLista(dataOfertas, 'ofertas')) // <- IMPORTANTE
       } catch (err) {
         console.error('Error cargando datos:', err)
       }
     }
+
     cargarDatos()
   }, [])
 
@@ -63,10 +74,26 @@ export default function DashboardPage() {
     ['cliente.nombre', 'nombreTarifa', 'tipoTarifa', 'agente.nombre'],
     busquedaComparativas
   )
+
   const agentesFiltrados = filtrar(agentes, ['nombre', 'email', 'telefono'], busquedaAgentes)
-  const lugaresFiltrados = filtrar(lugares, ['nombre', 'direccion', 'agente.nombre'], busquedaLugares)
-  const leadsFiltrados = filtrar(leads, ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'], busquedaLeads)
-  const ofertasFiltradas = filtrar(ofertas, ['titulo', 'tipo', 'descripcion', 'descripcionCorta'], busquedaOfertas)
+
+  const lugaresFiltrados = filtrar(
+    lugares,
+    ['nombre', 'direccion', 'agente.nombre'],
+    busquedaLugares
+  )
+
+  const leadsFiltrados = filtrar(
+    leads,
+    ['nombre', 'email', 'telefono', 'agente.nombre', 'lugar.nombre'],
+    busquedaLeads
+  )
+
+  const ofertasFiltradas = filtrar(
+    ofertas,
+    ['titulo', 'tipo', 'descripcion', 'descripcionCorta'],
+    busquedaOfertas
+  )
 
   const Bloque = ({ titulo, color, datos, campos, encabezados, busqueda, setBusqueda, onVer }: any) => (
     <div className={`${color} text-white p-4 rounded shadow-md mb-6 w-full`}>

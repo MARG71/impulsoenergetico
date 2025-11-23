@@ -5,7 +5,10 @@ const smtpHost = process.env.SMTP_HOST;
 const smtpPort = Number(process.env.SMTP_PORT || "587");
 const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;
-const smtpFrom = process.env.SMTP_FROM || "info@impulsoenergetico.es";
+
+// 👇 NUEVO: usamos EMAIL_FROM como principal
+const smtpFrom =
+  process.env.EMAIL_FROM || smtpUser || "info@impulsoenergetico.es";
 
 if (!smtpHost || !smtpUser || !smtpPass) {
   console.warn(
@@ -24,6 +27,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+
 // ========= FUNCION GENÉRICA =========
 export async function enviarEmail(options: {
   to: string;
@@ -36,7 +40,7 @@ export async function enviarEmail(options: {
     return;
   }
 
-  const from = smtpFrom || smtpUser;
+  const from = smtpFrom; // 👈 ya no hace falta el fallback
 
   try {
     const info = await transporter.sendMail({
@@ -53,6 +57,7 @@ export async function enviarEmail(options: {
     throw err;
   }
 }
+
 
 // ========= EMAIL DE BIENVENIDA =========
 interface EmailBienvenidaParams {
