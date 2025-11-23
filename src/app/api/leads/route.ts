@@ -1,158 +1,181 @@
 // src/app/api/leads/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// src/app/api/leads/route.ts
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { enviarEmail } from "@/lib/email";
+import { enviarEmailBienvenida } from "@/lib/email";
 
 // 🔹 GET: devolver todos los leads (para el dashboard)
 export async function GET() {
   try {
     const leads = await prisma.lead.findMany({
-      orderBy: { creadoEn: "desc" },
+      orderBy: {
+        creadoEn: "desc",
+      },
       include: {
         agente: true,
         lugar: true,
       },
     });
 
-    // 👇 Devolvemos SOLO el array, para que funcione tanto si el front hace
-    // data.leads || data || []  como si solo usa data
-    return NextResponse.json(leads);
+    return NextResponse.json({ leads });
   } catch (error) {
-    console.error("Error en GET /api/leads:", error);
+    console.error("[LEADS][GET] Error al obtener leads:", error);
     return NextResponse.json(
-      { error: "Error al cargar los leads" },
+      { error: "Error al obtener los leads" },
       { status: 500 }
     );
   }
 }
 
-// 🔹 POST: crear Lead, crear/actualizar Usuario y mandar email
-export async function POST(req: NextRequest) {
+// Helper: genera una contraseña provisional sencilla (8 caracteres)
+function generarPasswordProvisional() {
+  return Math.random().toString(36).slice(-8);
+}
+
+// 🔹 POST: crear/actualizar lead + crear usuario (si no existe) + enviar email bienvenida SOLO la 1ª vez
+export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { nombre, email, telefono, agenteId, lugarId } = body;
+
+    let { nombre, email, telefono, agenteId, lugarId } = body as {
+      nombre?: string;
+      email?: string;
+      telefono?: string;
+      agenteId?: string | number | null;
+      lugarId?: string | number | null;
+    };
+
+    nombre = (nombre || "").trim();
+    email = (email || "").trim();
+    telefono = (telefono || "").trim();
 
     if (!nombre || !email || !telefono) {
       return NextResponse.json(
-        { error: "Nombre, email y teléfono son obligatorios" },
+        { error: "Nombre, email y teléfono son obligatorios." },
         { status: 400 }
       );
     }
 
-    // Normalizamos IDs opcionales
-    const agenteIdNum =
-      typeof agenteId === "string" ? Number(agenteId) : agenteId ?? null;
-    const lugarIdNum =
-      typeof lugarId === "string" ? Number(lugarId) : lugarId ?? null;
+    // Normalizamos email para evitar duplicados por mayúsculas
+    const emailNormalizado = email.toLowerCase();
 
-    // 1) Buscar si ya existe un usuario con ese email
-    let usuario = await prisma.usuario.findUnique({
-      where: { email },
+    const agenteIdNum =
+      typeof agenteId === "string" ? Number(agenteId) : agenteId ?? undefined;
+    const lugarIdNum =
+      typeof lugarId === "string" ? Number(lugarId) : lugarId ?? undefined;
+
+    // 1️⃣ Buscamos si ya existe un lead con ese email
+    const existingLead = await prisma.lead.findFirst({
+      where: { email: emailNormalizado },
     });
 
-    let passwordProvisional: string | null = null;
-    const esUsuarioNuevo = !usuario;
+    let nuevoLead = false;
+    let lead;
 
-    // 2) Si NO existe, creamos usuario con contraseña provisional
-    if (!usuario) {
-      passwordProvisional = Math.random().toString(36).slice(-10); // 10 caracteres
-      const passwordHasheado = await bcrypt.hash(passwordProvisional, 10);
-
-      usuario = await prisma.usuario.create({
+    if (existingLead) {
+      // 🔁 Ya existía: actualizamos datos (para que en el CRM veas los últimos)
+      lead = await prisma.lead.update({
+        where: { id: existingLead.id },
         data: {
           nombre,
-          email,
-          password: passwordHasheado,
-          rol: "LUGAR", // rol por defecto para clientes finales
+          telefono,
+          email: emailNormalizado,
+          agenteId: agenteIdNum ?? existingLead.agenteId,
+          lugarId: lugarIdNum ?? existingLead.lugarId,
+        },
+      });
+    } else {
+      // 🆕 No existía: creamos lead nuevo
+      lead = await prisma.lead.create({
+        data: {
+          nombre,
+          email: emailNormalizado,
+          telefono,
+          estado: "pendiente",
           agenteId: agenteIdNum,
           lugarId: lugarIdNum,
         },
       });
-    } else {
-      // Si ya existe, actualizamos nombre/relaciones por si han cambiado
-      usuario = await prisma.usuario.update({
-        where: { id: usuario.id },
-        data: {
-          nombre,
-          agenteId: agenteIdNum ?? usuario.agenteId,
-          lugarId: lugarIdNum ?? usuario.lugarId,
-        },
-      });
+      nuevoLead = true;
     }
 
-    // 3) Crear el Lead
-    const lead = await prisma.lead.create({
-      data: {
-        nombre,
-        email,
-        telefono,
-        estado: "pendiente",
-        agenteId: agenteIdNum,
-        lugarId: lugarIdNum,
-      },
+    // 2️⃣ Buscamos si ya existe un usuario con ese email
+    let usuario = await prisma.usuario.findUnique({
+      where: { email: emailNormalizado },
     });
 
-    // 4) Mandar email de bienvenida SOLO si el usuario es nuevo
-    if (esUsuarioNuevo && passwordProvisional) {
+    let passwordProvisional: string | null = null;
+    let nuevoUsuario = false;
+    let emailEnviado = false;
+
+    if (!usuario) {
+      // 🆕 Creamos usuario y contraseña provisional SOLO la primera vez
+      passwordProvisional = generarPasswordProvisional();
+      const hash = await bcrypt.hash(passwordProvisional, 10);
+
+      usuario = await prisma.usuario.create({
+        data: {
+          nombre: nombre || "Usuario Impulso",
+          email: emailNormalizado,
+          password: hash,
+          rol: "LUGAR",
+          ...(agenteIdNum
+            ? {
+                agente: {
+                  connect: { id: agenteIdNum },
+                },
+              }
+            : {}),
+          ...(lugarIdNum
+            ? {
+                lugar: {
+                  connect: { id: lugarIdNum },
+                },
+              }
+            : {}),
+        },
+      });
+
+      nuevoUsuario = true;
+
+      // 3️⃣ Enviamos email de bienvenida con los datos de acceso
       try {
-        const base =
-          process.env.NEXT_PUBLIC_BASE_URL ??
-          process.env.NEXTAUTH_URL ??
+        const baseUrl =
+          process.env.NEXTAUTH_URL ||
+          process.env.NEXT_PUBLIC_APP_URL ||
           "https://impulsoenergetico.es";
 
-        const loginUrl = base.replace(/\/+$/, "") + "/login";
+        const linkAcceso = `${baseUrl.replace(/\/$/, "")}/login`;
 
-        const asunto = "Bienvenido/a a Impulso Energético";
-        const html = `
-          <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a;">
-            <h2 style="color:#10b981;">Hola ${nombre || ""}, ¡bienvenido/a!</h2>
-            <p>
-              Gracias por registrarte en <strong>Impulso Energético</strong>. 
-              Desde tu área privada podrás ver tus comparativas, ofertas y ventajas como socio.
-            </p>
-            <p>Hemos creado tu acceso provisional:</p>
-            <ul>
-              <li><strong>Usuario (email):</strong> ${email}</li>
-              <li><strong>Contraseña provisional:</strong> ${passwordProvisional}</li>
-            </ul>
-            <p>Te recomendamos cambiar la contraseña la primera vez que entres.</p>
-            <p>
-              Puedes acceder desde este enlace:<br/>
-              <a href="${loginUrl}" style="color:#10b981;">${loginUrl}</a>
-            </p>
-            <p style="margin-top:24px;">
-              Un saludo,<br/>
-              <strong>Equipo Impulso Energético</strong>
-            </p>
-          </div>
-        `;
-
-        await enviarEmail({
-          to: email,
-          subject: asunto,
-          html,
+        await enviarEmailBienvenida({
+          nombre,
+          email: emailNormalizado,
+          passwordProvisional,
+          linkAcceso,
         });
-      } catch (error) {
-        console.error("Error enviando email de bienvenida:", error);
-        // No rompemos la creación del lead si el email falla
+
+        emailEnviado = true;
+      } catch (err) {
+        console.error("[LEADS][POST] Error enviando email de bienvenida:", err);
+        // No rompemos la respuesta al cliente si el email falla
       }
+    } else {
+      // Si el usuario ya existe NO enviamos email (ya lo recibió en su día)
+      emailEnviado = false;
     }
 
-    // El modal solo mira res.ok, así que con esto es suficiente
-    return NextResponse.json(
-      {
-        ok: true,
-        lead,
-        usuarioId: usuario.id,
-        usuarioNuevo: esUsuarioNuevo,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      ok: true,
+      lead,
+      nuevoLead,
+      nuevoUsuario,
+      emailEnviado,
+    });
   } catch (error) {
-    console.error("Error en POST /api/leads:", error);
+    console.error("[LEADS][POST] Error al crear/actualizar lead:", error);
     return NextResponse.json(
-      { error: "Error interno creando el lead" },
+      { error: "Error al registrar el lead" },
       { status: 500 }
     );
   }
