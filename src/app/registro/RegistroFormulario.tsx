@@ -14,7 +14,9 @@ export default function RegistroFormulario() {
   const [nombre, setNombre] = useState(nombreParam);
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [enviando, setEnviando] = useState(false);
+
+  // 👇 estados de control
+  const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
@@ -22,19 +24,11 @@ export default function RegistroFormulario() {
     if (nombreParam) setNombre(nombreParam);
   }, [nombreParam]);
 
-  const buildQuery = () => {
-    const p = new URLSearchParams();
-    if (nombre) p.set("nombre", nombre);
-    if (agenteIdParam) p.set("agenteId", agenteIdParam);
-    if (lugarIdParam) p.set("lugarId", lugarIdParam);
-    const qs = p.toString();
-    return qs ? `?${qs}` : "";
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
     setError(null);
+    setOk(false);
 
     try {
       const res = await fetch("/api/leads", {
@@ -44,8 +38,8 @@ export default function RegistroFormulario() {
           nombre,
           email,
           telefono,
-          agenteId,
-          lugarId,
+          agenteId: agenteIdParam,
+          lugarId: lugarIdParam,
         }),
       });
 
@@ -60,20 +54,33 @@ export default function RegistroFormulario() {
       const esNuevoLead = !!data.nuevoLead;
 
       // Nombre / agente / lugar definitivos (los del lead que queda en BD)
-      const nombreFinal = lead.nombre || nombre;
-      const agenteFinal = lead.agenteId ?? agenteId;
-      const lugarFinal = lead.lugarId ?? lugarId;
+      const nombreFinal: string = lead.nombre || nombre;
+
+      const agenteFinal: number | undefined =
+        typeof lead.agenteId === "number"
+          ? lead.agenteId
+          : agenteIdParam
+          ? Number(agenteIdParam)
+          : undefined;
+
+      const lugarFinal: number | undefined =
+        typeof lead.lugarId === "number"
+          ? lead.lugarId
+          : lugarIdParam
+          ? Number(lugarIdParam)
+          : undefined;
 
       // Guardamos en localStorage para siguientes visitas
       try {
         if (nombreFinal) localStorage.setItem("clienteNombre", nombreFinal);
         if (email) localStorage.setItem("clienteEmail", email);
         if (telefono) localStorage.setItem("clienteTelefono", telefono);
-        if (agenteFinal) localStorage.setItem("agenteId", String(agenteFinal));
+        if (agenteFinal)
+          localStorage.setItem("agenteId", String(agenteFinal));
         if (lugarFinal) localStorage.setItem("lugarId", String(lugarFinal));
         localStorage.setItem("leadOK", "1");
       } catch {
-        // ignore
+        // ignoramos errores de localStorage
       }
 
       if (!esNuevoLead) {
@@ -89,17 +96,18 @@ export default function RegistroFormulario() {
       if (agenteFinal) params.set("agenteId", String(agenteFinal));
       if (lugarFinal) params.set("lugarId", String(lugarFinal));
 
+      setOk(true);
       router.push(`/bienvenida?${params.toString()}`);
     } catch (err: any) {
       console.error(err);
       setError(
-        err?.message || "Ha ocurrido un error al registrar tus datos. Inténtalo de nuevo."
+        err?.message ||
+          "Ha ocurrido un error al registrar tus datos. Inténtalo de nuevo."
       );
     } finally {
       setCargando(false);
     }
   };
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8 text-slate-50">
@@ -179,10 +187,10 @@ export default function RegistroFormulario() {
 
           <button
             type="submit"
-            disabled={enviando}
+            disabled={cargando}
             className="mt-2 w-full px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {enviando ? "Enviando..." : "Guardar mis datos y continuar"}
+            {cargando ? "Guardando..." : "Guardar mis datos y continuar"}
           </button>
         </form>
       </div>
