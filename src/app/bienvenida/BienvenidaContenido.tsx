@@ -82,6 +82,7 @@ export default function BienvenidaContenido() {
   const [clubColorAcento, setClubColorAcento] = useState<string>("#22c55e");
 
   // Lee datos básicos y posibles params extra de club
+  // Lee datos básicos y posibles params extra de club
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
     const agenteURL = searchParams.get("agenteId");
@@ -157,8 +158,8 @@ export default function BienvenidaContenido() {
       const qs = params.toString();
       router.replace(`/bienvenida${qs ? `?${qs}` : ""}`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agenteId, lugarId, router, searchParams]);
+
 
 
   // Si tenemos lugarId, cargamos info especial REAL del lugar

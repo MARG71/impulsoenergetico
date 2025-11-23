@@ -33,9 +33,8 @@ export default function RegistroFormulario() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEnviando(true);
+    setCargando(true);
     setError(null);
-    setOk(false);
 
     try {
       const res = await fetch("/api/leads", {
@@ -45,43 +44,62 @@ export default function RegistroFormulario() {
           nombre,
           email,
           telefono,
-          agenteId: agenteIdParam,
-          lugarId: lugarIdParam,
+          agenteId,
+          lugarId,
         }),
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "No se pudo registrar el lead");
+        const dataErr = await res.json().catch(() => ({}));
+        throw new Error(dataErr?.error || "Error al registrar tus datos");
       }
 
-      // Guardar en localStorage para que BienvenidaContenido lo use
+      const data = await res.json();
+
+      const lead = data.lead || {};
+      const esNuevoLead = !!data.nuevoLead;
+
+      // Nombre / agente / lugar definitivos (los del lead que queda en BD)
+      const nombreFinal = lead.nombre || nombre;
+      const agenteFinal = lead.agenteId ?? agenteId;
+      const lugarFinal = lead.lugarId ?? lugarId;
+
+      // Guardamos en localStorage para siguientes visitas
       try {
-        localStorage.setItem("clienteNombre", nombre);
-        localStorage.setItem("clienteEmail", email);
-        localStorage.setItem("clienteTelefono", telefono);
-        if (agenteIdParam) localStorage.setItem("agenteId", agenteIdParam);
-        if (lugarIdParam) localStorage.setItem("lugarId", lugarIdParam);
+        if (nombreFinal) localStorage.setItem("clienteNombre", nombreFinal);
+        if (email) localStorage.setItem("clienteEmail", email);
+        if (telefono) localStorage.setItem("clienteTelefono", telefono);
+        if (agenteFinal) localStorage.setItem("agenteId", String(agenteFinal));
+        if (lugarFinal) localStorage.setItem("lugarId", String(lugarFinal));
         localStorage.setItem("leadOK", "1");
       } catch {
-        // si falla localStorage no rompemos el flujo
+        // ignore
       }
 
-      setOk(true);
+      if (!esNuevoLead) {
+        // 📌 Email ya existía
+        alert(
+          "Este email ya estaba registrado. Te llevamos a tu zona de cliente para que veas tus ofertas."
+        );
+      }
 
-      // Redirigir a la pantalla de bienvenida con los mismos parámetros
-      const qs = buildQuery();
-      router.push(`/bienvenida${qs}`);
+      // Redirigimos a bienvenida con los datos “oficiales”
+      const params = new URLSearchParams();
+      if (nombreFinal) params.set("nombre", nombreFinal);
+      if (agenteFinal) params.set("agenteId", String(agenteFinal));
+      if (lugarFinal) params.set("lugarId", String(lugarFinal));
+
+      router.push(`/bienvenida?${params.toString()}`);
     } catch (err: any) {
-      console.error("Error al registrar lead:", err);
+      console.error(err);
       setError(
-        err?.message ||
-          "Ha ocurrido un error al registrar tus datos. Inténtalo de nuevo."
+        err?.message || "Ha ocurrido un error al registrar tus datos. Inténtalo de nuevo."
       );
     } finally {
-      setEnviando(false);
+      setCargando(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8 text-slate-50">
