@@ -115,31 +115,6 @@ export default function BienvenidaContenido() {
       // ignore
     }
 
-    // 🧭 Mantener agenteId y lugarId en la URL para no perder trazabilidad
-    useEffect(() => {
-      if (!agenteId && !lugarId) return
-
-      const params = new URLSearchParams(Array.from(searchParams.entries()))
-      let changed = false
-
-      if (agenteId && !params.get('agenteId')) {
-        params.set('agenteId', agenteId)
-        changed = true
-      }
-
-      if (lugarId && !params.get('lugarId')) {
-        params.set('lugarId', lugarId)
-        changed = true
-      }
-
-      if (changed) {
-        const qs = params.toString()
-        router.replace(`/bienvenida${qs ? `?${qs}` : ''}`)
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [agenteId, lugarId])
-
-
     // Extra: datos de club que puedan venir por querystring
     const clubLogoParam = searchParams.get("clubLogo");
     const clubMensajeParam = searchParams.get("clubMensaje");
@@ -160,6 +135,31 @@ export default function BienvenidaContenido() {
     }
     if (clubColorParam) setClubColorAcento(clubColorParam);
   }, [searchParams]);
+
+  // 🧭 Mantener agenteId y lugarId en la URL para no perder trazabilidad
+  useEffect(() => {
+    if (!agenteId && !lugarId) return;
+
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    let changed = false;
+
+    if (agenteId && !params.get("agenteId")) {
+      params.set("agenteId", agenteId);
+      changed = true;
+    }
+
+    if (lugarId && !params.get("lugarId")) {
+      params.set("lugarId", lugarId);
+      changed = true;
+    }
+
+    if (changed) {
+      const qs = params.toString();
+      router.replace(`/bienvenida${qs ? `?${qs}` : ""}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agenteId, lugarId, router, searchParams]);
+
 
   // Si tenemos lugarId, cargamos info especial REAL del lugar
   useEffect(() => {
