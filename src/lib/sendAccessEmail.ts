@@ -1,5 +1,4 @@
 // src/lib/sendAccessEmail.ts
-// src/lib/sendAccessEmail.ts
 import nodemailer from "nodemailer";
 
 type Rol = "ADMIN" | "AGENTE" | "LUGAR";
@@ -25,19 +24,23 @@ export async function sendAccessEmail({
   email,
   password,
 }: SendAccessEmailParams) {
-  // URL base de tu app (puede ser NEXTAUTH_URL o APP_BASE_URL)
+
+  // URL base
   const baseUrl =
-    process.env.NEXTAUTH_URL || process.env.APP_BASE_URL || "https://impulsoenergetico.es";
+    process.env.NEXTAUTH_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://impulsoenergetico.es";
 
   const loginUrl = `${baseUrl}/login`;
 
+  // 🔥 CORREGIDO: usar variables SMTP REALES del proyecto
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: Number(process.env.EMAIL_PORT || 587) === 465,
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: Number(process.env.SMTP_PORT) === 465,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
     },
   });
 
