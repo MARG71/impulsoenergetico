@@ -44,18 +44,19 @@ export async function GET(req: Request) {
         pctAgente: true,
       },
     });
+
     return NextResponse.json(items);
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
-// POST /api/agentes  { nombre, email, telefono?, pctAgente? }
+// POST /api/agentes { nombre, email, telefono?, pctAgente? }
 export async function POST(req: Request) {
   try {
     const b = await req.json();
     const nombre = (b?.nombre ?? "").trim();
-    const email = (b?.email ?? "").trim();
+    const email = (b?.email ?? "").trim().toLowerCase();
     const telefono = (b?.telefono ?? "").trim();
     const pctAgente = normPct(b?.pctAgente);
 
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1) Comprobar que el email no existe ni en Agente ni en Usuario
+    // ❗ Evitar duplicados: ni en Agente ni en Usuario
     const [agenteDup, usuarioDup] = await Promise.all([
       prisma.agente.findUnique({ where: { email } }),
       prisma.usuario.findUnique({ where: { email } }),
@@ -79,48 +80,36 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2) Generar contraseña aleatoria y hashearla
-    const plainPassword = Math.random().toString(36).slice(-10); // ej: 'k9f3a2b7xz'
+    // 1) Generar contraseña aleatoria
+    const plainPassword = Math.random().toString(36).slice(-10); // ej: k9f3a2b7xz
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    // 3) Crear agente y usuario vinculados en una transacción
-    const [agente, usuario] = await prisma.$transaction([
-      prisma.agente.create({
-        data: {
-          nombre,
-          email,
-          telefono,
-          ...(pctAgente !== undefined ? { pctAgente } : {}),
+    // 2) Crear Agente y su Usuario asociado en una sola operación
+    const agente = await prisma.agente.create({
+      data: {
+        nombre,
+        email,
+        telefono,
+        ...(pctAgente !== undefined ? { pctAgente } : {}),
+        usuarios: {
+          create: [
+            {
+              nombre,
+              email,
+              password: hashedPassword,
+              rol: "AGENTE", // enum Rol
+            },
+          ],
         },
-        select: {
-          id: true,
-          nombre: true,
-          email: true,
-          telefono: true,
-          pctAgente: true,
-        },
-      }),
-      prisma.usuario.create({
-        data: {
-          nombre,
-          email,
-          password: hashedPassword,
-          rol: "AGENTE",
-          // se rellena agenteId después con el resultado real
-          // pero en transacción no podemos usar el id del otro paso directamente,
-          // así que haremos un segundo paso con update si lo quieres perfecto.
-        },
-      }),
-    ]);
-
-    // 🔧 Opcional: si quieres guardar agenteId en Usuario,
-    // puedes hacer aquí un update (fuera de la transacción anterior):
-    await prisma.usuario.update({
-      where: { id: usuario.id },
-      data: { agenteId: agente.id },
+      },
+      include: {
+        usuarios: true,
+      },
     });
 
-    // 4) Enviar email de acceso
+    const usuario = agente.usuarios[0];
+
+    // 3) Enviar email de acceso al agente
     await sendAccessEmail({
       to: email,
       nombre,
@@ -131,7 +120,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        agente,
+        agente: {
+          id: agente.id,
+          nombre: agente.nombre,
+          email: agente.email,
+          telefono: agente.telefono,
+          pctAgente: agente.pctAgente,
+        },
         usuario: {
           id: usuario.id,
           email: usuario.email,
