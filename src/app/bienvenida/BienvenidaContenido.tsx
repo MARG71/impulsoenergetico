@@ -343,7 +343,7 @@ export default function BienvenidaContenido() {
     else router.push(`/comparador${buildQuery()}`);
   };
 
-  // 👉 Ahora también enviamos ofertaNombre (título) al comparador
+  // 👉 Enviamos ofertaId + ofertaNombre + tipo al comparador
   const irAComparadorConOferta = (tipo: TipoOferta, oferta: Oferta) => {
     const extra: Record<string, string> = {
       ofertaId: String(oferta.id),
@@ -516,13 +516,19 @@ export default function BienvenidaContenido() {
     },
   ];
 
-  // accesos rápidos como en el pantallazo 1
+  // accesos rápidos
   const accesosRapidos = [
     { label: "Gas", onClick: () => irAComparador("GAS") },
     { label: "Telefonía", onClick: () => irAComparador("TELEFONIA") },
-    { label: "Ferretería", onClick: () => router.push(`/ferreteria${buildQuery()}`) },
+    {
+      label: "Ferretería",
+      onClick: () => router.push(`/ferreteria${buildQuery()}`),
+    },
     { label: "Viajes", onClick: () => router.push(`/viajes${buildQuery()}`) },
-    { label: "Repuestos", onClick: () => router.push(`/repuestos${buildQuery()}`) },
+    {
+      label: "Repuestos",
+      onClick: () => router.push(`/repuestos${buildQuery()}`),
+    },
     { label: "Seguros", onClick: () => router.push(`/seguros${buildQuery()}`) },
   ];
 
@@ -552,7 +558,7 @@ export default function BienvenidaContenido() {
                     </div>
                   </div>
 
-                  {/* Teléfono + email (blanco, negrita, tamaño grande) */}
+                  {/* Teléfono + email */}
                   <div className="space-y-1">
                     <p className="text-base md:text-lg font-bold text-slate-50">
                       Tel. 692 13 70 48
@@ -621,7 +627,7 @@ export default function BienvenidaContenido() {
                     </p>
                   )}
 
-                  {/* Botones principales + accesos rápidos, lado a lado en escritorio */}
+                  {/* Botones principales + accesos rápidos */}
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-1">
                     <div className="flex flex-wrap gap-3">
                       <button
@@ -638,7 +644,7 @@ export default function BienvenidaContenido() {
                       </button>
                     </div>
 
-                    {/* Accesos rápidos (pantallazo 1) */}
+                    {/* Accesos rápidos */}
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] md:text-[11px] tracking-[0.22em] uppercase text-slate-300">
                         ACCESOS RÁPIDOS A SECCIONES
@@ -659,7 +665,7 @@ export default function BienvenidaContenido() {
                   </div>
                 </div>
 
-                {/* Tarjeta club a la derecha */}
+                {/* Tarjeta club */}
                 {hayClubEspecial && (
                   <div
                     className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
@@ -716,7 +722,7 @@ export default function BienvenidaContenido() {
               </div>
             </div>
 
-            {/* === BUSCADOR ENTRE BLOQUE SUPERIOR Y SECCIONES (CON AUTOCOMPLETE) === */}
+            {/* === BUSCADOR OFERTAS === */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-sm md:text-base font-semibold">
@@ -875,9 +881,9 @@ export default function BienvenidaContenido() {
                           </span>
                           {leadOK ? (
                             <button
-                              onClick={() => irAComparadorConOferta(tipoNorm, oferta)}
-
-                              
+                              onClick={() =>
+                                irAComparadorConOferta(tipoNorm, oferta)
+                              }
                               className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                             >
                               Ver en comparador
@@ -965,8 +971,7 @@ export default function BienvenidaContenido() {
                             <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
                               <span>{formFecha(oferta.creadaEn)}</span>
                               <button
-                                onClick={() => irAComparadorConOferta(tipoNorm, oferta)}
-
+                                onClick={() => irAComparadorConOferta(tipo, oferta)}
                                 className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${cfg.btn}`}
                               >
                                 Ver en comparador
