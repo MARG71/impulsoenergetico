@@ -1,7 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+
 import Image from "next/image";
 import {
   BarChart,
@@ -17,6 +18,7 @@ type TipoComparador = "luz" | "gas" | "telefonia";
 
 export default function ComparadorContenido() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const tipoURL = searchParams.get("tipo"); // luz | gas | telefonia
   const ofertaId = searchParams.get("ofertaId"); // id de la oferta (opcional)
@@ -141,7 +143,7 @@ export default function ComparadorContenido() {
     );
     const anual = suma * 12;
     setConsumoAnual(anual.toFixed(2));
-  }, [consumoPeriodos, nombreTarifa]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [consumoPeriodos, nombreTarifa]);
 
   // 🔁 Cargar comparativa existente (por ID)
   useEffect(() => {
@@ -167,9 +169,7 @@ export default function ComparadorContenido() {
         setConsumoPeriodos(df.consumoPeriodos || {});
         setPotencias(df.potencias || {});
         setIva(df.iva || "21");
-        setImpuestoElectricidad(
-          df.impuestoElectricidad || "5.113"
-        );
+        setImpuestoElectricidad(df.impuestoElectricidad || "5.113");
         setTerritorio(df.territorio || "peninsula");
         setReactiva(df.reactiva || "");
         setExceso(df.exceso || "");
@@ -357,8 +357,42 @@ export default function ComparadorContenido() {
       ? "Comparador de gas"
       : "Comparador de telefonía";
 
+  // 🔙 Construir la query para volver a bienvenida (manteniendo nombre + IDs)
+  const buildBackQuery = () => {
+    const params = new URLSearchParams();
+
+    const nombre = searchParams.get("nombre");
+    const agenteFromUrl = searchParams.get("agenteId");
+    const lugarFromUrl = searchParams.get("lugarId");
+
+    const agente = agenteFromUrl || idAgenteQR || agenteId || "";
+    const lugar = lugarFromUrl || idLugarQR || lugarId || "";
+
+    if (nombre) params.set("nombre", nombre);
+    if (agente) params.set("agenteId", agente);
+    if (lugar) params.set("lugarId", lugar);
+
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-8 md:py-8">
+      {/* BOTÓN FULL-WIDTH PARA VOLVER A BIENVENIDA */}
+      <div className="w-screen -mx-4 md:-mx-8 mb-6">
+        <button
+          type="button"
+          onClick={() => router.push(`/bienvenida${buildBackQuery()}`)}
+          className="w-full py-3 md:py-4 text-sm md:text-base font-semibold
+                     bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500
+                     text-slate-950 shadow-lg shadow-emerald-500/40
+                     hover:brightness-110 transition flex items-center justify-center gap-2"
+        >
+          <span>⬅</span>
+          <span>Volver a la pantalla de bienvenida</span>
+        </button>
+      </div>
+
       {/* CABECERA IMPULSO: LOGO + TITULO + INFO QR/OFER */}
       <div className="max-w-6xl mx-auto mb-6 rounded-3xl bg-slate-950/95 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.45)] p-5 md:p-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -482,9 +516,12 @@ export default function ComparadorContenido() {
 
             <h2 className="text-lg font-bold">
               Introduce los datos para tu comparativa
-{"}"}            </h2>
+            </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs md:text-sm">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-3 text-xs md:text-sm"
+            >
               <div className="space-y-2">
                 <div>
                   <label className="block font-semibold mb-1">
@@ -856,14 +893,8 @@ export default function ComparadorContenido() {
                         }}
                       />
                       <Legend />
-                      <Bar
-                        dataKey="ahorro"
-                        name="Ahorro (€)"
-                      />
-                      <Bar
-                        dataKey="comision"
-                        name="Comisión (€)"
-                      />
+                      <Bar dataKey="ahorro" name="Ahorro (€)" />
+                      <Bar dataKey="comision" name="Comisión (€)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
