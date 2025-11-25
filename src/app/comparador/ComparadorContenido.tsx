@@ -378,93 +378,94 @@ export default function ComparadorContenido() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-8 md:py-8">
-      {/* BOTÓN FULL-WIDTH PARA VOLVER A BIENVENIDA */}
-      <div className="w-screen -mx-4 md:-mx-8 mb-6">
-        <button
-          type="button"
-          onClick={() => router.push(`/bienvenida${buildBackQuery()}`)}
-          className="w-full py-3 md:py-4 text-sm md:text-base font-semibold
-                     bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500
-                     text-slate-950 shadow-lg shadow-emerald-500/40
-                     hover:brightness-110 transition flex items-center justify-center gap-2"
-        >
-          <span>⬅</span>
-          <span>Volver a la pantalla de bienvenida</span>
-        </button>
-      </div>
-
-      {/* CABECERA IMPULSO: LOGO + TITULO + INFO QR/OFER */}
-      <div className="max-w-6xl mx-auto mb-6 rounded-3xl bg-slate-950/95 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.45)] p-5 md:p-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Logo + título */}
-          <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
-            <div className="relative h-16 w-56 md:h-20 md:w-64 flex-shrink-0">
-              <Image
-                src="/logo-impulso.png"
-                alt="Impulso Energético"
-                fill
-                className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
-                priority
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
-                ESTUDIO PERSONALIZADO
-              </p>
-              <h1 className="text-xl md:text-3xl font-extrabold leading-tight">
-                {tituloComparador}
-              </h1>
-              {ofertaNombre && (
-                <p className="mt-1 text-xs md:text-sm text-amber-200">
-                  Oferta seleccionada:{" "}
-                  <span className="font-semibold text-amber-300">
-                    {ofertaNombre}
-                  </span>
+      {/* CABECERA IMPULSO: LOGO + TITULO + INFO QR/OFER + BOTÓN VOLVER */}
+      <div className="w-full mb-6 rounded-3xl bg-slate-950/95 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.45)] p-5 md:p-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Logo + título */}
+            <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+              <div className="relative h-16 w-56 md:h-20 md:w-64 flex-shrink-0">
+                <Image
+                  src="/logo-impulso.png"
+                  alt="Impulso Energético"
+                  fill
+                  className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                  priority
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
+                  ESTUDIO PERSONALIZADO
                 </p>
+                <h1 className="text-xl md:text-3xl font-extrabold leading-tight">
+                  {tituloComparador}
+                </h1>
+                {ofertaNombre && (
+                  <p className="mt-1 text-xs md:text-sm text-amber-200">
+                    Oferta seleccionada:{" "}
+                    <span className="font-semibold text-amber-300">
+                      {ofertaNombre}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Info de trazabilidad (agente / lugar / oferta) */}
+            <div className="w-full md:w-auto text-xs md:text-sm text-slate-300 text-left md:text-right space-y-1">
+              {(agenteId || lugarId) && (
+                <>
+                  {agenteId && (
+                    <div>
+                      <span className="font-semibold text-slate-100">
+                        Agente ID:
+                      </span>{" "}
+                      {agenteId}
+                    </div>
+                  )}
+                  {lugarId && (
+                    <div>
+                      <span className="font-semibold text-slate-100">
+                        Lugar ID:
+                      </span>{" "}
+                      {lugarId}
+                    </div>
+                  )}
+                </>
               )}
+              {ofertaId && (
+                <div>
+                  <span className="font-semibold text-slate-100">
+                    Oferta ID:
+                  </span>{" "}
+                  {ofertaId}
+                </div>
+              )}
+              <div className="pt-2 text-[10px] opacity-80">
+                Datos de QR y oferta guardados para trazabilidad de
+                clientes y comisiones.
+              </div>
             </div>
           </div>
 
-          {/* Info de trazabilidad (agente / lugar / oferta) */}
-          <div className="w-full md:w-auto text-xs md:text-sm text-slate-300 text-left md:text-right space-y-1">
-            {(agenteId || lugarId) && (
-              <>
-                {agenteId && (
-                  <div>
-                    <span className="font-semibold text-slate-100">
-                      Agente ID:
-                    </span>{" "}
-                    {agenteId}
-                  </div>
-                )}
-                {lugarId && (
-                  <div>
-                    <span className="font-semibold text-slate-100">
-                      Lugar ID:
-                    </span>{" "}
-                    {lugarId}
-                  </div>
-                )}
-              </>
-            )}
-            {ofertaId && (
-              <div>
-                <span className="font-semibold text-slate-100">
-                  Oferta ID:
-                </span>{" "}
-                {ofertaId}
-              </div>
-            )}
-            <div className="pt-2 text-[10px] opacity-80">
-              Datos de QR y oferta guardados para trazabilidad de
-              clientes y comisiones.
-            </div>
+          {/* Botón volver dentro de la cabecera */}
+          <div className="flex justify-center md:justify-start">
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/bienvenida${buildBackQuery()}`)
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs md:text-sm font-semibold shadow-md shadow-emerald-500/40"
+            >
+              <span>⬅</span>
+              <span>Volver a la pantalla de bienvenida</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* SELECTOR DE TIPO DE COMPARATIVA */}
-      <div className="max-w-6xl mx-auto mb-6 rounded-3xl bg-slate-900/90 border border-slate-700/80 p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-[0_0_32px_rgba(15,23,42,0.9)]">
+      <div className="w-full mb-6 rounded-3xl bg-slate-900/90 border border-slate-700/80 p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-[0_0_32px_rgba(15,23,42,0.9)]">
         <div className="flex flex-wrap gap-2 md:gap-3">
           {(["luz", "gas", "telefonia"] as TipoComparador[]).map(
             (tipo) => (
@@ -498,7 +499,7 @@ export default function ComparadorContenido() {
 
       {/* CONTENIDO SEGÚN TIPO */}
       {tipoComparador === "luz" && (
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* FORMULARIO */}
           <div className="rounded-3xl bg-gradient-to-br from-emerald-500/25 via-emerald-500/10 to-slate-950/90 border border-emerald-500/60 text-slate-50 p-5 md:p-6 shadow-[0_0_32px_rgba(16,185,129,0.55)] space-y-4">
             <div className="flex flex-col items-center justify-center mb-2 space-y-2">
@@ -994,7 +995,7 @@ export default function ComparadorContenido() {
       )}
 
       {tipoComparador === "gas" && (
-        <div className="max-w-3xl mx-auto mt-10 rounded-3xl bg-slate-950/90 border border-slate-800 p-8 text-center text-sm md:text-base text-slate-200 shadow-[0_0_28px_rgba(15,23,42,0.9)]">
+        <div className="w-full max-w-3xl mx-auto mt-10 rounded-3xl bg-slate-950/90 border border-slate-800 p-8 text-center text-sm md:text-base text-slate-200 shadow-[0_0_28px_rgba(15,23,42,0.9)]">
           🔥{" "}
           <span className="font-semibold">
             Comparador de Gas disponible próximamente
@@ -1005,7 +1006,7 @@ export default function ComparadorContenido() {
       )}
 
       {tipoComparador === "telefonia" && (
-        <div className="max-w-3xl mx-auto mt-10 rounded-3xl bg-slate-950/90 border border-slate-800 p-8 text-center text-sm md:text-base text-slate-200 shadow-[0_0_28px_rgba(15,23,42,0.9)]">
+        <div className="w-full max-w-3xl mx-auto mt-10 rounded-3xl bg-slate-950/90 border border-slate-800 p-8 text-center text-sm md:text-base text-slate-200 shadow-[0_0_28px_rgba(15,23,42,0.9)]">
           📞{" "}
           <span className="font-semibold">
             Comparador de Telefonía disponible próximamente
