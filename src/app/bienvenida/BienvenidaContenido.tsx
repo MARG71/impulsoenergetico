@@ -82,7 +82,6 @@ export default function BienvenidaContenido() {
   const [clubColorAcento, setClubColorAcento] = useState<string>("#22c55e");
 
   // Lee datos básicos y posibles params extra de club
-  // Lee datos básicos y posibles params extra de club
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
     const agenteURL = searchParams.get("agenteId");
@@ -159,8 +158,6 @@ export default function BienvenidaContenido() {
       router.replace(`/bienvenida${qs ? `?${qs}` : ""}`);
     }
   }, [agenteId, lugarId, router, searchParams]);
-
-
 
   // Si tenemos lugarId, cargamos info especial REAL del lugar
   useEffect(() => {
@@ -346,10 +343,15 @@ export default function BienvenidaContenido() {
     else router.push(`/comparador${buildQuery()}`);
   };
 
-  const irAComparadorConOferta = (tipo: TipoOferta, ofertaId: string) => {
+  // 👉 Ahora también enviamos ofertaNombre (título) al comparador
+  const irAComparadorConOferta = (tipo: TipoOferta, oferta: Oferta) => {
     const extra: Record<string, string> = {
-      ofertaId: String(ofertaId),
+      ofertaId: String(oferta.id),
     };
+
+    if (oferta.titulo) {
+      extra.ofertaNombre = oferta.titulo;
+    }
 
     const key = normalizarTipoOferta(tipo);
     if (key === "LUZ") extra.tipo = "luz";
@@ -362,7 +364,7 @@ export default function BienvenidaContenido() {
   // Click en una sugerencia del buscador
   const manejarClickSugerencia = (oferta: Oferta) => {
     const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
-    irAComparadorConOferta(tipoNorm, oferta.id);
+    irAComparadorConOferta(tipoNorm, oferta);
     setBusqueda(""); // limpiar y cerrar desplegable
   };
 
@@ -873,9 +875,9 @@ export default function BienvenidaContenido() {
                           </span>
                           {leadOK ? (
                             <button
-                              onClick={() =>
-                                irAComparadorConOferta(tipoNorm, oferta.id)
-                              }
+                              onClick={() => irAComparadorConOferta(tipoNorm, oferta)}
+
+                              
                               className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                             >
                               Ver en comparador
@@ -963,9 +965,8 @@ export default function BienvenidaContenido() {
                             <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
                               <span>{formFecha(oferta.creadaEn)}</span>
                               <button
-                                onClick={() =>
-                                  irAComparadorConOferta(tipo, oferta.id)
-                                }
+                                onClick={() => irAComparadorConOferta(tipoNorm, oferta)}
+
                                 className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${cfg.btn}`}
                               >
                                 Ver en comparador
