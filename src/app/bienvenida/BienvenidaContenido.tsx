@@ -17,6 +17,18 @@ interface Oferta {
   creadaEn?: string | null;
 }
 
+interface TarifaResumen {
+  id: number;
+  tipo: string;
+  subtipo: string;
+  compania: string;
+  nombre: string;
+  precioKwhP1: number | null;
+  precioKwhP2: number | null;
+  precioKwhP3: number | null;
+}
+
+
 const tipoConfig: Record<
   TipoOferta,
   { label: string; bgPill: string; btn: string; border: string }
@@ -57,6 +69,13 @@ export default function BienvenidaContenido() {
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Tarifa catálogo (LUZ importada de Excel)
+  const [tarifasLuz, setTarifasLuz] = useState<TarifaResumen[]>([]);
+  const [loadingTarifasLuz, setLoadingTarifasLuz] = useState(false);
+  const [errorTarifasLuz, setErrorTarifasLuz] = useState<string | null>(null);
+
+
   const [busqueda, setBusqueda] = useState("");
 
   const [nombre, setNombre] = useState<string | null>(null);
@@ -280,6 +299,50 @@ export default function BienvenidaContenido() {
     cargarOfertas();
   }, []);
 
+    // Cargar tarifas REALES de luz (OfertaTarifa) para mostrarlas en bienvenida
+  useEffect(() => {
+    const cargarTarifasLuz = async () => {
+      try {
+        setLoadingTarifasLuz(true);
+        setErrorTarifasLuz(null);
+
+        const res = await fetch("/api/ofertas-tarifas?tipo=LUZ&activa=true", {
+          cache: "no-store",
+        });
+        if (!res.ok)
+          throw new Error("No se pudieron cargar las tarifas de luz");
+
+        const data = await res.json();
+        const items = data.items || [];
+
+        const lista: TarifaResumen[] = items.map((t: any) => ({
+          id: t.id,
+          tipo: t.tipo,
+          subtipo: t.subtipo,
+          compania: t.compania,
+          nombre: t.nombre,
+          precioKwhP1:
+            t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
+          precioKwhP2:
+            t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
+          precioKwhP3:
+            t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
+        }));
+
+        setTarifasLuz(lista);
+      } catch (err: any) {
+        setErrorTarifasLuz(
+          err?.message || "Error al cargar las tarifas de luz"
+        );
+      } finally {
+        setLoadingTarifasLuz(false);
+      }
+    };
+
+    cargarTarifasLuz();
+  }, []);
+
+
   const ofertasFiltradas = useMemo(() => {
     const txt = busqueda.trim().toLowerCase();
     if (!txt) return ofertas;
@@ -417,7 +480,7 @@ export default function BienvenidaContenido() {
   const secciones = [
     {
       id: "luz",
-      label: "Luz",
+      label: "Luz IMPULSO",
       icon: "💡",
       bgClass:
         "bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-slate-950/90",
@@ -426,7 +489,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "gas",
-      label: "Gas",
+      label: "Gas IMPULSO",
       icon: "🔥",
       bgClass:
         "bg-gradient-to-br from-orange-500/30 via-orange-500/10 to-slate-950/90",
@@ -435,7 +498,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "telefonia",
-      label: "Telefonía",
+      label: "Telefonía IMPULSO",
       icon: "📶",
       bgClass:
         "bg-gradient-to-br from-sky-500/30 via-sky-500/10 to-slate-950/90",
@@ -444,7 +507,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "solar",
-      label: "Solar",
+      label: "Solar IMPULSO",
       icon: "☀️",
       bgClass:
         "bg-gradient-to-br from-amber-400/35 via-amber-400/10 to-slate-950/90",
@@ -453,7 +516,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "aerotermia",
-      label: "Aerotermia",
+      label: "Aerotermia IMPULSO",
       icon: "🌬️",
       bgClass:
         "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
@@ -462,7 +525,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "hermes",
-      label: "Batería HERMES IA",
+      label: "Batería IA",
       icon: "🔋",
       bgClass:
         "bg-gradient-to-br from-purple-500/35 via-purple-500/10 to-slate-950/90",
@@ -480,7 +543,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "inmobiliaria",
-      label: "Inmobiliaria",
+      label: "Inmobiliaria IMPULSO",
       icon: "🏡",
       bgClass:
         "bg-gradient-to-br from-rose-500/35 via-rose-500/10 to-slate-950/90",
@@ -489,7 +552,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "viajes",
-      label: "Viajes",
+      label: "Viajes VIAJANDO CON MERY",
       icon: "✈️",
       bgClass:
         "bg-gradient-to-br from-indigo-500/35 via-indigo-500/10 to-slate-950/90",
@@ -498,7 +561,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "repuestos",
-      label: "Repuestos coche",
+      label: "Repuestos RAPID",
       icon: "🚗",
       bgClass:
         "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
@@ -507,7 +570,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "seguros",
-      label: "Seguros",
+      label: "Seguros IMPULSO",
       icon: "🛡️",
       bgClass:
         "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
@@ -903,6 +966,73 @@ export default function BienvenidaContenido() {
                 </div>
               </section>
             )}
+
+            {/* TARIFAS REALES DE LUZ (catálogo Excel) */}
+            {!loadingTarifasLuz &&
+              !errorTarifasLuz &&
+              tarifasLuz.length > 0 && (
+                <section className="space-y-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 p-4 md:p-5">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                      💡 Tarifas de luz disponibles (catálogo)
+                      <span className="text-[11px] font-normal text-emerald-100/80">
+                        ({tarifasLuz.length} tarifa(s) activas)
+                      </span>
+                    </h3>
+                    <button
+                      onClick={() => irAComparador("LUZ")}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                    >
+                      Ir al comparador de luz
+                    </button>
+                  </div>
+
+                  <div className="flex gap-4 overflow-x-auto pb-1">
+                    {tarifasLuz.slice(0, 12).map((t) => (
+                      <div
+                        key={t.id}
+                        className="min-w-[240px] max-w-xs rounded-2xl bg-slate-950/85 border border-emerald-700/70 p-4 flex flex-col justify-between text-xs md:text-sm"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-800">
+                              {t.compania}
+                            </span>
+                            <span className="text-[10px] text-emerald-200/80">
+                              {t.subtipo}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-semibold text-slate-50">
+                            {t.nombre}
+                          </h4>
+                          <div className="mt-1 space-y-0.5 text-[11px] text-emerald-100/90">
+                            {t.precioKwhP1 != null && (
+                              <p>P1: {t.precioKwhP1.toFixed(5)} €/kWh</p>
+                            )}
+                            {t.precioKwhP2 != null && (
+                              <p>P2: {t.precioKwhP2.toFixed(5)} €/kWh</p>
+                            )}
+                            {t.precioKwhP3 != null && (
+                              <p>P3: {t.precioKwhP3.toFixed(5)} €/kWh</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                          <span>Tarifa catálogo</span>
+                          <button
+                            onClick={() => irAComparador("LUZ")}
+                            className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                          >
+                            Calcular ahorro
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
 
             {/* BLOQUES POR TIPO */}
             {!loading && !error && (
