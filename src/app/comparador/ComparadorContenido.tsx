@@ -256,9 +256,9 @@ export default function ComparadorContenido() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Consumo del período de la factura (suma de P1..P6 según tarifa)
+    // 1) Datos básicos de la factura introducida
     const consumoTotal = periodosConsumo.reduce(
-      (sum, key) => sum + (parseFloat(consumoPeriodos[key] || "0") || 0),
+      (sum, key) => sum + (parseFloat(consumoPeriodos[key]) || 0),
       0
     );
     const facturaNum = parseFloat(importeFactura) || 0;
@@ -268,107 +268,170 @@ export default function ComparadorContenido() {
       return;
     }
 
-    // Consumo anual (ya lo calculas, pero por si acaso)
-    const consumoAnualNumber =
-      parseFloat(consumoAnual || "0") || consumoTotal * 12;
+    // Días del periodo de facturación (para prorratear potencia)
+    const diasFactura = (() => {
+      if (!fechaInicio || !fechaFin) return 30;
+      const ini = new Date(fechaInicio);
+      const fin = new Date(fechaFin);
+      const diffMs = fin.getTime() - ini.getTime();
+      const d = diffMs / (1000 * 60 * 60 * 24);
+      if (!Number.isFinite(d) || d <= 0) return 30;
+      return d;
+    })();
+
+    const consumoAnualNum = consumoTotal * 12;
+    setConsumoAnual(consumoAnualNum.toFixed(2));
+
+    const ivaNum = (parseFloat(iva) || 0) / 100;
+    const impElecNum = (parseFloat(impuestoElectricidad) || 0) / 100;
+
+    const reactivaNum = parseFloat(reactiva) || 0;
+    const excesoNum = parseFloat(exceso) || 0;
+    const alquilerNum = parseFloat(alquiler) || 0;
+    const otrosNum = parseFloat(otros) || 0;
+
+    const extras = reactivaNum + excesoNum + alquilerNum + otrosNum;
+
+    // Helper para parsear números que vienen como string (Decimal)
+    const toNum = (v: any): number => {
+      if (v === null || v === undefined || v === "") return 0;
+      return Number(v);
+    };
 
     try {
-      // 1️⃣ Traer tarifas REALES de luz (+ tramos) desde tu API
-            const resTarifas = await fetch(
-        "/api/ofertas-tarifas?tipo=LUZ&activa=true",
-        { cache: "no-store" }
+      // 2) Cargar tarifas reales desde la API
+      const subtipo = nombreTarifa || "2.0TD"; // 2.0TD / 3.0TD / 6.1TD / 6.2TD
+      const res = await fetch(
+        `/api/ofertas-tarifas?tipo=LUZ&subtipo=${encodeURIComponent(
+          subtipo
+        )}&activa=true`
       );
 
-      if (!resTarifas.ok) {
-        const textoError = await resTarifas.text();
-        console.error(
-          "Error al obtener /api/ofertas-tarifas:",
-          resTarifas.status,
-          textoError
+      if (!res.ok) {
+        console.error("Error HTTP al obtener ofertas-tarifa:", res.status);
+        alert(
+          "Ha habido un problema al calcular la comparativa con las tarifas reales."
         );
-        throw new Error(
-          `Error obteniendo tarifas: ${resTarifas.status}`
-        );
-      }
-
-      const data = await resTarifas.json();
-
-      const tarifas: any[] = data.items || [];
-
-      if (!tarifas || tarifas.length === 0) {
-        alert("No hay tarifas de luz disponibles en el catálogo.");
         return;
       }
 
-      // 2️⃣ Calcular coste, ahorro y comisión para cada tarifa
-      const resultadosCalculados = tarifas.map((t: any) => {
-        // Decimals → number
-        const p1 = Number(t.precioKwhP1 ?? 0);
-        const p2 = Number(t.precioKwhP2 ?? p1);
-        const p3 = Number(t.precioKwhP3 ?? p2);
-        const p4 = Number(t.precioKwhP4 ?? p3);
-        const p5 = Number(t.precioKwhP5 ?? p4);
-        const p6 = Number(t.precioKwhP6 ?? p5);
+      const data = await res.json();
+      const items: any[] = data?.items || [];
 
-        const cP1 = parseFloat(consumoPeriodos["P1"] || "0") || 0;
-        const cP2 = parseFloat(consumoPeriodos["P2"] || "0") || 0;
-        const cP3 = parseFloat(consumoPeriodos["P3"] || "0") || 0;
-        const cP4 = parseFloat(consumoPeriodos["P4"] || "0") || 0;
-        const cP5 = parseFloat(consumoPeriodos["P5"] || "0") || 0;
-        const cP6 = parseFloat(consumoPeriodos["P6"] || "0") || 0;
+      if (!items.length) {
+        alert(
+          "No hay tarifas disponibles para este tipo de estudio. Revisa que haya tarifas importadas para " +
+            subtipo
+        );
+        return;
+      }
 
-        // 💡 De momento: coste solo por energía
-        const coste =
-          cP1 * p1 +
-          cP2 * p2 +
-          cP3 * p3 +
-          cP4 * p4 +
-          cP5 * p5 +
-          cP6 * p6;
+      // 3) Calcular coste, ahorro y comisión para cada tarifa
+      const resultadosCalculados = items.map((oferta) => {
+        // Precios de energía (€/kWh) por periodo
+        const precioEnergia: Record<string, number> = {
+          P1: toNum(oferta.precioKwhP1),
+          P2: toNum(oferta.precioKwhP2),
+          P3: toNum(oferta.precioKwhP3),
+          P4: toNum(oferta.precioKwhP4),
+          P5: toNum(oferta.precioKwhP5),
+          P6: toNum(oferta.precioKwhP6),
+        };
 
-        const ahorro = facturaNum - coste;
-        const ahorroPct = facturaNum > 0 ? (ahorro / facturaNum) * 100 : 0;
+        // Precios de potencia (€/kW·año) por periodo
+        const precioPotencia: Record<string, number> = {
+          P1: toNum(oferta.precioPotenciaP1),
+          P2: toNum(oferta.precioPotenciaP2),
+          P3: toNum(oferta.precioPotenciaP3),
+          P4: toNum(oferta.precioPotenciaP4),
+          P5: toNum(oferta.precioPotenciaP5),
+          P6: toNum(oferta.precioPotenciaP6),
+        };
 
-        // 🔎 Buscar tramo que aplica según consumo anual
-        const tramos: any[] = Array.isArray(t.tramos) ? t.tramos : [];
-        const tramoAplicado =
-          tramos.find((tr) => {
-            const desde = Number(tr.consumoDesdeKWh ?? 0);
-            const hasta =
-              tr.consumoHastaKWh == null
-                ? null
-                : Number(tr.consumoHastaKWh);
-            const okDesde = consumoAnualNumber >= desde;
-            const okHasta = hasta == null || consumoAnualNumber <= hasta;
-            return okDesde && okHasta;
-          }) || null;
+        // 3.1) Coste de energía de la factura
+        let costeEnergia = 0;
+        periodosConsumo.forEach((p) => {
+          const kwh = parseFloat(consumoPeriodos[p]) || 0;
+          const precio = precioEnergia[p] || 0;
+          costeEnergia += kwh * precio;
+        });
+
+        // 3.2) Coste de potencia prorrateado por días
+        let costePotencia = 0;
+        periodosPotencia.forEach((p) => {
+          const kw = parseFloat(potencias[p]) || 0;
+          const precio = precioPotencia[p] || 0; // €/kW·año
+          costePotencia += kw * precio * (diasFactura / 365);
+        });
+
+        let base = costeEnergia + costePotencia;
+
+        // 3.3) Impuesto electricidad + IVA
+        const impElec = base * impElecNum;
+        base += impElec;
+        const ivaImporte = base * ivaNum;
+        base += ivaImporte;
+
+        // 3.4) Extras (reactiva, exceso, alquiler, otros)
+        const costeTotalTarifa = base + extras;
+
+        // 3.5) Ahorro frente a la factura actual
+        const ahorro = facturaNum - costeTotalTarifa;
+        const ahorroPct =
+          facturaNum > 0 ? (ahorro / facturaNum) * 100 : 0;
+
+        // 3.6) Comisión: buscar tramo adecuado
+        const consumoAnualKWh = consumoAnualNum;
+        const tramos: any[] = oferta.tramos || [];
+
+        // Busca el tramo cuyo rango contenga el consumo anual
+        const tramo = tramos.find((t) => {
+          const desde = toNum(t.consumoDesdeKWh);
+          const hasta =
+            t.consumoHastaKWh === null || t.consumoHastaKWh === undefined
+              ? null
+              : toNum(t.consumoHastaKWh);
+          if (hasta === null) return consumoAnualKWh >= desde;
+          return consumoAnualKWh >= desde && consumoAnualKWh <= hasta;
+        });
+
+        const comisionKwhBase = toNum(oferta.comisionKwhAdminBase);
+        const comisionKwhTramo = tramo ? toNum(tramo.comisionKwhAdmin) : 0;
+        const comisionFijaTramo = tramo ? toNum(tramo.comisionFijaAdmin) : 0;
 
         const comisionKwh =
-          tramoAplicado?.comisionKwhAdmin != null
-            ? Number(tramoAplicado.comisionKwhAdmin)
-            : Number(t.comisionKwhAdminBase ?? 0);
+          comisionKwhTramo || comisionKwhBase || 0;
 
-        const comision = consumoAnualNumber * comisionKwh;
+        const comision =
+          consumoAnualKWh * comisionKwh + comisionFijaTramo;
+
+        // Precio medio kWh solo como dato informativo
+        const precioMedioKwh =
+          consumoTotal > 0 ? costeEnergia / consumoTotal : 0;
 
         return {
-          id: t.id,
-          compañia: t.compania,
-          tarifa: t.nombre,
+          id: oferta.id,
+          compañia: oferta.compania,
+          tarifa: oferta.nombre || oferta.anexoPrecio || "",
+          precio_kwh: precioMedioKwh,
+          comision_kwh: comisionKwh,
           consumoTotal,
-          coste,
+          coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
           comision,
         };
       });
 
-      // Ordenar por ahorro (como hacías antes)
+      // Ordenamos por ahorro (mayor primero) como en tu lógica
       resultadosCalculados.sort((a, b) => b.ahorro - a.ahorro);
-      setResultados(resultadosCalculados);
 
-      // 3️⃣ Guardar la comparativa en la base de datos (igual que antes)
+      setResultados(resultadosCalculados);
+      setOrden("ahorro");
+
+      // 4) Guardar la comparativa en BD como hacías antes
       try {
-        const res = await fetch("/api/comparativas", {
+        const resSave = await fetch("/api/comparativas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -387,7 +450,7 @@ export default function ComparadorContenido() {
               fechaFin,
               consumoPeriodos,
               potencias,
-              consumoAnual,
+              consumoAnual: consumoAnualNum.toFixed(2),
               importeFactura,
               iva,
               impuestoElectricidad,
@@ -399,22 +462,22 @@ export default function ComparadorContenido() {
             },
             resultados: resultadosCalculados,
             tipo: tipoComparador,
-            // 'ofertaId' de momento no está en el modelo Comparativa, se ignora si lo mandas
             ofertaId: ofertaId ? Number(ofertaId) : undefined,
           }),
         });
-        const dataResp = await res.json();
-        console.log("Comparativa guardada con éxito:", dataResp);
+        const dataSave = await resSave.json();
+        console.log("Comparativa guardada con éxito:", dataSave);
       } catch (error) {
         console.error("Error al guardar la comparativa:", error);
       }
     } catch (error) {
-      console.error("Error al calcular la comparativa:", error);
+      console.error("Error general en handleSubmit:", error);
       alert(
         "Ha habido un problema al calcular la comparativa con las tarifas reales."
       );
     }
   };
+
 
 
   const tituloComparador =
