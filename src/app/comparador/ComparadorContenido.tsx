@@ -274,14 +274,25 @@ export default function ComparadorContenido() {
 
     try {
       // 1️⃣ Traer tarifas REALES de luz (+ tramos) desde tu API
-      const resTarifas = await fetch(
-        "/api/ofertas-tarifas?tipo=LUZ&activa=true"
+            const resTarifas = await fetch(
+        "/api/ofertas-tarifas?tipo=LUZ&activa=true",
+        { cache: "no-store" }
       );
+
       if (!resTarifas.ok) {
-        throw new Error("No se pudieron cargar las tarifas desde el servidor");
+        const textoError = await resTarifas.text();
+        console.error(
+          "Error al obtener /api/ofertas-tarifas:",
+          resTarifas.status,
+          textoError
+        );
+        throw new Error(
+          `Error obteniendo tarifas: ${resTarifas.status}`
+        );
       }
 
       const data = await resTarifas.json();
+
       const tarifas: any[] = data.items || [];
 
       if (!tarifas || tarifas.length === 0) {
