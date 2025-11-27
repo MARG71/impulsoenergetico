@@ -397,37 +397,55 @@ export default function ComparadorContenido() {
 
         const comisionKwhBase = toNum(oferta.comisionKwhAdminBase);
         const comisionKwhTramo = tramo ? toNum(tramo.comisionKwhAdmin) : 0;
-        const comisionFijaTramo = tramo ? toNum(tramo.comisionFijaAdmin) : 0;
+        const comisionFijaTramoRaw = tramo
+          ? toNum(tramo.comisionFijaAdmin)
+          : 0;
 
-        const comisionKwh =
-          comisionKwhTramo || comisionKwhBase || 0;
+        // 🔹 Comisión variable €/kWh
+        let comisionKwh = comisionKwhTramo || comisionKwhBase || 0;
 
-        const comision =
-          consumoAnualKWh * comisionKwh + comisionFijaTramo;
+        // ⚠ Tus excels traen la comisión en CÉNTIMOS/kWh (40.96 = 0,4096 €/kWh)
+        //    Si el valor es > 1, lo interpretamos como céntimos y lo pasamos a euros
+        if (comisionKwh > 1) {
+          comisionKwh = comisionKwh / 100;
+        }
+
+        // 🔹 Comisión fija (por si la usas ahora o más adelante)
+        let comisionFijaTramo = comisionFijaTramoRaw || 0;
+        // Si algún día subes comisiones fijas en céntimos muy grandes,
+        // podemos normalizarlas igual. De momento lo dejamos así.
+
+        // Comisión total anual (variable + fija)
+        const comision = consumoAnualKWh * comisionKwh + comisionFijaTramo;
 
         // Precio medio kWh solo como dato informativo
         const precioMedioKwh =
           consumoTotal > 0 ? costeEnergia / consumoTotal : 0;
 
-        return {
-          id: oferta.id,
-          compañia: oferta.compania,
-          tarifa: oferta.nombre || oferta.anexoPrecio || "",
-          precio_kwh: precioMedioKwh,
-          comision_kwh: comisionKwh,
-          consumoTotal,
-          coste: costeTotalTarifa,
-          ahorro,
-          ahorroPct,
-          comision,
-        };
-      });
+          return {
+            id: oferta.id,
+            compañia: oferta.compania,
+            tarifa: oferta.nombre || oferta.anexoPrecio || "",
+            precio_kwh: precioMedioKwh,
+            comision_kwh: comisionKwh,
+            consumoTotal,
+            coste: costeTotalTarifa,
+            ahorro,
+            ahorroPct,
+            comision,
+          };
+        });
 
-      // Ordenamos por ahorro (mayor primero) como en tu lógica
-      resultadosCalculados.sort((a, b) => b.ahorro - a.ahorro);
+        // 🔹 QUITAR tarifas con coste 0 (o casi 0)
+        const resultadosFiltrados = resultadosCalculados.filter(
+          (r) => r.coste && r.coste > 0.01
+        );
 
-      setResultados(resultadosCalculados);
-      setOrden("ahorro");
+        // Ordenamos por ahorro (mayor primero)
+        resultadosFiltrados.sort((a, b) => b.ahorro - a.ahorro);
+
+        setResultados(resultadosFiltrados);
+        setOrden("ahorro");
 
       // 4) Guardar la comparativa en BD como hacías antes
       try {
