@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useRef,
-  RefObject,
-} from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -94,33 +88,16 @@ export default function BienvenidaContenido() {
   const [formEmail, setFormEmail] = useState("");
   const [formTelefono, setFormTelefono] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [mensajeGuardarError, setMensajeGuardarError] =
-    useState<string | null>(null);
-  const [mensajeGuardarOK, setMensajeGuardarOK] =
-    useState<string | null>(null);
+  const [mensajeGuardarError, setMensajeGuardarError] = useState<string | null>(
+    null
+  );
+  const [mensajeGuardarOK, setMensajeGuardarOK] = useState<string | null>(null);
 
   // Datos especiales de club / lugar
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [clubMensaje, setClubMensaje] = useState<string | null>(null);
   const [clubAportacion, setClubAportacion] = useState<number | null>(null);
   const [clubColorAcento, setClubColorAcento] = useState<string>("#22c55e");
-
-  // 🔁 Carruseles: refs
-  const destacadasRef = useRef<HTMLDivElement | null>(null);
-  const catalogoLuzRef = useRef<HTMLDivElement | null>(null);
-  const ofertasLuzRef = useRef<HTMLDivElement | null>(null);
-  const ofertasGasRef = useRef<HTMLDivElement | null>(null);
-  const ofertasTelRef = useRef<HTMLDivElement | null>(null);
-
-  const scrollCarrusel = (
-    ref: RefObject<HTMLDivElement | null>,
-    dir: "left" | "right"
-  ) => {
-    if (!ref.current) return;
-    const amount = dir === "left" ? -320 : 320;
-    ref.current.scrollBy({ left: amount, behavior: "smooth" });
-  };
-
 
   // Lee datos básicos y posibles params extra de club
   useEffect(() => {
@@ -343,9 +320,12 @@ export default function BienvenidaContenido() {
           subtipo: t.subtipo,
           compania: t.compania,
           nombre: t.nombre,
-          precioKwhP1: t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
-          precioKwhP2: t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
-          precioKwhP3: t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
+          precioKwhP1:
+            t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
+          precioKwhP2:
+            t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
+          precioKwhP3:
+            t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
         }));
 
         setTarifasLuz(lista);
@@ -398,6 +378,18 @@ export default function BienvenidaContenido() {
     });
     return grupos;
   }, [ofertasFiltradas]);
+
+  // Carrusel para tarifas de luz (catálogo)
+  const catalogoLuzRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollCatalogoLuz = (dir: "left" | "right") => {
+    if (!catalogoLuzRef.current) return;
+    const amount = dir === "left" ? -320 : 320; // px a desplazar
+    catalogoLuzRef.current.scrollBy({
+      left: amount,
+      behavior: "smooth",
+    });
+  };
 
   // 🔍 Sugerencias para el desplegable (autocomplete)
   const sugerencias = useMemo(() => {
@@ -617,27 +609,292 @@ export default function BienvenidaContenido() {
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
-  // Mapa de refs para los bloques por tipo
-  const carruselPorTipo: Record<
-    TipoOferta,
-    RefObject<HTMLDivElement | null>
-  > = {
-    LUZ: ofertasLuzRef,
-    GAS: ofertasGasRef,
-    TELEFONIA: ofertasTelRef,
-  };
-
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
         <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
           {/* COLUMNA IZQUIERDA (logo + bienvenida + buscador + secciones) */}
           <aside className="space-y-6">
-            {/* BLOQUE SUPERIOR */}
-            {/* ... (todo este bloque queda igual que en tu versión, no lo toco) */}
-            {/* --- BLOQUE SUPERIOR COMPLETO --- */}
-            {/* (lo dejo igual que me pasaste, sólo lo resumo para no hacer esto eterno) */}
+            {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
+            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
+              {/* Columna izquierda: logo + contacto + subtítulo */}
+              <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center">
+                    <div className="relative h-16 w-64 md:h-20 md:w-72">
+                      <Image
+                        src="/logo-impulso.png"
+                        alt="Impulso Energético"
+                        fill
+                        className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                        priority
+                      />
+                    </div>
+                  </div>
+
+                  {/* Teléfono + email */}
+                  <div className="space-y-1">
+                    <p className="text-base md:text-lg font-bold text-slate-50">
+                      Tel. 692 13 70 48
+                    </p>
+                    <p className="text-base md:text-lg font-bold text-slate-50">
+                      E-mail:{" "}
+                      <a
+                        href="mailto:info@impulsoenergetico.es"
+                        className="underline decoration-emerald-400/70 underline-offset-4"
+                      >
+                        info@impulsoenergetico.es
+                      </a>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1 mt-2">
+                  <p className="text-base md:text-lg font-bold text-slate-50">
+                    Plataforma de ahorro y comisiones
+                  </p>
+                  <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
+                    Servicios y ventajas para socios
+                  </p>
+                </div>
+              </div>
+
+              {/* Columna derecha: bienvenida + tarjeta club */}
+              <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
+                {/* Texto bienvenida + botones + accesos rápidos */}
+                <div className="flex-1 space-y-3">
+                  <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
+                    IMPULSO ENERGÉTICO
+                  </div>
+
+                  <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold leading-tight">
+                    {nombre && (
+                      <>
+                        Hola,{" "}
+                        <span className="text-emerald-400 font-extrabold">
+                          {nombre}
+                        </span>{" "}
+                        👋
+                        <br />
+                      </>
+                    )}
+                    Ahorra en tus facturas y{" "}
+                    <span className="text-amber-300 font-extrabold">
+                      gana comisiones
+                    </span>{" "}
+                    desde hoy.
+                  </h1>
+
+                  {(agenteId || lugarId) && (
+                    <p className="text-[11px] text-slate-400">
+                      QR detectado ·{" "}
+                      {agenteId && (
+                        <>
+                          Agente: <b>{agenteId}</b>{" "}
+                        </>
+                      )}
+                      {lugarId && (
+                        <>
+                          · Lugar: <b>{lugarId}</b>
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  {/* Botones principales + accesos rápidos */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-1">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => setModalAbierto(true)}
+                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                      >
+                        Acceder / actualizar mis datos
+                      </button>
+                      <button
+                        onClick={() => irAComparador("LUZ")}
+                        className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                      >
+                        LUZ
+                      </button>
+                    </div>
+
+                    {/* Accesos rápidos */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] md:text-[11px] tracking-[0.22em] uppercase text-slate-300">
+                        ACCESOS RÁPIDOS A SECCIONES
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {accesosRapidos.map((a) => (
+                          <button
+                            key={a.label}
+                            type="button"
+                            onClick={a.onClick}
+                            className="px-3 py-1.5 rounded-full border border-slate-600 text-[11px] text-slate-100 hover:bg-slate-800/80"
+                          >
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta club */}
+                {hayClubEspecial && (
+                  <div
+                    className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
+                    style={{
+                      borderColor: clubColorAcento || "#22c55e",
+                      boxShadow: `0 0 32px ${
+                        clubColorAcento || "rgba(34,197,94,0.55)"
+                      }`,
+                    }}
+                  >
+                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
+
+                    <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
+                      {clubLogoUrl ? (
+                        <Image
+                          src={clubLogoUrl}
+                          alt={clubNombre || "Logo club"}
+                          fill
+                          className="object-contain"
+                        />
+                      ) : (
+                        <span className="text-2xl">🤝</span>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-1">
+                      <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
+                        Club / Asociación
+                      </div>
+                      <div className="text-xs md:text-sm font-bold">
+                        {clubNombre || "Programa solidario"}
+                      </div>
+                      {clubMensaje && (
+                        <p className="text-[10px] md:text-xs text-slate-200/90">
+                          {clubMensaje}
+                        </p>
+                      )}
+                      {clubAportacion != null &&
+                        !Number.isNaN(clubAportacion) && (
+                          <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
+                            💚 Aportación acumulada:{" "}
+                            <span className="ml-1">
+                              {clubAportacion.toLocaleString("es-ES", {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              €
+                            </span>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* === BUSCADOR OFERTAS === */}
+            <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <h2 className="text-sm md:text-base font-semibold">
+                  Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
+                </h2>
+                <div className="relative w-full">
+                  <input
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    placeholder="Buscar ofertas por nombre, tipo o texto..."
+                    className="w-full rounded-full bg-slate-900/70 border border-emerald-500/70 px-4 py-2 pr-9 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                    🔍
+                  </span>
+
+                  {/* DROPDOWN DE SUGERENCIAS */}
+                  {sugerencias.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
+                      {sugerencias.map((oferta) => {
+                        const tipoNorm = normalizarTipoOferta(
+                          oferta.tipo as string
+                        );
+                        const cfg = tipoConfig[tipoNorm];
+
+                        return (
+                          <button
+                            key={oferta.id}
+                            type="button"
+                            onClick={() => manejarClickSugerencia(oferta)}
+                            className="w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-slate-900/90 text-xs md:text-sm border-b border-slate-800 last:border-b-0"
+                          >
+                            <span
+                              className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                            >
+                              {cfg.label}
+                            </span>
+                            <span className="flex-1">
+                              <span className="block font-semibold text-slate-50">
+                                {oferta.titulo}
+                              </span>
+                              <span className="block text-[11px] text-slate-300 line-clamp-1">
+                                {oferta.descripcionCorta ||
+                                  oferta.descripcionLarga}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-300/80">
+                {loading
+                  ? "Cargando ofertas…"
+                  : error
+                  ? `Error: ${error}`
+                  : ofertasFiltradas.length === 0
+                  ? "No hay ofertas que coincidan con tu búsqueda."
+                  : `${ofertasFiltradas.length} oferta(s) encontradas.`}
+              </p>
+            </section>
+
+            {/* SECCIONES */}
+            <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
+              <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
+                <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
+                Secciones
+              </p>
+
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+                {secciones.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={s.onClick}
+                    className={`group relative overflow-hidden rounded-3xl px-4 py-4 md:px-5 md:py-5 text-left text-sm md:text-base font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
+                      ${s.bgClass} ${s.ringClass}
+                      hover:translate-y-[-1px] hover:shadow-[0_0_26px_rgba(15,23,42,0.9)]`}
+                  >
+                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-xl shadow-[0_0_22px_rgba(255,255,255,0.25)]">
+                        {s.icon}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
+                          Servicio
+                        </span>
+                        <span className="text-sm md:text-base font-bold leading-snug">
+                          {s.label}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </nav>
           </aside>
 
           {/* COLUMNA DERECHA: solo ofertas */}
@@ -654,36 +911,14 @@ export default function BienvenidaContenido() {
               </div>
             )}
 
-            {/* CARRUSEL DESTACADAS */}
+            {/* CARRUSEL DESTACADAS (se queda igual, horizontal) */}
             {!loading && !error && ofertasDestacadas.length > 0 && (
               <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
-                    🌟 Ofertas especiales para ti
-                  </h3>
+                <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                  🌟 Ofertas especiales para ti
+                </h3>
 
-                  <div className="hidden md:flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => scrollCarrusel(destacadasRef, "left")}
-                      className="h-8 w-8 rounded-full border border-slate-600 bg-slate-900/80 flex items-center justify-center text-slate-200 hover:bg-slate-800"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => scrollCarrusel(destacadasRef, "right")}
-                      className="h-8 w-8 rounded-full border border-slate-600 bg-slate-900/80 flex items-center justify-center text-slate-200 hover:bg-slate-800"
-                    >
-                      ›
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  ref={destacadasRef}
-                  className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                >
+                <div className="flex gap-4 overflow-x-auto pb-2">
                   {ofertasDestacadas.map((oferta) => {
                     const tipoNorm = normalizarTipoOferta(
                       oferta.tipo as string
@@ -693,7 +928,7 @@ export default function BienvenidaContenido() {
                     return (
                       <div
                         key={oferta.id}
-                        className={`w-[260px] flex-shrink-0 rounded-2xl border ${cfg.border} bg-slate-900/85 p-4 shadow-lg shadow-slate-900/70 flex flex-col justify-between`}
+                        className={`min-w-[260px] max-w-xs rounded-2xl border ${cfg.border} bg-slate-900/85 p-4 shadow-lg shadow-slate-900/70 flex flex-col justify-between`}
                       >
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
@@ -745,7 +980,7 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* TARIFAS REALES DE LUZ (catálogo Excel) */}
+            {/* TARIFAS REALES DE LUZ (catálogo Excel) - se queda horizontal */}
             {!loadingTarifasLuz &&
               !errorTarifasLuz &&
               tarifasLuz.length > 0 && (
@@ -758,45 +993,22 @@ export default function BienvenidaContenido() {
                       </span>
                     </h3>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          scrollCarrusel(catalogoLuzRef, "left")
-                        }
-                        className="hidden md:inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-900/80 border border-emerald-700 text-emerald-100 hover:bg-slate-800"
-                        aria-label="Desplazar a la izquierda"
-                      >
-                        ‹
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          scrollCarrusel(catalogoLuzRef, "right")
-                        }
-                        className="hidden md:inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-900/80 border border-emerald-700 text-emerald-100 hover:bg-slate-800"
-                        aria-label="Desplazar a la derecha"
-                      >
-                        ›
-                      </button>
-
-                      <button
-                        onClick={() => irAComparador("LUZ")}
-                        className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                      >
-                        Ir al comparador de luz
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => irAComparador("LUZ")}
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                    >
+                      Ir al comparador de luz
+                    </button>
                   </div>
 
                   <div
                     ref={catalogoLuzRef}
-                    className="flex gap-4 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex gap-4 overflow-x-auto pb-1"
                   >
                     {tarifasLuz.map((t) => (
                       <div
                         key={t.id}
-                        className="w-[240px] flex-shrink-0 rounded-2xl bg-slate-950/85 border border-emerald-700/70 p-4 flex flex-col justify-between text-xs md:text-sm"
+                        className="min-w-[240px] max-w-xs rounded-2xl bg-slate-950/85 border border-emerald-700/70 p-4 flex flex-col justify-between text-xs md:text-sm"
                       >
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
@@ -838,7 +1050,7 @@ export default function BienvenidaContenido() {
                 </section>
               )}
 
-            {/* BLOQUES POR TIPO (LUZ / GAS / TELEFONÍA) */}
+            {/* BLOQUES POR TIPO — AHORA EN FILAS VERTICALES CON SCROLL */}
             {!loading && !error && (
               <section className="space-y-6">
                 {(["LUZ", "GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
@@ -853,44 +1065,20 @@ export default function BienvenidaContenido() {
                       ? "bg-orange-950/40 border-orange-800/70"
                       : "bg-sky-950/50 border-sky-800/70";
 
-                  const refCarrusel = carruselPorTipo[tipo];
-
                   return (
                     <div
                       key={tipo}
                       className={`rounded-2xl ${bgSection} border p-5`}
                     >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                        <div className="flex items-center gap-3">
+                        <div>
                           <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
                             {cfg.label}
                             <span className="text-[11px] font-normal text-slate-200/80">
                               ({lista.length} oferta(s) activas)
                             </span>
                           </h3>
-
-                          <div className="hidden md:flex items-center gap-1 ml-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                scrollCarrusel(refCarrusel, "left")
-                              }
-                              className="h-7 w-7 rounded-full border border-slate-500/70 bg-black/30 flex items-center justify-center text-slate-200 hover:bg-black/60 text-xs"
-                            >
-                              ‹
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                scrollCarrusel(refCarrusel, "right")
-                              }
-                              className="h-7 w-7 rounded-full border border-slate-500/70 bg-black/30 flex items-center justify-center text-slate-200 hover:bg-black/60 text-xs"
-                            >
-                              ›
-                            </button>
-                          </div>
                         </div>
-
                         <button
                           onClick={() => irAComparador(tipo)}
                           className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${cfg.btn} shadow-md shadow-slate-950/50`}
@@ -899,17 +1087,15 @@ export default function BienvenidaContenido() {
                         </button>
                       </div>
 
-                      <div
-                        ref={refCarrusel}
-                        className="flex gap-4 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                      >
+                      {/* LISTA EN FILAS CON SCROLL VERTICAL */}
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                         {lista.map((oferta) => (
                           <div
                             key={oferta.id}
-                            className="w-[240px] flex-shrink-0 rounded-2xl bg-slate-950/80 border border-slate-700 p-4 flex flex-col justify-between"
+                            className="w-full rounded-2xl bg-slate-950/80 border border-slate-700 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                           >
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center gap-2 mb-1">
                                 <span
                                   className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
                                 >
@@ -929,8 +1115,10 @@ export default function BienvenidaContenido() {
                               </p>
                             </div>
 
-                            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                              <span>{formFecha(oferta.creadaEn)}</span>
+                            <div className="flex flex-row md:flex-col items-end gap-2 text-[11px] text-slate-400">
+                              <span className="whitespace-nowrap">
+                                {formFecha(oferta.creadaEn)}
+                              </span>
                               <button
                                 onClick={() =>
                                   irAComparadorConOferta(tipo, oferta)
@@ -971,7 +1159,89 @@ export default function BienvenidaContenido() {
       {modalAbierto && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-3">
           <div className="w-full max-w-lg rounded-2xl bg-slate-950 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-5 md:p-6 space-y-4">
-            {/* ... el contenido del modal lo dejo igual que lo tenías ... */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg md:text-xl font-bold text-slate-50">
+                  Actualiza tus datos
+                </h2>
+                <p className="text-xs md:text-sm text-slate-300 mt-1">
+                  Revisa tu nombre, email y teléfono para poder enviarte ofertas
+                  y seguimiento de tus comparativas.
+                </p>
+              </div>
+              <button
+                onClick={() => setModalAbierto(false)}
+                className="text-slate-400 hover:text-slate-100 text-lg"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={manejarGuardarDatos} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Nombre completo
+                </label>
+                <input
+                  type="text"
+                  value={formNombre}
+                  onChange={(e) => setFormNombre(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-200">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  value={formTelefono}
+                  onChange={(e) => setFormTelefono(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                  required
+                />
+              </div>
+
+              {mensajeGuardarError && (
+                <p className="text-xs text-red-300">{mensajeGuardarError}</p>
+              )}
+              {mensajeGuardarOK && (
+                <p className="text-xs text-emerald-300">{mensajeGuardarOK}</p>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalAbierto(false)}
+                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
+                >
+                  Salir sin guardar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-xs md:text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {guardando ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
