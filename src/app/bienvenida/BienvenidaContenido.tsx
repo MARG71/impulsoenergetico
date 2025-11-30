@@ -102,7 +102,7 @@ export default function BienvenidaContenido() {
   // 🔹 Estado para el modal de datos
   const [modalAbierto, setModalAbierto] = useState(false);
   const [formNombre, setFormNombre] = useState("");
-  the [formEmail, setFormEmail] = useState("");
+  const [formEmail, setFormEmail] = useState("");
   const [formTelefono, setFormTelefono] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensajeGuardarError, setMensajeGuardarError] = useState<string | null>(
@@ -682,12 +682,18 @@ export default function BienvenidaContenido() {
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
   // Helpers para mostrar columnas de potencias / energías
-  const formLineaPeriodos = (label: string, valores: (number | null | undefined)[]) => {
+  const formLineaPeriodos = (
+    label: string,
+    valores: (number | null | undefined)[]
+  ) => {
     const activos = valores
       .map((v, idx) => (v != null ? `P${idx + 1}: ${v.toFixed(5)}` : null))
-      .filter(Boolean);
-    if (activos.length === 0) return `${label}: -`;
-    return `${label}: ${activos.join(" | ")}`;
+      .filter(Boolean) as string[];
+
+    if (activos.length === 0) {
+      return label ? `${label}: -` : "-";
+    }
+    return label ? `${label}: ${activos.join(" | ")}` : activos.join(" | ");
   };
 
   return (
@@ -1152,9 +1158,7 @@ export default function BienvenidaContenido() {
                               Potencia
                             </div>
                             <p className="leading-snug">
-                              {formLineaPeriodos("",
-                                potencias
-                              )}
+                              {formLineaPeriodos("", potencias)}
                             </p>
                           </div>
 
@@ -1164,9 +1168,7 @@ export default function BienvenidaContenido() {
                               Energía
                             </div>
                             <p className="leading-snug">
-                              {formLineaPeriodos("",
-                                energias
-                              )}
+                              {formLineaPeriodos("", energias)}
                             </p>
                           </div>
 
@@ -1366,7 +1368,7 @@ export default function BienvenidaContenido() {
                 <button
                   type="button"
                   onClick={() => setModalAbierto(false)}
-                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200:hover:bg-slate-800/70"
+                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
                 >
                   Salir sin guardar
                 </button>
