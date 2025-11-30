@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 
@@ -23,10 +22,28 @@ interface TarifaResumen {
   tipo: string;
   subtipo: string;
   compania: string;
-  nombre: string;
+  nombre: string; // anexo / nombre tarifa
+
+  // Precios de energía “clásicos” (por si tu API los usa)
   precioKwhP1: number | null;
   precioKwhP2: number | null;
   precioKwhP3: number | null;
+
+  // Potencias P1–P6 (opcionales)
+  potenciaP1?: number | null;
+  potenciaP2?: number | null;
+  potenciaP3?: number | null;
+  potenciaP4?: number | null;
+  potenciaP5?: number | null;
+  potenciaP6?: number | null;
+
+  // Energías P1–P6 (opcionales)
+  energiaP1?: number | null;
+  energiaP2?: number | null;
+  energiaP3?: number | null;
+  energiaP4?: number | null;
+  energiaP5?: number | null;
+  energiaP6?: number | null;
 }
 
 const tipoConfig: Record<
@@ -85,7 +102,7 @@ export default function BienvenidaContenido() {
   // 🔹 Estado para el modal de datos
   const [modalAbierto, setModalAbierto] = useState(false);
   const [formNombre, setFormNombre] = useState("");
-  const [formEmail, setFormEmail] = useState("");
+  the [formEmail, setFormEmail] = useState("");
   const [formTelefono, setFormTelefono] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensajeGuardarError, setMensajeGuardarError] = useState<string | null>(
@@ -323,6 +340,76 @@ export default function BienvenidaContenido() {
           precioKwhP1: t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
           precioKwhP2: t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
           precioKwhP3: t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
+
+          // Potencias P1–P6 (si existen en tu API, se usarán; si no, quedarán null)
+          potenciaP1:
+            t.potenciaP1 != null ? Number(t.potenciaP1) : t.potencia_p1 != null
+              ? Number(t.potencia_p1)
+              : null,
+          potenciaP2:
+            t.potenciaP2 != null ? Number(t.potenciaP2) : t.potencia_p2 != null
+              ? Number(t.potencia_p2)
+              : null,
+          potenciaP3:
+            t.potenciaP3 != null ? Number(t.potenciaP3) : t.potencia_p3 != null
+              ? Number(t.potencia_p3)
+              : null,
+          potenciaP4:
+            t.potenciaP4 != null ? Number(t.potenciaP4) : t.potencia_p4 != null
+              ? Number(t.potencia_p4)
+              : null,
+          potenciaP5:
+            t.potenciaP5 != null ? Number(t.potenciaP5) : t.potencia_p5 != null
+              ? Number(t.potencia_p5)
+              : null,
+          potenciaP6:
+            t.potenciaP6 != null ? Number(t.potenciaP6) : t.potencia_p6 != null
+              ? Number(t.potencia_p6)
+              : null,
+
+          // Energías P1–P6. Si no vienen, usamos como mínimo P1–P3 de precioKwh
+          energiaP1:
+            t.energiaP1 != null
+              ? Number(t.energiaP1)
+              : t.energia_p1 != null
+              ? Number(t.energia_p1)
+              : t.precioKwhP1 != null
+              ? Number(t.precioKwhP1)
+              : null,
+          energiaP2:
+            t.energiaP2 != null
+              ? Number(t.energiaP2)
+              : t.energia_p2 != null
+              ? Number(t.energia_p2)
+              : t.precioKwhP2 != null
+              ? Number(t.precioKwhP2)
+              : null,
+          energiaP3:
+            t.energiaP3 != null
+              ? Number(t.energiaP3)
+              : t.energia_p3 != null
+              ? Number(t.energia_p3)
+              : t.precioKwhP3 != null
+              ? Number(t.precioKwhP3)
+              : null,
+          energiaP4:
+            t.energiaP4 != null
+              ? Number(t.energiaP4)
+              : t.energia_p4 != null
+              ? Number(t.energia_p4)
+              : null,
+          energiaP5:
+            t.energiaP5 != null
+              ? Number(t.energiaP5)
+              : t.energia_p5 != null
+              ? Number(t.energia_p5)
+              : null,
+          energiaP6:
+            t.energiaP6 != null
+              ? Number(t.energiaP6)
+              : t.energia_p6 != null
+              ? Number(t.energia_p6)
+              : null,
         }));
 
         setTarifasLuz(lista);
@@ -593,6 +680,15 @@ export default function BienvenidaContenido() {
 
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
+
+  // Helpers para mostrar columnas de potencias / energías
+  const formLineaPeriodos = (label: string, valores: (number | null | undefined)[]) => {
+    const activos = valores
+      .map((v, idx) => (v != null ? `P${idx + 1}: ${v.toFixed(5)}` : null))
+      .filter(Boolean);
+    if (activos.length === 0) return `${label}: -`;
+    return `${label}: ${activos.join(" | ")}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
@@ -965,12 +1061,12 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* TARIFAS REALES DE LUZ (catálogo Excel) — EN FILAS VERTICALES */}
+            {/* TARIFAS REALES DE LUZ (catálogo Excel) — FILAS CON IMAGEN Y COLUMNAS */}
             {!loadingTarifasLuz &&
               !errorTarifasLuz &&
               tarifasLuz.length > 0 && (
                 <section className="space-y-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 p-4 md:p-5">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
                     <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
                       💡 Tarifas de luz disponibles (catálogo)
                       <span className="text-[11px] font-normal text-emerald-100/80">
@@ -986,51 +1082,109 @@ export default function BienvenidaContenido() {
                     </button>
                   </div>
 
+                  {/* Cabecera tipo tabla (solo en pantallas medianas en adelante) */}
+                  <div className="hidden md:grid grid-cols-[auto,1.4fr,1.6fr,1.4fr,1.4fr,auto] gap-3 px-4 pb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-100/80 border-b border-emerald-800/60">
+                    <div> </div>
+                    <div>Compañía / Anexo</div>
+                    <div>Nombre tarifa</div>
+                    <div>Potencia P1–P6</div>
+                    <div>Energía P1–P6</div>
+                    <div className="text-right">Acción</div>
+                  </div>
+
                   {/* Lista en filas con scroll vertical */}
                   <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {tarifasLuz.map((t) => (
-                      <div
-                        key={t.id}
-                        className="w-full rounded-2xl bg-slate-950/85 border border-emerald-700/70 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs md:text-sm"
-                      >
-                        <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-800">
-                              {t.compania}
-                            </span>
-                            <span className="text-[10px] text-emerald-200/80">
-                              {t.subtipo}
-                            </span>
-                          </div>
-                          <h4 className="text-sm font-semibold text-slate-50">
-                            {t.nombre}
-                          </h4>
-                          <div className="mt-1 space-y-0.5 text-[11px] text-emerald-100/90">
-                            {t.precioKwhP1 != null && (
-                              <p>P1: {t.precioKwhP1.toFixed(5)} €/kWh</p>
-                            )}
-                            {t.precioKwhP2 != null && (
-                              <p>P2: {t.precioKwhP2.toFixed(5)} €/kWh</p>
-                            )}
-                            {t.precioKwhP3 != null && (
-                              <p>P3: {t.precioKwhP3.toFixed(5)} €/kWh</p>
-                            )}
-                          </div>
-                        </div>
+                    {tarifasLuz.map((t) => {
+                      const potencias = [
+                        t.potenciaP1,
+                        t.potenciaP2,
+                        t.potenciaP3,
+                        t.potenciaP4,
+                        t.potenciaP5,
+                        t.potenciaP6,
+                      ];
+                      const energias = [
+                        t.energiaP1,
+                        t.energiaP2,
+                        t.energiaP3,
+                        t.energiaP4,
+                        t.energiaP5,
+                        t.energiaP6,
+                      ];
 
-                        <div className="flex flex-row md:flex-col items-end gap-2 text-[11px] text-slate-400">
-                          <span className="whitespace-nowrap">
-                            Tarifa catálogo
-                          </span>
-                          <button
-                            onClick={() => irAComparador("LUZ")}
-                            className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
-                          >
-                            Calcular ahorro
-                          </button>
+                      return (
+                        <div
+                          key={t.id}
+                          className="w-full rounded-2xl bg-slate-950/90 border border-emerald-800/70 px-4 py-3 flex flex-col md:grid md:grid-cols-[auto,1.4fr,1.6fr,1.4fr,1.4fr,auto] gap-3 items-center shadow-sm shadow-black/40"
+                        >
+                          {/* Columna imagen Impulso */}
+                          <div className="flex items-center justify-center">
+                            <div className="relative h-10 w-20 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-center overflow-hidden">
+                              <Image
+                                src="/logo-impulso.png"
+                                alt="Impulso Energético"
+                                fill
+                                className="object-contain"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Compañía + anexo */}
+                          <div className="w-full text-left">
+                            <div className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-2 py-0.5 text-[11px] font-semibold uppercase">
+                              {t.compania}
+                            </div>
+                            <p className="mt-1 text-[11px] text-emerald-100/90">
+                              {t.subtipo}
+                            </p>
+                          </div>
+
+                          {/* Nombre tarifa */}
+                          <div className="w-full text-left">
+                            <p className="text-sm font-semibold text-slate-50 leading-snug">
+                              {t.nombre}
+                            </p>
+                          </div>
+
+                          {/* Potencias */}
+                          <div className="w-full text-left text-[11px] text-emerald-100/90">
+                            <div className="font-semibold uppercase tracking-wide text-emerald-300/90 mb-0.5">
+                              Potencia
+                            </div>
+                            <p className="leading-snug">
+                              {formLineaPeriodos("",
+                                potencias
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Energías */}
+                          <div className="w-full text-left text-[11px] text-emerald-100/90">
+                            <div className="font-semibold uppercase tracking-wide text-emerald-300/90 mb-0.5">
+                              Energía
+                            </div>
+                            <p className="leading-snug">
+                              {formLineaPeriodos("",
+                                energias
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Acción */}
+                          <div className="w-full flex md:flex-col items-end justify-between gap-1 text-[11px] text-slate-400">
+                            <span className="md:text-right whitespace-nowrap">
+                              Tarifa catálogo
+                            </span>
+                            <button
+                              onClick={() => irAComparador("LUZ")}
+                              className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                            >
+                              Calcular ahorro
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               )}
@@ -1212,7 +1366,7 @@ export default function BienvenidaContenido() {
                 <button
                   type="button"
                   onClick={() => setModalAbierto(false)}
-                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
+                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200:hover:bg-slate-800/70"
                 >
                   Salir sin guardar
                 </button>
