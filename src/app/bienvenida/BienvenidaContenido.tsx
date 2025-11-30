@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -320,12 +320,9 @@ export default function BienvenidaContenido() {
           subtipo: t.subtipo,
           compania: t.compania,
           nombre: t.nombre,
-          precioKwhP1:
-            t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
-          precioKwhP2:
-            t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
-          precioKwhP3:
-            t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
+          precioKwhP1: t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
+          precioKwhP2: t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
+          precioKwhP3: t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
         }));
 
         setTarifasLuz(lista);
@@ -378,18 +375,6 @@ export default function BienvenidaContenido() {
     });
     return grupos;
   }, [ofertasFiltradas]);
-
-  // Carrusel para tarifas de luz (catálogo)
-  const catalogoLuzRef = useRef<HTMLDivElement | null>(null);
-
-  const scrollCatalogoLuz = (dir: "left" | "right") => {
-    if (!catalogoLuzRef.current) return;
-    const amount = dir === "left" ? -320 : 320; // px a desplazar
-    catalogoLuzRef.current.scrollBy({
-      left: amount,
-      behavior: "smooth",
-    });
-  };
 
   // 🔍 Sugerencias para el desplegable (autocomplete)
   const sugerencias = useMemo(() => {
@@ -897,7 +882,7 @@ export default function BienvenidaContenido() {
             </nav>
           </aside>
 
-          {/* COLUMNA DERECHA: solo ofertas */}
+          {/* COLUMNA DERECHA: ofertas y catálogo */}
           <main className="space-y-8 md:space-y-10">
             {loading && (
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
@@ -911,7 +896,7 @@ export default function BienvenidaContenido() {
               </div>
             )}
 
-            {/* CARRUSEL DESTACADAS (se queda igual, horizontal) */}
+            {/* CARRUSEL DESTACADAS (se queda igual) */}
             {!loading && !error && ofertasDestacadas.length > 0 && (
               <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
                 <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
@@ -980,7 +965,7 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* TARIFAS REALES DE LUZ (catálogo Excel) - se queda horizontal */}
+            {/* TARIFAS REALES DE LUZ (catálogo Excel) — EN FILAS VERTICALES */}
             {!loadingTarifasLuz &&
               !errorTarifasLuz &&
               tarifasLuz.length > 0 && (
@@ -1001,16 +986,14 @@ export default function BienvenidaContenido() {
                     </button>
                   </div>
 
-                  <div
-                    ref={catalogoLuzRef}
-                    className="flex gap-4 overflow-x-auto pb-1"
-                  >
+                  {/* Lista en filas con scroll vertical */}
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                     {tarifasLuz.map((t) => (
                       <div
                         key={t.id}
-                        className="min-w-[240px] max-w-xs rounded-2xl bg-slate-950/85 border border-emerald-700/70 p-4 flex flex-col justify-between text-xs md:text-sm"
+                        className="w-full rounded-2xl bg-slate-950/85 border border-emerald-700/70 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs md:text-sm"
                       >
-                        <div className="space-y-1.5">
+                        <div className="flex-1 space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-800">
                               {t.compania}
@@ -1035,8 +1018,10 @@ export default function BienvenidaContenido() {
                           </div>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                          <span>Tarifa catálogo</span>
+                        <div className="flex flex-row md:flex-col items-end gap-2 text-[11px] text-slate-400">
+                          <span className="whitespace-nowrap">
+                            Tarifa catálogo
+                          </span>
                           <button
                             onClick={() => irAComparador("LUZ")}
                             className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
@@ -1050,18 +1035,16 @@ export default function BienvenidaContenido() {
                 </section>
               )}
 
-            {/* BLOQUES POR TIPO — AHORA EN FILAS VERTICALES CON SCROLL */}
+            {/* BLOQUES POR TIPO — SOLO GAS Y TELEFONÍA EN FILAS VERTICALES */}
             {!loading && !error && (
               <section className="space-y-6">
-                {(["LUZ", "GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
+                {(["GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
                   const lista = ofertasPorTipo[tipo];
                   if (!lista || lista.length === 0) return null;
                   const cfg = tipoConfig[tipo];
 
                   const bgSection =
-                    tipo === "LUZ"
-                      ? "bg-emerald-950/60 border-emerald-800/80"
-                      : tipo === "GAS"
+                    tipo === "GAS"
                       ? "bg-orange-950/40 border-orange-800/70"
                       : "bg-sky-950/50 border-sky-800/70";
 
