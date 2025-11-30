@@ -1121,15 +1121,13 @@ export default function BienvenidaContenido() {
                       return (
                         <div
                           key={t.id}
-                          className={`grid grid-cols-[80px,1.3fr,1.6fr,1.9fr,1.9fr,120px] items-center px-4 py-2.5 text-[11px] md:text-xs ${
-                            index % 2 === 0
-                              ? "bg-slate-950"
-                              : "bg-slate-900/95"
-                          } hover:bg-emerald-900/35 transition`}
+                          className={`grid grid-cols-[90px,1.4fr,1.7fr,1.7fr,1.7fr,130px] items-center px-4 py-3
+                            ${index % 2 === 0 ? "bg-slate-950" : "bg-slate-900/95"}
+                            hover:bg-emerald-900/35 transition`}
                         >
                           {/* LOGO IMPULSO */}
                           <div className="flex justify-center">
-                            <div className="relative h-8 w-16 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-center overflow-hidden">
+                            <div className="relative h-8 w-18 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-center overflow-hidden">
                               <Image
                                 src="/logo-impulso.png"
                                 alt="Impulso Energético"
@@ -1139,38 +1137,40 @@ export default function BienvenidaContenido() {
                             </div>
                           </div>
 
-                          {/* COMPAÑÍA / ANEXO */}
-                          <div className="pr-2">
-                            <div className="font-semibold text-emerald-100 uppercase tracking-[0.08em] leading-tight">
-                              {t.compania}
-                            </div>
-                            <div className="text-[10px] text-emerald-200/85 truncate">
-                              {t.subtipo}
+                          {/* COMPAÑÍA (izquierda) + ANEXO (derecha) EN LA MISMA FILA */}
+                          <div className="pr-3">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[11px] md:text-[12px] font-bold text-emerald-50 uppercase tracking-[0.08em]">
+                                {t.compania}
+                              </span>
+                              <span className="text-[11px] md:text-xs text-emerald-100/85">
+                                {t.subtipo}
+                              </span>
                             </div>
                           </div>
 
                           {/* NOMBRE TARIFA */}
-                          <div className="pr-2">
-                            <span className="text-[11px] md:text-xs font-semibold text-slate-50 truncate">
+                          <div className="pr-3">
+                            <span className="text-[11px] md:text-sm font-semibold text-slate-50 truncate">
                               {t.nombre}
                             </span>
                           </div>
 
-                          {/* POTENCIAS P1–P6 */}
-                          <div className="pr-2 text-[10px] text-emerald-100/90 truncate">
+                          {/* POTENCIA P1–P6 */}
+                          <div className="pr-3 text-[11px] md:text-xs text-emerald-100/90">
                             {formLineaPeriodos("", potencias)}
                           </div>
 
-                          {/* ENERGÍAS P1–P6 */}
-                          <div className="pr-2 text-[10px] text-emerald-100/90 truncate">
+                          {/* ENERGÍA P1–P6 */}
+                          <div className="pr-3 text-[11px] md:text-xs text-emerald-100/90">
                             {formLineaPeriodos("", energias)}
                           </div>
 
-                          {/* BOTÓN ACCIÓN */}
+                          {/* ACCIÓN */}
                           <div className="flex justify-end">
                             <button
                               onClick={() => irAComparador("LUZ")}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                              className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                             >
                               Calcular ahorro
                             </button>
