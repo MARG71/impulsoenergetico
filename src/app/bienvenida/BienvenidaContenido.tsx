@@ -113,13 +113,14 @@ export default function BienvenidaContenido() {
   const ofertasTelRef = useRef<HTMLDivElement | null>(null);
 
   const scrollCarrusel = (
-    ref: RefObject<HTMLDivElement>,
+    ref: RefObject<HTMLDivElement | null>,
     dir: "left" | "right"
   ) => {
     if (!ref.current) return;
     const amount = dir === "left" ? -320 : 320;
     ref.current.scrollBy({ left: amount, behavior: "smooth" });
   };
+
 
   // Lee datos básicos y posibles params extra de club
   useEffect(() => {
@@ -617,11 +618,15 @@ export default function BienvenidaContenido() {
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
   // Mapa de refs para los bloques por tipo
-  const carruselPorTipo: Record<TipoOferta, RefObject<HTMLDivElement>> = {
+  const carruselPorTipo: Record<
+    TipoOferta,
+    RefObject<HTMLDivElement | null>
+  > = {
     LUZ: ofertasLuzRef,
     GAS: ofertasGasRef,
     TELEFONIA: ofertasTelRef,
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
