@@ -1067,30 +1067,30 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* TARIFAS REALES DE LUZ (catálogo Excel) — FILAS CON IMAGEN Y COLUMNAS */}
-            {!loadingTarifasLuz &&
-              !errorTarifasLuz &&
-              tarifasLuz.length > 0 && (
-                <section className="space-y-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 p-4 md:p-5">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
-                    <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
-                      💡 Tarifas de luz disponibles (catálogo)
-                      <span className="text-[11px] font-normal text-emerald-100/80">
-                        ({tarifasLuz.length} tarifa(s) activas)
-                      </span>
-                    </h3>
+            {/* TARIFAS REALES DE LUZ (catálogo Excel) — TABLA ESTILO COMPARATIVAS */}
+            {!loadingTarifasLuz && !errorTarifasLuz && tarifasLuz.length > 0 && (
+              <section className="space-y-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 p-4 md:p-5">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                    💡 Tarifas de luz disponibles (catálogo)
+                    <span className="text-[11px] font-normal text-emerald-100/80">
+                      ({tarifasLuz.length} tarifa(s) activas)
+                    </span>
+                  </h3>
 
-                    <button
-                      onClick={() => irAComparador("LUZ")}
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                    >
-                      Ir al comparador de luz
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => irAComparador("LUZ")}
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                  >
+                    Ir al comparador de luz
+                  </button>
+                </div>
 
-                  {/* Cabecera tipo tabla (solo en pantallas medianas en adelante) */}
-                  <div className="hidden md:grid grid-cols-[auto,1.4fr,1.6fr,1.4fr,1.4fr,auto] gap-3 px-4 pb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-100/80 border-b border-emerald-800/60">
-                    <div> </div>
+                {/* CONTENEDOR TABLA */}
+                <div className="mt-2 rounded-2xl overflow-hidden border border-emerald-800/70 bg-slate-950/95">
+                  {/* CABECERA TIPO TABLA */}
+                  <div className="grid grid-cols-[80px,1.3fr,1.6fr,1.9fr,1.9fr,120px] items-center px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] bg-emerald-500 text-slate-950 shadow-sm">
+                    <div className="text-center" />
                     <div>Compañía / Anexo</div>
                     <div>Nombre tarifa</div>
                     <div>Potencia P1–P6</div>
@@ -1098,9 +1098,9 @@ export default function BienvenidaContenido() {
                     <div className="text-right">Acción</div>
                   </div>
 
-                  {/* Lista en filas con scroll vertical */}
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {tarifasLuz.map((t) => {
+                  {/* FILAS CON SCROLL VERTICAL */}
+                  <div className="max-h-80 overflow-y-auto">
+                    {tarifasLuz.map((t, index) => {
                       const potencias = [
                         t.potenciaP1,
                         t.potenciaP2,
@@ -1121,11 +1121,15 @@ export default function BienvenidaContenido() {
                       return (
                         <div
                           key={t.id}
-                          className="w-full rounded-2xl bg-slate-950/90 border border-emerald-800/70 px-4 py-3 flex flex-col md:grid md:grid-cols-[auto,1.4fr,1.6fr,1.4fr,1.4fr,auto] gap-3 items-center shadow-sm shadow-black/40"
+                          className={`grid grid-cols-[80px,1.3fr,1.6fr,1.9fr,1.9fr,120px] items-center px-4 py-2.5 text-[11px] md:text-xs ${
+                            index % 2 === 0
+                              ? "bg-slate-950"
+                              : "bg-slate-900/95"
+                          } hover:bg-emerald-900/35 transition`}
                         >
-                          {/* Columna imagen Impulso */}
-                          <div className="flex items-center justify-center">
-                            <div className="relative h-10 w-20 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-center overflow-hidden">
+                          {/* LOGO IMPULSO */}
+                          <div className="flex justify-center">
+                            <div className="relative h-8 w-16 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-center overflow-hidden">
                               <Image
                                 src="/logo-impulso.png"
                                 alt="Impulso Energético"
@@ -1135,51 +1139,38 @@ export default function BienvenidaContenido() {
                             </div>
                           </div>
 
-                          {/* Compañía + anexo */}
-                          <div className="w-full text-left">
-                            <div className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-2 py-0.5 text-[11px] font-semibold uppercase">
+                          {/* COMPAÑÍA / ANEXO */}
+                          <div className="pr-2">
+                            <div className="font-semibold text-emerald-100 uppercase tracking-[0.08em] leading-tight">
                               {t.compania}
                             </div>
-                            <p className="mt-1 text-[11px] text-emerald-100/90">
+                            <div className="text-[10px] text-emerald-200/85 truncate">
                               {t.subtipo}
-                            </p>
+                            </div>
                           </div>
 
-                          {/* Nombre tarifa */}
-                          <div className="w-full text-left">
-                            <p className="text-sm font-semibold text-slate-50 leading-snug">
+                          {/* NOMBRE TARIFA */}
+                          <div className="pr-2">
+                            <span className="text-[11px] md:text-xs font-semibold text-slate-50 truncate">
                               {t.nombre}
-                            </p>
-                          </div>
-
-                          {/* Potencias */}
-                          <div className="w-full text-left text-[11px] text-emerald-100/90">
-                            <div className="font-semibold uppercase tracking-wide text-emerald-300/90 mb-0.5">
-                              Potencia
-                            </div>
-                            <p className="leading-snug">
-                              {formLineaPeriodos("", potencias)}
-                            </p>
-                          </div>
-
-                          {/* Energías */}
-                          <div className="w-full text-left text-[11px] text-emerald-100/90">
-                            <div className="font-semibold uppercase tracking-wide text-emerald-300/90 mb-0.5">
-                              Energía
-                            </div>
-                            <p className="leading-snug">
-                              {formLineaPeriodos("", energias)}
-                            </p>
-                          </div>
-
-                          {/* Acción */}
-                          <div className="w-full flex md:flex-col items-end justify-between gap-1 text-[11px] text-slate-400">
-                            <span className="md:text-right whitespace-nowrap">
-                              Tarifa catálogo
                             </span>
+                          </div>
+
+                          {/* POTENCIAS P1–P6 */}
+                          <div className="pr-2 text-[10px] text-emerald-100/90 truncate">
+                            {formLineaPeriodos("", potencias)}
+                          </div>
+
+                          {/* ENERGÍAS P1–P6 */}
+                          <div className="pr-2 text-[10px] text-emerald-100/90 truncate">
+                            {formLineaPeriodos("", energias)}
+                          </div>
+
+                          {/* BOTÓN ACCIÓN */}
+                          <div className="flex justify-end">
                             <button
                               onClick={() => irAComparador("LUZ")}
-                              className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                              className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                             >
                               Calcular ahorro
                             </button>
@@ -1188,8 +1179,10 @@ export default function BienvenidaContenido() {
                       );
                     })}
                   </div>
-                </section>
-              )}
+                </div>
+              </section>
+            )}
+
 
             {/* BLOQUES POR TIPO — SOLO GAS Y TELEFONÍA EN FILAS VERTICALES */}
             {!loading && !error && (
