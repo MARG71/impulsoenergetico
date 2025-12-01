@@ -330,6 +330,7 @@ export default function BienvenidaContenido() {
 
         const data = await res.json();
         const items = data.items || [];
+        console.log("PRIMERA TARIFA API", items[0]);
 
         const lista: TarifaResumen[] = items.map((t: any) => ({
           id: t.id,
@@ -341,30 +342,54 @@ export default function BienvenidaContenido() {
           precioKwhP2: t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
           precioKwhP3: t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
 
-          // Potencias P1–P6 (si existen en tu API, se usarán; si no, quedarán null)
+          // 🔹 POTENCIAS P1–P6 (probamos varios nombres posibles)
           potenciaP1:
-            t.potenciaP1 != null ? Number(t.potenciaP1) : t.potencia_p1 != null
+            t.potenciaP1 != null
+              ? Number(t.potenciaP1)
+              : t.potencia_p1 != null
               ? Number(t.potencia_p1)
+              : t.precioPotenciaP1 != null
+              ? Number(t.precioPotenciaP1)
               : null,
           potenciaP2:
-            t.potenciaP2 != null ? Number(t.potenciaP2) : t.potencia_p2 != null
+            t.potenciaP2 != null
+              ? Number(t.potenciaP2)
+              : t.potencia_p2 != null
               ? Number(t.potencia_p2)
+              : t.precioPotenciaP2 != null
+              ? Number(t.precioPotenciaP2)
               : null,
           potenciaP3:
-            t.potenciaP3 != null ? Number(t.potenciaP3) : t.potencia_p3 != null
+            t.potenciaP3 != null
+              ? Number(t.potenciaP3)
+              : t.potencia_p3 != null
               ? Number(t.potencia_p3)
+              : t.precioPotenciaP3 != null
+              ? Number(t.precioPotenciaP3)
               : null,
           potenciaP4:
-            t.potenciaP4 != null ? Number(t.potenciaP4) : t.potencia_p4 != null
+            t.potenciaP4 != null
+              ? Number(t.potenciaP4)
+              : t.potencia_p4 != null
               ? Number(t.potencia_p4)
+              : t.precioPotenciaP4 != null
+              ? Number(t.precioPotenciaP4)
               : null,
           potenciaP5:
-            t.potenciaP5 != null ? Number(t.potenciaP5) : t.potencia_p5 != null
+            t.potenciaP5 != null
+              ? Number(t.potenciaP5)
+              : t.potencia_p5 != null
               ? Number(t.potencia_p5)
+              : t.precioPotenciaP5 != null
+              ? Number(t.precioPotenciaP5)
               : null,
           potenciaP6:
-            t.potenciaP6 != null ? Number(t.potenciaP6) : t.potencia_p6 != null
+            t.potenciaP6 != null
+              ? Number(t.potenciaP6)
+              : t.potencia_p6 != null
               ? Number(t.potencia_p6)
+              : t.precioPotenciaP6 != null
+              ? Number(t.precioPotenciaP6)
               : null,
 
           // Energías P1–P6. Si no vienen, usamos como mínimo P1–P3 de precioKwh
@@ -1086,115 +1111,117 @@ export default function BienvenidaContenido() {
                   </button>
                 </div>
 
-                    {/* CONTENEDOR TABLA — AHORA COMO TABLA COMPLETA CON COLUMNAS */}
-                    <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95 overflow-x-auto">
-                      <table className="min-w-[1100px] w-full text-[11px] md:text-xs">
-                        <thead>
-                          <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
-                            <th className="px-3 py-2 text-left">Compañía</th>
-                            <th className="px-3 py-2 text-left">Anexo</th>
-                            <th className="px-3 py-2 text-left">Tarifa</th>
+                {/* CONTENEDOR TABLA — con scroll vertical y horizontal */}
+                <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
+                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                    <table className="min-w-[1100px] w-full text-xs md:text-sm">
+                      <thead>
+                        <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
+                          <th className="px-3 py-2 text-left">Compañía</th>
+                          <th className="px-3 py-2 text-left">Anexo</th>
+                          <th className="px-3 py-2 text-left">Tarifa</th>
 
-                            <th className="px-3 py-2 text-right">P.P.1</th>
-                            <th className="px-3 py-2 text-right">P.P.2</th>
-                            <th className="px-3 py-2 text-right">P.P.3</th>
-                            <th className="px-3 py-2 text-right">P.P.4</th>
-                            <th className="px-3 py-2 text-right">P.P.5</th>
-                            <th className="px-3 py-2 text-right">P.P.6</th>
+                          <th className="px-3 py-2 text-right">P.P.1</th>
+                          <th className="px-3 py-2 text-right">P.P.2</th>
+                          <th className="px-3 py-2 text-right">P.P.3</th>
+                          <th className="px-3 py-2 text-right">P.P.4</th>
+                          <th className="px-3 py-2 text-right">P.P.5</th>
+                          <th className="px-3 py-2 text-right">P.P.6</th>
 
-                            <th className="px-3 py-2 text-right">P.E.1</th>
-                            <th className="px-3 py-2 text-right">P.E.2</th>
-                            <th className="px-3 py-2 text-right">P.E.3</th>
-                            <th className="px-3 py-2 text-right">P.E.4</th>
-                            <th className="px-3 py-2 text-right">P.E.5</th>
-                            <th className="px-3 py-2 text-right">P.E.6</th>
+                          <th className="px-3 py-2 text-right">P.E.1</th>
+                          <th className="px-3 py-2 text-right">P.E.2</th>
+                          <th className="px-3 py-2 text-right">P.E.3</th>
+                          <th className="px-3 py-2 text-right">P.E.4</th>
+                          <th className="px-3 py-2 text-right">P.E.5</th>
+                          <th className="px-3 py-2 text-right">P.E.6</th>
 
-                            <th className="px-3 py-2 text-right">Acción</th>
-                          </tr>
-                        </thead>
+                          <th className="px-3 py-2 text-right">Acción</th>
+                        </tr>
+                      </thead>
 
-                        <tbody>
-                          {tarifasLuz.map((t, index) => (
-                            <tr
-                              key={t.id}
-                              className={`${
-                                index % 2 === 0 ? "bg-slate-950" : "bg-slate-900/95"
-                              } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
-                            >
-                              <td className="px-3 py-2 whitespace-nowrap font-semibold text-emerald-50">
-                                {t.compania}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-emerald-100/85">
-                                {t.subtipo || "-"}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-slate-50">
-                                {t.nombre}
-                              </td>
+                      <tbody>
+                        {tarifasLuz.map((t, index) => (
+                          <tr
+                            key={t.id}
+                            className={`${
+                              index % 2 === 0 ? "bg-slate-950" : "bg-slate-900/95"
+                            } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
+                          >
+                            <td className="px-3 py-2 whitespace-nowrap font-semibold text-emerald-50">
+                              {t.compania}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap font-semibold text-emerald-100/85">
+                              {t.subtipo || "-"}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap font-semibold text-slate-50">
+                              {t.nombre}
+                            </td>
 
-                              {/* POTENCIAS P1–P6 */}
-                              <td className="px-3 py-2 text-right">
-                                {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
-                              </td>
+                            {/* POTENCIAS P1–P6 */}
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
+                            </td>
 
-                              {/* ENERGÍAS P1–P6 */}
-                              <td className="px-3 py-2 text-right">
-                                {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
-                              </td>
+                            {/* ENERGÍAS P1–P6 */}
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
+                            </td>
 
-                              <td className="px-3 py-2 text-right">
-                                <button
-                                  onClick={() => irAComparador("LUZ")}
-                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                                >
-                                  Calcular ahorro
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-
-                          {tarifasLuz.length === 0 && (
-                            <tr>
-                              <td
-                                colSpan={16}
-                                className="px-3 py-4 text-center text-[11px] text-slate-400"
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                onClick={() => irAComparador("LUZ")}
+                                className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                               >
-                                No hay tarifas de luz disponibles.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                                Calcular ahorro
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {tarifasLuz.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={16}
+                              className="px-3 py-4 text-center text-[11px] text-slate-400"
+                            >
+                              No hay tarifas de luz disponibles.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
               </section>
             )}
