@@ -706,21 +706,6 @@ export default function BienvenidaContenido() {
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
-  // Helpers para mostrar columnas de potencias / energías
-  const formLineaPeriodos = (
-    label: string,
-    valores: (number | null | undefined)[]
-  ) => {
-    const activos = valores
-      .map((v, idx) => (v != null ? `P${idx + 1}: ${v.toFixed(5)}` : null))
-      .filter(Boolean) as string[];
-
-    if (activos.length === 0) {
-      return label ? `${label}: -` : "-";
-    }
-    return label ? `${label}: ${activos.join(" | ")}` : activos.join(" | ");
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
@@ -1023,7 +1008,7 @@ export default function BienvenidaContenido() {
               </div>
             )}
 
-            {/* CARRUSEL DESTACADAS (se queda igual) */}
+            {/* CARRUSEL DESTACADAS */}
             {!loading && !error && ofertasDestacadas.length > 0 && (
               <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
                 <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
@@ -1111,128 +1096,125 @@ export default function BienvenidaContenido() {
                   </button>
                 </div>
 
-                
-                  {/* CONTENEDOR TABLA — ajustado al ancho de pantalla */}
-                  <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
-                    {/* solo scroll vertical si hay muchas filas */}
-                    <div className="max-h-[420px] overflow-y-auto">
-                      <table className="w-full table-fixed text-[11px] md:text-xs">
-                        <thead>
-                          <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
-                            <th className="px-3 py-2 text-left">Compañía</th>
-                            <th className="px-3 py-2 text-left">Tarifa</th>
-                            <th className="px-3 py-2 text-left">Anexo</th>
-                            <th className="px-2 py-2 text-center">P.P.1</th>
-                            <th className="px-2 py-2 text-center">P.P.2</th>
-                            <th className="px-2 py-2 text-center">P.P.3</th>
-                            <th className="px-2 py-2 text-center">P.P.4</th>
-                            <th className="px-2 py-2 text-center">P.P.5</th>
-                            <th className="px-2 py-2 text-center">P.P.6</th>
-                            <th className="px-2 py-2 text-center">P.E.1</th>
-                            <th className="px-2 py-2 text-center">P.E.2</th>
-                            <th className="px-2 py-2 text-center">P.E.3</th>
-                            <th className="px-2 py-2 text-center">P.E.4</th>
-                            <th className="px-2 py-2 text-center">P.E.5</th>
-                            <th className="px-2 py-2 text-center">P.E.6</th>
-                            <th className="px-3 py-2 text-right">Acción</th>
-                          </tr>
-                        </thead>
+                {/* CONTENEDOR TABLA — ajustado al ancho de pantalla */}
+                <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
+                  {/* solo scroll vertical si hay muchas filas */}
+                  <div className="max-h-[420px] overflow-y-auto">
+                    <table className="w-full table-fixed text-[11px] md:text-xs">
+                      <thead>
+                        <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
+                          <th className="px-3 py-2 text-left">Compañía</th>
+                          <th className="px-3 py-2 text-left">Tarifa</th>
+                          <th className="px-3 py-2 text-left">Anexo</th>
+                          <th className="px-2 py-2 text-center">P.P.1</th>
+                          <th className="px-2 py-2 text-center">P.P.2</th>
+                          <th className="px-2 py-2 text-center">P.P.3</th>
+                          <th className="px-2 py-2 text-center">P.P.4</th>
+                          <th className="px-2 py-2 text-center">P.P.5</th>
+                          <th className="px-2 py-2 text-center">P.P.6</th>
+                          <th className="px-2 py-2 text-center">P.E.1</th>
+                          <th className="px-2 py-2 text-center">P.E.2</th>
+                          <th className="px-2 py-2 text-center">P.E.3</th>
+                          <th className="px-2 py-2 text-center">P.E.4</th>
+                          <th className="px-2 py-2 text-center">P.E.5</th>
+                          <th className="px-2 py-2 text-center">P.E.6</th>
+                          <th className="px-3 py-2 text-right">Acción</th>
+                        </tr>
+                      </thead>
 
-                        <tbody>
-                          {tarifasLuz.map((t, index) => (
-                            <tr
-                              key={t.id}
-                              className={`${
-                                index % 2 === 0 ? "bg-slate-950" : "bg-slate-900/95"
-                              } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
-                            >
-                              {/* COMPAÑÍA */}
-                              <td className="px-3 py-2 font-semibold text-emerald-50 whitespace-nowrap overflow-hidden text-ellipsis">
-                                {t.compania}
-                              </td>
+                      <tbody>
+                        {tarifasLuz.map((t, index) => (
+                          <tr
+                            key={t.id}
+                            className={`${
+                              index % 2 === 0
+                                ? "bg-slate-950"
+                                : "bg-slate-900/95"
+                            } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
+                          >
+                            {/* COMPAÑÍA */}
+                            <td className="px-3 py-2 font-semibold text-emerald-50 whitespace-nowrap overflow-hidden text-ellipsis">
+                              {t.compania}
+                            </td>
 
-                              {/* ANEXO (estrecho) */}
-                              <td className="px-3 py-2 font-semibold text-emerald-100/85 whitespace-nowrap overflow-hidden text-ellipsis">
-                                {t.subtipo || "-"}
-                              </td>
+                            {/* TARIFA (se adapta al espacio que queda) */}
+                            <td className="px-3 py-2 font-semibold text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis">
+                              {t.nombre}
+                            </td>
 
-                              {/* TARIFA (se adapta al espacio que queda) */}
-                              <td className="px-3 py-2 font-semibold text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis">
-                                {t.nombre}
-                              </td>
+                            {/* ANEXO (estrecho) */}
+                            <td className="px-3 py-2 font-semibold text-emerald-100/85 whitespace-nowrap overflow-hidden text-ellipsis">
+                              {t.subtipo || "-"}
+                            </td>
 
-                              {/* POTENCIAS */}
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
-                              </td>
+                            {/* POTENCIAS */}
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
+                            </td>
 
-                              {/* ENERGÍAS */}
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
-                              </td>
-                              <td className="px-2 py-2 text-right font-semibold">
-                                {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
-                              </td>
+                            {/* ENERGÍAS */}
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right font-semibold">
+                              {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
+                            </td>
 
-                              {/* BOTÓN */}
-                              <td className="px-3 py-2 text-right">
-                                <button
-                                  onClick={() => irAComparador("LUZ")}
-                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                                >
-                                  Calcular ahorro
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-
-                          {tarifasLuz.length === 0 && (
-                            <tr>
-                              <td
-                                colSpan={16}
-                                className="px-3 py-4 text-center text-[11px] text-slate-400"
+                            {/* BOTÓN */}
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                onClick={() => irAComparador("LUZ")}
+                                className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                               >
-                                No hay tarifas de luz disponibles.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                                Calcular ahorro
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {tarifasLuz.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={16}
+                              className="px-3 py-4 text-center text-[11px] text-slate-400"
+                            >
+                              No hay tarifas de luz disponibles.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-
-
-
+                </div>
               </section>
             )}
-
 
             {/* BLOQUES POR TIPO — SOLO GAS Y TELEFONÍA EN FILAS VERTICALES */}
             {!loading && !error && (
