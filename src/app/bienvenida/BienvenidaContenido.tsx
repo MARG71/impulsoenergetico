@@ -1118,7 +1118,7 @@ export default function BienvenidaContenido() {
                       <thead>
                         <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
                           <th className="px-3 py-2 text-left w-28 md:w-32">Compañía</th>
-                          <th className="px-3 py-2 text-left w-70 md:w-24 flex-1">Anexo</th>
+                          <th className="px-3 py-2 text-left w-50 md:w-24">Anexo</th>
                           <th className="px-3 py-2 text-left w-20 md:w-24">Tarifa</th>
                           <th className="px-3 py-2 text-center w-16">P.P.1</th>
                           <th className="px-3 py-2 text-center w-16">P.P.2</th>
@@ -1151,7 +1151,7 @@ export default function BienvenidaContenido() {
                             </td>
 
                             {/* TARIFA (NOMBRE) */}
-                            <td className="px-3 py-2 w-70 md:w-24 whitespace-nowrap font-semibold text-slate-50">
+                            <td className="px-3 py-2 w-50 md:w-24 whitespace-nowrap font-semibold text-slate-50">
                               {t.nombre}
                             </td>
 
