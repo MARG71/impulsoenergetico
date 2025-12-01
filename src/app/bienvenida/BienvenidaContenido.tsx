@@ -1086,100 +1086,116 @@ export default function BienvenidaContenido() {
                   </button>
                 </div>
 
-                {/* CONTENEDOR TABLA */}
-                <div className="mt-2 rounded-2xl overflow-hidden border border-emerald-800/70 bg-slate-950/95">
-                  {/* CABECERA TIPO TABLA */}
-                  <div className="grid grid-cols-[80px,1.3fr,1.6fr,1.9fr,1.9fr,120px] items-center px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] bg-emerald-500 text-slate-950 shadow-sm">
-                    <div className="text-center" />
-                    <div>Compañía / Anexo</div>
-                    <div>Nombre tarifa</div>
-                    <div>Potencia P1–P6</div>
-                    <div>Energía P1–P6</div>
-                    <div className="text-right">Acción</div>
-                  </div>
+                    {/* CONTENEDOR TABLA — AHORA COMO TABLA COMPLETA CON COLUMNAS */}
+                    <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95 overflow-x-auto">
+                      <table className="min-w-[1100px] w-full text-[11px] md:text-xs">
+                        <thead>
+                          <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
+                            <th className="px-3 py-2 text-left">Compañía</th>
+                            <th className="px-3 py-2 text-left">Anexo</th>
+                            <th className="px-3 py-2 text-left">Tarifa</th>
 
-                  {/* FILAS CON SCROLL VERTICAL */}
-                  <div className="max-h-80 overflow-y-auto">
-                    {tarifasLuz.map((t, index) => {
-                      const potencias = [
-                        t.potenciaP1,
-                        t.potenciaP2,
-                        t.potenciaP3,
-                        t.potenciaP4,
-                        t.potenciaP5,
-                        t.potenciaP6,
-                      ];
-                      const energias = [
-                        t.energiaP1,
-                        t.energiaP2,
-                        t.energiaP3,
-                        t.energiaP4,
-                        t.energiaP5,
-                        t.energiaP6,
-                      ];
+                            <th className="px-3 py-2 text-right">P.P.1</th>
+                            <th className="px-3 py-2 text-right">P.P.2</th>
+                            <th className="px-3 py-2 text-right">P.P.3</th>
+                            <th className="px-3 py-2 text-right">P.P.4</th>
+                            <th className="px-3 py-2 text-right">P.P.5</th>
+                            <th className="px-3 py-2 text-right">P.P.6</th>
 
-                      return (
-                        <div
-                          key={t.id}
-                          className={`grid grid-cols-[90px,1.4fr,1.7fr,1.7fr,1.7fr,130px] items-center px-4 py-3
-                            ${index % 2 === 0 ? "bg-slate-950" : "bg-slate-900/95"}
-                            hover:bg-emerald-900/35 transition`}
-                        >
-                          {/* LOGO IMPULSO */}
-                          <div className="flex justify-center">
-                            <div className="relative h-8 w-18 rounded-xl bg-slate-900/90 border border-emerald-500/40 flex items-center justify-center overflow-hidden">
-                              <Image
-                                src="/logo-impulso.png"
-                                alt="Impulso Energético"
-                                fill
-                                className="object-contain"
-                              />
-                            </div>
-                          </div>
+                            <th className="px-3 py-2 text-right">P.E.1</th>
+                            <th className="px-3 py-2 text-right">P.E.2</th>
+                            <th className="px-3 py-2 text-right">P.E.3</th>
+                            <th className="px-3 py-2 text-right">P.E.4</th>
+                            <th className="px-3 py-2 text-right">P.E.5</th>
+                            <th className="px-3 py-2 text-right">P.E.6</th>
 
-                          {/* COMPAÑÍA (izquierda) + ANEXO (derecha) EN LA MISMA FILA */}
-                          <div className="pr-3">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-[11px] md:text-[12px] font-bold text-emerald-50 uppercase tracking-[0.08em]">
-                                {t.compania}
-                              </span>
-                              <span className="text-[11px] md:text-xs text-emerald-100/85">
-                                {t.subtipo}
-                              </span>
-                            </div>
-                          </div>
+                            <th className="px-3 py-2 text-right">Acción</th>
+                          </tr>
+                        </thead>
 
-                          {/* NOMBRE TARIFA */}
-                          <div className="pr-3">
-                            <span className="text-[11px] md:text-sm font-semibold text-slate-50 truncate">
-                              {t.nombre}
-                            </span>
-                          </div>
-
-                          {/* POTENCIA P1–P6 */}
-                          <div className="pr-3 text-[11px] md:text-xs text-emerald-100/90">
-                            {formLineaPeriodos("", potencias)}
-                          </div>
-
-                          {/* ENERGÍA P1–P6 */}
-                          <div className="pr-3 text-[11px] md:text-xs text-emerald-100/90">
-                            {formLineaPeriodos("", energias)}
-                          </div>
-
-                          {/* ACCIÓN */}
-                          <div className="flex justify-end">
-                            <button
-                              onClick={() => irAComparador("LUZ")}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                        <tbody>
+                          {tarifasLuz.map((t, index) => (
+                            <tr
+                              key={t.id}
+                              className={`${
+                                index % 2 === 0 ? "bg-slate-950" : "bg-slate-900/95"
+                              } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
                             >
-                              Calcular ahorro
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                              <td className="px-3 py-2 whitespace-nowrap font-semibold text-emerald-50">
+                                {t.compania}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-emerald-100/85">
+                                {t.subtipo || "-"}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-slate-50">
+                                {t.nombre}
+                              </td>
+
+                              {/* POTENCIAS P1–P6 */}
+                              <td className="px-3 py-2 text-right">
+                                {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
+                              </td>
+
+                              {/* ENERGÍAS P1–P6 */}
+                              <td className="px-3 py-2 text-right">
+                                {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
+                              </td>
+
+                              <td className="px-3 py-2 text-right">
+                                <button
+                                  onClick={() => irAComparador("LUZ")}
+                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                                >
+                                  Calcular ahorro
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+
+                          {tarifasLuz.length === 0 && (
+                            <tr>
+                              <td
+                                colSpan={16}
+                                className="px-3 py-4 text-center text-[11px] text-slate-400"
+                              >
+                                No hay tarifas de luz disponibles.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
               </section>
             )}
 
