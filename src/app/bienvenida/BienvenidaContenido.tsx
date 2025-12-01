@@ -1111,31 +1111,34 @@ export default function BienvenidaContenido() {
                   </button>
                 </div>
 
-                {/* CONTENEDOR TABLA — con scroll vertical y horizontal */}
+                
+                {/* CONTENEDOR TABLA — SOLO PC */}
                 <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
-                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/40 scrollbar-track-slate-800">
-                    <table className="w-full text-xs md:text-sm">
+                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                    <table className="min-w-[1400px] w-full text-xs md:text-sm">
                       <thead>
                         <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
-                          <th className="px-3 py-2 text-left w-28 md:w-32">Compañía</th>
-                          <th className="px-3 py-2 text-left w-50 md:w-24">Anexo</th>
-                          <th className="px-3 py-2 text-left w-20 md:w-24">Tarifa</th>
-                          <th className="px-3 py-2 text-center w-16">P.P.1</th>
-                          <th className="px-3 py-2 text-center w-16">P.P.2</th>
-                          <th className="px-3 py-2 text-center w-16">P.P.3</th>
-                          <th className="px-3 py-2 text-center w-16">P.P.4</th>
-                          <th className="px-3 py-2 text-center w-16">P.P.5</th>
-                          <th className="px-3 py-2 text-center w-16">P.P.6</th>
-                          <th className="px-3 py-2 text-center w-16">P.E.1</th>
-                          <th className="px-3 py-2 text-center w-16">P.E.2</th>
-                          <th className="px-3 py-2 text-center w-16">P.E.3</th>
-                          <th className="px-3 py-2 text-center w-16">P.E.4</th>
-                          <th className="px-3 py-2 text-center w-16">P.E.5</th>
-                          <th className="px-3 py-2 text-center w-16">P.E.6</th>
-                          <th className="px-3 py-2 text-right w-28">Acción</th>
+                          <th className="px-3 py-2 text-left w-32">Compañía</th>
+                          <th className="px-3 py-2 text-left w-24">Anexo</th>
+                          <th className="px-3 py-2 text-left w-auto">Tarifa</th>
+
+                          <th className="px-3 py-2 text-center w-20">P.P.1</th>
+                          <th className="px-3 py-2 text-center w-20">P.P.2</th>
+                          <th className="px-3 py-2 text-center w-20">P.P.3</th>
+                          <th className="px-3 py-2 text-center w-20">P.P.4</th>
+                          <th className="px-3 py-2 text-center w-20">P.P.5</th>
+                          <th className="px-3 py-2 text-center w-20">P.P.6</th>
+
+                          <th className="px-3 py-2 text-center w-20">P.E.1</th>
+                          <th className="px-3 py-2 text-center w-20">P.E.2</th>
+                          <th className="px-3 py-2 text-center w-20">P.E.3</th>
+                          <th className="px-3 py-2 text-center w-20">P.E.4</th>
+                          <th className="px-3 py-2 text-center w-20">P.E.5</th>
+                          <th className="px-3 py-2 text-center w-20">P.E.6</th>
+
+                          <th className="px-3 py-2 text-right w-32">Acción</th>
                         </tr>
                       </thead>
-
 
                       <tbody>
                         {tarifasLuz.map((t, index) => (
@@ -1146,64 +1149,41 @@ export default function BienvenidaContenido() {
                             } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
                           >
                             {/* COMPAÑÍA */}
-                            <td className="px-3 py-2 w-28 md:w-32 whitespace-nowrap font-semibold text-emerald-50">
+                            <td className="px-3 py-2 font-semibold whitespace-nowrap text-emerald-50">
                               {t.compania}
                             </td>
 
-                            {/* TARIFA (NOMBRE) */}
-                            <td className="px-3 py-2 w-50 md:w-24 whitespace-nowrap font-semibold text-slate-50">
+                            {/* ANEXO (estrecho) */}
+                            <td className="px-3 py-2 font-semibold whitespace-nowrap text-emerald-100/85 w-24 overflow-hidden text-ellipsis">
+                              {t.subtipo}
+                            </td>
+
+                            {/* TARIFA (ancho adaptable) */}
+                            <td className="px-3 py-2 font-semibold whitespace-nowrap text-slate-50">
                               {t.nombre}
                             </td>
 
-                            {/* ANEXO (SUBTIPO) */}
-                            <td className="px-3 py-2 w-20 md:w-24 whitespace-nowrap font-semibold text-emerald-100/85">
-                              {t.subtipo || "-"}
-                            </td>
+                            {/* POTENCIAS */}
+                            <td className="px-3 py-2 text-right font-semibold">{t.potenciaP1?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.potenciaP2?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.potenciaP3?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.potenciaP4?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.potenciaP5?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.potenciaP6?.toFixed(5) ?? "-"}</td>
 
-                            {/* POTENCIAS P1–P6 */}
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
-                            </td>
+                            {/* ENERGÍAS */}
+                            <td className="px-3 py-2 text-right font-semibold">{t.energiaP1?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.energiaP2?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.energiaP3?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.energiaP4?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.energiaP5?.toFixed(5) ?? "-"}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{t.energiaP6?.toFixed(5) ?? "-"}</td>
 
-                            {/* ENERGÍAS P1–P6 */}
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold">
-                              {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
-                            </td>
-
+                            {/* BOTÓN */}
                             <td className="px-3 py-2 text-right">
                               <button
                                 onClick={() => irAComparador("LUZ")}
-                                className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                               >
                                 Calcular ahorro
                               </button>
@@ -1225,6 +1205,7 @@ export default function BienvenidaContenido() {
                     </table>
                   </div>
                 </div>
+
 
               </section>
             )}
