@@ -1114,13 +1114,12 @@ export default function BienvenidaContenido() {
                 {/* CONTENEDOR TABLA — con scroll vertical y horizontal */}
                 <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
                   <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-                    <table className="min-w-[1100px] w-full text-xs md:text-sm">
+                    <table className="w-full text-xs md:text-sm">
                       <thead>
                         <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
                           <th className="px-3 py-2 text-left">Compañía</th>
-                          <th className="px-3 py-2 text-left">Anexo</th>
                           <th className="px-3 py-2 text-left">Tarifa</th>
-
+                          <th className="px-3 py-2 text-left">Anexo</th>
                           <th className="px-3 py-2 text-right">P.P.1</th>
                           <th className="px-3 py-2 text-right">P.P.2</th>
                           <th className="px-3 py-2 text-right">P.P.3</th>
