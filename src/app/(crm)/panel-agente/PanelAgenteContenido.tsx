@@ -67,19 +67,24 @@ export default function PanelAgenteContenido() {
   const [data, setData] = useState<PanelResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rolUsuario, setRolUsuario] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "loading") return;
 
     if (!session) {
-      setError("Debes iniciar sesión como agente para ver este panel.");
+      setError("Debes iniciar sesión para ver este panel.");
       setLoading(false);
       return;
     }
 
-    const rol = (session.user as any)?.role;
-    if (rol !== "AGENTE") {
-      setError("Este panel es solo para usuarios con rol AGENTE.");
+    // 👇 En tu proyecto a veces usas `rol` y otras `role`, leemos ambos
+    const rol = (session.user as any)?.rol ?? (session.user as any)?.role ?? null;
+    setRolUsuario(rol);
+
+    // ✅ Permitimos AGENTE y ADMIN
+    if (rol !== "AGENTE" && rol !== "ADMIN") {
+      setError("Este panel solo está disponible para usuarios con rol AGENTE o ADMIN.");
       setLoading(false);
       return;
     }
@@ -124,16 +129,19 @@ export default function PanelAgenteContenido() {
   }
 
   const { agente, stats } = data;
+  const esAdmin = rolUsuario === "ADMIN";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-8">
       {/* CABECERA */}
       <header className="max-w-7xl mx-auto mb-8">
         <h1 className="text-3xl md:text-4xl font-extrabold mb-2">
-          Zona del Agente
+          {esAdmin ? "Panel global del agente" : "Zona del Agente"}
         </h1>
         <p className="text-sm text-slate-400">
-          Aquí puedes ver tus lugares, leads y comparativas generadas con tus QRs y enlaces.
+          {esAdmin
+            ? "Estás viendo el panel de un agente. Más adelante podremos ampliar para ver el resumen de todos."
+            : "Aquí puedes ver tus lugares, leads y comparativas generadas con tus QRs y enlaces."}
         </p>
       </header>
 
@@ -166,6 +174,12 @@ export default function PanelAgenteContenido() {
                   {stats.totalLeads}
                 </span>
               </p>
+              {esAdmin && (
+                <p className="text-[11px] text-emerald-300 mt-1">
+                  Estás conectado como <span className="font-bold">ADMIN</span>:
+                  puedes revisar la actividad de este agente.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto">
@@ -191,7 +205,7 @@ export default function PanelAgenteContenido() {
         {/* LUGARES DEL AGENTE */}
         <section className="rounded-3xl bg-slate-950/80 border border-sky-500/60 p-6 md:p-7 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xl font-bold">Tus lugares con QR</h3>
+            <h3 className="text-xl font-bold">Lugares con QR</h3>
             <span className="text-xs text-slate-400">
               {agente.lugares.length} lugar(es)
             </span>
@@ -199,8 +213,7 @@ export default function PanelAgenteContenido() {
 
           {agente.lugares.length === 0 ? (
             <p className="text-sm text-slate-400">
-              Todavía no tienes lugares asignados. Cuando el administrador te asigne
-              lugares con QR, aparecerán aquí.
+              Todavía no hay lugares asignados. Cuando se asignen lugares con QR, aparecerán aquí.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
@@ -220,7 +233,6 @@ export default function PanelAgenteContenido() {
                         {lugar.direccion}
                       </td>
                       <td className="px-4 py-2">
-                        {/* Enlace típico al flujo del cliente vía QR */}
                         <a
                           href={`/registro?agenteId=${agente.id}&lugarId=${lugar.id}`}
                           className="inline-flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950"
@@ -247,7 +259,7 @@ export default function PanelAgenteContenido() {
 
           {agente.leads.length === 0 ? (
             <p className="text-sm text-slate-400">
-              Todavía no tienes leads registrados desde tus QRs o enlaces.
+              Todavía no hay leads registrados desde estos QRs o enlaces.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
@@ -290,7 +302,7 @@ export default function PanelAgenteContenido() {
         {/* COMPARATIVAS DEL AGENTE */}
         <section className="rounded-3xl bg-slate-950/80 border border-orange-500/70 p-6 md:p-7 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xl font-bold">Tus últimas comparativas</h3>
+            <h3 className="text-xl font-bold">Últimas comparativas</h3>
             <span className="text-xs text-slate-400">
               {stats.totalComparativas} comparativa(s)
             </span>
@@ -298,8 +310,8 @@ export default function PanelAgenteContenido() {
 
           {agente.comparativas.length === 0 ? (
             <p className="text-sm text-slate-400">
-              Todavía no tienes comparativas registradas. Cuando hagas estudios con el
-              comparador asociados a tus QRs, aparecerán aquí.
+              Todavía no hay comparativas registradas. Cuando hagas estudios con el
+              comparador asociados a estos QRs, aparecerán aquí.
             </p>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
@@ -371,7 +383,9 @@ function KpiCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border bg-slate-950/90 px-4 py-3 flex flex-col justify-center ${accent || "border-slate-700"}`}
+      className={`rounded-2xl border bg-slate-950/90 px-4 py-3 flex flex-col justify-center ${
+        accent || "border-slate-700"
+      }`}
     >
       <span className="text-[11px] text-slate-400 uppercase tracking-wide">
         {label}
