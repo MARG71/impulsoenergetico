@@ -12,7 +12,8 @@ type Lead = {
   telefono: string;
   estado?: string | null;
   creadoEn?: string;
-  agenteId?: number | null; // por si viene desde la API
+  origen?: string | null;
+  agenteId?: number | null;
   agente?: { id: number; nombre: string } | null;
   lugar?: { id: number; nombre: string } | null;
 };
@@ -21,6 +22,11 @@ type RespuestaLeads = {
   leads?: Lead[];
 } | Lead[];
 
+type AgenteOption = {
+  id: number;
+  nombre: string;
+};
+
 const ESTADOS_BASE = [
   { id: "NUEVO", label: "Nuevos", descripcion: "Acaban de registrarse" },
   { id: "CONTACTADO", label: "Contactados", descripcion: "Ya se ha hablado con ellos" },
@@ -28,6 +34,9 @@ const ESTADOS_BASE = [
   { id: "COMPARATIVA", label: "Con comparativa", descripcion: "Ya se les ha hecho estudio" },
   { id: "CERRADO", label: "Cerrados / Alta", descripcion: "Convertidos en cliente" },
 ];
+
+type RangoFechas = "HOY" | "7" | "30" | "TODO";
+type OrigenFiltro = "TODOS" | "QR" | "WEB" | "IMPORTADO";
 
 function normalizarEstado(raw?: string | null): string {
   if (!raw) return "NUEVO";
@@ -40,13 +49,29 @@ function normalizarEstado(raw?: string | null): string {
   return "NUEVO";
 }
 
+function normalizarOrigen(raw?: string | null): OrigenFiltro | "DESCONOCIDO" {
+  if (!raw) return "DESCONOCIDO";
+  const v = raw.toString().trim().toUpperCase();
+  if (v.includes("QR")) return "QR";
+  if (v.includes("WEB") || v.includes("FORM")) return "WEB";
+  if (v.includes("IMPORT")) return "IMPORTADO";
+  return "DESCONOCIDO";
+}
+
 export default function PipelineAgentesPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [agentes, setAgentes] = useState<AgenteOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filtros
+  const [filtroAgenteId, setFiltroAgenteId] = useState<"todos" | number>("todos");
+  const [filtroLugarId, setFiltroLugarId] = useState<"todos" | number>("todos");
+  const [filtroRango, setFiltroRango] = useState<RangoFechas>("TODO");
+  const [filtroOrigen, setFiltroOrigen] = useState<OrigenFiltro>("TODOS");
 
   const rol =
     (session?.user as any)?.rol ?? (session?.user as any)?.role ?? null;
@@ -68,38 +93,67 @@ export default function PipelineAgentesPage() {
       return;
     }
 
-    // Permitimos ADMIN y AGENTE
     if (rol !== "ADMIN" && rol !== "AGENTE") {
       setError("Solo usuarios con rol ADMIN o AGENTE pueden ver este pipeline.");
       setLoading(false);
       return;
     }
 
-    const cargarLeads = async () => {
+    const cargarDatos = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/leads");
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
+
+        // 1) Leads
+        const [resLeads, resAgentes] = await Promise.all([
+          fetch("/api/leads"),
+          rol === "ADMIN" ? fetch("/api/agentes") : Promise.resolve(null),
+        ]);
+
+        if (!resLeads.ok) {
+          const err = await resLeads.json().catch(() => ({}));
           throw new Error(err.error || "Error al cargar los leads");
         }
-        const data = (await res.json()) as RespuestaLeads;
-        const lista = Array.isArray(data) ? data : data.leads || [];
-        setLeads(lista);
+
+        const dataLeads = (await resLeads.json()) as RespuestaLeads;
+        const listaLeads = Array.isArray(dataLeads)
+          ? dataLeads
+          : dataLeads.leads || [];
+        setLeads(listaLeads);
+
+        // 2) Agentes (solo admin)
+        if (rol === "ADMIN" && resAgentes) {
+          if (!resAgentes.ok) {
+            console.warn("No se pudieron cargar agentes para el filtro.");
+          } else {
+            const dataA = await resAgentes.json();
+            const listaAgentes: any[] = Array.isArray(dataA)
+              ? dataA
+              : Array.isArray(dataA.agentes)
+              ? dataA.agentes
+              : [];
+            setAgentes(
+              listaAgentes.map((a) => ({
+                id: a.id,
+                nombre: a.nombre || a.name || `Agente ${a.id}`,
+              }))
+            );
+          }
+        }
+
         setError(null);
       } catch (err: any) {
-        console.error("Error cargando leads en pipeline:", err);
+        console.error("Error cargando datos en pipeline:", err);
         setError(err.message || "Error al cargar el pipeline");
       } finally {
         setLoading(false);
       }
     };
 
-    cargarLeads();
+    cargarDatos();
   }, [session, status, rol]);
 
-  // 👇 Leads visibles según rol
-  const visibleLeads = useMemo(() => {
+  // Leads base según rol (ADMIN ve todos, AGENTE solo los suyos)
+  const leadsSegunRol = useMemo(() => {
     if (rol === "AGENTE" && agenteIdUsuario) {
       return leads.filter((l) => {
         const aid = l.agenteId ?? l.agente?.id ?? (l as any).agenteId ?? null;
@@ -108,6 +162,117 @@ export default function PipelineAgentesPage() {
     }
     return leads;
   }, [leads, rol, agenteIdUsuario]);
+
+  // Opciones de lugar en función de los leads según rol y filtro de agente
+  const lugaresOpciones = useMemo(() => {
+    const setIds = new Set<number>();
+    const arr: { id: number; nombre: string }[] = [];
+
+    let base = leadsSegunRol;
+
+    // si ADMIN y hay filtro de agente, aplicarlo antes de sacar lugares
+    if (rol === "ADMIN" && typeof filtroAgenteId === "number") {
+      base = base.filter((l) => {
+        const aid = l.agenteId ?? l.agente?.id ?? (l as any).agenteId ?? null;
+        return aid === filtroAgenteId;
+      });
+    }
+
+    base.forEach((l) => {
+      if (l.lugar && typeof l.lugar.id === "number") {
+        if (!setIds.has(l.lugar.id)) {
+          setIds.add(l.lugar.id);
+          arr.push({ id: l.lugar.id, nombre: l.lugar.nombre });
+        }
+      }
+    });
+
+    return arr.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [leadsSegunRol, rol, filtroAgenteId]);
+
+  // Asegurarnos de que si cambiamos agente, el lugar filtrado siga siendo válido
+  useEffect(() => {
+    if (
+      filtroLugarId !== "todos" &&
+      !lugaresOpciones.some((l) => l.id === filtroLugarId)
+    ) {
+      setFiltroLugarId("todos");
+    }
+  }, [lugaresOpciones, filtroLugarId]);
+
+  // Leads filtrados por agente, lugar, rango fechas y origen
+  const visibleLeads = useMemo(() => {
+    let base = [...leadsSegunRol];
+
+    // Filtro por agente (solo ADMIN)
+    if (rol === "ADMIN" && typeof filtroAgenteId === "number") {
+      base = base.filter((l) => {
+        const aid = l.agenteId ?? l.agente?.id ?? (l as any).agenteId ?? null;
+        return aid === filtroAgenteId;
+      });
+    }
+
+    // Filtro por lugar
+    if (typeof filtroLugarId === "number") {
+      base = base.filter((l) => l.lugar?.id === filtroLugarId);
+    }
+
+    // Filtro por rango de fechas
+    if (filtroRango !== "TODO") {
+      const ahora = new Date();
+      let desde: Date;
+
+      if (filtroRango === "HOY") {
+        desde = new Date(
+          ahora.getFullYear(),
+          ahora.getMonth(),
+          ahora.getDate(),
+          0,
+          0,
+          0,
+          0
+        );
+      } else {
+        const dias = filtroRango === "7" ? 7 : 30;
+        desde = new Date(
+          ahora.getFullYear(),
+          ahora.getMonth(),
+          ahora.getDate() - dias,
+          0,
+          0,
+          0,
+          0
+        );
+      }
+
+      base = base.filter((l) => {
+        if (!l.creadoEn) return false;
+        const d = new Date(l.creadoEn);
+        if (filtroRango === "HOY") {
+          return (
+            d.getFullYear() === desde.getFullYear() &&
+            d.getMonth() === desde.getMonth() &&
+            d.getDate() === desde.getDate()
+          );
+        }
+        return d >= desde;
+      });
+    }
+
+    // Filtro por origen
+    if (filtroOrigen !== "TODOS") {
+      base = base.filter((l) => normalizarOrigen(l.origen) === filtroOrigen);
+    }
+
+    return base;
+  }, [
+    leadsSegunRol,
+    rol,
+    filtroAgenteId,
+    filtroLugarId,
+    filtroRango,
+    filtroOrigen,
+  ]);
 
   // Agrupamos por columnas usando SOLO los visibles
   const columnas = useMemo(() => {
@@ -149,10 +314,10 @@ export default function PipelineAgentesPage() {
       return (
         <div className="flex justify-center items-center py-10">
           <div className="bg-slate-900/80 border border-slate-700 text-slate-200 px-6 py-4 rounded-2xl max-w-md text-sm text-center">
-            <p>No hay leads registrados todavía.</p>
+            <p>No hay leads registrados con los filtros actuales.</p>
             <p className="text-xs text-slate-400 mt-1">
-              Cuando entren clientes por QR o formulario, los verás aquí
-              organizados por estado.
+              Ajusta los filtros o espera a que entren nuevos registros por QR o
+              formulario.
             </p>
           </div>
         </div>
@@ -258,6 +423,120 @@ export default function PipelineAgentesPage() {
               </div>
             </div>
           </header>
+
+          {/* Filtros */}
+          <section className="rounded-3xl bg-slate-950/90 border border-slate-800 px-4 py-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-col md:flex-row gap-3 md:items-end">
+              {/* Filtro agente (solo admin) */}
+              {rol === "ADMIN" && (
+                <div className="flex flex-col">
+                  <label className="text-xs text-slate-400 mb-1">
+                    Filtrar por agente
+                  </label>
+                  <select
+                    value={
+                      typeof filtroAgenteId === "number"
+                        ? filtroAgenteId
+                        : "todos"
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFiltroAgenteId(
+                        v === "todos" ? "todos" : Number(v)
+                      );
+                    }}
+                    className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+                  >
+                    <option value="todos">Todos los agentes</option>
+                    {agentes.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Filtro lugar */}
+              <div className="flex flex-col">
+                <label className="text-xs text-slate-400 mb-1">
+                  Filtrar por lugar
+                </label>
+                <select
+                  value={
+                    typeof filtroLugarId === "number"
+                      ? filtroLugarId
+                      : "todos"
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFiltroLugarId(
+                      v === "todos" ? "todos" : Number(v)
+                    );
+                  }}
+                  className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 min-w-[200px]"
+                >
+                  <option value="todos">Todos los lugares</option>
+                  {lugaresOpciones.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro origen */}
+              <div className="flex flex-col">
+                <label className="text-xs text-slate-400 mb-1">
+                  Origen del lead
+                </label>
+                <select
+                  value={filtroOrigen}
+                  onChange={(e) =>
+                    setFiltroOrigen(e.target.value as OrigenFiltro)
+                  }
+                  className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+                >
+                  <option value="TODOS">Todos</option>
+                  <option value="QR">Desde QR</option>
+                  <option value="WEB">Formulario web</option>
+                  <option value="IMPORTADO">Importados</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Filtro rango de fechas */}
+            <div className="flex flex-col items-start md:items-end gap-2">
+              <span className="text-xs text-slate-400 mb-1">
+                Rango de fechas
+              </span>
+              <div className="inline-flex rounded-full bg-slate-900 border border-slate-700 p-1">
+                {[
+                  { id: "HOY", label: "Hoy" },
+                  { id: "7", label: "7 días" },
+                  { id: "30", label: "30 días" },
+                  { id: "TODO", label: "Todo" },
+                ].map((r) => {
+                  const activo = filtroRango === (r.id as RangoFechas);
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() =>
+                        setFiltroRango(r.id as RangoFechas)
+                      }
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                        activo
+                          ? "bg-emerald-500 text-slate-950"
+                          : "text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
 
           {contenido()}
         </div>
