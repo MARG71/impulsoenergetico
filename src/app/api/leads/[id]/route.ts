@@ -6,12 +6,9 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
 // Obtener un lead concreto (para la ficha /leads/[id])
-export async function GET(
-  req: Request,
-  context: { params: { id: string } }
-) {
+export async function GET(req: Request, context: any) {
   try {
-    const id = Number(context.params.id);
+    const id = Number(context?.params?.id);
     if (!id || Number.isNaN(id)) {
       return NextResponse.json(
         { error: "ID de lead no válido" },
@@ -45,10 +42,7 @@ export async function GET(
 }
 
 // Actualizar estado (y en el futuro más cosas)
-export async function PATCH(
-  req: Request,
-  context: { params: { id: string } }
-) {
+export async function PATCH(req: Request, context: any) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -70,7 +64,7 @@ export async function PATCH(
       );
     }
 
-    const id = Number(context.params.id);
+    const id = Number(context?.params?.id);
     if (!id || Number.isNaN(id)) {
       return NextResponse.json(
         { error: "ID de lead no válido" },
