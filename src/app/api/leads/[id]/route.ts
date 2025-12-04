@@ -1,15 +1,17 @@
 // src/app/api/leads/[id]/route.ts
+// src/app/api/leads/[id]/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
-type Params = { params: { id: string } };
-
-// Obtener un lead concreto (para la ficha /leads/[id] que haremos luego)
-export async function GET(req: Request, { params }: Params) {
+// Obtener un lead concreto (para la ficha /leads/[id])
+export async function GET(
+  req: Request,
+  context: { params: { id: string } }
+) {
   try {
-    const id = Number(params.id);
+    const id = Number(context.params.id);
     if (!id || Number.isNaN(id)) {
       return NextResponse.json(
         { error: "ID de lead no válido" },
@@ -43,7 +45,10 @@ export async function GET(req: Request, { params }: Params) {
 }
 
 // Actualizar estado (y en el futuro más cosas)
-export async function PATCH(req: Request, { params }: Params) {
+export async function PATCH(
+  req: Request,
+  context: { params: { id: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -65,7 +70,7 @@ export async function PATCH(req: Request, { params }: Params) {
       );
     }
 
-    const id = Number(params.id);
+    const id = Number(context.params.id);
     if (!id || Number.isNaN(id)) {
       return NextResponse.json(
         { error: "ID de lead no válido" },
