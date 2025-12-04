@@ -12,6 +12,7 @@ type Lead = {
   telefono: string;
   estado?: string | null;
   creadoEn?: string;
+  agenteId?: number | null; // por si viene desde la API
   agente?: { id: number; nombre: string } | null;
   lugar?: { id: number; nombre: string } | null;
 };
@@ -31,7 +32,6 @@ const ESTADOS_BASE = [
 function normalizarEstado(raw?: string | null): string {
   if (!raw) return "NUEVO";
   const v = raw.toString().trim().toUpperCase();
-  // Mapeos típicos que puedas tener en BD
   if (["NUEVO", "NEW"].includes(v)) return "NUEVO";
   if (["CONTACTADO", "LLAMADO", "CONTACT"].includes(v)) return "CONTACTADO";
   if (["ESTUDIO", "EN_ESTUDIO", "PENDIENTE"].includes(v)) return "EN_ESTUDIO";
@@ -48,19 +48,29 @@ export default function PipelineAgentesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 1) Proteger solo para ADMIN
   const rol =
     (session?.user as any)?.rol ?? (session?.user as any)?.role ?? null;
+  const agenteIdUsuario = (session?.user as any)?.agenteId
+    ? Number((session?.user as any).agenteId)
+    : null;
+
+  const nombreUsuario =
+    (session?.user as any)?.nombre ?? session?.user?.name ?? "Usuario Impulso";
+  const labelRol =
+    rol === "ADMIN" ? "Administrador" : rol === "AGENTE" ? "Agente" : rol || "";
 
   useEffect(() => {
     if (status === "loading") return;
+
     if (!session) {
       setError("Debes iniciar sesión para ver el pipeline.");
       setLoading(false);
       return;
     }
-    if (rol !== "ADMIN") {
-      setError("Solo los usuarios con rol ADMIN pueden ver el pipeline completo.");
+
+    // Permitimos ADMIN y AGENTE
+    if (rol !== "ADMIN" && rol !== "AGENTE") {
+      setError("Solo usuarios con rol ADMIN o AGENTE pueden ver este pipeline.");
       setLoading(false);
       return;
     }
@@ -88,9 +98,21 @@ export default function PipelineAgentesPage() {
     cargarLeads();
   }, [session, status, rol]);
 
+  // 👇 Leads visibles según rol
+  const visibleLeads = useMemo(() => {
+    if (rol === "AGENTE" && agenteIdUsuario) {
+      return leads.filter((l) => {
+        const aid = l.agenteId ?? l.agente?.id ?? (l as any).agenteId ?? null;
+        return aid === agenteIdUsuario;
+      });
+    }
+    return leads;
+  }, [leads, rol, agenteIdUsuario]);
+
+  // Agrupamos por columnas usando SOLO los visibles
   const columnas = useMemo(() => {
     const agrupado: Record<string, Lead[]> = {};
-    for (const lead of leads) {
+    for (const lead of visibleLeads) {
       const est = normalizarEstado(lead.estado);
       if (!agrupado[est]) agrupado[est] = [];
       agrupado[est].push(lead);
@@ -99,9 +121,9 @@ export default function PipelineAgentesPage() {
       ...col,
       leads: agrupado[col.id] || [],
     }));
-  }, [leads]);
+  }, [visibleLeads]);
 
-  const totalLeads = leads.length;
+  const totalLeads = visibleLeads.length;
 
   const contenido = () => {
     if (status === "loading" || loading) {
@@ -116,7 +138,7 @@ export default function PipelineAgentesPage() {
       return (
         <div className="flex justify-center items-center py-10">
           <div className="bg-red-900/70 border border-red-500/70 text-red-50 px-6 py-4 rounded-2xl max-w-md text-sm text-center">
-            <h2 className="font-semibold mb-1">Pipeline de agentes</h2>
+            <h2 className="font-semibold mb-1">Pipeline de leads</h2>
             <p>{error}</p>
           </div>
         </div>
@@ -211,15 +233,25 @@ export default function PipelineAgentesPage() {
             <div className="rounded-3xl bg-slate-950/95 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-extrabold text-white mb-1">
-                  Pipeline global de leads
+                  {rol === "ADMIN"
+                    ? "Pipeline global de leads"
+                    : "Pipeline de tus leads"}
                 </h1>
                 <p className="text-sm text-slate-300 max-w-xl">
-                  Vista para ADMIN con todos los leads que han entrado por QR o
-                  formularios, organizados por estado.
+                  {rol === "ADMIN"
+                    ? "Vista para ADMIN con todos los leads que han entrado por QR o formularios, organizados por estado."
+                    : "Vista para AGENTE con todos tus leads que han entrado por QR o formularios, organizados por estado."}
+                </p>
+                <p className="text-xs text-slate-400 mt-2">
+                  Conectado como{" "}
+                  <span className="font-semibold text-emerald-300">
+                    {nombreUsuario}
+                  </span>{" "}
+                  · <span className="font-semibold">{labelRol}</span>
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-slate-400">Total de leads</p>
+                <p className="text-xs text-slate-400">Total de leads visibles</p>
                 <p className="text-3xl font-extrabold text-emerald-300">
                   {totalLeads}
                 </p>
