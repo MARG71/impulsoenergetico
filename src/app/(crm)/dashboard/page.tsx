@@ -221,10 +221,9 @@ export default function DashboardPage() {
 
   return (
     <CRMClienteLayout>
-      {/* Fondo un poco más “Impulso”: negro suave y contenido centrado */}
       <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Cabecera con banda de color corporativa */}
+          {/* CABECERA */}
           <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/20 via-amber-400/10 to-emerald-400/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.45)]">
             <div className="rounded-3xl bg-slate-950/95 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
@@ -233,12 +232,14 @@ export default function DashboardPage() {
                 </h1>
                 <p className="mt-1 text-sm md:text-base text-slate-300 max-w-2xl">
                   Visión global de lo que hacen los clientes
-                  <span className="font-semibold text-emerald-300"> (QR, registros, comparativas)</span>{' '}
+                  <span className="font-semibold text-emerald-300">
+                    {' '}
+                    (QR, registros, comparativas)
+                  </span>{' '}
                   y accesos rápidos a la gestión.
                 </p>
               </div>
 
-              {/* Selector de rango de fechas */}
               <div className="flex flex-col items-end gap-2">
                 <span className="text-[11px] uppercase tracking-wide text-slate-400">
                   Ver actividad de
@@ -284,46 +285,46 @@ export default function DashboardPage() {
 
           {!cargando && !error && (
             <>
-              {/* 1️⃣ KPIs principales (un poco más grandes) */}
+              {/* 1️⃣ KPIs PRINCIPALES */}
               <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                 <KpiCard
                   titulo="Leads nuevos"
                   valor={resumen.leadsRango.length}
                   descripcion={`Registros en ${tituloRango.toLowerCase()}`}
                   color="from-emerald-500 to-emerald-400"
-                  onClick={() => router.push('/dashboard/leads')}
+                  onClick={() => router.push('/panel-agente')}
                 />
                 <KpiCard
                   titulo="Leads desde QR"
                   valor={resumen.leadsDesdeQR.length}
                   descripcion="Clientes que han entrado por QR"
                   color="from-sky-500 to-blue-500"
-                  onClick={() => router.push('/dashboard/leads')}
+                  onClick={() => router.push('/panel-agente')}
                 />
                 <KpiCard
                   titulo="Comparativas"
                   valor={resumen.comparativasRango.length}
                   descripcion="Luz · Gas · Telefonía · Seguros"
                   color="from-orange-500 to-amber-400"
-                  onClick={() => router.push('/dashboard/comparativas')}
+                  onClick={() => router.push('/dashboard/historial')}
                 />
                 <KpiCard
                   titulo="Lugares activos"
                   valor={lugares.length}
                   descripcion="Negocios con QR o clientes vinculados"
                   color="from-lime-500 to-emerald-400"
-                  onClick={() => router.push('/dashboard/lugares')}
+                  onClick={() => router.push('/lugares')}
                 />
                 <KpiCard
                   titulo="Agentes activos"
                   valor={agentes.length}
                   descripcion="Comerciales gestionando clientes"
                   color="from-fuchsia-500 to-pink-500"
-                  onClick={() => router.push('/dashboard/agentes')}
+                  onClick={() => router.push('/agentes')}
                 />
               </section>
 
-              {/* 2️⃣ Actividad por tipo de servicio */}
+              {/* 2️⃣ ACTIVIDAD POR TIPO */}
               <section className="rounded-3xl bg-slate-900/80 border border-slate-800 p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-5 gap-4">
                   <div>
@@ -339,7 +340,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => router.push('/dashboard/comparativas')}
+                    onClick={() => router.push('/dashboard/historial')}
                     className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
                   >
                     Ir a gestión de comparativas
@@ -380,7 +381,7 @@ export default function DashboardPage() {
                 </div>
               </section>
 
-              {/* 3️⃣ Actividad cronológica + resumen QR */}
+              {/* 3️⃣ ACTIVIDAD Y RESUMEN QR */}
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* Línea temporal */}
                 <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-6 shadow-lg">
@@ -389,7 +390,7 @@ export default function DashboardPage() {
                       Actividad de clientes ({tituloRango})
                     </h2>
                     <button
-                      onClick={() => router.push('/pipeline-agentes')}
+                      onClick={() => router.push('/panel-agente')}
                       className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition shadow-lg shadow-blue-600/30"
                     >
                       Ver pipeline completo
@@ -434,9 +435,7 @@ export default function DashboardPage() {
                           <div className="ml-2">
                             {ev.tipo === 'lead' ? (
                               <button
-                                onClick={() =>
-                                  router.push(`/dashboard/leads/${ev.id}`)
-                                }
+                                onClick={() => router.push('/panel-agente')}
                                 className="text-[11px] font-semibold text-emerald-300 hover:text-emerald-100"
                               >
                                 Ver lead
@@ -499,19 +498,19 @@ export default function DashboardPage() {
 
                   <div className="mt-6 flex flex-wrap gap-3">
                     <button
-                      onClick={() => router.push('/dashboard/leads')}
+                      onClick={() => router.push('/panel-agente')}
                       className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
                     >
                       Gestionar leads
                     </button>
                     <button
-                      onClick={() => router.push('/dashboard/lugares')}
+                      onClick={() => router.push('/lugares')}
                       className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-lime-400 text-slate-950 hover:bg-lime-300 transition shadow-lg shadow-lime-400/30"
                     >
                       Ver lugares
                     </button>
                     <button
-                      onClick={() => router.push('/dashboard/agentes')}
+                      onClick={() => router.push('/agentes')}
                       className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-sky-500 text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
                     >
                       Ver agentes
@@ -576,7 +575,7 @@ function KpiCard({
   titulo: string
   valor: number
   descripcion: string
-  color: string // tailwind gradient classes: from-.. to-..
+  color: string
   onClick: () => void
 }) {
   return (
