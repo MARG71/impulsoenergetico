@@ -292,14 +292,14 @@ export default function DashboardPage() {
                   valor={resumen.leadsRango.length}
                   descripcion={`Registros en ${tituloRango.toLowerCase()}`}
                   color="from-emerald-500 to-emerald-400"
-                  onClick={() => router.push('/panel-agente')}
+                  onClick={() => router.push('/pipeline-agentes')}
                 />
                 <KpiCard
                   titulo="Leads desde QR"
                   valor={resumen.leadsDesdeQR.length}
                   descripcion="Clientes que han entrado por QR"
                   color="from-sky-500 to-blue-500"
-                  onClick={() => router.push('/panel-agente')}
+                  onClick={() => router.push('/pipeline-agentes')}
                 />
                 <KpiCard
                   titulo="Comparativas"
@@ -390,7 +390,7 @@ export default function DashboardPage() {
                       Actividad de clientes ({tituloRango})
                     </h2>
                     <button
-                      onClick={() => router.push('/panel-agente')}
+                      onClick={() => router.push('/pipeline-agentes')}
                       className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition shadow-lg shadow-blue-600/30"
                     >
                       Ver pipeline completo
@@ -498,7 +498,7 @@ export default function DashboardPage() {
 
                   <div className="mt-6 flex flex-wrap gap-3">
                     <button
-                      onClick={() => router.push('/panel-agente')}
+                      onClick={() => router.push('/pipeline-agentes')}
                       className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
                     >
                       Gestionar leads
