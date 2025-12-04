@@ -72,6 +72,37 @@ export default function PipelineAgentesPage() {
   const [filtroLugarId, setFiltroLugarId] = useState<"todos" | number>("todos");
   const [filtroRango, setFiltroRango] = useState<RangoFechas>("TODO");
   const [filtroOrigen, setFiltroOrigen] = useState<OrigenFiltro>("TODOS");
+  
+  // Cambiar estado de un lead
+  const handleEstadoChange = async (leadId: number, nuevoEstado: string) => {
+    // Lo normalizamos igual que usamos para agrupación
+    const estadoNormalizado = nuevoEstado.toUpperCase();
+
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ estado: estadoNormalizado }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "No se pudo actualizar el estado");
+      }
+
+      // Actualizamos en memoria
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === leadId ? { ...l, estado: estadoNormalizado } : l
+        )
+      );
+    } catch (error) {
+      console.error("Error actualizando estado del lead:", error);
+      alert("No se ha podido actualizar el estado del lead.");
+    }
+  };
 
   const rol =
     (session?.user as any)?.rol ?? (session?.user as any)?.role ?? null;
@@ -348,40 +379,129 @@ export default function PipelineAgentesPage() {
 
             {/* Lista de leads */}
             <div className="flex-1 overflow-y-auto max-h-[550px] px-3 py-3 space-y-3">
-              {col.leads.map((lead) => (
-                <button
-                  key={lead.id}
-                  onClick={() => router.push("/panel-agente")}
-                  className="w-full text-left rounded-2xl bg-slate-900/80 border border-slate-700 hover:border-emerald-400/70 hover:shadow-[0_0_20px_rgba(16,185,129,0.35)] px-3.5 py-3 transition"
-                >
-                  <p className="text-xs font-semibold text-slate-50 truncate">
-                    {lead.nombre || "Lead sin nombre"}
-                  </p>
-                  <p className="text-[11px] text-slate-300 truncate">
-                    {lead.email || lead.telefono || "Sin datos de contacto"}
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                    {lead.lugar?.nombre
-                      ? `Lugar: ${lead.lugar.nombre}`
-                      : "Sin lugar asignado"}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                    {lead.agente?.nombre
-                      ? `Agente: ${lead.agente.nombre}`
-                      : "Sin agente asignado"}
-                  </p>
-                  {lead.creadoEn && (
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      {new Date(lead.creadoEn).toLocaleString("es-ES", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+              {col.leads.map((lead) => {
+                const telefonoLimpio = (lead.telefono || "").replace(/\D/g, "");
+                const origenMensaje = lead.origen
+                  ? `Te contactamos desde IMPULSO ENERGÉTICO sobre tu solicitud (${lead.origen}).`
+                  : "Te contactamos desde IMPULSO ENERGÉTICO sobre tu solicitud.";
+
+                const whatsappUrl =
+                  telefonoLimpio.length > 5
+                    ? `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(
+                        origenMensaje
+                      )}`
+                    : null;
+
+                const mailtoUrl = lead.email
+                  ? `mailto:${lead.email}?subject=${encodeURIComponent(
+                      "IMPULSO ENERGÉTICO - Información"
+                    )}&body=${encodeURIComponent(origenMensaje)}`
+                  : null;
+
+                return (
+                  <div
+                    key={lead.id}
+                    onClick={() => router.push(`/leads/${lead.id}`)}
+                    className="w-full text-left rounded-2xl bg-slate-900/80 border border-slate-700 hover:border-emerald-400/70 hover:shadow-[0_0_20px_rgba(16,185,129,0.35)] px-3.5 py-3 transition cursor-pointer"
+                  >
+                    {/* Datos principales */}
+                    <p className="text-xs font-semibold text-slate-50 truncate">
+                      {lead.nombre || "Lead sin nombre"}
                     </p>
-                  )}
-                </button>
-              ))}
+                    <p className="text-[11px] text-slate-300 truncate">
+                      {lead.email || lead.telefono || "Sin datos de contacto"}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                      {lead.lugar?.nombre
+                        ? `Lugar: ${lead.lugar.nombre}`
+                        : "Sin lugar asignado"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                      {lead.agente?.nombre
+                        ? `Agente: ${lead.agente.nombre}`
+                        : "Sin agente asignado"}
+                    </p>
+                    {lead.creadoEn && (
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {new Date(lead.creadoEn).toLocaleString("es-ES", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
+
+                    {/* Acciones rápidas */}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      {/* Select de estado */}
+                      <div
+                        className="flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-[10px] text-slate-400">
+                          Estado:
+                        </span>
+                        <select
+                          value={lead.estado || "NUEVO"}
+                          onChange={(e) =>
+                            handleEstadoChange(lead.id, e.target.value)
+                          }
+                          className="bg-slate-950 border border-slate-700 rounded-full px-2 py-1 text-[11px] text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-400/70"
+                        >
+                          <option value="NUEVO">Nuevo</option>
+                          <option value="CONTACTADO">Contactado</option>
+                          <option value="EN_ESTUDIO">En estudio</option>
+                          <option value="COMPARATIVA">Con comparativa</option>
+                          <option value="CERRADO">Cerrado / Alta</option>
+                        </select>
+                      </div>
+
+                      {/* Botones de contacto / ver agente */}
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Ver agente (si tiene) */}
+                        {lead.agente?.id && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(`/agentes/${lead.agente!.id}`)
+                            }
+                            className="text-[11px] px-2 py-1 rounded-full bg-slate-950 border border-slate-700 hover:border-sky-400 text-slate-200"
+                          >
+                            👤
+                          </button>
+                        )}
+
+                        {/* Email */}
+                        {mailtoUrl && (
+                          <a
+                            href={mailtoUrl}
+                            className="text-[11px] px-2 py-1 rounded-full bg-slate-950 border border-slate-700 hover:border-emerald-400 text-slate-200"
+                          >
+                            📧
+                          </a>
+                        )}
+
+                        {/* WhatsApp */}
+                        {whatsappUrl && (
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-semibold"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
             </div>
           </div>
         ))}
