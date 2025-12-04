@@ -25,7 +25,6 @@ export default function DashboardPage() {
 
   const [rangoDias, setRangoDias] = useState<RangoDias>(1) // por defecto: HOY
 
-  // 👇 Función auxiliar para normalizar respuestas {clave: []} o []
   const normalizarLista = (data: any, key?: string) => {
     if (key && Array.isArray(data?.[key])) return data[key]
     if (Array.isArray(data)) return data
@@ -73,26 +72,23 @@ export default function DashboardPage() {
     cargarDatos()
   }, [])
 
-  // 🔎 Función para obtener la fecha del registro (ajusta nombres de campos aquí)
   const obtenerFecha = (item: any): Date | null => {
     const raw =
-      item?.creadoEn || item?.createdAt || item?.fecha || item?.fechaRegistro || null // ⚠️ AJUSTA a tu schema
+      item?.creadoEn || item?.createdAt || item?.fecha || item?.fechaRegistro || null
     if (!raw) return null
     const d = new Date(raw)
     return isNaN(d.getTime()) ? null : d
   }
 
-  // ⏱️ Filtrado por rango de días: hoy, 7 días, 30 días, todo
   const estaEnRango = (item: any): boolean => {
-    if (rangoDias === 0) return true // todo
+    if (rangoDias === 0) return true
     const fecha = obtenerFecha(item)
     if (!fecha) return false
 
     const ahora = new Date()
     const inicio = new Date()
-    // Rango: hoy, últimos 7 días, últimos 30 días
+
     if (rangoDias === 1) {
-      // solo hoy
       inicio.setHours(0, 0, 0, 0)
       const fin = new Date()
       fin.setHours(23, 59, 59, 999)
@@ -104,16 +100,12 @@ export default function DashboardPage() {
     return fecha >= inicio && fecha <= ahora
   }
 
-  // 💡 KPIs y métricas calculadas
   const resumen = useMemo(() => {
-    // Filtrar por rango de días
     const leadsRango = leads.filter(estaEnRango)
     const comparativasRango = comparativas.filter(estaEnRango)
 
-    // Leads que vienen de QR (⚠️ ajusta si usas otro campo: qrId, qrID, qr, etc.)
     const leadsDesdeQR = leadsRango.filter((lead) => !!(lead as any).qrId)
 
-    // Comparativas por tipo de servicio
     const comparativasLuz = comparativasRango.filter(
       (c: any) =>
         c?.tipoServicio === 'luz' ||
@@ -143,13 +135,11 @@ export default function DashboardPage() {
         c?.tipoTarifa === 'seguros'
     )
 
-    // Otras comparativas (si las hubiera)
     const comparativasOtras = comparativasRango.filter((c: any) => {
       const t = (c?.tipoServicio || c?.tipoTarifa || '').toString().toLowerCase()
       return t && !['luz', 'gas', 'telefonia', 'telefonía', 'tel', 'seguros'].includes(t)
     })
 
-    // 📜 Construimos una "línea temporal" de eventos
     type Evento = {
       tipo: 'lead' | 'comparativa'
       fecha: Date
@@ -160,7 +150,6 @@ export default function DashboardPage() {
 
     const eventos: Evento[] = []
 
-    // Eventos de leads (registros nuevos)
     for (const lead of leads) {
       const fecha = obtenerFecha(lead)
       if (!fecha || !estaEnRango(lead)) continue
@@ -173,16 +162,13 @@ export default function DashboardPage() {
         tipo: 'lead',
         fecha,
         id: lead.id,
-        descripcion: vieneDeQR
-          ? `Nuevo registro desde QR`
-          : `Nuevo registro de cliente`,
+        descripcion: vieneDeQR ? `Nuevo registro desde QR` : `Nuevo registro de cliente`,
         detalle: `${
           lead?.nombre || 'Cliente sin nombre'
         } · Agente: ${agenteNombre} · Lugar: ${lugarNombre}`,
       })
     }
 
-    // Eventos de comparativas
     for (const comp of comparativas) {
       const fecha = obtenerFecha(comp)
       if (!fecha || !estaEnRango(comp)) continue
@@ -200,7 +186,6 @@ export default function DashboardPage() {
       })
     }
 
-    // Ordenar eventos por fecha descendente
     eventos.sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
 
     return {
@@ -212,11 +197,10 @@ export default function DashboardPage() {
       comparativasTel,
       comparativasSeguros,
       comparativasOtras,
-      eventos: eventos.slice(0, 30), // mostramos máximo 30 eventos en el dashboard
+      eventos: eventos.slice(0, 30),
     }
   }, [leads, comparativas, rangoDias])
 
-  // 🧰 Pequeño formateador de fechas
   const formatearFechaCorta = (fecha: Date) => {
     return fecha.toLocaleString('es-ES', {
       day: '2-digit',
@@ -237,314 +221,351 @@ export default function DashboardPage() {
 
   return (
     <CRMClienteLayout>
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Cabecera principal */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-900">
-              Centro de Control IMPULSO ENERGÉTICO
-            </h1>
-            <p className="text-sm text-slate-600">
-              Visión global de lo que hacen los clientes (QR, registros, comparativas) y acceso rápido a la gestión.
-            </p>
-          </div>
-
-          {/* Selector de rango de fechas */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 mr-2">Ver actividad de:</span>
-            <button
-              onClick={() => setRangoDias(1)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                rangoDias === 1
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-white text-slate-700 border-slate-300'
-              }`}
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => setRangoDias(7)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                rangoDias === 7
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-white text-slate-700 border-slate-300'
-              }`}
-            >
-              7 días
-            </button>
-            <button
-              onClick={() => setRangoDias(30)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                rangoDias === 30
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-white text-slate-700 border-slate-300'
-              }`}
-            >
-              30 días
-            </button>
-            <button
-              onClick={() => setRangoDias(0)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                rangoDias === 0
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-700 border-slate-300'
-              }`}
-            >
-              Todo
-            </button>
-          </div>
-        </div>
-
-        {cargando && (
-          <div className="p-4 text-center text-slate-600">Cargando datos...</div>
-        )}
-
-        {error && !cargando && (
-          <div className="p-4 mb-4 text-center text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {!cargando && !error && (
-          <>
-            {/* 1️⃣ KPIs principales */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-              <KpiCard
-                titulo="Leads nuevos"
-                valor={resumen.leadsRango.length}
-                descripcion={`Registros de clientes en ${tituloRango.toLowerCase()}`}
-                color="bg-emerald-600"
-                onClick={() => router.push('/dashboard/leads')}
-              />
-              <KpiCard
-                titulo="Leads desde QR"
-                valor={resumen.leadsDesdeQR.length}
-                descripcion={`Clientes que han entrado desde QR`}
-                color="bg-blue-700"
-                onClick={() => router.push('/dashboard/leads')}
-              />
-              <KpiCard
-                titulo="Comparativas"
-                valor={resumen.comparativasRango.length}
-                descripcion={`Luz, gas, telefonía, seguros...`}
-                color="bg-orange-500"
-                onClick={() => router.push('/dashboard/comparativas')}
-              />
-              <KpiCard
-                titulo="Lugares activos"
-                valor={lugares.length}
-                descripcion="Negocios con QR o clientes vinculados"
-                color="bg-lime-600"
-                onClick={() => router.push('/dashboard/lugares')}
-              />
-              <KpiCard
-                titulo="Agentes activos"
-                valor={agentes.length}
-                descripcion="Comerciales gestionando clientes"
-                color="bg-fuchsia-600"
-                onClick={() => router.push('/dashboard/agentes')}
-              />
-            </section>
-
-            {/* 2️⃣ Resumen por tipo de servicio */}
-            <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Actividad por tipo de servicio
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Comparativas realizadas en {tituloRango.toLowerCase()} según servicio.
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push('/dashboard/comparativas')}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition"
-                >
-                  Ir a gestión de comparativas
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
-                <ServicioCard
-                  titulo="Luz"
-                  valor={resumen.comparativasLuz.length}
-                  subtitulo="Comparativas de electricidad"
-                  tono="bg-orange-50 border-orange-200"
-                />
-                <ServicioCard
-                  titulo="Gas"
-                  valor={resumen.comparativasGas.length}
-                  subtitulo="Comparativas de gas"
-                  tono="bg-amber-50 border-amber-200"
-                />
-                <ServicioCard
-                  titulo="Telefonía"
-                  valor={resumen.comparativasTel.length}
-                  subtitulo="Móvil, fibra, etc."
-                  tono="bg-sky-50 border-sky-200"
-                />
-                <ServicioCard
-                  titulo="Seguros"
-                  valor={resumen.comparativasSeguros.length}
-                  subtitulo="Seguros energéticos / hogar"
-                  tono="bg-violet-50 border-violet-200"
-                />
-                <ServicioCard
-                  titulo="Otros"
-                  valor={resumen.comparativasOtras.length}
-                  subtitulo="Otros servicios"
-                  tono="bg-slate-50 border-slate-200"
-                />
-              </div>
-            </section>
-
-            {/* 3️⃣ Actividad cronológica del día / rango */}
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* Línea temporal */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Actividad de clientes ({tituloRango})
-                  </h2>
-                  <button
-                    onClick={() => router.push('/pipeline-agentes')}
-                    className="px-4 py-2 rounded-full text-xs font-semibold bg-blue-700 text-white hover:bg-blue-800 transition"
-                  >
-                    Ver pipeline completo
-                  </button>
-                </div>
-
-                {resumen.eventos.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    No hay actividad registrada en este periodo.
-                  </p>
-                ) : (
-                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                    {resumen.eventos.map((ev, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
-                      >
-                        <div className="mt-1">
-                          {ev.tipo === 'lead' ? (
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-600 text-[11px] font-bold text-white">
-                              QR
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-[11px] font-bold text-white">
-                              C
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-slate-900 truncate">
-                              {ev.descripcion}
-                            </p>
-                            <span className="text-[10px] text-slate-500 whitespace-nowrap">
-                              {formatearFechaCorta(ev.fecha)}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 truncate mt-0.5">
-                            {ev.detalle}
-                          </p>
-                        </div>
-                        <div className="ml-2">
-                          {ev.tipo === 'lead' ? (
-                            <button
-                              onClick={() =>
-                                router.push(`/dashboard/leads/${ev.id}`)
-                              }
-                              className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-900"
-                            >
-                              Ver lead
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() =>
-                                router.push(`/comparador?id=${ev.id}`)
-                              }
-                              className="text-[10px] font-semibold text-orange-600 hover:text-orange-800"
-                            >
-                              Ver comp.
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Resumen rápido de QR / registros */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-                <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                  Resumen QR y registros
-                </h2>
-                <p className="text-xs text-slate-500 mb-3">
-                  Aquí ves de un vistazo lo que ha entrado por QR, cuántos clientes nuevos se han registrado y cuántos han llegado a hacer comparativas.
+      {/* Fondo un poco más “Impulso”: negro suave y contenido centrado */}
+      <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-4 py-8">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Cabecera con banda de color corporativa */}
+          <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/20 via-amber-400/10 to-emerald-400/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.45)]">
+            <div className="rounded-3xl bg-slate-950/95 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
+                  Centro de Control IMPULSO ENERGÉTICO
+                </h1>
+                <p className="mt-1 text-sm md:text-base text-slate-300 max-w-2xl">
+                  Visión global de lo que hacen los clientes
+                  <span className="font-semibold text-emerald-300"> (QR, registros, comparativas)</span>{' '}
+                  y accesos rápidos a la gestión.
                 </p>
+              </div>
 
-                <div className="space-y-3">
-                  <ResumenFila
-                    titulo="Clientes registrados (en rango)"
-                    valor={resumen.leadsRango.length}
-                    descripcion="Total de registros en el periodo seleccionado."
+              {/* Selector de rango de fechas */}
+              <div className="flex flex-col items-end gap-2">
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                  Ver actividad de
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  <Chip
+                    activo={rangoDias === 1}
+                    onClick={() => setRangoDias(1)}
+                    label="Hoy"
                   />
-                  <ResumenFila
-                    titulo="Clientes desde QR"
-                    valor={resumen.leadsDesdeQR.length}
-                    descripcion="Personas que han accedido desde un código QR."
+                  <Chip
+                    activo={rangoDias === 7}
+                    onClick={() => setRangoDias(7)}
+                    label="7 días"
                   />
-                  <ResumenFila
-                    titulo="Comparativas realizadas"
-                    valor={resumen.comparativasRango.length}
-                    descripcion="Total de comparativas creadas por esos clientes."
+                  <Chip
+                    activo={rangoDias === 30}
+                    onClick={() => setRangoDias(30)}
+                    label="30 días"
                   />
-                  <ResumenFila
-                    titulo="Lugares con actividad"
-                    valor={
-                      new Set(
-                        resumen.leadsRango
-                          .map((l: any) => l?.lugarId)
-                          .filter(Boolean)
-                      ).size
-                    }
-                    descripcion="Lugares / negocios que han generado movimiento."
+                  <Chip
+                    activo={rangoDias === 0}
+                    onClick={() => setRangoDias(0)}
+                    label="Todo"
+                    variante="dark"
                   />
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => router.push('/dashboard/leads')}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
-                  >
-                    Gestionar leads
-                  </button>
-                  <button
-                    onClick={() => router.push('/dashboard/lugares')}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-lime-600 text-white hover:bg-lime-700"
-                  >
-                    Ver lugares
-                  </button>
-                  <button
-                    onClick={() => router.push('/dashboard/agentes')}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-700 text-white hover:bg-blue-800"
-                  >
-                    Ver agentes
-                  </button>
                 </div>
               </div>
-            </section>
-          </>
-        )}
+            </div>
+          </div>
+
+          {cargando && (
+            <div className="p-6 text-center text-slate-300 text-sm rounded-2xl bg-slate-900/70 border border-slate-800">
+              Cargando datos...
+            </div>
+          )}
+
+          {error && !cargando && (
+            <div className="p-4 mb-4 text-center text-sm text-red-200 bg-red-900/60 border border-red-700 rounded-2xl">
+              {error}
+            </div>
+          )}
+
+          {!cargando && !error && (
+            <>
+              {/* 1️⃣ KPIs principales (un poco más grandes) */}
+              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                <KpiCard
+                  titulo="Leads nuevos"
+                  valor={resumen.leadsRango.length}
+                  descripcion={`Registros en ${tituloRango.toLowerCase()}`}
+                  color="from-emerald-500 to-emerald-400"
+                  onClick={() => router.push('/dashboard/leads')}
+                />
+                <KpiCard
+                  titulo="Leads desde QR"
+                  valor={resumen.leadsDesdeQR.length}
+                  descripcion="Clientes que han entrado por QR"
+                  color="from-sky-500 to-blue-500"
+                  onClick={() => router.push('/dashboard/leads')}
+                />
+                <KpiCard
+                  titulo="Comparativas"
+                  valor={resumen.comparativasRango.length}
+                  descripcion="Luz · Gas · Telefonía · Seguros"
+                  color="from-orange-500 to-amber-400"
+                  onClick={() => router.push('/dashboard/comparativas')}
+                />
+                <KpiCard
+                  titulo="Lugares activos"
+                  valor={lugares.length}
+                  descripcion="Negocios con QR o clientes vinculados"
+                  color="from-lime-500 to-emerald-400"
+                  onClick={() => router.push('/dashboard/lugares')}
+                />
+                <KpiCard
+                  titulo="Agentes activos"
+                  valor={agentes.length}
+                  descripcion="Comerciales gestionando clientes"
+                  color="from-fuchsia-500 to-pink-500"
+                  onClick={() => router.push('/dashboard/agentes')}
+                />
+              </section>
+
+              {/* 2️⃣ Actividad por tipo de servicio */}
+              <section className="rounded-3xl bg-slate-900/80 border border-slate-800 p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-5 gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">
+                      Actividad por tipo de servicio
+                    </h2>
+                    <p className="text-xs md:text-sm text-slate-300 mt-1">
+                      Comparativas realizadas en{' '}
+                      <span className="font-semibold text-emerald-300">
+                        {tituloRango.toLowerCase()}
+                      </span>{' '}
+                      según servicio.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push('/dashboard/comparativas')}
+                    className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
+                  >
+                    Ir a gestión de comparativas
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 text-xs">
+                  <ServicioCard
+                    titulo="Luz"
+                    valor={resumen.comparativasLuz.length}
+                    subtitulo="Comparativas de electricidad"
+                    tono="bg-orange-50/90 border-orange-200 text-orange-900"
+                  />
+                  <ServicioCard
+                    titulo="Gas"
+                    valor={resumen.comparativasGas.length}
+                    subtitulo="Comparativas de gas"
+                    tono="bg-amber-50/90 border-amber-200 text-amber-900"
+                  />
+                  <ServicioCard
+                    titulo="Telefonía"
+                    valor={resumen.comparativasTel.length}
+                    subtitulo="Móvil, fibra, etc."
+                    tono="bg-sky-50/90 border-sky-200 text-sky-900"
+                  />
+                  <ServicioCard
+                    titulo="Seguros"
+                    valor={resumen.comparativasSeguros.length}
+                    subtitulo="Seguros energéticos / hogar"
+                    tono="bg-violet-50/90 border-violet-200 text-violet-900"
+                  />
+                  <ServicioCard
+                    titulo="Otros"
+                    valor={resumen.comparativasOtras.length}
+                    subtitulo="Otros servicios"
+                    tono="bg-slate-50/90 border-slate-200 text-slate-900"
+                  />
+                </div>
+              </section>
+
+              {/* 3️⃣ Actividad cronológica + resumen QR */}
+              <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Línea temporal */}
+                <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-6 shadow-lg">
+                  <div className="flex items-center justify-between mb-4 gap-3">
+                    <h2 className="text-xl font-semibold text-white">
+                      Actividad de clientes ({tituloRango})
+                    </h2>
+                    <button
+                      onClick={() => router.push('/pipeline-agentes')}
+                      className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition shadow-lg shadow-blue-600/30"
+                    >
+                      Ver pipeline completo
+                    </button>
+                  </div>
+
+                  {resumen.eventos.length === 0 ? (
+                    <p className="text-sm text-slate-300">
+                      No hay actividad registrada en este periodo.
+                    </p>
+                  ) : (
+                    <div className="space-y-3 max-h-[430px] overflow-y-auto pr-1">
+                      {resumen.eventos.map((ev, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-2"
+                        >
+                          <div className="mt-1">
+                            {ev.tipo === 'lead' ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-[11px] font-extrabold text-slate-950 shadow-lg shadow-emerald-500/40">
+                                QR
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-[11px] font-extrabold text-slate-950 shadow-lg shadow-orange-500/40">
+                                C
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-50 truncate">
+                                {ev.descripcion}
+                              </p>
+                              <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                                {formatearFechaCorta(ev.fecha)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-300 truncate mt-0.5">
+                              {ev.detalle}
+                            </p>
+                          </div>
+                          <div className="ml-2">
+                            {ev.tipo === 'lead' ? (
+                              <button
+                                onClick={() =>
+                                  router.push(`/dashboard/leads/${ev.id}`)
+                                }
+                                className="text-[11px] font-semibold text-emerald-300 hover:text-emerald-100"
+                              >
+                                Ver lead
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  router.push(`/comparador?id=${ev.id}`)
+                                }
+                                className="text-[11px] font-semibold text-orange-300 hover:text-orange-100"
+                              >
+                                Ver comp.
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Resumen QR y registros */}
+                <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-6 shadow-lg">
+                  <h2 className="text-xl font-semibold text-white mb-2">
+                    Resumen QR y registros
+                  </h2>
+                  <p className="text-xs md:text-sm text-slate-300 mb-4">
+                    Aquí ves de un vistazo lo que ha entrado por QR, cuántos clientes
+                    nuevos se han registrado y cuántos han llegado a hacer comparativas.
+                  </p>
+
+                  <div className="space-y-3">
+                    <ResumenFila
+                      titulo="Clientes registrados (en rango)"
+                      valor={resumen.leadsRango.length}
+                      descripcion="Total de registros en el periodo seleccionado."
+                    />
+                    <ResumenFila
+                      titulo="Clientes desde QR"
+                      valor={resumen.leadsDesdeQR.length}
+                      descripcion="Personas que han accedido desde un código QR."
+                    />
+                    <ResumenFila
+                      titulo="Comparativas realizadas"
+                      valor={resumen.comparativasRango.length}
+                      descripcion="Total de comparativas creadas por esos clientes."
+                    />
+                    <ResumenFila
+                      titulo="Lugares con actividad"
+                      valor={
+                        new Set(
+                          resumen.leadsRango
+                            .map((l: any) => l?.lugarId)
+                            .filter(Boolean)
+                        ).size
+                      }
+                      descripcion="Lugares / negocios que han generado movimiento."
+                    />
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button
+                      onClick={() => router.push('/dashboard/leads')}
+                      className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
+                    >
+                      Gestionar leads
+                    </button>
+                    <button
+                      onClick={() => router.push('/dashboard/lugares')}
+                      className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-lime-400 text-slate-950 hover:bg-lime-300 transition shadow-lg shadow-lime-400/30"
+                    >
+                      Ver lugares
+                    </button>
+                    <button
+                      onClick={() => router.push('/dashboard/agentes')}
+                      className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-sky-500 text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
+                    >
+                      Ver agentes
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
       </div>
     </CRMClienteLayout>
   )
 }
 
-// 🔹 Tarjeta KPI superior
+/* ---------- Componentes de apoyo ---------- */
+
+function Chip({
+  activo,
+  onClick,
+  label,
+  variante = 'light',
+}: {
+  activo: boolean
+  onClick: () => void
+  label: string
+  variante?: 'light' | 'dark'
+}) {
+  const base =
+    'px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors'
+  if (activo) {
+    return (
+      <button
+        onClick={onClick}
+        className={`${base} ${
+          variante === 'dark'
+            ? 'bg-slate-900 text-white border-slate-100'
+            : 'bg-emerald-500 text-slate-950 border-emerald-400'
+        } shadow-md`}
+      >
+        {label}
+      </button>
+    )
+  }
+  return (
+    <button
+      onClick={onClick}
+      className={`${base} bg-slate-950 text-slate-200 border-slate-700 hover:border-emerald-400/60 hover:text-emerald-200`}
+    >
+      {label}
+    </button>
+  )
+}
+
 function KpiCard({
   titulo,
   valor,
@@ -555,33 +576,34 @@ function KpiCard({
   titulo: string
   valor: number
   descripcion: string
-  color: string
+  color: string // tailwind gradient classes: from-.. to-..
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className="group rounded-2xl bg-white shadow-sm border border-slate-100 p-4 flex flex-col justify-between hover:shadow-md transition text-left"
+      className="group rounded-3xl bg-slate-900/80 border border-slate-800 p-5 flex flex-col justify-between hover:border-emerald-400/70 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] transition text-left"
     >
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
           {titulo}
         </p>
         <span
-          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full text-white ${color}`}
+          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full text-slate-950 bg-gradient-to-r ${color} shadow-md`}
         >
           Ver gestión
         </span>
       </div>
-      <div className="mt-3">
-        <p className="text-3xl font-bold text-slate-900">{valor}</p>
-        <p className="text-xs text-slate-500 mt-1">{descripcion}</p>
+      <div className="mt-4">
+        <p className="text-4xl font-extrabold text-white leading-none">
+          {valor}
+        </p>
+        <p className="text-xs md:text-sm text-slate-300 mt-2">{descripcion}</p>
       </div>
     </button>
   )
 }
 
-// 🔹 Tarjeta de resumen por servicio
 function ServicioCard({
   titulo,
   valor,
@@ -595,18 +617,17 @@ function ServicioCard({
 }) {
   return (
     <div
-      className={`rounded-xl px-3 py-3 border ${tono} flex flex-col justify-between`}
+      className={`rounded-2xl px-4 py-3 border ${tono} flex flex-col justify-between`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-700">{titulo}</span>
-        <span className="text-lg font-bold text-slate-900">{valor}</span>
+        <span className="text-xs font-semibold">{titulo}</span>
+        <span className="text-2xl font-extrabold">{valor}</span>
       </div>
-      <span className="mt-1 text-[11px] text-slate-500">{subtitulo}</span>
+      <span className="mt-1 text-[11px]">{subtitulo}</span>
     </div>
   )
 }
 
-// 🔹 Fila de resumen QR / registros
 function ResumenFila({
   titulo,
   valor,
@@ -617,12 +638,12 @@ function ResumenFila({
   descripcion: string
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+    <div className="flex items-start justify-between gap-3 rounded-2xl bg-slate-950/70 border border-slate-800 px-4 py-3">
       <div className="flex-1">
-        <p className="text-xs font-semibold text-slate-800">{titulo}</p>
-        <p className="text-[11px] text-slate-500">{descripcion}</p>
+        <p className="text-xs font-semibold text-slate-50">{titulo}</p>
+        <p className="text-[11px] text-slate-300 mt-0.5">{descripcion}</p>
       </div>
-      <p className="text-xl font-bold text-slate-900 ml-2">{valor}</p>
+      <p className="text-2xl font-extrabold text-emerald-300 ml-2">{valor}</p>
     </div>
   )
 }
