@@ -625,7 +625,7 @@ export default function BienvenidaContenido() {
     },
     {
       id: "aerotermia",
-      label: "Aerotermia IMPULSO",
+      label: "Aerotermia y Geotermia IMPULSO",
       icon: "🌬️",
       bgClass:
         "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
