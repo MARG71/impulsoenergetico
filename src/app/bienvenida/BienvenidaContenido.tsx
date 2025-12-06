@@ -668,19 +668,6 @@ export default function BienvenidaContenido() {
       ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
       onClick: () => router.push(`/viajes${buildQuery()}`),
     },
-
-    // 👉 NUEVO BOTÓN PLADUR DICOPLAC
-    {
-      id: "pladur",
-      label: "Pladur DICOPLAC",
-      icon: "🏗️",
-      bgClass:
-        "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
-      ringClass:
-        "ring-zinc-300/70 group-hover:ring-zinc-100/90",
-      onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
-    },
-
     {
       id: "repuestos",
       label: "Repuestos RAPID",
@@ -698,6 +685,17 @@ export default function BienvenidaContenido() {
         "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
       ringClass: "ring-slate-300/70 group-hover:ring-slate-100/90",
       onClick: () => router.push(`/seguros${buildQuery()}`),
+    },
+
+    // ⭐ NUEVO BOTÓN PLADUR DICOPLAC
+    {
+      id: "pladur",
+      label: "Pladur DICOPLAC",
+      icon: "🏗️",
+      bgClass:
+        "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
+      ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
+      onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
     },
   ];
 
