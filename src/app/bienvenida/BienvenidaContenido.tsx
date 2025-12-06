@@ -585,6 +585,7 @@ export default function BienvenidaContenido() {
   };
 
   // 🔹 Config de secciones para los botones tipo tarjeta (neón)
+  // 🔹 Config de secciones para los botones tipo tarjeta (neón)
   const secciones = [
     {
       id: "luz",
@@ -667,6 +668,19 @@ export default function BienvenidaContenido() {
       ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
       onClick: () => router.push(`/viajes${buildQuery()}`),
     },
+
+    // 👉 NUEVO BOTÓN PLADUR DICOPLAC
+    {
+      id: "pladur",
+      label: "Pladur DICOPLAC",
+      icon: "🏗️",
+      bgClass:
+        "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
+      ringClass:
+        "ring-zinc-300/70 group-hover:ring-zinc-100/90",
+      onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
+    },
+
     {
       id: "repuestos",
       label: "Repuestos RAPID",
@@ -675,15 +689,6 @@ export default function BienvenidaContenido() {
         "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
       ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
       onClick: () => router.push(`/repuestos${buildQuery()}`),
-    },
-    {
-      id: "pladur",
-      label: "Pladur DICOPLAC",
-      icon: "🧱",
-      bgClass:
-        "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
-      ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
-      onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
     },
     {
       id: "seguros",
