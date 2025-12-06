@@ -794,7 +794,9 @@ export default function BienvenidaContenido() {
                     </span>{" "}
                     desde hoy.
                   </h1>
-
+                  <p className="mt-2 text-xs text-amber-300 font-bold">
+                    VERSIÓN CON PLADUR ACTIVADA
+                  </p>
                   {(agenteId || lugarId) && (
                     <p className="text-[11px] text-slate-400">
                       QR detectado ·{" "}
