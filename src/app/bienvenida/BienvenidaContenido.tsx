@@ -678,6 +678,7 @@ export default function BienvenidaContenido() {
     },
 
     // 👉 NUEVO BOTÓN PLADUR DICOPLAC
+    
     {
       id: "pladur",
       label: "Pladur DICOPLAC",
