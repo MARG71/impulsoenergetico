@@ -676,9 +676,6 @@ export default function BienvenidaContenido() {
       ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
       onClick: () => router.push(`/repuestos${buildQuery()}`),
     },
-
-    // 👉 NUEVO BOTÓN PLADUR DICOPLAC
-    
     {
       id: "pladur",
       label: "Pladur DICOPLAC",
@@ -688,7 +685,6 @@ export default function BienvenidaContenido() {
       ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
       onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
     },
-
     {
       id: "seguros",
       label: "Seguros IMPULSO",
