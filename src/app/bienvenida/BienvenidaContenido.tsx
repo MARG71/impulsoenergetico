@@ -190,6 +190,42 @@ const tipoPorSeccion: Record<string, TipoOferta | null> = {
   pladur: "PLADUR",
 };
 
+function descripcionPorSeccion(id: string): string {
+  switch (id) {
+    case "luz":
+      return "Tarifas de luz seleccionadas para bajar tu factura combinando indexadas, fijas y planes especiales Impulso.";
+    case "gas":
+      return "Condiciones negociadas para calefacción y agua caliente, buscando el mejor equilibrio entre precio y consumo.";
+    case "telefonia":
+      return "Fibra, móvil y combinados para pagar menos manteniendo cobertura, velocidad y servicio técnico.";
+    case "solar":
+      return "Instalaciones fotovoltaicas llave en mano para maximizar el autoconsumo y el retorno de la inversión.";
+    case "aerotermia":
+      return "Sistemas de aerotermia y geotermia de alta eficiencia para climatizar tu vivienda con menos consumo.";
+    case "hermes":
+      return "Batería HERMES-IA: almacenamiento inteligente para aprovechar mejor tu energía y ganar autonomía.";
+    case "ferreteria":
+      return "Herramienta, instalación y material profesional a precios competitivos a través de BRICOTITAN.";
+    case "inmobiliaria":
+      return "Compra, venta y alquiler con asesoramiento integral y condiciones especiales para clientes Impulso.";
+    case "viajes":
+      return "Viajes personalizados con ventajas y descuentos exclusivos a través de VIAJANDO CON MERY.";
+    case "repuestos":
+      return "Repuestos de coche de calidad, eligiendo entre recambio original, equivalente o superior según tu caso.";
+    case "seguros":
+      return "Seguros de hogar, auto, vida y negocio comparando varias compañías para ajustar coberturas y precio.";
+    case "gangas":
+      return "Chollos, liquidaciones y oportunidades puntuales con stock limitado y precios muy agresivos.";
+    case "hipotecas":
+      return "Hipotecas y financiación con bancos y entidades colaboradoras, buscando tipo y cuota que encajen contigo.";
+    case "pladur":
+      return "Soluciones en pladur y sistemas DICOPLAC para reformas rápidas, limpias y con buen aislamiento.";
+    default:
+      return "Ofertas especiales seleccionadas para este servicio. Filtra por destacadas o las más recientes del mes.";
+  }
+}
+
+
 /** Texto para el botón grande de cada sección en la parte de ofertas */
 const textoBotonSeccion = (seccionId: string, label: string) => {
   switch (seccionId) {
@@ -217,6 +253,21 @@ export default function BienvenidaContenido() {
   const [tarifasLuz, setTarifasLuz] = useState<TarifaResumen[]>([]);
   const [loadingTarifasLuz, setLoadingTarifasLuz] = useState(false);
   const [errorTarifasLuz, setErrorTarifasLuz] = useState<string | null>(null);
+
+  // Buscador específico para el catálogo de luz
+  const [busquedaTarifasLuz, setBusquedaTarifasLuz] = useState("");
+
+  const tarifasLuzFiltradas = useMemo(() => {
+    const txt = busquedaTarifasLuz.trim().toLowerCase();
+    if (!txt) return tarifasLuz;
+
+    return tarifasLuz.filter((t) => {
+      const cadena =
+        `${t.compania || ""} ${t.nombre || ""} ${t.subtipo || ""} ${t.tipo || ""}`.toLowerCase();
+      return cadena.includes(txt);
+    });
+  }, [busquedaTarifasLuz, tarifasLuz]);
+
 
   const [busqueda, setBusqueda] = useState("");
 
@@ -1195,16 +1246,41 @@ export default function BienvenidaContenido() {
 
                 <div className="flex gap-4 overflow-x-auto pb-2">
                   {ofertasDestacadas.map((oferta) => {
-                    const tipoNorm = normalizarTipoOferta(
-                      oferta.tipo as string
-                    );
+                    const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
                     const cfg = tipoConfig[tipoNorm];
+
+                    let cardGradient =
+                      "from-slate-700/40 via-slate-950 to-slate-950";
+                    let cardGlow = "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
+
+                    if (tipoNorm === "LUZ") {
+                      cardGradient =
+                        "from-emerald-500/30 via-emerald-900/30 to-slate-950";
+                      cardGlow = "shadow-[0_0_22px_rgba(16,185,129,0.75)]";
+                    } else if (tipoNorm === "GAS") {
+                      cardGradient =
+                        "from-orange-500/30 via-orange-900/30 to-slate-950";
+                      cardGlow = "shadow-[0_0_22px_rgba(249,115,22,0.75)]";
+                    } else if (tipoNorm === "TELEFONIA") {
+                      cardGradient =
+                        "from-sky-500/30 via-sky-900/30 to-slate-950";
+                      cardGlow = "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
+                    }
 
                     return (
                       <div
                         key={oferta.id}
-                        className={`min-w-[260px] max-w-xs rounded-2xl border ${cfg.border} bg-slate-900/85 p-4 shadow-lg shadow-slate-900/70 flex flex-col justify-between`}
+                        className={`
+                          relative overflow-hidden
+                          min-w-[260px] max-w-xs
+                          rounded-2xl border ${cfg.border}
+                          bg-gradient-to-br ${cardGradient}
+                          ${cardGlow}
+                          p-4 flex flex-col justify-between
+                        `}
                       >
+                        <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <span
@@ -1216,15 +1292,15 @@ export default function BienvenidaContenido() {
                               Destacada
                             </span>
                           </div>
-                          <h4 className="text-sm font-semibold text-slate-50">
+                          <h4 className="text-sm md:text-base font-semibold text-slate-50">
                             {oferta.titulo}
                           </h4>
-                          <p className="text-xs text-slate-200/85">
+                          <p className="text-xs md:text-sm text-slate-100/90">
                             {oferta.descripcionCorta}
                           </p>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-100">
                           <span>
                             {formFecha(oferta.creadaEn)
                               ? `Actualizada: ${formFecha(oferta.creadaEn)}`
@@ -1235,14 +1311,14 @@ export default function BienvenidaContenido() {
                               onClick={() =>
                                 irAComparadorConOferta(tipoNorm, oferta)
                               }
-                              className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
+                              className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                             >
                               Ver en comparador
                             </button>
                           ) : (
                             <button
                               onClick={() => setModalAbierto(true)}
-                              className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
+                              className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                             >
                               Desbloquear
                             </button>
@@ -1251,135 +1327,7 @@ export default function BienvenidaContenido() {
                       </div>
                     );
                   })}
-                </div>
-              </section>
-            )}
 
-            {/* TABLA TARIFAS LUZ */}
-            {!loadingTarifasLuz && !errorTarifasLuz && tarifasLuz.length > 0 && (
-              <section className="space-y-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 p-4 md:p-5">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
-                    💡 Tarifas de luz disponibles (catálogo)
-                    <span className="text-[11px] font-normal text-emerald-100/80">
-                      ({tarifasLuz.length} tarifa(s) activas)
-                    </span>
-                  </h3>
-
-                  <button
-                    onClick={() => irAComparador("LUZ")}
-                    className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                  >
-                    Ir al comparador de luz
-                  </button>
-                </div>
-
-                <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
-                  <div className="max-h-[420px] overflow-y-auto">
-                    <table className="w-full table-fixed text-[11px] md:text-xs">
-                      <thead>
-                        <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
-                          <th className="px-3 py-2 text-left">Compañía</th>
-                          <th className="px-3 py-2 text-left">Tarifa</th>
-                          <th className="px-3 py-2 text-left">Anexo</th>
-                          <th className="px-2 py-2 text-center">P.P.1</th>
-                          <th className="px-2 py-2 text-center">P.P.2</th>
-                          <th className="px-2 py-2 text-center">P.P.3</th>
-                          <th className="px-2 py-2 text-center">P.P.4</th>
-                          <th className="px-2 py-2 text-center">P.P.5</th>
-                          <th className="px-2 py-2 text-center">P.P.6</th>
-                          <th className="px-2 py-2 text-center">P.E.1</th>
-                          <th className="px-2 py-2 text-center">P.E.2</th>
-                          <th className="px-2 py-2 text-center">P.E.3</th>
-                          <th className="px-2 py-2 text-center">P.E.4</th>
-                          <th className="px-2 py-2 text-center">P.E.5</th>
-                          <th className="px-2 py-2 text-center">P.E.6</th>
-                          <th className="px-3 py-2 text-right">Acción</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {tarifasLuz.map((t, index) => (
-                          <tr
-                            key={t.id}
-                            className={`${
-                              index % 2 === 0
-                                ? "bg-slate-950"
-                                : "bg-slate-900/95"
-                            } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
-                          >
-                            <td className="px-3 py-2 font-semibold text-emerald-50 whitespace-nowrap overflow-hidden text-ellipsis">
-                              {t.compania}
-                            </td>
-                            <td className="px-3 py-2 font-semibold text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis">
-                              {t.nombre}
-                            </td>
-                            <td className="px-3 py-2 font-semibold text-emerald-100/85 whitespace-nowrap overflow-hidden text-ellipsis">
-                              {t.subtipo || "-"}
-                            </td>
-
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.potenciaP2 != null ? t.potenciaP2.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.potenciaP3 != null ? t.potenciaP3.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.potenciaP4 != null ? t.potenciaP4.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.potenciaP5 != null ? t.potenciaP5.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
-                            </td>
-
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.energiaP2 != null ? t.energiaP2.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.energiaP3 != null ? t.energiaP3.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.energiaP4 != null ? t.energiaP4.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.energiaP5 != null ? t.energiaP5.toFixed(5) : "-"}
-                            </td>
-                            <td className="px-2 py-2 text-right font-semibold">
-                              {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
-                            </td>
-
-                            <td className="px-3 py-2 text-right">
-                              <button
-                                onClick={() => irAComparador("LUZ")}
-                                className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                              >
-                                Calcular ahorro
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-
-                        {tarifasLuz.length === 0 && (
-                          <tr>
-                            <td
-                              colSpan={16}
-                              className="px-3 py-4 text-center text-[11px] text-slate-400"
-                            >
-                              No hay tarifas de luz disponibles.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               </section>
             )}
@@ -1519,8 +1467,7 @@ export default function BienvenidaContenido() {
                             {sec.label}
                           </h3>
                           <p className="text-[11px] md:text-xs text-slate-200/80">
-                            Ofertas especiales seleccionadas para este servicio. Filtra por
-                            destacadas o las más recientes del mes.
+                            {descripcionPorSeccion(sec.id)}
                           </p>
                         </div>
 
@@ -1569,12 +1516,215 @@ export default function BienvenidaContenido() {
                         </div>
                       </div>
 
-                      {/* Contenido: mensaje o carrusel */}
-                      {sinOfertas ? (
+                      {/* Contenido: mensaje / catálogo / carrusel */}
+
+                      {/* 1) Mensaje cuando no hay ofertas */}
+                      {sinOfertas && (
                         <p className="text-[12px] text-slate-200/85">
                           En cuanto haya una oferta interesante para {sec.label}, la verás aquí.
                         </p>
-                      ) : (
+                      )}
+
+                      {/* 2) Catálogo de luz unificado dentro de Luz IMPULSO */}
+                      {sec.id === "luz" && (
+                        <div className="mt-5 space-y-3 rounded-2xl bg-slate-950/90 border border-emerald-800/80 p-4 md:p-5">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <h4 className="text-sm md:text-base font-semibold flex items-center gap-2">
+                              💡 Tarifas de luz disponibles (catálogo)
+                              <span className="text-[11px] font-normal text-emerald-100/80">
+                                ({tarifasLuzFiltradas.length} tarifa(s) activas)
+                              </span>
+                            </h4>
+
+                            <button
+                              onClick={() => irAComparador("LUZ")}
+                              className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                            >
+                              Ir al comparador de luz
+                            </button>
+                          </div>
+
+                          {/* Buscador catálogo luz */}
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <input
+                              value={busquedaTarifasLuz}
+                              onChange={(e) =>
+                                setBusquedaTarifasLuz(e.target.value)
+                              }
+                              placeholder="Buscar por compañía, tarifa, anexo, tipo..."
+                              className="w-full md:max-w-sm rounded-full bg-slate-900/80 border border-emerald-500/70 px-4 py-2 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                            />
+                            <p className="text-[11px] text-slate-300/80">
+                              {loadingTarifasLuz
+                                ? "Cargando catálogo de luz…"
+                                : errorTarifasLuz
+                                ? `Error al cargar: ${errorTarifasLuz}`
+                                : tarifasLuzFiltradas.length === 0
+                                ? "No hay tarifas que coincidan con tu búsqueda."
+                                : `${tarifasLuzFiltradas.length} tarifa(s) coinciden con tu búsqueda.`}
+                            </p>
+                          </div>
+
+                          {!loadingTarifasLuz &&
+                            !errorTarifasLuz &&
+                            tarifasLuzFiltradas.length > 0 && (
+                              <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
+                                <div className="max-h-[420px] overflow-y-auto">
+                                  <table className="w-full table-fixed text-[11px] md:text-xs">
+                                    <thead>
+                                      <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
+                                        <th className="px-3 py-2 text-left">
+                                          Compañía
+                                        </th>
+                                        <th className="px-3 py-2 text-left">
+                                          Tarifa
+                                        </th>
+                                        <th className="px-3 py-2 text-left">
+                                          Anexo
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.P.1
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.P.2
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.P.3
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.P.4
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.P.5
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.P.6
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.E.1
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.E.2
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.E.3
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.E.4
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.E.5
+                                        </th>
+                                        <th className="px-2 py-2 text-center">
+                                          P.E.6
+                                        </th>
+                                        <th className="px-3 py-2 text-right">
+                                          Acción
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {tarifasLuzFiltradas.map((t, index) => (
+                                        <tr
+                                          key={t.id}
+                                          className={`${
+                                            index % 2 === 0
+                                              ? "bg-slate-950"
+                                              : "bg-slate-900/95"
+                                          } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
+                                        >
+                                          <td className="px-3 py-2 font-semibold text-emerald-50 whitespace-nowrap overflow-hidden text-ellipsis">
+                                            {t.compania}
+                                          </td>
+                                          <td className="px-3 py-2 font-semibold text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis">
+                                            {t.nombre}
+                                          </td>
+                                          <td className="px-3 py-2 font-semibold text-emerald-100/85 whitespace-nowrap overflow-hidden text-ellipsis">
+                                            {t.subtipo || "-"}
+                                          </td>
+
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.potenciaP1 != null
+                                              ? t.potenciaP1.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.potenciaP2 != null
+                                              ? t.potenciaP2.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.potenciaP3 != null
+                                              ? t.potenciaP3.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.potenciaP4 != null
+                                              ? t.potenciaP4.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.potenciaP5 != null
+                                              ? t.potenciaP5.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.potenciaP6 != null
+                                              ? t.potenciaP6.toFixed(5)
+                                              : "-"}
+                                          </td>
+
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.energiaP1 != null
+                                              ? t.energiaP1.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.energiaP2 != null
+                                              ? t.energiaP2.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.energiaP3 != null
+                                              ? t.energiaP3.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.energiaP4 != null
+                                              ? t.energiaP4.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.energiaP5 != null
+                                              ? t.energiaP5.toFixed(5)
+                                              : "-"}
+                                          </td>
+                                          <td className="px-2 py-2 text-right font-semibold">
+                                            {t.energiaP6 != null
+                                              ? t.energiaP6.toFixed(5)
+                                              : "-"}
+                                          </td>
+
+                                          <td className="px-3 py-2 text-right">
+                                            <button
+                                              onClick={() => irAComparador("LUZ")}
+                                              className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
+                                            >
+                                              Calcular ahorro
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                        </div>
+                      )}
+
+                      {/* 3) Carrusel de ofertas (solo si hay ofertas) */}
+                      {!sinOfertas && (
                         <div className="relative mt-2 pb-3">
                           {/* FLECHA IZQUIERDA */}
                           <button
@@ -1691,6 +1841,7 @@ export default function BienvenidaContenido() {
                 })}
               </section>
             )}
+
 
 
             <footer className="pt-4 border-top border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
