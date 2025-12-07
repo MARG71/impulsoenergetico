@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { ModalDatosCliente } from "./ModalDatosCliente";
+
 
 type TipoOferta =
   | "LUZ"
@@ -25,11 +27,12 @@ interface Oferta {
   titulo: string;
   descripcionCorta: string;
   descripcionLarga: string;
-  tipo: TipoOferta | string;
+  tipo: TipoOferta;          // 👈 ya NO `| string`
   destacada: boolean;
   activa: boolean;
   creadaEn?: string | null;
 }
+
 
 interface TarifaResumen {
   id: number;
@@ -1087,10 +1090,11 @@ export default function BienvenidaContenido() {
   };
 
   const manejarClickSugerencia = (oferta: Oferta) => {
-    const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
+    const tipoNorm = oferta.tipo;  // ya es TipoOferta
     irAComparadorConOferta(tipoNorm, oferta);
     setBusqueda("");
   };
+
 
   const manejarGuardarDatos = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1345,9 +1349,10 @@ export default function BienvenidaContenido() {
     const tipo = tipoPorSeccion[seccionId];
     if (!tipo) return [];
     return ofertasFiltradas.filter(
-      (o) => o.activa && normalizarTipoOferta(o.tipo as string) === tipo
+      (o) => o.activa && o.tipo === tipo   // antes normalizarTipoOferta(...)
     );
   };
+
 
 return (
   <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
@@ -1550,9 +1555,8 @@ return (
                 {sugerencias.length > 0 && (
                   <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
                     {sugerencias.map((oferta) => {
-                      const tipoNorm = normalizarTipoOferta(
-                        oferta.tipo as string
-                      );
+                      const tipoNorm = oferta.tipo;
+                      
                       const cfg = tipoConfig[tipoNorm];
 
                       return (
@@ -1653,7 +1657,7 @@ return (
 
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {ofertasDestacadas.map((oferta) => {
-                  const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
+                  const tipoNorm = oferta.tipo;  // ya es TipoOferta
                   const cfg = tipoConfig[tipoNorm];
 
                   let cardGradient =
@@ -1750,6 +1754,7 @@ return (
                 let ofertasSeccion = obtenerOfertasDeSeccion(sec.id);
                 const tipoSec = tipoPorSeccion[sec.id];
 
+                
                 const totalSeccion = ofertasSeccion.length;
 
                 // Filtro actual de esa sección
@@ -2369,100 +2374,22 @@ return (
       </div>
     </div>
 
-    {/* MODAL DATOS */}
-    {modalAbierto && (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-3">
-        <div className="w-full max-w-lg rounded-2xl bg-slate-950 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-5 md:p-6 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg md:text-xl font-bold text-slate-50">
-                Actualiza tus datos
-              </h2>
-              <p className="text-xs md:text-sm text-slate-300 mt-1">
-                Revisa tu nombre, email y teléfono para poder enviarte
-                ofertas y seguimiento de tus comparativas.
-              </p>
-            </div>
-            <button
-              onClick={() => setModalAbierto(false)}
-              className="text-slate-400 hover:text-slate-100 text-lg"
-              aria-label="Cerrar"
-            >
-              ✕
-            </button>
-          </div>
+    <ModalDatosCliente
+    abierto={modalAbierto}
+    onClose={() => setModalAbierto(false)}
+    onSubmit={manejarGuardarDatos}
+    formNombre={formNombre}
+    formEmail={formEmail}
+    formTelefono={formTelefono}
+    setFormNombre={setFormNombre}
+    setFormEmail={setFormEmail}
+    setFormTelefono={setFormTelefono}
+    guardando={guardando}
+    mensajeGuardarError={mensajeGuardarError}
+    mensajeGuardarOK={mensajeGuardarOK}
+  />
 
-          <form onSubmit={manejarGuardarDatos} className="space-y-4">
-            <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-200">
-                Nombre completo
-              </label>
-              <input
-                type="text"
-                value={formNombre}
-                onChange={(e) => setFormNombre(e.target.value)}
-                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-                required
-              />
-            </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-200">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formEmail}
-                onChange={(e) => setFormEmail(e.target.value)}
-                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-200">
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                value={formTelefono}
-                onChange={(e) => setFormTelefono(e.target.value)}
-                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-                required
-              />
-            </div>
-
-            {mensajeGuardarError && (
-              <p className="text-xs text-red-300">
-                {mensajeGuardarError}
-              </p>
-            )}
-            {mensajeGuardarOK && (
-              <p className="text-xs text-emerald-300">
-                {mensajeGuardarOK}
-              </p>
-            )}
-
-            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModalAbierto(false)}
-                className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
-              >
-                Salir sin guardar
-              </button>
-              <button
-                type="submit"
-                disabled={guardando}
-                className="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-xs md:text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {guardando ? "Guardando..." : "Guardar cambios"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )}
   </div>
 );
 }
