@@ -5,24 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ModalDatosCliente } from "./ModalDatosCliente";
 import { HeroBienvenida } from "./HeroBienvenida";
+import { getCardStylePorTipo } from "./helpers/getCardStylePorTipo";
+import { getVisualConfigPorTipo } from "./helpers/tipoVisualConfig";
 
 
+import { TipoOferta } from "./types";
 
-type TipoOferta =
-  | "LUZ"
-  | "GAS"
-  | "TELEFONIA"
-  | "SOLAR"
-  | "AEROTERMIA"
-  | "BATERIA"
-  | "FERRETERIA"
-  | "INMOBILIARIA"
-  | "VIAJES"
-  | "REPUESTOS"
-  | "SEGUROS"
-  | "GANGAS"
-  | "HIPOTECAS"
-  | "PLADUR";
 
 interface Oferta {
   id: string;
@@ -63,95 +51,7 @@ interface TarifaResumen {
 }
 
 /** Config visual por tipo de oferta (para pills y botones) */
-const tipoConfig: Record<
-  TipoOferta,
-  { label: string; bgPill: string; btn: string; border: string }
-> = {
-  LUZ: {
-    label: "Luz",
-    bgPill: "bg-emerald-100 text-emerald-800",
-    btn: "bg-emerald-600 hover:bg-emerald-500",
-    border: "border-emerald-200",
-  },
-  GAS: {
-    label: "Gas",
-    bgPill: "bg-orange-100 text-orange-800",
-    btn: "bg-orange-500 hover:bg-orange-400",
-    border: "border-orange-200",
-  },
-  TELEFONIA: {
-    label: "Telefonía",
-    bgPill: "bg-sky-100 text-sky-800",
-    btn: "bg-sky-600 hover:bg-sky-500",
-    border: "border-sky-200",
-  },
-  SOLAR: {
-    label: "Solar",
-    bgPill: "bg-amber-100 text-amber-800",
-    btn: "bg-amber-500 hover:bg-amber-400",
-    border: "border-amber-200",
-  },
-  AEROTERMIA: {
-    label: "Aerotermia / Geotermia",
-    bgPill: "bg-cyan-100 text-cyan-800",
-    btn: "bg-cyan-500 hover:bg-cyan-400",
-    border: "border-cyan-200",
-  },
-  BATERIA: {
-    label: "Batería IA",
-    bgPill: "bg-purple-100 text-purple-800",
-    btn: "bg-purple-600 hover:bg-purple-500",
-    border: "border-purple-200",
-  },
-  FERRETERIA: {
-    label: "Ferretería",
-    bgPill: "bg-lime-100 text-lime-800",
-    btn: "bg-lime-600 hover:bg-lime-500",
-    border: "border-lime-200",
-  },
-  INMOBILIARIA: {
-    label: "Inmobiliaria",
-    bgPill: "bg-rose-100 text-rose-800",
-    btn: "bg-rose-500 hover:bg-rose-400",
-    border: "border-rose-200",
-  },
-  VIAJES: {
-    label: "Viajes",
-    bgPill: "bg-indigo-100 text-indigo-800",
-    btn: "bg-indigo-500 hover:bg-indigo-400",
-    border: "border-indigo-200",
-  },
-  REPUESTOS: {
-    label: "Repuestos",
-    bgPill: "bg-orange-100 text-orange-800",
-    btn: "bg-orange-500 hover:bg-orange-400",
-    border: "border-orange-200",
-  },
-  SEGUROS: {
-    label: "Seguros",
-    bgPill: "bg-slate-200 text-slate-800",
-    btn: "bg-slate-500 hover:bg-slate-400",
-    border: "border-slate-300",
-  },
-  GANGAS: {
-    label: "La Tienda de las Gangas",
-    bgPill: "bg-pink-100 text-pink-800",
-    btn: "bg-pink-500 hover:bg-pink-400",
-    border: "border-pink-200",
-  },
-  HIPOTECAS: {
-    label: "Hipotecas y financiación",
-    bgPill: "bg-emerald-100 text-emerald-800",
-    btn: "bg-emerald-600 hover:bg-emerald-500",
-    border: "border-emerald-200",
-  },
-  PLADUR: {
-    label: "Pladur DICOPLAC",
-    bgPill: "bg-zinc-100 text-zinc-800",
-    btn: "bg-zinc-500 hover:bg-zinc-400",
-    border: "border-zinc-200",
-  },
-};
+
 
 /** Normaliza el tipo que viene de BD al enum que usamos aquí */
 function normalizarTipoOferta(raw: string | undefined | null): TipoOferta {
@@ -1399,9 +1299,12 @@ return (
                 {sugerencias.length > 0 && (
                   <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
                     {sugerencias.map((oferta) => {
-                      const tipoNorm = oferta.tipo;
-                      
-                      const cfg = tipoConfig[tipoNorm];
+                      const tipoNorm = oferta.tipo; // ya es TipoOferta
+                      const cfg = getVisualConfigPorTipo(tipoNorm);
+
+                      const pillClass =
+                        cfg?.bgPill ??
+                        "bg-slate-800 text-slate-100 border border-slate-600";
 
                       return (
                         <button
@@ -1411,17 +1314,16 @@ return (
                           className="w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-slate-900/90 text-xs md:text-sm border-b border-slate-800 last:border-b-0"
                         >
                           <span
-                            className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                            className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${pillClass}`}
                           >
-                            {cfg.label}
+                            {cfg?.label ?? tipoNorm}
                           </span>
                           <span className="flex-1">
                             <span className="block font-semibold text-slate-50">
                               {oferta.titulo}
                             </span>
                             <span className="block text-[11px] text-slate-300 line-clamp-1">
-                              {oferta.descripcionCorta ||
-                                oferta.descripcionLarga}
+                              {oferta.descripcionCorta || oferta.descripcionLarga}
                             </span>
                           </span>
                         </button>
@@ -1429,6 +1331,7 @@ return (
                     })}
                   </div>
                 )}
+
               </div>
             </div>
             <p className="text-[11px] text-slate-300/80">
@@ -1501,8 +1404,8 @@ return (
 
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {ofertasDestacadas.map((oferta) => {
-                  const tipoNorm = oferta.tipo;  // ya es TipoOferta
-                  const cfg = tipoConfig[tipoNorm];
+                  const tipoNorm = oferta.tipo; // TipoOferta
+                  const cfg = getVisualConfigPorTipo(tipoNorm);
 
                   let cardGradient =
                     "from-slate-700/40 via-slate-950 to-slate-950";
@@ -1526,26 +1429,31 @@ return (
                       "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
                   }
 
+                  const borderClass = cfg?.border ?? "border-slate-700";
+                  const pillClass =
+                    cfg?.bgPill ??
+                    "bg-slate-800 text-slate-100 border border-slate-600";
+
                   return (
                     <div
                       key={oferta.id}
                       className={`
-                          relative overflow-hidden
-                          min-w-[260px] max-w-xs
-                          rounded-2xl border ${cfg.border}
-                          bg-gradient-to-br ${cardGradient}
-                          ${cardGlow}
-                          p-4 flex flex-col justify-between
-                        `}
+                        relative overflow-hidden
+                        min-w-[260px] max-w-xs
+                        rounded-2xl border ${borderClass}
+                        bg-gradient-to-br ${cardGradient}
+                        ${cardGlow}
+                        p-4 flex flex-col justify-between
+                      `}
                     >
                       <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
                           >
-                            {cfg.label}
+                            {cfg?.label ?? tipoNorm}
                           </span>
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/15 text-yellow-300 border border-yellow-400/30">
                             Destacada
@@ -1586,6 +1494,8 @@ return (
                     </div>
                   );
                 })}
+
+
               </div>
             </section>
           )}
@@ -1633,94 +1543,18 @@ return (
                   bgSection =
                     "bg-emerald-950/40 border-emerald-800/70";
 
-                const cfg =
-                  tipoSec != null ? tipoConfig[tipoSec] : undefined;
+                const cfg = getVisualConfigPorTipo(tipoSec);
                 const pillClass =
                   cfg?.bgPill ||
                   "bg-slate-800 text-slate-100 border border-slate-600";
                 const btnClass =
-                  cfg?.btn ||
-                  "bg-emerald-500 hover:bg-emerald-400";
+                  cfg?.btn || "bg-emerald-500 hover:bg-emerald-400";
+
 
                 // 🎇 Fondo y glow neon por tipo para cada TARJETA
-                let cardGradient =
-                  "from-slate-700/40 via-slate-950 to-slate-950";
-                let cardGlow =
-                  "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
+                const { gradient: cardGradient, glow: cardGlow } = getCardStylePorTipo(tipoSec);
 
                 const metricas = metricasPorSeccion[sec.id] ?? [];
-
-                if (tipoSec === "LUZ") {
-                  cardGradient =
-                    "from-emerald-500/30 via-emerald-900/30 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(16,185,129,0.85)]";
-                } else if (tipoSec === "GAS") {
-                  cardGradient =
-                    "from-orange-500/30 via-orange-900/30 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(249,115,22,0.85)]";
-                } else if (tipoSec === "TELEFONIA") {
-                  cardGradient =
-                    "from-sky-500/30 via-sky-900/30 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(56,189,248,0.85)]";
-                } else if (tipoSec === "SEGUROS") {
-                  cardGradient =
-                    "from-slate-400/35 via-slate-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_24px_rgba(148,163,184,0.9)]";
-                } else if (tipoSec === "GANGAS") {
-                  cardGradient =
-                    "from-pink-500/35 via-rose-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(244,114,182,0.9)]";
-                } else if (tipoSec === "HIPOTECAS") {
-                  cardGradient =
-                    "from-emerald-500/30 via-emerald-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(16,185,129,0.9)]";
-                } else if (tipoSec === "REPUESTOS") {
-                  cardGradient =
-                    "from-orange-400/35 via-amber-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(251,146,60,0.9)]";
-                } else if (tipoSec === "PLADUR") {
-                  cardGradient =
-                    "from-zinc-400/35 via-zinc-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_24px_rgba(161,161,170,0.9)]";
-                } else if (tipoSec === "FERRETERIA") {
-                  cardGradient =
-                    "from-lime-400/35 via-lime-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(132,204,22,0.9)]";
-                } else if (tipoSec === "INMOBILIARIA") {
-                  cardGradient =
-                    "from-rose-500/35 via-rose-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(244,63,94,0.9)]";
-                } else if (tipoSec === "VIAJES") {
-                  cardGradient =
-                    "from-indigo-500/35 via-indigo-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(129,140,248,0.9)]";
-                } else if (tipoSec === "SOLAR") {
-                  cardGradient =
-                    "from-amber-400/35 via-amber-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(251,191,36,0.9)]";
-                } else if (tipoSec === "AEROTERMIA") {
-                  cardGradient =
-                    "from-cyan-400/35 via-cyan-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(34,211,238,0.9)]";
-                } else if (tipoSec === "BATERIA") {
-                  cardGradient =
-                    "from-purple-500/35 via-purple-900/40 to-slate-950";
-                  cardGlow =
-                    "shadow-[0_0_26px_rgba(168,85,247,0.9)]";
-                }
 
                 return (
                   <div

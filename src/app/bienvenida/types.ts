@@ -1,0 +1,15 @@
+export type TipoOferta =
+  | "LUZ"
+  | "GAS"
+  | "TELEFONIA"
+  | "SEGUROS"
+  | "GANGAS"
+  | "HIPOTECAS"
+  | "REPUESTOS"
+  | "PLADUR"
+  | "FERRETERIA"
+  | "INMOBILIARIA"
+  | "VIAJES"
+  | "SOLAR"
+  | "AEROTERMIA"
+  | "BATERIA";
