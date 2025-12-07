@@ -190,40 +190,29 @@ const tipoPorSeccion: Record<string, TipoOferta | null> = {
   pladur: "PLADUR",
 };
 
-function descripcionPorSeccion(id: string): string {
-  switch (id) {
-    case "luz":
-      return "Tarifas de luz seleccionadas para bajar tu factura combinando indexadas, fijas y planes especiales Impulso.";
-    case "gas":
-      return "Condiciones negociadas para calefacción y agua caliente, buscando el mejor equilibrio entre precio y consumo.";
-    case "telefonia":
-      return "Fibra, móvil y combinados para pagar menos manteniendo cobertura, velocidad y servicio técnico.";
-    case "solar":
-      return "Instalaciones fotovoltaicas llave en mano para maximizar el autoconsumo y el retorno de la inversión.";
-    case "aerotermia":
-      return "Sistemas de aerotermia y geotermia de alta eficiencia para climatizar tu vivienda con menos consumo.";
-    case "hermes":
-      return "Batería HERMES-IA: almacenamiento inteligente para aprovechar mejor tu energía y ganar autonomía.";
-    case "ferreteria":
-      return "Herramienta, instalación y material profesional a precios competitivos a través de BRICOTITAN.";
-    case "inmobiliaria":
-      return "Compra, venta y alquiler con asesoramiento integral y condiciones especiales para clientes Impulso.";
-    case "viajes":
-      return "Viajes personalizados con ventajas y descuentos exclusivos a través de VIAJANDO CON MERY.";
-    case "repuestos":
-      return "Repuestos de coche de calidad, eligiendo entre recambio original, equivalente o superior según tu caso.";
-    case "seguros":
-      return "Seguros de hogar, auto, vida y negocio comparando varias compañías para ajustar coberturas y precio.";
-    case "gangas":
-      return "Chollos, liquidaciones y oportunidades puntuales con stock limitado y precios muy agresivos.";
-    case "hipotecas":
-      return "Hipotecas y financiación con bancos y entidades colaboradoras, buscando tipo y cuota que encajen contigo.";
-    case "pladur":
-      return "Soluciones en pladur y sistemas DICOPLAC para reformas rápidas, limpias y con buen aislamiento.";
-    default:
-      return "Ofertas especiales seleccionadas para este servicio. Filtra por destacadas o las más recientes del mes.";
-  }
-}
+// 🔥 Mensajes afinados por sección
+const DESCRIPCIONES_SECCION: Record<string, string> = {
+  luz: "Ahorra cada mes en tu factura con las tarifas más competitivas del mercado. Estudio personalizado incluido.",
+  gas: "Optimiza tu suministro con precios ajustados y estabilidad a largo plazo. Comparación inmediata.",
+  telefonia: "Fibra, móvil y TV con las mejores compañías. Packs especiales y promociones activas.",
+  solar: "Instalación de paneles solares con retorno asegurado. Ahorro real desde el primer mes.",
+  aerotermia: "Reduce hasta un 70% tu gasto en calefacción y ACS con sistemas de alta eficiencia.",
+  hermes: "Batería HERMES-IA: autonomía, ahorro y gestión inteligente del consumo energético.",
+  ferreteria: "Miles de productos BRICOTITAN al mejor precio. Calidad profesional garantizada.",
+  inmobiliaria: "Compra, vende o alquila con asesoramiento experto y análisis de mercado.",
+  viajes: "Viajes únicos con VIAJANDO CON MERY. Experiencias seleccionadas y precios finales claros.",
+  repuestos: "Repuestos de coche rápidos y económicos. Marcas oficiales y alternativas.",
+  seguros: "Protección total en hogar, coche, salud, comercio y más. Comparativa entre varias compañías.",
+  gangas: "Ofertas explosivas, últimas unidades y descuentos reales. ¡Corre antes de que vuelen!",
+  hipotecas: "Mejora tu cuota, reunifica deudas o consigue la mejor hipoteca del mercado.",
+  pladur: "Soluciones en pladur DICOPLAC: obra nueva, reformas y montajes profesionales.",
+};
+
+// Función helper tipada (esta es la que usaremos en el JSX)
+const descripcionPorSeccion = (id: string): string =>
+  DESCRIPCIONES_SECCION[id] ??
+  "Ofertas especiales seleccionadas para este servicio.";
+
 
 // 📊 Mini-resumen numérico por sección (chips)
 const resumenNumericoPorSeccion: Record<
@@ -1598,8 +1587,9 @@ export default function BienvenidaContenido() {
                           <div className="mt-1 inline-flex max-w-3xl rounded-2xl bg-slate-900/80 border border-slate-600/80 px-3 py-2 shadow-[0_0_22px_rgba(15,23,42,0.95)]">
                             <p className="text-sm md:text-base font-semibold text-slate-100 leading-snug">
                               <span className="bg-gradient-to-r from-emerald-300 via-emerald-100 to-slate-100 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(16,185,129,0.55)]">
-                                {descripcionPorSeccion[sec.id]}
+                                {descripcionPorSeccion(sec.id)}
                               </span>
+
                             </p>
                           </div>
 
