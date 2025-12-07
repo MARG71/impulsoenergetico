@@ -824,8 +824,37 @@ export default function BienvenidaContenido() {
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
   
+  // Filtro activo por sección del carrusel: "todas" | "destacadas" | "recientes"
+  const [filtrosSeccion, setFiltrosSeccion] =
+    useState<Record<string, "todas" | "destacadas" | "recientes">>({});
+  
+  
   // Refs para cada carrusel por sección
   const carruselRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Desplazamiento manual con flechas
+  const scrollSeccion = (id: string, direccion: "left" | "right") => {
+    const cont = carruselRefs.current[id];
+    if (!cont) return;
+
+    const cardWidth = 280; // mismo ancho que el auto-scroll
+    const maxScroll = cont.scrollWidth - cont.clientWidth;
+
+    if (direccion === "right") {
+      const next = cont.scrollLeft + cardWidth;
+      cont.scrollTo({
+        left: next >= maxScroll ? maxScroll : next,
+        behavior: "smooth",
+      });
+    } else {
+      const prev = cont.scrollLeft - cardWidth;
+      cont.scrollTo({
+        left: prev <= 0 ? 0 : prev,
+        behavior: "smooth",
+      });
+    }
+  };
+
 
   // Auto-scroll suave cada 6 segundos en todos los carruseles
   useEffect(() => {
@@ -1359,8 +1388,29 @@ export default function BienvenidaContenido() {
             {!loading && !error && (
               <section className="space-y-6">
                 {secciones.map((sec) => {
-                  const ofertasSeccion = obtenerOfertasDeSeccion(sec.id);
+                  // Todas las ofertas activas de la sección
+                  let ofertasSeccion = obtenerOfertasDeSeccion(sec.id);
                   const tipoSec = tipoPorSeccion[sec.id];
+
+                  const totalSeccion = ofertasSeccion.length;
+
+                  // Filtro actual de esa sección
+                  const filtroActual = filtrosSeccion[sec.id] ?? "todas";
+
+                  // Filtrado según "todas" | "destacadas" | "recientes"
+                  if (filtroActual === "destacadas") {
+                    ofertasSeccion = ofertasSeccion.filter((o) => o.destacada);
+                  } else if (filtroActual === "recientes") {
+                    const ahora = new Date();
+                    const hace30 = new Date();
+                    hace30.setDate(ahora.getDate() - 30);
+                    ofertasSeccion = ofertasSeccion.filter((o) => {
+                      if (!o.creadaEn) return false;
+                      const f = new Date(o.creadaEn);
+                      return f >= hace30;
+                    });
+                  }
+
                   const sinOfertas = ofertasSeccion.length === 0;
 
                   // 🎨 Colores de fondo para la banda de la sección
@@ -1448,9 +1498,9 @@ export default function BienvenidaContenido() {
                       className={`rounded-2xl border p-5 ${bgSection}`}
                     >
                       {/* Cabecera de la sección */}
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                        <div>
-                          <div className="flex items-center gap-2 text-xs text-slate-200/85 mb-1">
+                      <div className="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs text-slate-200/85">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/60 border border-slate-600/80">
                               <span className="text-base">{sec.icon}</span>
                               <span className="font-semibold uppercase tracking-wide">
@@ -1458,22 +1508,65 @@ export default function BienvenidaContenido() {
                               </span>
                             </span>
                             <span className="text-[11px] opacity-80">
-                              {sinOfertas
-                                ? "Sin ofertas activas por ahora"
-                                : `${ofertasSeccion.length} oferta(s) activa(s)`}
+                              {totalSeccion === 0
+                                ? "Sin ofertas para esta sección"
+                                : `${totalSeccion} oferta(s) totales · Mostrando ${
+                                    ofertasSeccion.length
+                                  } (${filtroActual})`}
                             </span>
                           </div>
                           <h3 className="text-lg md:text-xl font-semibold">
                             {sec.label}
                           </h3>
+                          <p className="text-[11px] md:text-xs text-slate-200/80">
+                            Ofertas especiales seleccionadas para este servicio. Filtra por
+                            destacadas o las más recientes del mes.
+                          </p>
                         </div>
 
-                        <button
-                          onClick={sec.onClick}
-                          className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/60`}
-                        >
-                          {textoBotonSeccion(sec.id, sec.label)}
-                        </button>
+                        {/* CTA + filtros */}
+                        <div className="flex flex-col items-stretch gap-2 md:items-end">
+                          {/* Filtros */}
+                          <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/70 border border-slate-700 px-1 py-1">
+                            {[
+                              { id: "todas", label: "Todas" },
+                              { id: "destacadas", label: "Destacadas" },
+                              { id: "recientes", label: "Recientes" },
+                            ].map((f) => {
+                              const activo = filtroActual === f.id;
+                              return (
+                                <button
+                                  key={f.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setFiltrosSeccion((prev) => ({
+                                      ...prev,
+                                      [sec.id]: f.id as
+                                        | "todas"
+                                        | "destacadas"
+                                        | "recientes",
+                                    }))
+                                  }
+                                  className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
+                                    activo
+                                      ? "bg-emerald-500 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
+                                      : "text-slate-200 hover:bg-slate-800/80"
+                                  }`}
+                                >
+                                  {f.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* CTA grande */}
+                          <button
+                            onClick={sec.onClick}
+                            className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/60`}
+                          >
+                            {textoBotonSeccion(sec.id, sec.label)}
+                          </button>
+                        </div>
                       </div>
 
                       {/* Contenido: mensaje o carrusel */}
@@ -1482,83 +1575,114 @@ export default function BienvenidaContenido() {
                           En cuanto haya una oferta interesante para {sec.label}, la verás aquí.
                         </p>
                       ) : (
-                        <div
-                          className="mt-2 -mx-2 overflow-x-auto pb-3"
-                          ref={(el) => {
-                            carruselRefs.current[sec.id] = el;
-                          }}
-                        >
-                          <div className="flex gap-4 px-2 min-w-full">
-                            {ofertasSeccion.map((oferta) => (
-                              <div
-                                key={oferta.id}
-                                className={`
-                                  relative overflow-hidden
-                                  min-w-[280px] max-w-xs
-                                  rounded-2xl border ${cfg?.border ?? "border-slate-700"}
-                                  bg-gradient-to-br ${cardGradient}
-                                  ${cardGlow}
-                                  px-4 py-3
-                                  flex flex-col justify-between
-                                `}
-                              >
-                                {/* brillo interior */}
-                                <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+                        <div className="relative mt-2 pb-3">
+                          {/* FLECHA IZQUIERDA */}
+                          <button
+                            onClick={() => scrollSeccion(sec.id, "left")}
+                            className="
+                              absolute left-2 top-1/2 -translate-y-1/2 z-20
+                              bg-slate-900/70 backdrop-blur-sm border border-slate-600
+                              hover:bg-slate-800 text-slate-100
+                              w-9 h-9 rounded-full flex items-center justify-center
+                              shadow-[0_0_12px_rgba(0,0,0,0.6)]
+                            "
+                          >
+                            ◀
+                          </button>
 
-                                <div className="flex-1 space-y-2">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
-                                      >
-                                        {cfg?.label || sec.label}
-                                      </span>
-                                      {oferta.destacada && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
-                                          Destacada
+                          {/* FLECHA DERECHA */}
+                          <button
+                            onClick={() => scrollSeccion(sec.id, "right")}
+                            className="
+                              absolute right-2 top-1/2 -translate-y-1/2 z-20
+                              bg-slate-900/70 backdrop-blur-sm border border-slate-600
+                              hover:bg-slate-800 text-slate-100
+                              w-9 h-9 rounded-full flex items-center justify-center
+                              shadow-[0_0_12px_rgba(0,0,0,0.6)]
+                            "
+                          >
+                            ▶
+                          </button>
+
+                          {/* CARRUSEL */}
+                          <div
+                            className="overflow-x-auto -mx-2 px-2"
+                            ref={(el) => {
+                              carruselRefs.current[sec.id] = el;
+                            }}
+                          >
+                            <div className="flex gap-4 min-w-full">
+                              {ofertasSeccion.map((oferta) => (
+                                <div
+                                  key={oferta.id}
+                                  className={`
+                                    relative overflow-hidden
+                                    min-w-[280px] max-w-xs
+                                    rounded-2xl border ${cfg?.border ?? "border-slate-700"}
+                                    bg-gradient-to-br ${cardGradient}
+                                    ${cardGlow}
+                                    px-4 py-3
+                                    flex flex-col justify-between
+                                  `}
+                                >
+                                  {/* brillo interior */}
+                                  <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
+                                        >
+                                          {cfg?.label || sec.label}
                                         </span>
-                                      )}
+                                        {oferta.destacada && (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
+                                            Destacada
+                                          </span>
+                                        )}
+                                      </div>
+                                      {/* Fecha arriba a la derecha */}
+                                      <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
+                                        {formFecha(oferta.creadaEn)}
+                                      </span>
                                     </div>
-                                    {/* Fecha arriba a la derecha */}
-                                    <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
-                                      {formFecha(oferta.creadaEn)}
-                                    </span>
+
+                                    <h4 className="text-sm md:text-base font-semibold text-slate-50">
+                                      {oferta.titulo}
+                                    </h4>
+                                    <p className="text-xs md:text-sm text-slate-100/90">
+                                      {oferta.descripcionCorta}
+                                    </p>
                                   </div>
 
-                                  <h4 className="text-sm md:text-base font-semibold text-slate-50">
-                                    {oferta.titulo}
-                                  </h4>
-                                  <p className="text-xs md:text-sm text-slate-100/90">
-                                    {oferta.descripcionCorta}
-                                  </p>
+                                  <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
+                                    {tipoSec === "LUZ" ||
+                                    tipoSec === "GAS" ||
+                                    tipoSec === "TELEFONIA" ? (
+                                      <button
+                                        onClick={() =>
+                                          irAComparadorConOferta(
+                                            tipoSec as TipoOferta,
+                                            oferta
+                                          )
+                                        }
+                                        className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
+                                      >
+                                        Ver en comparador
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={sec.onClick}
+                                        className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
+                                      >
+                                        Ir a {sec.label}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-
-                                <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
-                                  {tipoSec === "LUZ" ||
-                                  tipoSec === "GAS" ||
-                                  tipoSec === "TELEFONIA" ? (
-                                    <button
-                                      onClick={() =>
-                                        irAComparadorConOferta(
-                                          tipoSec as TipoOferta,
-                                          oferta
-                                        )
-                                      }
-                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
-                                    >
-                                      Ver en comparador
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={sec.onClick}
-                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
-                                    >
-                                      Ir a {sec.label}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         </div>
                       )}
