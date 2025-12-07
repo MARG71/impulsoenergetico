@@ -1327,7 +1327,7 @@ export default function BienvenidaContenido() {
               </section>
             )}
 
-            {/* 🔥 NUEVO BLOQUE: SECCIÓN DE OFERTAS POR CADA SECCIÓN DEL MENÚ */}
+            {/* 🔥 BLOQUE: CARRUSEL DE OFERTAS POR CADA SECCIÓN DEL MENÚ */}
             {!loading && !error && (
               <section className="space-y-6">
                 {secciones.map((sec) => {
@@ -1335,8 +1335,8 @@ export default function BienvenidaContenido() {
                   const tipoSec = tipoPorSeccion[sec.id];
                   const sinOfertas = ofertasSeccion.length === 0;
 
-                  let bgSection =
-                    "bg-slate-950/60 border-slate-800/80"; // por defecto
+                  // Color de fondo por tipo (opcional)
+                  let bgSection = "bg-slate-950/60 border-slate-800/80";
                   if (tipoSec === "GAS")
                     bgSection = "bg-orange-950/40 border-orange-800/70";
                   else if (tipoSec === "TELEFONIA")
@@ -1344,8 +1344,7 @@ export default function BienvenidaContenido() {
                   else if (tipoSec === "LUZ")
                     bgSection = "bg-emerald-950/40 border-emerald-800/70";
 
-                  const cfg =
-                    tipoSec != null ? tipoConfig[tipoSec] : undefined;
+                  const cfg = tipoSec != null ? tipoConfig[tipoSec] : undefined;
                   const pillClass =
                     cfg?.bgPill ||
                     "bg-slate-800 text-slate-100 border border-slate-600";
@@ -1357,6 +1356,7 @@ export default function BienvenidaContenido() {
                       key={sec.id}
                       className={`rounded-2xl border p-5 ${bgSection}`}
                     >
+                      {/* Cabecera de la sección */}
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
                         <div>
                           <div className="flex items-center gap-2 text-xs text-slate-200/85 mb-1">
@@ -1385,69 +1385,68 @@ export default function BienvenidaContenido() {
                         </button>
                       </div>
 
+                      {/* Contenido: mensaje o carrusel */}
                       {sinOfertas ? (
                         <p className="text-[11px] text-slate-200/85">
-                          En cuanto haya una oferta interesante para{" "}
-                          {sec.label}, la verás aquí.
+                          En cuanto haya una oferta interesante para {sec.label}, la verás aquí.
                         </p>
                       ) : (
-                        <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                          {ofertasSeccion.map((oferta) => (
-                            <div
-                              key={oferta.id}
-                              className="w-full rounded-2xl bg-slate-950/85 border border-slate-700 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                            >
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span
-                                    className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
-                                  >
-                                    {cfg?.label || sec.label}
-                                  </span>
-                                  {oferta.destacada && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-300 border border-yellow-200/40">
-                                      Destacada
+                        <div className="mt-2 -mx-2 overflow-x-auto pb-2">
+                          <div className="flex gap-3 px-2 min-w-full">
+                            {ofertasSeccion.map((oferta) => (
+                              <div
+                                key={oferta.id}
+                                className="min-w-[260px] max-w-xs rounded-2xl bg-slate-950/85 border border-slate-700 px-4 py-3 flex flex-col justify-between"
+                              >
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span
+                                      className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
+                                    >
+                                      {cfg?.label || sec.label}
                                     </span>
+                                    {oferta.destacada && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-300 border border-yellow-200/40">
+                                        Destacada
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h4 className="text-sm font-semibold text-slate-50">
+                                    {oferta.titulo}
+                                  </h4>
+                                  <p className="text-xs text-slate-200/80">
+                                    {oferta.descripcionCorta}
+                                  </p>
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                                  <span className="whitespace-nowrap">
+                                    {formFecha(oferta.creadaEn)}
+                                  </span>
+
+                                  {tipoSec === "LUZ" ||
+                                  tipoSec === "GAS" ||
+                                  tipoSec === "TELEFONIA" ? (
+                                    <button
+                                      onClick={() =>
+                                        irAComparadorConOferta(tipoSec, oferta)
+                                      }
+                                      className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
+                                    >
+                                      Ver en comparador
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={sec.onClick}
+                                      className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
+                                    >
+                                      Ir a {sec.label}
+                                    </button>
                                   )}
                                 </div>
-                                <h4 className="text-sm font-semibold text-slate-50">
-                                  {oferta.titulo}
-                                </h4>
-                                <p className="text-xs text-slate-200/80">
-                                  {oferta.descripcionCorta}
-                                </p>
                               </div>
-
-                              <div className="flex flex-row md:flex-col items-end gap-2 text-[11px] text-slate-400">
-                                <span className="whitespace-nowrap">
-                                  {formFecha(oferta.creadaEn)}
-                                </span>
-
-                                {tipoSec === "LUZ" ||
-                                tipoSec === "GAS" ||
-                                tipoSec === "TELEFONIA" ? (
-                                  <button
-                                    onClick={() =>
-                                      irAComparadorConOferta(
-                                        tipoSec,
-                                        oferta
-                                      )
-                                    }
-                                    className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
-                                  >
-                                    Ver en comparador
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={sec.onClick}
-                                    className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
-                                  >
-                                    Ir a {sec.label}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
