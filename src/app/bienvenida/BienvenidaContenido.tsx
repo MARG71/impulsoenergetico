@@ -213,6 +213,297 @@ const descripcionPorSeccion = (id: string): string =>
   DESCRIPCIONES_SECCION[id] ??
   "Ofertas especiales seleccionadas para este servicio.";
 
+// 🔥 Métricas visuales por sección (KPIs)
+type KPIMetrica = {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: string;
+};
+
+const metricasPorSeccion: Record<string, KPIMetrica[]> = {
+  luz: [
+    {
+      icon: "💡",
+      label: "Ahorro medio luz",
+      value: "hasta 28%",
+      hint: "Sobre tarifas estándar de mercado",
+    },
+    {
+      icon: "📊",
+      label: "Estudios realizados",
+      value: "+3.200",
+      hint: "Comparativas personalizadas de luz",
+    },
+    {
+      icon: "⭐",
+      label: "Nivel de satisfacción",
+      value: "4,9 / 5",
+      hint: "Valoración media de nuestros clientes",
+    },
+  ],
+  gas: [
+    {
+      icon: "🔥",
+      label: "Consumo optimizado",
+      value: "hasta 20%",
+      hint: "Ajuste de potencias y términos fijos",
+    },
+    {
+      icon: "📆",
+      label: "Estabilidad de precio",
+      value: "12 meses",
+      hint: "Sin sustos por cambios bruscos",
+    },
+    {
+      icon: "🙌",
+      label: "Clientes satisfechos",
+      value: "+1.500",
+      hint: "Gestión y seguimiento continuo",
+    },
+  ],
+  telefonia: [
+    {
+      icon: "📶",
+      label: "Packs fibra+móvil",
+      value: "desde 29€/mes",
+      hint: "Con llamadas ilimitadas incluidas",
+    },
+    {
+      icon: "📺",
+      label: "TV y plataformas",
+      value: "+8 opciones",
+      hint: "Configura tu paquete a medida",
+    },
+    {
+      icon: "⚡",
+      label: "Altas y cambios",
+      value: "< 48h",
+      hint: "Tramitación rápida con soporte",
+    },
+  ],
+  solar: [
+    {
+      icon: "☀️",
+      label: "Ahorro energético",
+      value: "hasta 60%",
+      hint: "En la factura de luz anual",
+    },
+    {
+      icon: "⏱️",
+      label: "Retorno inversión",
+      value: "4–7 años",
+      hint: "Según consumo y ubicación",
+    },
+    {
+      icon: "🏡",
+      label: "Instalaciones realizadas",
+      value: "+250",
+      hint: "Entre hogares y negocios",
+    },
+  ],
+  aerotermia: [
+    {
+      icon: "🌬️",
+      label: "Ahorro calefacción",
+      value: "hasta 70%",
+      hint: "Frente a sistemas tradicionales",
+    },
+    {
+      icon: "🏠",
+      label: "Viviendas adaptadas",
+      value: "+140",
+      hint: "Unidades interiores instaladas",
+    },
+    {
+      icon: "♻️",
+      label: "Eficiencia energética",
+      value: "Clase A+++",
+      hint: "Equipos de última generación",
+    },
+  ],
+  hermes: [
+    {
+      icon: "🔋",
+      label: "Autonomía media",
+      value: "hasta 85%",
+      hint: "Cobertura de consumos nocturnos",
+    },
+    {
+      icon: "🤖",
+      label: "Gestión inteligente",
+      value: "24/7",
+      hint: "Optimización automática IA",
+    },
+    {
+      icon: "💶",
+      label: "Retorno estimado",
+      value: "5–8 años",
+      hint: "Según perfil de consumo",
+    },
+  ],
+  ferreteria: [
+    {
+      icon: "🔩",
+      label: "Referencias activas",
+      value: "+5.000",
+      hint: "Catálogo BRICOTITAN actualizado",
+    },
+    {
+      icon: "🚚",
+      label: "Entrega media",
+      value: "24–72h",
+      hint: "En la mayoría de productos",
+    },
+    {
+      icon: "🏗️",
+      label: "Calidad profesional",
+      value: "Garantizada",
+      hint: "Materiales para uso intensivo",
+    },
+  ],
+  inmobiliaria: [
+    {
+      icon: "🏡",
+      label: "Operaciones gestionadas",
+      value: "+380",
+      hint: "Compra, venta y alquiler",
+    },
+    {
+      icon: "📉",
+      label: "Mejora cuota hipoteca",
+      value: "hasta 25%",
+      hint: "Media en revisiones y cambios",
+    },
+    {
+      icon: "🧾",
+      label: "Asesoramiento",
+      value: "100% incluido",
+      hint: "Acompañamiento en todo el proceso",
+    },
+  ],
+  viajes: [
+    {
+      icon: "✈️",
+      label: "Viajes organizados",
+      value: "+420",
+      hint: "Por VIAJANDO CON MERY",
+    },
+    {
+      icon: "🌍",
+      label: "Destinos disponibles",
+      value: "+60",
+      hint: "Europa, Caribe y grandes viajes",
+    },
+    {
+      icon: "💺",
+      label: "Plazas preferentes",
+      value: "Limitadas",
+      hint: "Reservas con mejores condiciones",
+    },
+  ],
+  repuestos: [
+    {
+      icon: "🚗",
+      label: "Piezas disponibles",
+      value: "+12.000",
+      hint: "Originales y equivalentes",
+    },
+    {
+      icon: "⏱️",
+      label: "Tiempo medio entrega",
+      value: "24–48h",
+      hint: "En repuestos más demandados",
+    },
+    {
+      icon: "🛠️",
+      label: "Aplicaciones",
+      value: "+30 marcas",
+      hint: "Turismos, furgonetas y más",
+    },
+  ],
+  seguros: [
+    {
+      icon: "🛡️",
+      label: "Ramos asegurados",
+      value: "+10",
+      hint: "Hogar, auto, salud, comercio, etc.",
+    },
+    {
+      icon: "🏦",
+      label: "Aseguradoras",
+      value: "+15",
+      hint: "Comparamos entre múltiples compañías",
+    },
+    {
+      icon: "💶",
+      label: "Ahorro medio póliza",
+      value: "hasta 30%",
+      hint: "Respecto a renovación estándar",
+    },
+  ],
+  gangas: [
+    {
+      icon: "🛍️",
+      label: "Descuentos activos",
+      value: "hasta -70%",
+      hint: "Últimas unidades y promos relámpago",
+    },
+    {
+      icon: "⏳",
+      label: "Duración ofertas",
+      value: "muy limitada",
+      hint: "Solo mientras haya stock",
+    },
+    {
+      icon: "💣",
+      label: "Chollos destacados",
+      value: "actualizados",
+      hint: "Revisa esta sección cada semana",
+    },
+  ],
+  hipotecas: [
+    {
+      icon: "🏦",
+      label: "Bancos analizados",
+      value: "+14",
+      hint: "Comparativa de condiciones completas",
+    },
+    {
+      icon: "📉",
+      label: "Reducción cuota",
+      value: "hasta 35%",
+      hint: "Con cambios de banco o revisión",
+    },
+    {
+      icon: "📆",
+      label: "Plazos",
+      value: "hasta 30 años",
+      hint: "Estudio personalizado de viabilidad",
+    },
+  ],
+  pladur: [
+    {
+      icon: "🏗️",
+      label: "Proyectos ejecutados",
+      value: "+220",
+      hint: "Obra nueva y reformas integrales",
+    },
+    {
+      icon: "🎯",
+      label: "Especialización",
+      value: "DICOPLAC",
+      hint: "Sistemas técnicos de alta calidad",
+    },
+    {
+      icon: "🧱",
+      label: "Soluciones",
+      value: "a medida",
+      hint: "Acústicas, térmicas y decorativas",
+    },
+  ],
+};
+
 
 // 📊 Mini-resumen numérico por sección (chips)
 const resumenNumericoPorSeccion: Record<
@@ -1058,336 +1349,339 @@ export default function BienvenidaContenido() {
     );
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
-        <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
-          {/* COLUMNA IZQUIERDA */}
-          <aside className="space-y-6">
-            {/* BLOQUE SUPERIOR: logo + bienvenida + club */}
-            <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
-              <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center">
-                    <div className="relative h-16 w-64 md:h-20 md:w-72">
-                      <Image
-                        src="/logo-impulso.png"
-                        alt="Impulso Energético"
-                        fill
-                        className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
-                        priority
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-base md:text-lg font-bold text-slate-50">
-                      Tel. 692 13 70 48
-                    </p>
-                    <p className="text-base md:text-lg font-bold text-slate-50">
-                      E-mail:{" "}
-                      <a
-                        href="mailto:info@impulsoenergetico.es"
-                        className="underline decoration-emerald-400/70 underline-offset-4"
-                      >
-                        info@impulsoenergetico.es
-                      </a>
-                    </p>
+return (
+  <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+    <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
+      <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
+        {/* COLUMNA IZQUIERDA */}
+        <aside className="space-y-6">
+          {/* BLOQUE SUPERIOR: logo + bienvenida + club */}
+          <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
+            <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center">
+                  <div className="relative h-16 w-64 md:h-20 md:w-72">
+                    <Image
+                      src="/logo-impulso.png"
+                      alt="Impulso Energético"
+                      fill
+                      className="object-contain drop-shadow-[0_0_24px_rgba(16,231,152,0.75)]"
+                      priority
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-1 mt-2">
+                <div className="space-y-1">
                   <p className="text-base md:text-lg font-bold text-slate-50">
-                    Plataforma de ahorro y comisiones
+                    Tel. 692 13 70 48
                   </p>
-                  <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
-                    Servicios y ventajas para socios
+                  <p className="text-base md:text-lg font-bold text-slate-50">
+                    E-mail:{" "}
+                    <a
+                      href="mailto:info@impulsoenergetico.es"
+                      className="underline decoration-emerald-400/70 underline-offset-4"
+                    >
+                      info@impulsoenergetico.es
+                    </a>
                   </p>
                 </div>
               </div>
 
-              <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                <div className="flex-1 space-y-3">
-                  <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
-                    IMPULSO ENERGÉTICO
-                  </div>
+              <div className="space-y-1 mt-2">
+                <p className="text-base md:text-lg font-bold text-slate-50">
+                  Plataforma de ahorro y comisiones
+                </p>
+                <p className="text-[11px] md:text-xs tracking-[0.22em] uppercase text-emerald-300 font-semibold">
+                  Servicios y ventajas para socios
+                </p>
+              </div>
+            </div>
 
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold leading-tight">
-                    {nombre && (
+            <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
+              <div className="flex-1 space-y-3">
+                <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
+                  IMPULSO ENERGÉTICO
+                </div>
+
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold leading-tight">
+                  {nombre && (
+                    <>
+                      Hola,{" "}
+                      <span className="text-emerald-400 font-extrabold">
+                        {nombre}
+                      </span>{" "}
+                      👋
+                      <br />
+                    </>
+                  )}
+                  Ahorra en tus facturas y{" "}
+                  <span className="text-amber-300 font-extrabold">
+                    gana comisiones
+                  </span>{" "}
+                  desde hoy.
+                </h1>
+                <p className="mt-2 text-xs text-amber-300 font-bold">
+                  VERSIÓN CON PLADUR ACTIVADA
+                </p>
+                {(agenteId || lugarId) && (
+                  <p className="text-[11px] text-slate-400">
+                    QR detectado ·{" "}
+                    {agenteId && (
                       <>
-                        Hola,{" "}
-                        <span className="text-emerald-400 font-extrabold">
-                          {nombre}
-                        </span>{" "}
-                        👋
-                        <br />
+                        Agente: <b>{agenteId}</b>{" "}
                       </>
                     )}
-                    Ahorra en tus facturas y{" "}
-                    <span className="text-amber-300 font-extrabold">
-                      gana comisiones
-                    </span>{" "}
-                    desde hoy.
-                  </h1>
-                  <p className="mt-2 text-xs text-amber-300 font-bold">
-                    VERSIÓN CON PLADUR ACTIVADA
+                    {lugarId && (
+                      <>
+                        · Lugar: <b>{lugarId}</b>
+                      </>
+                    )}
                   </p>
-                  {(agenteId || lugarId) && (
-                    <p className="text-[11px] text-slate-400">
-                      QR detectado ·{" "}
-                      {agenteId && (
-                        <>
-                          Agente: <b>{agenteId}</b>{" "}
-                        </>
-                      )}
-                      {lugarId && (
-                        <>
-                          · Lugar: <b>{lugarId}</b>
-                        </>
-                      )}
-                    </p>
-                  )}
+                )}
 
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-1">
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={() => setModalAbierto(true)}
-                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
-                      >
-                        Acceder / actualizar mis datos
-                      </button>
-                      <button
-                        onClick={() => irAComparador("LUZ")}
-                        className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
-                      >
-                        LUZ
-                      </button>
-                    </div>
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-1">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => setModalAbierto(true)}
+                      className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 font-semibold text-slate-950 shadow shadow-emerald-500/40 text-xs md:text-sm"
+                    >
+                      Acceder / actualizar mis datos
+                    </button>
+                    <button
+                      onClick={() => irAComparador("LUZ")}
+                      className="px-4 py-2.5 rounded-full border border-emerald-300 text-emerald-200 hover:bg-emerald-500/10 text-xs md:text-sm"
+                    >
+                      LUZ
+                    </button>
+                  </div>
 
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] md:text-[11px] tracking-[0.22em] uppercase text-slate-300">
-                        ACCESOS RÁPIDOS A SECCIONES
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {accesosRapidos.map((a) => (
-                          <button
-                            key={a.label}
-                            type="button"
-                            onClick={a.onClick}
-                            className="px-3 py-1.5 rounded-full border border-slate-600 text-[11px] text-slate-100 hover:bg-slate-800/80"
-                          >
-                            {a.label}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] md:text-[11px] tracking-[0.22em] uppercase text-slate-300">
+                      ACCESOS RÁPIDOS A SECCIONES
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {accesosRapidos.map((a) => (
+                        <button
+                          key={a.label}
+                          type="button"
+                          onClick={a.onClick}
+                          className="px-3 py-1.5 rounded-full border border-slate-600 text-[11px] text-slate-100 hover:bg-slate-800/80"
+                        >
+                          {a.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {hayClubEspecial && (
-                  <div
-                    className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
-                    style={{
-                      borderColor: clubColorAcento || "#22c55e",
-                      boxShadow: `0 0 32px ${
-                        clubColorAcento || "rgba(34,197,94,0.55)"
-                      }`,
-                    }}
-                  >
-                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
+              {hayClubEspecial && (
+                <div
+                  className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
+                  style={{
+                    borderColor: clubColorAcento || "#22c55e",
+                    boxShadow: `0 0 32px ${
+                      clubColorAcento || "rgba(34,197,94,0.55)"
+                    }`,
+                  }}
+                >
+                  <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-60" />
 
-                    <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
-                      {clubLogoUrl ? (
-                        <Image
-                          src={clubLogoUrl}
-                          alt={clubNombre || "Logo club"}
-                          fill
-                          className="object-contain"
-                        />
-                      ) : (
-                        <span className="text-2xl">🤝</span>
-                      )}
+                  <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-slate-900/90 border border-white/15 flex items-center justify-center overflow-hidden">
+                    {clubLogoUrl ? (
+                      <Image
+                        src={clubLogoUrl}
+                        alt={clubNombre || "Logo club"}
+                        fill
+                        className="object-contain"
+                      />
+                    ) : (
+                      <span className="text-2xl">🤝</span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-1">
+                    <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
+                      Club / Asociación
                     </div>
+                    <div className="text-xs md:text-sm font-bold">
+                      {clubNombre || "Programa solidario"}
+                    </div>
+                    {clubMensaje && (
+                      <p className="text-[10px] md:text-xs text-slate-200/90">
+                        {clubMensaje}
+                      </p>
+                    )}
+                    {clubAportacion != null && !Number.isNaN(clubAportacion) && (
+                      <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
+                        💚 Aportación acumulada:{" "}
+                        <span className="ml-1">
+                          {clubAportacion.toLocaleString("es-ES", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          €
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-                    <div className="flex-1 space-y-1">
-                      <div className="text-[9px] uppercase tracking-[0.22em] text-emerald-200/90 font-semibold">
-                        Club / Asociación
-                      </div>
-                      <div className="text-xs md:text-sm font-bold">
-                        {clubNombre || "Programa solidario"}
-                      </div>
-                      {clubMensaje && (
-                        <p className="text-[10px] md:text-xs text-slate-200/90">
-                          {clubMensaje}
-                        </p>
-                      )}
-                      {clubAportacion != null &&
-                        !Number.isNaN(clubAportacion) && (
-                          <div className="inline-flex items-center mt-1 rounded-full bg-black/40 px-3 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-300/50">
-                            💚 Aportación acumulada:{" "}
-                            <span className="ml-1">
-                              {clubAportacion.toLocaleString("es-ES", {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                              })}{" "}
-                              €
+          {/* BUSCADOR OFERTAS */}
+          <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <h2 className="text-sm md:text-base font-semibold">
+                Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
+              </h2>
+              <div className="relative w-full">
+                <input
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar ofertas por nombre, tipo o texto..."
+                  className="w-full rounded-full bg-slate-900/70 border border-emerald-500/70 px-4 py-2 pr-9 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                  🔍
+                </span>
+
+                {sugerencias.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
+                    {sugerencias.map((oferta) => {
+                      const tipoNorm = normalizarTipoOferta(
+                        oferta.tipo as string
+                      );
+                      const cfg = tipoConfig[tipoNorm];
+
+                      return (
+                        <button
+                          key={oferta.id}
+                          type="button"
+                          onClick={() => manejarClickSugerencia(oferta)}
+                          className="w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-slate-900/90 text-xs md:text-sm border-b border-slate-800 last:border-b-0"
+                        >
+                          <span
+                            className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                          >
+                            {cfg.label}
+                          </span>
+                          <span className="flex-1">
+                            <span className="block font-semibold text-slate-50">
+                              {oferta.titulo}
                             </span>
-                          </div>
-                        )}
-                    </div>
+                            <span className="block text-[11px] text-slate-300 line-clamp-1">
+                              {oferta.descripcionCorta ||
+                                oferta.descripcionLarga}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
+            <p className="text-[11px] text-slate-300/80">
+              {loading
+                ? "Cargando ofertas…"
+                : error
+                ? `Error: ${error}`
+                : ofertasFiltradas.length === 0
+                ? "No hay ofertas que coincidan con tu búsqueda."
+                : `${ofertasFiltradas.length} oferta(s) encontradas.`}
+            </p>
+          </section>
 
-            {/* BUSCADOR OFERTAS */}
-            <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <h2 className="text-sm md:text-base font-semibold">
-                  Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
-                </h2>
-                <div className="relative w-full">
-                  <input
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Buscar ofertas por nombre, tipo o texto..."
-                    className="w-full rounded-full bg-slate-900/70 border border-emerald-500/70 px-4 py-2 pr-9 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                    🔍
-                  </span>
+          {/* SECCIONES (botones de la izquierda) */}
+          <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
+            <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
+              <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
+              Secciones
+            </p>
 
-                  {sugerencias.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
-                      {sugerencias.map((oferta) => {
-                        const tipoNorm = normalizarTipoOferta(
-                          oferta.tipo as string
-                        );
-                        const cfg = tipoConfig[tipoNorm];
-
-                        return (
-                          <button
-                            key={oferta.id}
-                            type="button"
-                            onClick={() => manejarClickSugerencia(oferta)}
-                            className="w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-slate-900/90 text-xs md:text-sm border-b border-slate-800 last:border-b-0"
-                          >
-                            <span
-                              className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
-                            >
-                              {cfg.label}
-                            </span>
-                            <span className="flex-1">
-                              <span className="block font-semibold text-slate-50">
-                                {oferta.titulo}
-                              </span>
-                              <span className="block text-[11px] text-slate-300 line-clamp-1">
-                                {oferta.descripcionCorta ||
-                                  oferta.descripcionLarga}
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-300/80">
-                {loading
-                  ? "Cargando ofertas…"
-                  : error
-                  ? `Error: ${error}`
-                  : ofertasFiltradas.length === 0
-                  ? "No hay ofertas que coincidan con tu búsqueda."
-                  : `${ofertasFiltradas.length} oferta(s) encontradas.`}
-              </p>
-            </section>
-
-            {/* SECCIONES (botones de la izquierda) */}
-            <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
-              <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
-                <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
-                Secciones
-              </p>
-
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-                {secciones.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={s.onClick}
-                    className={`group relative overflow-hidden rounded-3xl px-4 py-4 md:px-5 md:py-5 text-left text-sm md:text-base font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+              {secciones.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={s.onClick}
+                  className={`group relative overflow-hidden rounded-3xl px-4 py-4 md:px-5 md:py-5 text-left text-sm md:text-base font-semibold text-slate-50 shadow-lg shadow-black/40 ring-1 transition 
                       ${s.bgClass} ${s.ringClass}
                       hover:translate-y-[-1px] hover:shadow-[0_0_26px_rgba(15,23,42,0.9)]`}
-                  >
-                    <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
-                    <div className="flex items-center gap-3 md:gap-4">
-                      <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-xl shadow-[0_0_22px_rgba(255,255,255,0.25)]">
-                        {s.icon}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
-                          Servicio
-                        </span>
-                        <span className="text-sm md:text-base font-bold leading-snug">
-                          {s.label}
-                        </span>
-                      </div>
+                >
+                  <span className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition" />
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10 text-xl shadow-[0_0_22px_rgba(255,255,255,0.25)]">
+                      {s.icon}
                     </div>
-                  </button>
-                ))}
-              </div>
-            </nav>
-          </aside>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] md:text-xs uppercase tracking-[0.18em] text-slate-200/80">
+                        Servicio
+                      </span>
+                      <span className="text-sm md:text-base font-bold leading-snug">
+                        {s.label}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </nav>
+        </aside>
 
-          {/* COLUMNA DERECHA */}
-          <main className="space-y-8 md:space-y-10">
-            {loading && (
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
-                Cargando ofertas, un momento…
-              </div>
-            )}
+        {/* COLUMNA DERECHA */}
+        <main className="space-y-8 md:space-y-10">
+          {loading && (
+            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
+              Cargando ofertas, un momento…
+            </div>
+          )}
 
-            {error && !loading && (
-              <div className="rounded-2xl border border-red-700 bg-red-950/60 p-6 text-center text-sm text-red-200">
-                {error}
-              </div>
-            )}
+          {error && !loading && (
+            <div className="rounded-2xl border border-red-700 bg-red-950/60 p-6 text-center text-sm text-red-200">
+              {error}
+            </div>
+          )}
 
-            {/* CARRUSEL DESTACADAS */}
-            {!loading && !error && ofertasDestacadas.length > 0 && (
-              <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
-                <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
-                  🌟 Ofertas especiales para ti
-                </h3>
+          {/* CARRUSEL DESTACADAS */}
+          {!loading && !error && ofertasDestacadas.length > 0 && (
+            <section className="space-y-4 rounded-2xl bg-slate-950/80 border border-slate-800 p-4 md:p-5">
+              <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
+                🌟 Ofertas especiales para ti
+              </h3>
 
-                <div className="flex gap-4 overflow-x-auto pb-2">
-                  {ofertasDestacadas.map((oferta) => {
-                    const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
-                    const cfg = tipoConfig[tipoNorm];
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {ofertasDestacadas.map((oferta) => {
+                  const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
+                  const cfg = tipoConfig[tipoNorm];
 
-                    let cardGradient =
-                      "from-slate-700/40 via-slate-950 to-slate-950";
-                    let cardGlow = "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
+                  let cardGradient =
+                    "from-slate-700/40 via-slate-950 to-slate-950";
+                  let cardGlow =
+                    "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
 
-                    if (tipoNorm === "LUZ") {
-                      cardGradient =
-                        "from-emerald-500/30 via-emerald-900/30 to-slate-950";
-                      cardGlow = "shadow-[0_0_22px_rgba(16,185,129,0.75)]";
-                    } else if (tipoNorm === "GAS") {
-                      cardGradient =
-                        "from-orange-500/30 via-orange-900/30 to-slate-950";
-                      cardGlow = "shadow-[0_0_22px_rgba(249,115,22,0.75)]";
-                    } else if (tipoNorm === "TELEFONIA") {
-                      cardGradient =
-                        "from-sky-500/30 via-sky-900/30 to-slate-950";
-                      cardGlow = "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
-                    }
+                  if (tipoNorm === "LUZ") {
+                    cardGradient =
+                      "from-emerald-500/30 via-emerald-900/30 to-slate-950";
+                    cardGlow =
+                      "shadow-[0_0_22px_rgba(16,185,129,0.75)]";
+                  } else if (tipoNorm === "GAS") {
+                    cardGradient =
+                      "from-orange-500/30 via-orange-900/30 to-slate-950";
+                    cardGlow =
+                      "shadow-[0_0_22px_rgba(249,115,22,0.75)]";
+                  } else if (tipoNorm === "TELEFONIA") {
+                    cardGradient =
+                      "from-sky-500/30 via-sky-900/30 to-slate-950";
+                    cardGlow =
+                      "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
+                  }
 
-                    return (
-                      <div
-                        key={oferta.id}
-                        className={`
+                  return (
+                    <div
+                      key={oferta.id}
+                      className={`
                           relative overflow-hidden
                           min-w-[260px] max-w-xs
                           rounded-2xl border ${cfg.border}
@@ -1395,344 +1689,418 @@ export default function BienvenidaContenido() {
                           ${cardGlow}
                           p-4 flex flex-col justify-between
                         `}
-                      >
-                        <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
-                            >
-                              {cfg.label}
-                            </span>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/15 text-yellow-300 border border-yellow-400/30">
-                              Destacada
-                            </span>
-                          </div>
-                          <h4 className="text-sm md:text-base font-semibold text-slate-50">
-                            {oferta.titulo}
-                          </h4>
-                          <p className="text-xs md:text-sm text-slate-100/90">
-                            {oferta.descripcionCorta}
-                          </p>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-100">
-                          <span>
-                            {formFecha(oferta.creadaEn)
-                              ? `Actualizada: ${formFecha(oferta.creadaEn)}`
-                              : ""}
-                          </span>
-                          {leadOK ? (
-                            <button
-                              onClick={() =>
-                                irAComparadorConOferta(tipoNorm, oferta)
-                              }
-                              className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
-                            >
-                              Ver en comparador
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setModalAbierto(true)}
-                              className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
-                            >
-                              Desbloquear
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                </div>
-              </section>
-            )}
-
-            {/* 🔥 BLOQUE: CARRUSEL DE OFERTAS POR CADA SECCIÓN DEL MENÚ */}
-            {!loading && !error && (
-              <section className="space-y-6">
-                {secciones.map((sec) => {
-                  // Todas las ofertas activas de la sección
-                  let ofertasSeccion = obtenerOfertasDeSeccion(sec.id);
-                  const tipoSec = tipoPorSeccion[sec.id];
-
-                  const totalSeccion = ofertasSeccion.length;
-
-                  // Filtro actual de esa sección
-                  const filtroActual = filtrosSeccion[sec.id] ?? "todas";
-
-                  // Filtrado según "todas" | "destacadas" | "recientes"
-                  if (filtroActual === "destacadas") {
-                    ofertasSeccion = ofertasSeccion.filter((o) => o.destacada);
-                  } else if (filtroActual === "recientes") {
-                    const ahora = new Date();
-                    const hace30 = new Date();
-                    hace30.setDate(ahora.getDate() - 30);
-                    ofertasSeccion = ofertasSeccion.filter((o) => {
-                      if (!o.creadaEn) return false;
-                      const f = new Date(o.creadaEn);
-                      return f >= hace30;
-                    });
-                  }
-
-                  const sinOfertas = ofertasSeccion.length === 0;
-
-                  // 🎨 Colores de fondo para la banda de la sección
-                  let bgSection = "bg-slate-950/60 border-slate-800/80";
-                  if (tipoSec === "GAS")
-                    bgSection = "bg-orange-950/40 border-orange-800/70";
-                  else if (tipoSec === "TELEFONIA")
-                    bgSection = "bg-sky-950/50 border-sky-800/70";
-                  else if (tipoSec === "LUZ")
-                    bgSection = "bg-emerald-950/40 border-emerald-800/70";
-
-                  const cfg = tipoSec != null ? tipoConfig[tipoSec] : undefined;
-                  const pillClass =
-                    cfg?.bgPill ||
-                    "bg-slate-800 text-slate-100 border border-slate-600";
-                  const btnClass =
-                    cfg?.btn || "bg-emerald-500 hover:bg-emerald-400";
-
-                  // 🎇 Fondo y glow neon por tipo para cada TARJETA
-                  let cardGradient =
-                    "from-slate-700/40 via-slate-950 to-slate-950";
-                  let cardGlow = "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
-
-                  if (tipoSec === "LUZ") {
-                    cardGradient =
-                      "from-emerald-500/30 via-emerald-900/30 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(16,185,129,0.85)]";
-                  } else if (tipoSec === "GAS") {
-                    cardGradient =
-                      "from-orange-500/30 via-orange-900/30 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(249,115,22,0.85)]";
-                  } else if (tipoSec === "TELEFONIA") {
-                    cardGradient =
-                      "from-sky-500/30 via-sky-900/30 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(56,189,248,0.85)]";
-                  } else if (tipoSec === "SEGUROS") {
-                    cardGradient =
-                      "from-slate-400/35 via-slate-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_24px_rgba(148,163,184,0.9)]";
-                  } else if (tipoSec === "GANGAS") {
-                    cardGradient =
-                      "from-pink-500/35 via-rose-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(244,114,182,0.9)]";
-                  } else if (tipoSec === "HIPOTECAS") {
-                    cardGradient =
-                      "from-emerald-500/30 via-emerald-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(16,185,129,0.9)]";
-                  } else if (tipoSec === "REPUESTOS") {
-                    cardGradient =
-                      "from-orange-400/35 via-amber-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(251,146,60,0.9)]";
-                  } else if (tipoSec === "PLADUR") {
-                    cardGradient =
-                      "from-zinc-400/35 via-zinc-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_24px_rgba(161,161,170,0.9)]";
-                  } else if (tipoSec === "FERRETERIA") {
-                    cardGradient =
-                      "from-lime-400/35 via-lime-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(132,204,22,0.9)]";
-                  } else if (tipoSec === "INMOBILIARIA") {
-                    cardGradient =
-                      "from-rose-500/35 via-rose-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(244,63,94,0.9)]";
-                  } else if (tipoSec === "VIAJES") {
-                    cardGradient =
-                      "from-indigo-500/35 via-indigo-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(129,140,248,0.9)]";
-                  } else if (tipoSec === "SOLAR") {
-                    cardGradient =
-                      "from-amber-400/35 via-amber-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(251,191,36,0.9)]";
-                  } else if (tipoSec === "AEROTERMIA") {
-                    cardGradient =
-                      "from-cyan-400/35 via-cyan-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(34,211,238,0.9)]";
-                  } else if (tipoSec === "BATERIA") {
-                    cardGradient =
-                      "from-purple-500/35 via-purple-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_26px_rgba(168,85,247,0.9)]";
-                  }
-
-                  return (
-                    <div
-                      key={sec.id}
-                      className={`rounded-2xl border p-5 md:p-6 ${bgSection} shadow-[0_0_30px_rgba(15,23,42,0.9)]`}
                     >
-                      {/* Cabecera de la sección */}
-                      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
-                        <div className="space-y-2 max-w-3xl">
-                          <div className="flex items-center gap-2 text-xs text-slate-200/85">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 border border-slate-600/80 shadow-[0_0_16px_rgba(15,23,42,1)]">
-                              <span className="text-base">{sec.icon}</span>
-                              <span className="font-semibold uppercase tracking-wide">
-                                {sec.label}
-                              </span>
+                      <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
+                          >
+                            {cfg.label}
+                          </span>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/15 text-yellow-300 border border-yellow-400/30">
+                            Destacada
+                          </span>
+                        </div>
+                        <h4 className="text-sm md:text-base font-semibold text-slate-50">
+                          {oferta.titulo}
+                        </h4>
+                        <p className="text-xs md:text-sm text-slate-100/90">
+                          {oferta.descripcionCorta}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between text-[11px] text-slate-100">
+                        <span>
+                          {formFecha(oferta.creadaEn)
+                            ? `Actualizada: ${formFecha(oferta.creadaEn)}`
+                            : ""}
+                        </span>
+                        {leadOK ? (
+                          <button
+                            onClick={() =>
+                              irAComparadorConOferta(tipoNorm, oferta)
+                            }
+                            className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
+                          >
+                            Ver en comparador
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setModalAbierto(true)}
+                            className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
+                          >
+                            Desbloquear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* 🔥 BLOQUE: CARRUSEL DE OFERTAS POR CADA SECCIÓN DEL MENÚ */}
+          {!loading && !error && (
+            <section className="space-y-6">
+              {secciones.map((sec) => {
+                // Todas las ofertas activas de la sección
+                let ofertasSeccion = obtenerOfertasDeSeccion(sec.id);
+                const tipoSec = tipoPorSeccion[sec.id];
+
+                const totalSeccion = ofertasSeccion.length;
+
+                // Filtro actual de esa sección
+                const filtroActual = filtrosSeccion[sec.id] ?? "todas";
+
+                // Filtrado según "todas" | "destacadas" | "recientes"
+                if (filtroActual === "destacadas") {
+                  ofertasSeccion = ofertasSeccion.filter(
+                    (o) => o.destacada
+                  );
+                } else if (filtroActual === "recientes") {
+                  const ahora = new Date();
+                  const hace30 = new Date();
+                  hace30.setDate(ahora.getDate() - 30);
+                  ofertasSeccion = ofertasSeccion.filter((o) => {
+                    if (!o.creadaEn) return false;
+                    const f = new Date(o.creadaEn);
+                    return f >= hace30;
+                  });
+                }
+
+                const sinOfertas = ofertasSeccion.length === 0;
+
+                // 🎨 Colores de fondo para la banda de la sección
+                let bgSection = "bg-slate-950/60 border-slate-800/80";
+                if (tipoSec === "GAS")
+                  bgSection =
+                    "bg-orange-950/40 border-orange-800/70";
+                else if (tipoSec === "TELEFONIA")
+                  bgSection = "bg-sky-950/50 border-sky-800/70";
+                else if (tipoSec === "LUZ")
+                  bgSection =
+                    "bg-emerald-950/40 border-emerald-800/70";
+
+                const cfg =
+                  tipoSec != null ? tipoConfig[tipoSec] : undefined;
+                const pillClass =
+                  cfg?.bgPill ||
+                  "bg-slate-800 text-slate-100 border border-slate-600";
+                const btnClass =
+                  cfg?.btn ||
+                  "bg-emerald-500 hover:bg-emerald-400";
+
+                // 🎇 Fondo y glow neon por tipo para cada TARJETA
+                let cardGradient =
+                  "from-slate-700/40 via-slate-950 to-slate-950";
+                let cardGlow =
+                  "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
+
+                const metricas = metricasPorSeccion[sec.id] ?? [];
+
+                if (tipoSec === "LUZ") {
+                  cardGradient =
+                    "from-emerald-500/30 via-emerald-900/30 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(16,185,129,0.85)]";
+                } else if (tipoSec === "GAS") {
+                  cardGradient =
+                    "from-orange-500/30 via-orange-900/30 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(249,115,22,0.85)]";
+                } else if (tipoSec === "TELEFONIA") {
+                  cardGradient =
+                    "from-sky-500/30 via-sky-900/30 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(56,189,248,0.85)]";
+                } else if (tipoSec === "SEGUROS") {
+                  cardGradient =
+                    "from-slate-400/35 via-slate-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_24px_rgba(148,163,184,0.9)]";
+                } else if (tipoSec === "GANGAS") {
+                  cardGradient =
+                    "from-pink-500/35 via-rose-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(244,114,182,0.9)]";
+                } else if (tipoSec === "HIPOTECAS") {
+                  cardGradient =
+                    "from-emerald-500/30 via-emerald-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(16,185,129,0.9)]";
+                } else if (tipoSec === "REPUESTOS") {
+                  cardGradient =
+                    "from-orange-400/35 via-amber-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(251,146,60,0.9)]";
+                } else if (tipoSec === "PLADUR") {
+                  cardGradient =
+                    "from-zinc-400/35 via-zinc-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_24px_rgba(161,161,170,0.9)]";
+                } else if (tipoSec === "FERRETERIA") {
+                  cardGradient =
+                    "from-lime-400/35 via-lime-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(132,204,22,0.9)]";
+                } else if (tipoSec === "INMOBILIARIA") {
+                  cardGradient =
+                    "from-rose-500/35 via-rose-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(244,63,94,0.9)]";
+                } else if (tipoSec === "VIAJES") {
+                  cardGradient =
+                    "from-indigo-500/35 via-indigo-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(129,140,248,0.9)]";
+                } else if (tipoSec === "SOLAR") {
+                  cardGradient =
+                    "from-amber-400/35 via-amber-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(251,191,36,0.9)]";
+                } else if (tipoSec === "AEROTERMIA") {
+                  cardGradient =
+                    "from-cyan-400/35 via-cyan-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(34,211,238,0.9)]";
+                } else if (tipoSec === "BATERIA") {
+                  cardGradient =
+                    "from-purple-500/35 via-purple-900/40 to-slate-950";
+                  cardGlow =
+                    "shadow-[0_0_26px_rgba(168,85,247,0.9)]";
+                }
+
+                return (
+                  <div
+                    key={sec.id}
+                    className={`rounded-2xl border p-5 md:p-6 ${bgSection} shadow-[0_0_30px_rgba(15,23,42,0.9)]`}
+                  >
+                    {/* Cabecera de la sección */}
+                    <div className="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
+                      {/* Lado izquierdo: título + descripción + KPIs */}
+                      <div className="space-y-2 md:space-y-3">
+                        <div className="flex items-center gap-2 text-xs text-slate-200/85">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/60 border border-slate-600/80">
+                            <span className="text-base">
+                              {sec.icon}
                             </span>
-                            <span className="text-[11px] opacity-80">
-                              {totalSeccion === 0
-                                ? "Sin ofertas para esta sección"
-                                : `${totalSeccion} oferta(s) totales · Mostrando ${ofertasSeccion.length} (${filtroActual})`}
+                            <span className="font-semibold uppercase tracking-wide">
+                              {sec.label}
                             </span>
-                          </div>
-
-                          <h3 className="text-2xl md:text-3xl font-black tracking-tight text-slate-50 flex items-center gap-3">
-                            <span className="h-[3px] w-8 rounded-full bg-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.9)]" />
-                            {sec.label}
-                          </h3>
-
-                          <div className="mt-1 inline-flex max-w-3xl rounded-2xl bg-slate-900/80 border border-slate-600/80 px-3 py-2 shadow-[0_0_22px_rgba(15,23,42,0.95)]">
-                            <p className="text-sm md:text-base font-semibold text-slate-100 leading-snug">
-                              <span className="bg-gradient-to-r from-emerald-300 via-emerald-100 to-slate-100 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(16,185,129,0.55)]">
-                                {descripcionPorSeccion(sec.id)}
-                              </span>
-
-                            </p>
-                          </div>
-
-                          {/* Chips numéricos por sección */}
-                          {(resumenNumericoPorSeccion[sec.id] ?? []).length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {resumenNumericoPorSeccion[sec.id]!.map((chip, idx) => (
-                                <div
-                                  key={idx}
-                                  className="inline-flex items-baseline gap-1 rounded-full 
-                                            bg-slate-950/90 border border-slate-600/80 
-                                            px-3 py-1 shadow-[0_0_18px_rgba(15,23,42,0.95)]"
-                                >
-                                  <span className="text-[10px] md:text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                                    {chip.label}
-                                  </span>
-                                  <span className="text-xs md:text-sm font-bold text-emerald-300">
-                                    {chip.value}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          </span>
+                          <span className="text-[11px] opacity-80">
+                            {totalSeccion === 0
+                              ? "Sin ofertas para esta sección"
+                              : `${totalSeccion} oferta(s) totales · Mostrando ${ofertasSeccion.length} (${filtroActual})`}
+                          </span>
                         </div>
 
-                        {/* CTA + filtros */}
-                        <div className="flex flex-col items-stretch gap-2 md:items-end">
-                          {/* Filtros */}
-                          <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 border border-slate-700 px-1 py-1 shadow-[0_0_18px_rgba(15,23,42,0.9)]">
-                            {[
-                              { id: "todas", label: "Todas" },
-                              { id: "destacadas", label: "Destacadas" },
-                              { id: "recientes", label: "Recientes" },
-                            ].map((f) => {
-                              const activo = filtroActual === f.id;
-                              return (
-                                <button
-                                  key={f.id}
-                                  type="button"
-                                  onClick={() =>
-                                    setFiltrosSeccion((prev) => ({
-                                      ...prev,
-                                      [sec.id]: f.id as
+                        {/* Título grande de sección */}
+                        <h3 className="text-xl md:text-2xl font-extrabold text-slate-50 tracking-tight drop-shadow-[0_0_16px_rgba(15,23,42,0.9)]">
+                          {sec.label}
+                        </h3>
+
+                        {/* Descripción con efecto destacado */}
+                        <p className="text-sm md:text-base font-semibold text-slate-100 leading-snug">
+                          <span className="bg-gradient-to-r from-emerald-300 via-emerald-100 to-slate-100 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(16,185,129,0.55)]">
+                            {descripcionPorSeccion(sec.id)}
+                          </span>
+                        </p>
+
+                        {/* Banda de KPIs */}
+                        {metricas.length > 0 && (
+                          <div className="mt-2 grid gap-2 md:grid-cols-3">
+                            {metricas.map((m, idx) => (
+                              <div
+                                key={idx}
+                                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2.5 md:px-4 md:py-3 shadow-[0_0_20px_rgba(15,23,42,0.8)]"
+                              >
+                                <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 text-[10px] md:text-[11px] uppercase tracking-[0.16em] text-slate-300">
+                                    {m.icon && (
+                                      <span className="text-sm md:text-base">
+                                        {m.icon}
+                                      </span>
+                                    )}
+                                    <span>{m.label}</span>
+                                  </div>
+                                  <div className="text-sm md:text-lg font-extrabold text-emerald-200 drop-shadow-[0_0_14px_rgba(16,185,129,0.9)]">
+                                    {m.value}
+                                  </div>
+                                </div>
+
+                                {m.hint && (
+                                  <p className="mt-1 text-[10px] md:text-[11px] text-slate-300/85">
+                                    {m.hint}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lado derecho: filtros + CTA */}
+                      <div className="flex flex-col items-stretch gap-2 md:items-end">
+                        {/* Filtros */}
+                        <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 border border-slate-700 px-1 py-1 shadow-[0_0_18px_rgba(15,23,42,0.9)]">
+                          {[
+                            { id: "todas", label: "Todas" },
+                            { id: "destacadas", label: "Destacadas" },
+                            { id: "recientes", label: "Recientes" },
+                          ].map((f) => {
+                            const activo = filtroActual === f.id;
+                            return (
+                              <button
+                                key={f.id}
+                                type="button"
+                                onClick={() =>
+                                  setFiltrosSeccion((prev) => ({
+                                    ...prev,
+                                    [sec.id]:
+                                      f.id as
                                         | "todas"
                                         | "destacadas"
                                         | "recientes",
-                                    }))
-                                  }
-                                  className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-                                    activo
-                                      ? "bg-emerald-500 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.9)]"
-                                      : "text-slate-200 hover:bg-slate-800/80"
-                                  }`}
-                                >
-                                  {f.label}
-                                </button>
-                              );
-                            })}
-                          </div>
+                                  }))
+                                }
+                                className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
+                                  activo
+                                    ? "bg-emerald-500 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.9)]"
+                                    : "text-slate-200 hover:bg-slate-800/80"
+                                }`}
+                              >
+                                {f.label}
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                          {/* CTA grande */}
+                        {/* CTA grande */}
+                        <button
+                          onClick={sec.onClick}
+                          className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/80 hover:-translate-y-[1px] transition-transform`}
+                        >
+                          {textoBotonSeccion(sec.id, sec.label)}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 1) Mensaje cuando no hay ofertas */}
+                    {sinOfertas && (
+                      <p className="text-[12px] md:text-sm text-slate-200/85 mt-1">
+                        En cuanto haya una oferta interesante para{" "}
+                        {sec.label}, la verás aquí.
+                      </p>
+                    )}
+
+                    {/* 2) Catálogo de luz unificado dentro de Luz IMPULSO */}
+                    {sec.id === "luz" && (
+                      <div className="mt-5 space-y-3 rounded-2xl bg-slate-950/90 border border-emerald-800/80 p-4 md:p-5">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                          <h4 className="text-sm md:text-base font-semibold flex items-center gap-2">
+                            💡 Tarifas de luz disponibles (catálogo)
+                            <span className="text-[11px] font-normal text-emerald-100/80">
+                              ({tarifasLuzFiltradas.length} tarifa(s)
+                              activas)
+                            </span>
+                          </h4>
+
                           <button
-                            onClick={sec.onClick}
-                            className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/80 hover:-translate-y-[1px] transition-transform`}
+                            onClick={() => irAComparador("LUZ")}
+                            className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                           >
-                            {textoBotonSeccion(sec.id, sec.label)}
+                            Ir al comparador de luz
                           </button>
                         </div>
-                      </div>
 
-                      {/* 1) Mensaje cuando no hay ofertas */}
-                      {sinOfertas && (
-                        <p className="text-[12px] md:text-sm text-slate-200/85 mt-1">
-                          En cuanto haya una oferta interesante para {sec.label}, la verás aquí.
-                        </p>
-                      )}
+                        {/* Buscador catálogo luz */}
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                          <input
+                            value={busquedaTarifasLuz}
+                            onChange={(e) =>
+                              setBusquedaTarifasLuz(e.target.value)
+                            }
+                            placeholder="Buscar por compañía, tarifa, anexo, tipo..."
+                            className="w-full md:max-w-sm rounded-full bg-slate-900/80 border border-emerald-500/70 px-4 py-2 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                          />
+                          <p className="text-[11px] text-slate-300/80">
+                            {loadingTarifasLuz
+                              ? "Cargando catálogo de luz…"
+                              : errorTarifasLuz
+                              ? `Error al cargar: ${errorTarifasLuz}`
+                              : tarifasLuzFiltradas.length === 0
+                              ? "No hay tarifas que coincidan con tu búsqueda."
+                              : `${tarifasLuzFiltradas.length} tarifa(s) coinciden con tu búsqueda.`}
+                          </p>
+                        </div>
 
-                      {/* 2) Catálogo de luz unificado dentro de Luz IMPULSO */}
-                      {sec.id === "luz" && (
-                        <div className="mt-5 space-y-3 rounded-2xl bg-slate-950/90 border border-emerald-800/80 p-4 md:p-5">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                            <h4 className="text-sm md:text-base font-semibold flex items-center gap-2">
-                              💡 Tarifas de luz disponibles (catálogo)
-                              <span className="text-[11px] font-normal text-emerald-100/80">
-                                ({tarifasLuzFiltradas.length} tarifa(s) activas)
-                              </span>
-                            </h4>
-
-                            <button
-                              onClick={() => irAComparador("LUZ")}
-                              className="inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow shadow-emerald-500/40"
-                            >
-                              Ir al comparador de luz
-                            </button>
-                          </div>
-
-                          {/* Buscador catálogo luz */}
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                            <input
-                              value={busquedaTarifasLuz}
-                              onChange={(e) => setBusquedaTarifasLuz(e.target.value)}
-                              placeholder="Buscar por compañía, tarifa, anexo, tipo..."
-                              className="w-full md:max-w-sm rounded-full bg-slate-900/80 border border-emerald-500/70 px-4 py-2 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
-                            />
-                            <p className="text-[11px] text-slate-300/80">
-                              {loadingTarifasLuz
-                                ? "Cargando catálogo de luz…"
-                                : errorTarifasLuz
-                                ? `Error al cargar: ${errorTarifasLuz}`
-                                : tarifasLuzFiltradas.length === 0
-                                ? "No hay tarifas que coincidan con tu búsqueda."
-                                : `${tarifasLuzFiltradas.length} tarifa(s) coinciden con tu búsqueda.`}
-                            </p>
-                          </div>
-
-                          {!loadingTarifasLuz &&
-                            !errorTarifasLuz &&
-                            tarifasLuzFiltradas.length > 0 && (
-                              <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
-                                <div className="max-h-[420px] overflow-y-auto">
-                                  <table className="w-full table-fixed text-[11px] md:text-xs">
-                                    <thead>
-                                      <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
-                                        <th className="px-3 py-2 text-left">Compañía</th>
-                                        <th className="px-3 py-2 text-left">Tarifa</th>
-                                        <th className="px-3 py-2 text-left">Anexo</th>
-                                        <th className="px-2 py-2 text-center">P.P.1</th>
-                                        <th className="px-2 py-2 text-center">P.P.2</th>
-                                        <th className="px-2 py-2 text-center">P.P.3</th>
-                                        <th className="px-2 py-2 text-center">P.P.4</th>
-                                        <th className="px-2 py-2 text-center">P.P.5</th>
-                                        <th className="px-2 py-2 text-center">P.P.6</th>
-                                        <th className="px-2 py-2 text-center">P.E.1</th>
-                                        <th className="px-2 py-2 text-center">P.E.2</th>
-                                        <th className="px-2 py-2 text-center">P.E.3</th>
-                                        <th className="px-2 py-2 text-center">P.E.4</th>
-                                        <th className="px-2 py-2 text-center">P.E.5</th>
-                                        <th className="px-2 py-2 text-center">P.E.6</th>
-                                        <th className="px-3 py-2 text-right">Acción</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {tarifasLuzFiltradas.map((t, index) => (
+                        {!loadingTarifasLuz &&
+                          !errorTarifasLuz &&
+                          tarifasLuzFiltradas.length > 0 && (
+                            <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
+                              <div className="max-h-[420px] overflow-y-auto">
+                                <table className="w-full table-fixed text-[11px] md:text-xs">
+                                  <thead>
+                                    <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
+                                      <th className="px-3 py-2 text-left">
+                                        Compañía
+                                      </th>
+                                      <th className="px-3 py-2 text-left">
+                                        Tarifa
+                                      </th>
+                                      <th className="px-3 py-2 text-left">
+                                        Anexo
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.P.1
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.P.2
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.P.3
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.P.4
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.P.5
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.P.6
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.E.1
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.E.2
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.E.3
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.E.4
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.E.5
+                                      </th>
+                                      <th className="px-2 py-2 text-center">
+                                        P.E.6
+                                      </th>
+                                      <th className="px-3 py-2 text-right">
+                                        Acción
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {tarifasLuzFiltradas.map(
+                                      (t, index) => (
                                         <tr
                                           key={t.id}
                                           className={`${
@@ -1753,130 +2121,163 @@ export default function BienvenidaContenido() {
 
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.potenciaP1 != null
-                                              ? t.potenciaP1.toFixed(5)
+                                              ? t.potenciaP1.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.potenciaP2 != null
-                                              ? t.potenciaP2.toFixed(5)
+                                              ? t.potenciaP2.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.potenciaP3 != null
-                                              ? t.potenciaP3.toFixed(5)
+                                              ? t.potenciaP3.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.potenciaP4 != null
-                                              ? t.potenciaP4.toFixed(5)
+                                              ? t.potenciaP4.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.potenciaP5 != null
-                                              ? t.potenciaP5.toFixed(5)
+                                              ? t.potenciaP5.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.potenciaP6 != null
-                                              ? t.potenciaP6.toFixed(5)
+                                              ? t.potenciaP6.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
 
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.energiaP1 != null
-                                              ? t.energiaP1.toFixed(5)
+                                              ? t.energiaP1.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.energiaP2 != null
-                                              ? t.energiaP2.toFixed(5)
+                                              ? t.energiaP2.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.energiaP3 != null
-                                              ? t.energiaP3.toFixed(5)
+                                              ? t.energiaP3.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.energiaP4 != null
-                                              ? t.energiaP4.toFixed(5)
+                                              ? t.energiaP4.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.energiaP5 != null
-                                              ? t.energiaP5.toFixed(5)
+                                              ? t.energiaP5.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
                                           <td className="px-2 py-2 text-right font-semibold">
                                             {t.energiaP6 != null
-                                              ? t.energiaP6.toFixed(5)
+                                              ? t.energiaP6.toFixed(
+                                                  5
+                                                )
                                               : "-"}
                                           </td>
 
                                           <td className="px-3 py-2 text-right">
                                             <button
-                                              onClick={() => irAComparador("LUZ")}
+                                              onClick={() =>
+                                                irAComparador("LUZ")
+                                              }
                                               className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow shadow-emerald-500/40"
                                             >
                                               Calcular ahorro
                                             </button>
                                           </td>
                                         </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
+                                      )
+                                    )}
+                                  </tbody>
+                                </table>
                               </div>
-                            )}
-                        </div>
-                      )}
+                            </div>
+                          )}
+                      </div>
+                    )}
 
-                      {/* 3) Carrusel de ofertas (solo si hay ofertas) */}
-                      {!sinOfertas && (
-                        <div className="relative mt-4 pb-4">
-                          {/* FLECHA IZQUIERDA */}
-                          <button
-                            onClick={() => scrollSeccion(sec.id, "left")}
-                            className="
+                    {/* 3) Carrusel de ofertas (solo si hay ofertas) */}
+                    {!sinOfertas && (
+                      <div className="relative mt-4 pb-4">
+                        {/* FLECHA IZQUIERDA */}
+                        <button
+                          onClick={() =>
+                            scrollSeccion(sec.id, "left")
+                          }
+                          className="
                               absolute left-2 top-1/2 -translate-y-1/2 z-20
                               bg-slate-950/90 backdrop-blur-sm border border-slate-600
                               hover:bg-slate-800 text-slate-100
                               w-9 h-9 rounded-full flex items-center justify-center
                               shadow-[0_0_16px_rgba(0,0,0,0.8)]
                             "
-                          >
-                            ◀
-                          </button>
+                        >
+                          ◀
+                        </button>
 
-                          {/* FLECHA DERECHA */}
-                          <button
-                            onClick={() => scrollSeccion(sec.id, "right")}
-                            className="
+                        {/* FLECHA DERECHA */}
+                        <button
+                          onClick={() =>
+                            scrollSeccion(sec.id, "right")
+                          }
+                          className="
                               absolute right-2 top-1/2 -translate-y-1/2 z-20
                               bg-slate-950/90 backdrop-blur-sm border border-slate-600
                               hover:bg-slate-800 text-slate-100
                               w-9 h-9 rounded-full flex items-center justify-center
                               shadow-[0_0_16px_rgba(0,0,0,0.8)]
                             "
-                          >
-                            ▶
-                          </button>
+                        >
+                          ▶
+                        </button>
 
-                          {/* CARRUSEL -> padding lateral para que NO se monten flechas y tarjetas */}
-                          <div
-                            className="overflow-x-auto px-10"
-                            ref={(el) => {
-                              carruselRefs.current[sec.id] = el;
-                            }}
-                          >
-                            <div className="flex gap-4 min-w-full pb-1">
-                              {ofertasSeccion.map((oferta) => (
-                                <div
-                                  key={oferta.id}
-                                  className={`
+                        {/* CARRUSEL */}
+                        <div
+                          className="overflow-x-auto px-10"
+                          ref={(el) => {
+                            carruselRefs.current[sec.id] = el;
+                          }}
+                        >
+                          <div className="flex gap-4 min-w-full pb-1">
+                            {ofertasSeccion.map((oferta) => (
+                              <div
+                                key={oferta.id}
+                                className={`
                                     relative overflow-hidden
                                     min-w-[280px] max-w-xs
-                                    rounded-2xl border ${cfg?.border ?? "border-slate-700"}
+                                    rounded-2xl border ${
+                                      cfg?.border ?? "border-slate-700"
+                                    }
                                     bg-gradient-to-br ${cardGradient}
                                     ${cardGlow}
                                     px-4 py-3
@@ -1884,185 +2285,183 @@ export default function BienvenidaContenido() {
                                     transition-transform duration-300
                                     hover:-translate-y-1
                                   `}
-                                >
-                                  {/* brillo interior */}
-                                  <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+                              >
+                                <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
 
-                                  <div className="flex-1 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
-                                        >
-                                          {cfg?.label || sec.label}
-                                        </span>
-                                        {oferta.destacada && (
-                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
-                                            Destacada
-                                          </span>
-                                        )}
-                                      </div>
-                                      {/* Fecha arriba a la derecha */}
-                                      <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
-                                        {formFecha(oferta.creadaEn)}
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
+                                      >
+                                        {cfg?.label || sec.label}
                                       </span>
+                                      {oferta.destacada && (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
+                                          Destacada
+                                        </span>
+                                      )}
                                     </div>
-
-                                    <h4 className="text-base md:text-lg font-bold text-slate-50">
-                                      {oferta.titulo}
-                                    </h4>
-                                    <p className="text-sm md:text-base text-slate-100/90">
-                                      {oferta.descripcionCorta}
-                                    </p>
+                                    <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
+                                      {formFecha(oferta.creadaEn)}
+                                    </span>
                                   </div>
 
-                                  <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
-                                    {tipoSec === "LUZ" ||
-                                    tipoSec === "GAS" ||
-                                    tipoSec === "TELEFONIA" ? (
-                                      <button
-                                        onClick={() =>
-                                          irAComparadorConOferta(
-                                            tipoSec as TipoOferta,
-                                            oferta
-                                          )
-                                        }
-                                        className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
-                                      >
-                                        Ver en comparador
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={sec.onClick}
-                                        className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
-                                      >
-                                        Ir a {sec.label}
-                                      </button>
-                                    )}
-                                  </div>
+                                  <h4 className="text-base md:text-lg font-bold text-slate-50">
+                                    {oferta.titulo}
+                                  </h4>
+                                  <p className="text-sm md:text-base text-slate-100/90">
+                                    {oferta.descripcionCorta}
+                                  </p>
                                 </div>
-                              ))}
-                            </div>
+
+                                <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
+                                  {tipoSec === "LUZ" ||
+                                  tipoSec === "GAS" ||
+                                  tipoSec === "TELEFONIA" ? (
+                                    <button
+                                      onClick={() =>
+                                        irAComparadorConOferta(
+                                          tipoSec as TipoOferta,
+                                          oferta
+                                        )
+                                      }
+                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
+                                    >
+                                      Ver en comparador
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={sec.onClick}
+                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
+                                    >
+                                      Ir a {sec.label}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </section>
-            )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </section>
+          )}
 
-
-
-
-            <footer className="pt-4 border-top border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
-              <span>© 2025 Impulso Energético</span>
-              <div className="flex gap-4">
-                <button className="hover:text-emerald-300 transition">
-                  Ver ofertas
-                </button>
-                <button className="hover:text-emerald-300 transition">
-                  Aviso legal
-                </button>
-                <button className="hover:text-emerald-300 transition">
-                  Privacidad
-                </button>
-              </div>
-            </footer>
-          </main>
-        </div>
-      </div>
-
-      {/* MODAL DATOS */}
-      {modalAbierto && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-3">
-          <div className="w-full max-w-lg rounded-2xl bg-slate-950 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-5 md:p-6 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg md:text-xl font-bold text-slate-50">
-                  Actualiza tus datos
-                </h2>
-                <p className="text-xs md:text-sm text-slate-300 mt-1">
-                  Revisa tu nombre, email y teléfono para poder enviarte ofertas
-                  y seguimiento de tus comparativas.
-                </p>
-              </div>
-              <button
-                onClick={() => setModalAbierto(false)}
-                className="text-slate-400 hover:text-slate-100 text-lg"
-                aria-label="Cerrar"
-              >
-                ✕
+          <footer className="pt-4 border-t border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span>© 2025 Impulso Energético</span>
+            <div className="flex gap-4">
+              <button className="hover:text-emerald-300 transition">
+                Ver ofertas
+              </button>
+              <button className="hover:text-emerald-300 transition">
+                Aviso legal
+              </button>
+              <button className="hover:text-emerald-300 transition">
+                Privacidad
               </button>
             </div>
-
-            <form onSubmit={manejarGuardarDatos} className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-200">
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  value={formNombre}
-                  onChange={(e) => setFormNombre(e.target.value)}
-                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-200">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-200">
-                  Teléfono
-                </label>
-                <input
-                  type="tel"
-                  value={formTelefono}
-                  onChange={(e) => setFormTelefono(e.target.value)}
-                  className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-                  required
-                />
-              </div>
-
-              {mensajeGuardarError && (
-                <p className="text-xs text-red-300">{mensajeGuardarError}</p>
-              )}
-              {mensajeGuardarOK && (
-                <p className="text-xs text-emerald-300">{mensajeGuardarOK}</p>
-              )}
-
-              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalAbierto(false)}
-                  className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
-                >
-                  Salir sin guardar
-                </button>
-                <button
-                  type="submit"
-                  disabled={guardando}
-                  className="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-xs md:text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {guardando ? "Guardando..." : "Guardar cambios"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          </footer>
+        </main>
+      </div>
     </div>
-  );
-}
+
+    {/* MODAL DATOS */}
+    {modalAbierto && (
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-3">
+        <div className="w-full max-w-lg rounded-2xl bg-slate-950 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-5 md:p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg md:text-xl font-bold text-slate-50">
+                Actualiza tus datos
+              </h2>
+              <p className="text-xs md:text-sm text-slate-300 mt-1">
+                Revisa tu nombre, email y teléfono para poder enviarte
+                ofertas y seguimiento de tus comparativas.
+              </p>
+            </div>
+            <button
+              onClick={() => setModalAbierto(false)}
+              className="text-slate-400 hover:text-slate-100 text-lg"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={manejarGuardarDatos} className="space-y-4">
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-slate-200">
+                Nombre completo
+              </label>
+              <input
+                type="text"
+                value={formNombre}
+                onChange={(e) => setFormNombre(e.target.value)}
+                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-slate-200">
+                Email
+              </label>
+              <input
+                type="email"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-slate-200">
+                Teléfono
+              </label>
+              <input
+                type="tel"
+                value={formTelefono}
+                onChange={(e) => setFormTelefono(e.target.value)}
+                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
+                required
+              />
+            </div>
+
+            {mensajeGuardarError && (
+              <p className="text-xs text-red-300">
+                {mensajeGuardarError}
+              </p>
+            )}
+            {mensajeGuardarOK && (
+              <p className="text-xs text-emerald-300">
+                {mensajeGuardarOK}
+              </p>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalAbierto(false)}
+                className="px-4 py-2 rounded-full border border-slate-600 text-xs md:text-sm text-slate-200 hover:bg-slate-800/70"
+              >
+                Salir sin guardar
+              </button>
+              <button
+                type="submit"
+                disabled={guardando}
+                className="px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-xs md:text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {guardando ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+  </div>
+);
