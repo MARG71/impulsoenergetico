@@ -4,7 +4,21 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 
-type TipoOferta = "LUZ" | "GAS" | "TELEFONIA";
+type TipoOferta =
+  | "LUZ"
+  | "GAS"
+  | "TELEFONIA"
+  | "SOLAR"
+  | "AEROTERMIA"
+  | "BATERIA"
+  | "FERRETERIA"
+  | "INMOBILIARIA"
+  | "VIAJES"
+  | "REPUESTOS"
+  | "SEGUROS"
+  | "GANGAS"
+  | "HIPOTECAS"
+  | "PLADUR";
 
 interface Oferta {
   id: string;
@@ -22,14 +36,12 @@ interface TarifaResumen {
   tipo: string;
   subtipo: string;
   compania: string;
-  nombre: string; // anexo / nombre tarifa
+  nombre: string;
 
-  // Precios de energía “clásicos” (por si tu API los usa)
   precioKwhP1: number | null;
   precioKwhP2: number | null;
   precioKwhP3: number | null;
 
-  // Potencias P1–P6 (opcionales)
   potenciaP1?: number | null;
   potenciaP2?: number | null;
   potenciaP3?: number | null;
@@ -37,7 +49,6 @@ interface TarifaResumen {
   potenciaP5?: number | null;
   potenciaP6?: number | null;
 
-  // Energías P1–P6 (opcionales)
   energiaP1?: number | null;
   energiaP2?: number | null;
   energiaP3?: number | null;
@@ -46,6 +57,7 @@ interface TarifaResumen {
   energiaP6?: number | null;
 }
 
+/** Config visual por tipo de oferta (para pills y botones) */
 const tipoConfig: Record<
   TipoOferta,
   { label: string; bgPill: string; btn: string; border: string }
@@ -68,14 +80,129 @@ const tipoConfig: Record<
     btn: "bg-sky-600 hover:bg-sky-500",
     border: "border-sky-200",
   },
+  SOLAR: {
+    label: "Solar",
+    bgPill: "bg-amber-100 text-amber-800",
+    btn: "bg-amber-500 hover:bg-amber-400",
+    border: "border-amber-200",
+  },
+  AEROTERMIA: {
+    label: "Aerotermia / Geotermia",
+    bgPill: "bg-cyan-100 text-cyan-800",
+    btn: "bg-cyan-500 hover:bg-cyan-400",
+    border: "border-cyan-200",
+  },
+  BATERIA: {
+    label: "Batería IA",
+    bgPill: "bg-purple-100 text-purple-800",
+    btn: "bg-purple-600 hover:bg-purple-500",
+    border: "border-purple-200",
+  },
+  FERRETERIA: {
+    label: "Ferretería",
+    bgPill: "bg-lime-100 text-lime-800",
+    btn: "bg-lime-600 hover:bg-lime-500",
+    border: "border-lime-200",
+  },
+  INMOBILIARIA: {
+    label: "Inmobiliaria",
+    bgPill: "bg-rose-100 text-rose-800",
+    btn: "bg-rose-500 hover:bg-rose-400",
+    border: "border-rose-200",
+  },
+  VIAJES: {
+    label: "Viajes",
+    bgPill: "bg-indigo-100 text-indigo-800",
+    btn: "bg-indigo-500 hover:bg-indigo-400",
+    border: "border-indigo-200",
+  },
+  REPUESTOS: {
+    label: "Repuestos",
+    bgPill: "bg-orange-100 text-orange-800",
+    btn: "bg-orange-500 hover:bg-orange-400",
+    border: "border-orange-200",
+  },
+  SEGUROS: {
+    label: "Seguros",
+    bgPill: "bg-slate-200 text-slate-800",
+    btn: "bg-slate-500 hover:bg-slate-400",
+    border: "border-slate-300",
+  },
+  GANGAS: {
+    label: "La Tienda de las Gangas",
+    bgPill: "bg-pink-100 text-pink-800",
+    btn: "bg-pink-500 hover:bg-pink-400",
+    border: "border-pink-200",
+  },
+  HIPOTECAS: {
+    label: "Hipotecas y financiación",
+    bgPill: "bg-emerald-100 text-emerald-800",
+    btn: "bg-emerald-600 hover:bg-emerald-500",
+    border: "border-emerald-200",
+  },
+  PLADUR: {
+    label: "Pladur DICOPLAC",
+    bgPill: "bg-zinc-100 text-zinc-800",
+    btn: "bg-zinc-500 hover:bg-zinc-400",
+    border: "border-zinc-200",
+  },
 };
 
+/** Normaliza el tipo que viene de BD al enum que usamos aquí */
 function normalizarTipoOferta(raw: string | undefined | null): TipoOferta {
   const v = String(raw || "").toUpperCase();
+
+  if (v === "LUZ") return "LUZ";
   if (v === "GAS") return "GAS";
   if (v === "TELEFONIA" || v === "TELÉFONIA") return "TELEFONIA";
+  if (v === "SOLAR") return "SOLAR";
+  if (v === "AEROTERMIA" || v === "GEOTERMIA") return "AEROTERMIA";
+  if (v === "BATERIA" || v === "BATERÍA" || v === "BATERIA IA") return "BATERIA";
+  if (v === "FERRETERIA" || v === "FERRETERÍA") return "FERRETERIA";
+  if (v === "INMOBILIARIA") return "INMOBILIARIA";
+  if (v === "VIAJES") return "VIAJES";
+  if (v === "REPUESTOS" || v === "REPUESTO") return "REPUESTOS";
+  if (v === "SEGUROS" || v === "SEGURO") return "SEGUROS";
+  if (v === "GANGAS") return "GANGAS";
+  if (v === "HIPOTECAS" || v === "FINANCIACION" || v === "FINANCIACIÓN")
+    return "HIPOTECAS";
+  if (v === "PLADUR") return "PLADUR";
+
+  // por defecto, lo consideramos LUZ
   return "LUZ";
 }
+
+/** Qué tipo de oferta corresponde a cada sección del grid de secciones */
+const tipoPorSeccion: Record<string, TipoOferta | null> = {
+  luz: "LUZ",
+  gas: "GAS",
+  telefonia: "TELEFONIA",
+  solar: "SOLAR",
+  aerotermia: "AEROTERMIA",
+  hermes: "BATERIA",
+  ferreteria: "FERRETERIA",
+  inmobiliaria: "INMOBILIARIA",
+  viajes: "VIAJES",
+  repuestos: "REPUESTOS",
+  seguros: "SEGUROS",
+  gangas: "GANGAS",
+  hipotecas: "HIPOTECAS",
+  pladur: "PLADUR",
+};
+
+/** Texto para el botón grande de cada sección en la parte de ofertas */
+const textoBotonSeccion = (seccionId: string, label: string) => {
+  switch (seccionId) {
+    case "luz":
+      return "Ir al comparador de Luz";
+    case "gas":
+      return "Ir al comparador de Gas";
+    case "telefonia":
+      return "Ir al comparador de Telefonía";
+    default:
+      return `Ir a ${label}`;
+  }
+};
 
 export default function BienvenidaContenido() {
   const router = useRouter();
@@ -87,7 +214,6 @@ export default function BienvenidaContenido() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tarifa catálogo (LUZ importada de Excel)
   const [tarifasLuz, setTarifasLuz] = useState<TarifaResumen[]>([]);
   const [loadingTarifasLuz, setLoadingTarifasLuz] = useState(false);
   const [errorTarifasLuz, setErrorTarifasLuz] = useState<string | null>(null);
@@ -99,7 +225,6 @@ export default function BienvenidaContenido() {
   const [lugarId, setLugarId] = useState<string | null>(null);
   const [leadOK, setLeadOK] = useState(false);
 
-  // 🔹 Estado para el modal de datos
   const [modalAbierto, setModalAbierto] = useState(false);
   const [formNombre, setFormNombre] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -110,13 +235,11 @@ export default function BienvenidaContenido() {
   );
   const [mensajeGuardarOK, setMensajeGuardarOK] = useState<string | null>(null);
 
-  // Datos especiales de club / lugar
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [clubMensaje, setClubMensaje] = useState<string | null>(null);
   const [clubAportacion, setClubAportacion] = useState<number | null>(null);
   const [clubColorAcento, setClubColorAcento] = useState<string>("#22c55e");
 
-  // Lee datos básicos y posibles params extra de club
   useEffect(() => {
     const nombreURL = searchParams.get("nombre");
     const agenteURL = searchParams.get("agenteId");
@@ -150,7 +273,6 @@ export default function BienvenidaContenido() {
       // ignore
     }
 
-    // Extra: datos de club que puedan venir por querystring
     const clubLogoParam = searchParams.get("clubLogo");
     const clubMensajeParam = searchParams.get("clubMensaje");
     const clubAportacionParam = searchParams.get("clubAportacion");
@@ -171,7 +293,6 @@ export default function BienvenidaContenido() {
     if (clubColorParam) setClubColorAcento(clubColorParam);
   }, [searchParams]);
 
-  // 🧭 Mantener agenteId y lugarId en la URL para no perder trazabilidad
   useEffect(() => {
     if (!agenteId && !lugarId) return;
 
@@ -194,7 +315,6 @@ export default function BienvenidaContenido() {
     }
   }, [agenteId, lugarId, router, searchParams]);
 
-  // Si tenemos lugarId, cargamos info especial REAL del lugar
   useEffect(() => {
     if (!lugarId) return;
 
@@ -209,7 +329,6 @@ export default function BienvenidaContenido() {
         const lugar = (data && (data.lugar || data)) || null;
         if (!lugar) return;
 
-        // Solo mostramos la tarjeta si el lugar está marcado como especial
         if (lugar.especial === false) return;
 
         const posibleLogo: string | null = lugar.especialLogoUrl ?? null;
@@ -246,7 +365,6 @@ export default function BienvenidaContenido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lugarId]);
 
-  // ⚙️ Inicializar formulario con nombre + localStorage
   useEffect(() => {
     setFormNombre(nombre || "");
 
@@ -275,7 +393,6 @@ export default function BienvenidaContenido() {
     return qs ? `?${qs}` : "";
   };
 
-  // Carga de ofertas
   useEffect(() => {
     const cargarOfertas = async () => {
       try {
@@ -315,7 +432,6 @@ export default function BienvenidaContenido() {
     cargarOfertas();
   }, []);
 
-  // Cargar tarifas REALES de luz (OfertaTarifa) para mostrarlas en bienvenida
   useEffect(() => {
     const cargarTarifasLuz = async () => {
       try {
@@ -330,7 +446,6 @@ export default function BienvenidaContenido() {
 
         const data = await res.json();
         const items = data.items || [];
-        console.log("PRIMERA TARIFA API", items[0]);
 
         const lista: TarifaResumen[] = items.map((t: any) => ({
           id: t.id,
@@ -341,8 +456,6 @@ export default function BienvenidaContenido() {
           precioKwhP1: t.precioKwhP1 != null ? Number(t.precioKwhP1) : null,
           precioKwhP2: t.precioKwhP2 != null ? Number(t.precioKwhP2) : null,
           precioKwhP3: t.precioKwhP3 != null ? Number(t.precioKwhP3) : null,
-
-          // 🔹 POTENCIAS P1–P6 (probamos varios nombres posibles)
           potenciaP1:
             t.potenciaP1 != null
               ? Number(t.potenciaP1)
@@ -391,8 +504,6 @@ export default function BienvenidaContenido() {
               : t.precioPotenciaP6 != null
               ? Number(t.precioPotenciaP6)
               : null,
-
-          // Energías P1–P6. Si no vienen, usamos como mínimo P1–P3 de precioKwh
           energiaP1:
             t.energiaP1 != null
               ? Number(t.energiaP1)
@@ -474,21 +585,6 @@ export default function BienvenidaContenido() {
     [ofertasFiltradas]
   );
 
-  const ofertasPorTipo = useMemo(() => {
-    const grupos: Record<TipoOferta, Oferta[]> = {
-      LUZ: [],
-      GAS: [],
-      TELEFONIA: [],
-    };
-    (ofertasFiltradas || []).forEach((o) => {
-      if (!o.activa) return;
-      const key = normalizarTipoOferta(o.tipo as string);
-      grupos[key].push(o);
-    });
-    return grupos;
-  }, [ofertasFiltradas]);
-
-  // 🔍 Sugerencias para el desplegable (autocomplete)
   const sugerencias = useMemo(() => {
     const txt = busqueda.trim();
     if (txt.length < 2) return [];
@@ -514,7 +610,6 @@ export default function BienvenidaContenido() {
     else router.push(`/comparador${buildQuery()}`);
   };
 
-  // 👉 Enviamos ofertaId + ofertaNombre + tipo al comparador
   const irAComparadorConOferta = (tipo: TipoOferta, oferta: Oferta) => {
     const extra: Record<string, string> = {
       ofertaId: String(oferta.id),
@@ -524,7 +619,7 @@ export default function BienvenidaContenido() {
       extra.ofertaNombre = oferta.titulo;
     }
 
-    const key = normalizarTipoOferta(tipo);
+    const key = normalizarTipoOferta(tipo as string);
     if (key === "LUZ") extra.tipo = "luz";
     else if (key === "GAS") extra.tipo = "gas";
     else if (key === "TELEFONIA") extra.tipo = "telefonia";
@@ -532,14 +627,12 @@ export default function BienvenidaContenido() {
     router.push(`/comparador${buildQuery(extra)}`);
   };
 
-  // Click en una sugerencia del buscador
   const manejarClickSugerencia = (oferta: Oferta) => {
     const tipoNorm = normalizarTipoOferta(oferta.tipo as string);
     irAComparadorConOferta(tipoNorm, oferta);
-    setBusqueda(""); // limpiar y cerrar desplegable
+    setBusqueda("");
   };
 
-  // Guardar datos del modal
   const manejarGuardarDatos = async (e: React.FormEvent) => {
     e.preventDefault();
     setGuardando(true);
@@ -563,7 +656,6 @@ export default function BienvenidaContenido() {
         throw new Error("No se pudieron guardar los datos");
       }
 
-      // Guardamos en localStorage para futuros accesos
       try {
         localStorage.setItem("clienteNombre", formNombre);
         localStorage.setItem("clienteEmail", formEmail);
@@ -584,146 +676,136 @@ export default function BienvenidaContenido() {
     }
   };
 
-  // 🔹 Config de secciones para los botones tipo tarjeta (neón)
-  // 🔹 Config de secciones para los botones tipo tarjeta (neón)
-const secciones = [
-  {
-    id: "luz",
-    label: "Luz IMPULSO",
-    icon: "💡",
-    bgClass:
-      "bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-slate-950/90",
-    ringClass: "ring-emerald-400/70 group-hover:ring-emerald-200/90",
-    onClick: () => irAComparador("LUZ" as TipoOferta),
-  },
-  {
-    id: "gas",
-    label: "Gas IMPULSO",
-    icon: "🔥",
-    bgClass:
-      "bg-gradient-to-br from-orange-500/30 via-orange-500/10 to-slate-950/90",
-    ringClass: "ring-orange-400/70 group-hover:ring-orange-200/90",
-    onClick: () => irAComparador("GAS" as TipoOferta),
-  },
-  {
-    id: "telefonia",
-    label: "Telefonía IMPULSO",
-    icon: "📶",
-    bgClass:
-      "bg-gradient-to-br from-sky-500/30 via-sky-500/10 to-slate-950/90",
-    ringClass: "ring-sky-400/70 group-hover:ring-sky-200/90",
-    onClick: () => irAComparador("TELEFONIA" as TipoOferta),
-  },
-  {
-    id: "solar",
-    label: "Solar IMPULSO",
-    icon: "☀️",
-    bgClass:
-      "bg-gradient-to-br from-amber-400/35 via-amber-400/10 to-slate-950/90",
-    ringClass: "ring-amber-300/70 group-hover:ring-amber-100/90",
-    onClick: () => router.push(`/solar${buildQuery()}`),
-  },
-  {
-    id: "aerotermia",
-    label: "Aerotermia y Geotermia IMPULSO",
-    icon: "🌬️",
-    bgClass:
-      "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
-    ringClass: "ring-cyan-300/70 group-hover:ring-cyan-100/90",
-    onClick: () => router.push(`/aerotermia${buildQuery()}`),
-  },
-  {
-    id: "hermes",
-    label: "Batería IA",
-    icon: "🔋",
-    bgClass:
-      "bg-gradient-to-br from-purple-500/35 via-purple-500/10 to-slate-950/90",
-    ringClass: "ring-purple-400/70 group-hover:ring-purple-200/90",
-    onClick: () => router.push(`/bateria-hermes${buildQuery()}`),
-  },
-  {
-    id: "ferreteria",
-    label: "Ferretería BRICOTITAN",
-    icon: "🔩",
-    bgClass:
-      "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
-    ringClass: "ring-lime-300/70 group-hover:ring-lime-100/90",
-    onClick: () => router.push(`/ferreteria${buildQuery()}`),
-  },
-  {
-    id: "inmobiliaria",
-    label: "Inmobiliaria IMPULSO",
-    icon: "🏡",
-    bgClass:
-      "bg-gradient-to-br from-rose-500/35 via-rose-500/10 to-slate-950/90",
-    ringClass: "ring-rose-400/70 group-hover:ring-rose-200/90",
-    onClick: () => router.push(`/inmobiliaria${buildQuery()}`),
-  },
-  {
-    id: "viajes",
-    label: "Viajes VIAJANDO CON MERY",
-    icon: "✈️",
-    bgClass:
-      "bg-gradient-to-br from-indigo-500/35 via-indigo-500/10 to-slate-950/90",
-    ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
-    onClick: () => router.push(`/viajes${buildQuery()}`),
-  },
-  {
-    id: "repuestos",
-    label: "Repuestos RAPID",
-    icon: "🚗",
-    bgClass:
-      "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
-    ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
-    onClick: () => router.push(`/repuestos${buildQuery()}`),
-  },
-  {
-    id: "seguros",
-    label: "Seguros IMPULSO",
-    icon: "🛡️",
-    bgClass:
-      "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
-    ringClass: "ring-slate-300/70 group-hover:ring-slate-100/90",
-    onClick: () => router.push(`/seguros${buildQuery()}`),
-  },
+  /** GRID de secciones (botones grandes de la izquierda) */
+  const secciones = [
+    {
+      id: "luz",
+      label: "Luz IMPULSO",
+      icon: "💡",
+      bgClass:
+        "bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-slate-950/90",
+      ringClass: "ring-emerald-400/70 group-hover:ring-emerald-200/90",
+      onClick: () => irAComparador("LUZ" as TipoOferta),
+    },
+    {
+      id: "gas",
+      label: "Gas IMPULSO",
+      icon: "🔥",
+      bgClass:
+        "bg-gradient-to-br from-orange-500/30 via-orange-500/10 to-slate-950/90",
+      ringClass: "ring-orange-400/70 group-hover:ring-orange-200/90",
+      onClick: () => irAComparador("GAS" as TipoOferta),
+    },
+    {
+      id: "telefonia",
+      label: "Telefonía IMPULSO",
+      icon: "📶",
+      bgClass:
+        "bg-gradient-to-br from-sky-500/30 via-sky-500/10 to-slate-950/90",
+      ringClass: "ring-sky-400/70 group-hover:ring-sky-200/90",
+      onClick: () => irAComparador("TELEFONIA" as TipoOferta),
+    },
+    {
+      id: "solar",
+      label: "Solar IMPULSO",
+      icon: "☀️",
+      bgClass:
+        "bg-gradient-to-br from-amber-400/35 via-amber-400/10 to-slate-950/90",
+      ringClass: "ring-amber-300/70 group-hover:ring-amber-100/90",
+      onClick: () => router.push(`/solar${buildQuery()}`),
+    },
+    {
+      id: "aerotermia",
+      label: "Aerotermia y Geotermia IMPULSO",
+      icon: "🌬️",
+      bgClass:
+        "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
+      ringClass: "ring-cyan-300/70 group-hover:ring-cyan-100/90",
+      onClick: () => router.push(`/aerotermia${buildQuery()}`),
+    },
+    {
+      id: "hermes",
+      label: "Batería IA",
+      icon: "🔋",
+      bgClass:
+        "bg-gradient-to-br from-purple-500/35 via-purple-500/10 to-slate-950/90",
+      ringClass: "ring-purple-400/70 group-hover:ring-purple-200/90",
+      onClick: () => router.push(`/bateria-hermes${buildQuery()}`),
+    },
+    {
+      id: "ferreteria",
+      label: "Ferretería BRICOTITAN",
+      icon: "🔩",
+      bgClass:
+        "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
+      ringClass: "ring-lime-300/70 group-hover:ring-lime-100/90",
+      onClick: () => router.push(`/ferreteria${buildQuery()}`),
+    },
+    {
+      id: "inmobiliaria",
+      label: "Inmobiliaria IMPULSO",
+      icon: "🏡",
+      bgClass:
+        "bg-gradient-to-br from-rose-500/35 via-rose-500/10 to-slate-950/90",
+      ringClass: "ring-rose-400/70 group-hover:ring-rose-200/90",
+      onClick: () => router.push(`/inmobiliaria${buildQuery()}`),
+    },
+    {
+      id: "viajes",
+      label: "Viajes VIAJANDO CON MERY",
+      icon: "✈️",
+      bgClass:
+        "bg-gradient-to-br from-indigo-500/35 via-indigo-500/10 to-slate-950/90",
+      ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
+      onClick: () => router.push(`/viajes${buildQuery()}`),
+    },
+    {
+      id: "repuestos",
+      label: "Repuestos RAPID",
+      icon: "🚗",
+      bgClass:
+        "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
+      ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
+      onClick: () => router.push(`/repuestos${buildQuery()}`),
+    },
+    {
+      id: "seguros",
+      label: "Seguros IMPULSO",
+      icon: "🛡️",
+      bgClass:
+        "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
+      ringClass: "ring-slate-300/70 group-hover:ring-slate-100/90",
+      onClick: () => router.push(`/seguros${buildQuery()}`),
+    },
+    {
+      id: "gangas",
+      label: "La Tienda de las Gangas",
+      icon: "🛍️",
+      bgClass:
+        "bg-gradient-to-br from-pink-500/35 via-pink-500/10 to-slate-950/90",
+      ringClass: "ring-pink-300/70 group-hover:ring-pink-100/90",
+      onClick: () => router.push(`/gangas${buildQuery()}`),
+    },
+    {
+      id: "hipotecas",
+      label: "Hipotecas y Financiación IMPULSO",
+      icon: "🏦",
+      bgClass:
+        "bg-gradient-to-br from-emerald-500/35 via-emerald-500/10 to-slate-950/90",
+      ringClass: "ring-emerald-300/70 group-hover:ring-emerald-100/90",
+      onClick: () => router.push(`/hipotecas-financiacion${buildQuery()}`),
+    },
+    {
+      id: "pladur",
+      label: "Pladur DICOPLAC",
+      icon: "🏗️",
+      bgClass:
+        "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
+      ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
+      onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
+    },
+  ];
 
-  // ⭐ NUEVA SECCIÓN: LA TIENDA DE LAS GANGAS
-  {
-    id: "gangas",
-    label: "La Tienda de las Gangas",
-    icon: "🛍️",
-    bgClass:
-      "bg-gradient-to-br from-pink-500/35 via-pink-500/10 to-slate-950/90",
-    ringClass: "ring-pink-300/70 group-hover:ring-pink-100/90",
-    onClick: () => router.push(`/gangas${buildQuery()}`),
-  },
-
-  // ⭐ NUEVA SECCIÓN: HIPOTECAS Y FINANCIACIÓN IMPULSO
-  {
-    id: "hipotecas",
-    label: "Hipotecas y Financiación IMPULSO",
-    icon: "🏦",
-    bgClass:
-      "bg-gradient-to-br from-emerald-500/35 via-emerald-500/10 to-slate-950/90",
-    ringClass: "ring-emerald-300/70 group-hover:ring-emerald-100/90",
-    onClick: () => router.push(`/hipotecas-financiacion${buildQuery()}`),
-  },
-
-  // ⭐ NUEVO BOTÓN PLADUR DICOPLAC
-  {
-    id: "pladur",
-    label: "Pladur DICOPLAC",
-    icon: "🏗️",
-    bgClass:
-      "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
-    ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
-    onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
-  },
-];
-
-
-
-  // accesos rápidos
   const accesosRapidos = [
     { label: "Gas", onClick: () => irAComparador("GAS") },
     { label: "Telefonía", onClick: () => irAComparador("TELEFONIA") },
@@ -742,15 +824,23 @@ const secciones = [
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
 
+  /** Ofertas asociadas a una sección concreta del grid */
+  const obtenerOfertasDeSeccion = (seccionId: string): Oferta[] => {
+    const tipo = tipoPorSeccion[seccionId];
+    if (!tipo) return [];
+    return ofertasFiltradas.filter(
+      (o) => o.activa && normalizarTipoOferta(o.tipo as string) === tipo
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       <div className="w-screen px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 md:py-8">
         <div className="grid gap-8 md:grid-cols-[340px,1fr] lg:grid-cols-[360px,1fr] items-start">
-          {/* COLUMNA IZQUIERDA (logo + bienvenida + buscador + secciones) */}
+          {/* COLUMNA IZQUIERDA */}
           <aside className="space-y-6">
-            {/* BLOQUE SUPERIOR: logo (izquierda) + bienvenida+club (derecha) */}
+            {/* BLOQUE SUPERIOR: logo + bienvenida + club */}
             <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
-              {/* Columna izquierda: logo + contacto + subtítulo */}
               <div className="flex flex-col justify-between gap-4 lg:w-[280px] xl:w-[320px]">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center">
@@ -765,7 +855,6 @@ const secciones = [
                     </div>
                   </div>
 
-                  {/* Teléfono + email */}
                   <div className="space-y-1">
                     <p className="text-base md:text-lg font-bold text-slate-50">
                       Tel. 692 13 70 48
@@ -792,9 +881,7 @@ const secciones = [
                 </div>
               </div>
 
-              {/* Columna derecha: bienvenida + tarjeta club */}
               <div className="flex-1 rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4 md:p-5 lg:p-6 shadow-[0_0_32px_rgba(15,23,42,0.9)] flex flex-col lg:flex-row gap-5 lg:gap-7 items-start justify-between">
-                {/* Texto bienvenida + botones + accesos rápidos */}
                 <div className="flex-1 space-y-3">
                   <div className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                     IMPULSO ENERGÉTICO
@@ -836,7 +923,6 @@ const secciones = [
                     </p>
                   )}
 
-                  {/* Botones principales + accesos rápidos */}
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-1">
                     <div className="flex flex-wrap gap-3">
                       <button
@@ -853,7 +939,6 @@ const secciones = [
                       </button>
                     </div>
 
-                    {/* Accesos rápidos */}
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] md:text-[11px] tracking-[0.22em] uppercase text-slate-300">
                         ACCESOS RÁPIDOS A SECCIONES
@@ -874,7 +959,6 @@ const secciones = [
                   </div>
                 </div>
 
-                {/* Tarjeta club */}
                 {hayClubEspecial && (
                   <div
                     className="w-full lg:w-[260px] xl:w-[300px] relative overflow-hidden rounded-2xl bg-slate-950/80 border p-4 flex gap-4 items-center shadow-[0_0_28px_rgba(16,185,129,0.45)]"
@@ -931,7 +1015,7 @@ const secciones = [
               </div>
             </div>
 
-            {/* === BUSCADOR OFERTAS === */}
+            {/* BUSCADOR OFERTAS */}
             <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h2 className="text-sm md:text-base font-semibold">
@@ -948,7 +1032,6 @@ const secciones = [
                     🔍
                   </span>
 
-                  {/* DROPDOWN DE SUGERENCIAS */}
                   {sugerencias.length > 0 && (
                     <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
                       {sugerencias.map((oferta) => {
@@ -996,7 +1079,7 @@ const secciones = [
               </p>
             </section>
 
-            {/* SECCIONES */}
+            {/* SECCIONES (botones de la izquierda) */}
             <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
               <p className="text-base md:text-xl font-extrabold text-slate-50 uppercase tracking-[0.22em] flex items-center gap-3">
                 <span className="h-[2px] w-6 bg-emerald-400 rounded-full shadow-[0_0_16px_rgba(16,185,129,0.9)]" />
@@ -1032,7 +1115,7 @@ const secciones = [
             </nav>
           </aside>
 
-          {/* COLUMNA DERECHA: ofertas y catálogo */}
+          {/* COLUMNA DERECHA */}
           <main className="space-y-8 md:space-y-10">
             {loading && (
               <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center text-sm text-slate-300">
@@ -1115,7 +1198,7 @@ const secciones = [
               </section>
             )}
 
-            {/* TARIFAS REALES DE LUZ (catálogo Excel) — TABLA ESTILO COMPARATIVAS */}
+            {/* TABLA TARIFAS LUZ */}
             {!loadingTarifasLuz && !errorTarifasLuz && tarifasLuz.length > 0 && (
               <section className="space-y-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 p-4 md:p-5">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -1134,9 +1217,7 @@ const secciones = [
                   </button>
                 </div>
 
-                {/* CONTENEDOR TABLA — ajustado al ancho de pantalla */}
                 <div className="mt-2 rounded-2xl border border-emerald-800/70 bg-slate-950/95">
-                  {/* solo scroll vertical si hay muchas filas */}
                   <div className="max-h-[420px] overflow-y-auto">
                     <table className="w-full table-fixed text-[11px] md:text-xs">
                       <thead>
@@ -1170,22 +1251,16 @@ const secciones = [
                                 : "bg-slate-900/95"
                             } hover:bg-emerald-900/35 transition border-b border-slate-800/70 last:border-b-0`}
                           >
-                            {/* COMPAÑÍA */}
                             <td className="px-3 py-2 font-semibold text-emerald-50 whitespace-nowrap overflow-hidden text-ellipsis">
                               {t.compania}
                             </td>
-
-                            {/* TARIFA (se adapta al espacio que queda) */}
                             <td className="px-3 py-2 font-semibold text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis">
                               {t.nombre}
                             </td>
-
-                            {/* ANEXO (estrecho) */}
                             <td className="px-3 py-2 font-semibold text-emerald-100/85 whitespace-nowrap overflow-hidden text-ellipsis">
                               {t.subtipo || "-"}
                             </td>
 
-                            {/* POTENCIAS */}
                             <td className="px-2 py-2 text-right font-semibold">
                               {t.potenciaP1 != null ? t.potenciaP1.toFixed(5) : "-"}
                             </td>
@@ -1205,7 +1280,6 @@ const secciones = [
                               {t.potenciaP6 != null ? t.potenciaP6.toFixed(5) : "-"}
                             </td>
 
-                            {/* ENERGÍAS */}
                             <td className="px-2 py-2 text-right font-semibold">
                               {t.energiaP1 != null ? t.energiaP1.toFixed(5) : "-"}
                             </td>
@@ -1225,7 +1299,6 @@ const secciones = [
                               {t.energiaP6 != null ? t.energiaP6.toFixed(5) : "-"}
                             </td>
 
-                            {/* BOTÓN */}
                             <td className="px-3 py-2 text-right">
                               <button
                                 onClick={() => irAComparador("LUZ")}
@@ -1254,85 +1327,129 @@ const secciones = [
               </section>
             )}
 
-            {/* BLOQUES POR TIPO — SOLO GAS Y TELEFONÍA EN FILAS VERTICALES */}
+            {/* 🔥 NUEVO BLOQUE: SECCIÓN DE OFERTAS POR CADA SECCIÓN DEL MENÚ */}
             {!loading && !error && (
               <section className="space-y-6">
-                {(["GAS", "TELEFONIA"] as TipoOferta[]).map((tipo) => {
-                  const lista = ofertasPorTipo[tipo];
-                  if (!lista || lista.length === 0) return null;
-                  const cfg = tipoConfig[tipo];
+                {secciones.map((sec) => {
+                  const ofertasSeccion = obtenerOfertasDeSeccion(sec.id);
+                  const tipoSec = tipoPorSeccion[sec.id];
+                  const sinOfertas = ofertasSeccion.length === 0;
 
-                  const bgSection =
-                    tipo === "GAS"
-                      ? "bg-orange-950/40 border-orange-800/70"
-                      : "bg-sky-950/50 border-sky-800/70";
+                  let bgSection =
+                    "bg-slate-950/60 border-slate-800/80"; // por defecto
+                  if (tipoSec === "GAS")
+                    bgSection = "bg-orange-950/40 border-orange-800/70";
+                  else if (tipoSec === "TELEFONIA")
+                    bgSection = "bg-sky-950/50 border-sky-800/70";
+                  else if (tipoSec === "LUZ")
+                    bgSection = "bg-emerald-950/40 border-emerald-800/70";
+
+                  const cfg =
+                    tipoSec != null ? tipoConfig[tipoSec] : undefined;
+                  const pillClass =
+                    cfg?.bgPill ||
+                    "bg-slate-800 text-slate-100 border border-slate-600";
+                  const btnClass =
+                    cfg?.btn || "bg-emerald-500 hover:bg-emerald-400";
 
                   return (
                     <div
-                      key={tipo}
-                      className={`rounded-2xl ${bgSection} border p-5`}
+                      key={sec.id}
+                      className={`rounded-2xl border p-5 ${bgSection}`}
                     >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
                         <div>
-                          <h3 className="text-base md:text-lg font-semibold flex items-center gap-2">
-                            {cfg.label}
-                            <span className="text-[11px] font-normal text-slate-200/80">
-                              ({lista.length} oferta(s) activas)
+                          <div className="flex items-center gap-2 text-xs text-slate-200/85 mb-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/60 border border-slate-600/80">
+                              <span className="text-base">{sec.icon}</span>
+                              <span className="font-semibold uppercase tracking-wide">
+                                {sec.label}
+                              </span>
                             </span>
+                            <span className="text-[11px] opacity-80">
+                              {sinOfertas
+                                ? "Sin ofertas activas por ahora"
+                                : `${ofertasSeccion.length} oferta(s) activa(s)`}
+                            </span>
+                          </div>
+                          <h3 className="text-base md:text-lg font-semibold">
+                            {sec.label}
                           </h3>
                         </div>
+
                         <button
-                          onClick={() => irAComparador(tipo)}
-                          className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${cfg.btn} shadow-md shadow-slate-950/50`}
+                          onClick={sec.onClick}
+                          className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${btnClass} shadow-md shadow-slate-950/50`}
                         >
-                          Ir al comparador de {cfg.label}
+                          {textoBotonSeccion(sec.id, sec.label)}
                         </button>
                       </div>
 
-                      {/* LISTA EN FILAS CON SCROLL VERTICAL */}
-                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                        {lista.map((oferta) => (
-                          <div
-                            key={oferta.id}
-                            className="w-full rounded-2xl bg-slate-950/80 border border-slate-700 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                          >
-                            <div className="flex-1 space-y-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span
-                                  className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cfg.bgPill}`}
-                                >
-                                  {cfg.label}
-                                </span>
-                                {oferta.destacada && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-300 border border-yellow-200/40">
-                                    Destacada
+                      {sinOfertas ? (
+                        <p className="text-[11px] text-slate-200/85">
+                          En cuanto haya una oferta interesante para{" "}
+                          {sec.label}, la verás aquí.
+                        </p>
+                      ) : (
+                        <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                          {ofertasSeccion.map((oferta) => (
+                            <div
+                              key={oferta.id}
+                              className="w-full rounded-2xl bg-slate-950/85 border border-slate-700 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                            >
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span
+                                    className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
+                                  >
+                                    {cfg?.label || sec.label}
                                   </span>
+                                  {oferta.destacada && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-300 border border-yellow-200/40">
+                                      Destacada
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="text-sm font-semibold text-slate-50">
+                                  {oferta.titulo}
+                                </h4>
+                                <p className="text-xs text-slate-200/80">
+                                  {oferta.descripcionCorta}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-row md:flex-col items-end gap-2 text-[11px] text-slate-400">
+                                <span className="whitespace-nowrap">
+                                  {formFecha(oferta.creadaEn)}
+                                </span>
+
+                                {tipoSec === "LUZ" ||
+                                tipoSec === "GAS" ||
+                                tipoSec === "TELEFONIA" ? (
+                                  <button
+                                    onClick={() =>
+                                      irAComparadorConOferta(
+                                        tipoSec,
+                                        oferta
+                                      )
+                                    }
+                                    className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
+                                  >
+                                    Ver en comparador
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={sec.onClick}
+                                    className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
+                                  >
+                                    Ir a {sec.label}
+                                  </button>
                                 )}
                               </div>
-                              <h4 className="text-sm font-semibold text-slate-50">
-                                {oferta.titulo}
-                              </h4>
-                              <p className="text-xs text-slate-200/80">
-                                {oferta.descripcionCorta}
-                              </p>
                             </div>
-
-                            <div className="flex flex-row md:flex-col items-end gap-2 text-[11px] text-slate-400">
-                              <span className="whitespace-nowrap">
-                                {formFecha(oferta.creadaEn)}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  irAComparadorConOferta(tipo, oferta)
-                                }
-                                className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${cfg.btn}`}
-                              >
-                                Ver en comparador
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1357,7 +1474,7 @@ const secciones = [
         </div>
       </div>
 
-      {/* MODAL: Acceder / actualizar mis datos */}
+      {/* MODAL DATOS */}
       {modalAbierto && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-3">
           <div className="w-full max-w-lg rounded-2xl bg-slate-950 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-5 md:p-6 space-y-4">
