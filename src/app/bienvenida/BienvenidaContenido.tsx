@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 
@@ -823,6 +823,34 @@ export default function BienvenidaContenido() {
 
   const hayClubEspecial =
     !!clubLogoUrl || !!clubMensaje || !!clubNombre || clubAportacion !== null;
+  
+  // Refs para cada carrusel por sección
+  const carruselRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Auto-scroll suave cada 6 segundos en todos los carruseles
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      const refs = carruselRefs.current;
+
+      Object.values(refs).forEach((el) => {
+        if (!el) return;
+        if (el.scrollWidth <= el.clientWidth) return; // no hace falta scroll
+
+        const cardWidth = 280; // px aproximados de cada tarjeta
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        const next = el.scrollLeft + cardWidth;
+
+        el.scrollTo({
+          left: next >= maxScroll ? 0 : next,
+          behavior: "smooth",
+        });
+      });
+    }, 6000); // ⏱️ cada 6 segundos
+
+    return () => clearInterval(intervalo);
+  }, []);
+
+  
 
   /** Ofertas asociadas a una sección concreta del grid */
   const obtenerOfertasDeSeccion = (seccionId: string): Oferta[] => {
@@ -1335,7 +1363,7 @@ export default function BienvenidaContenido() {
                   const tipoSec = tipoPorSeccion[sec.id];
                   const sinOfertas = ofertasSeccion.length === 0;
 
-                  // Color de fondo por tipo (opcional)
+                  // 🎨 Colores de fondo para la banda de la sección
                   let bgSection = "bg-slate-950/60 border-slate-800/80";
                   if (tipoSec === "GAS")
                     bgSection = "bg-orange-950/40 border-orange-800/70";
@@ -1350,6 +1378,69 @@ export default function BienvenidaContenido() {
                     "bg-slate-800 text-slate-100 border border-slate-600";
                   const btnClass =
                     cfg?.btn || "bg-emerald-500 hover:bg-emerald-400";
+
+                  // 🎇 Fondo y glow neon por tipo para cada TARJETA
+                  let cardGradient =
+                    "from-slate-700/40 via-slate-950 to-slate-950";
+                  let cardGlow = "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
+
+                  if (tipoSec === "LUZ") {
+                    cardGradient =
+                      "from-emerald-500/30 via-emerald-900/30 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(16,185,129,0.75)]";
+                  } else if (tipoSec === "GAS") {
+                    cardGradient =
+                      "from-orange-500/30 via-orange-900/30 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(249,115,22,0.75)]";
+                  } else if (tipoSec === "TELEFONIA") {
+                    cardGradient =
+                      "from-sky-500/30 via-sky-900/30 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
+                  } else if (tipoSec === "SEGUROS") {
+                    cardGradient =
+                      "from-slate-400/35 via-slate-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(148,163,184,0.75)]";
+                  } else if (tipoSec === "GANGAS") {
+                    cardGradient =
+                      "from-pink-500/35 via-rose-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(244,114,182,0.8)]";
+                  } else if (tipoSec === "HIPOTECAS") {
+                    cardGradient =
+                      "from-emerald-500/30 via-emerald-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(16,185,129,0.8)]";
+                  } else if (tipoSec === "REPUESTOS") {
+                    cardGradient =
+                      "from-orange-400/35 via-amber-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(251,146,60,0.8)]";
+                  } else if (tipoSec === "PLADUR") {
+                    cardGradient =
+                      "from-zinc-400/35 via-zinc-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(161,161,170,0.8)]";
+                  } else if (tipoSec === "FERRETERIA") {
+                    cardGradient =
+                      "from-lime-400/35 via-lime-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(132,204,22,0.8)]";
+                  } else if (tipoSec === "INMOBILIARIA") {
+                    cardGradient =
+                      "from-rose-500/35 via-rose-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(244,63,94,0.8)]";
+                  } else if (tipoSec === "VIAJES") {
+                    cardGradient =
+                      "from-indigo-500/35 via-indigo-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(129,140,248,0.8)]";
+                  } else if (tipoSec === "SOLAR") {
+                    cardGradient =
+                      "from-amber-400/35 via-amber-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(251,191,36,0.8)]";
+                  } else if (tipoSec === "AEROTERMIA") {
+                    cardGradient =
+                      "from-cyan-400/35 via-cyan-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(34,211,238,0.8)]";
+                  } else if (tipoSec === "BATERIA") {
+                    cardGradient =
+                      "from-purple-500/35 via-purple-900/40 to-slate-950";
+                    cardGlow = "shadow-[0_0_22px_rgba(168,85,247,0.8)]";
+                  }
 
                   return (
                     <div
@@ -1372,14 +1463,14 @@ export default function BienvenidaContenido() {
                                 : `${ofertasSeccion.length} oferta(s) activa(s)`}
                             </span>
                           </div>
-                          <h3 className="text-base md:text-lg font-semibold">
+                          <h3 className="text-lg md:text-xl font-semibold">
                             {sec.label}
                           </h3>
                         </div>
 
                         <button
                           onClick={sec.onClick}
-                          className={`inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-semibold text-white ${btnClass} shadow-md shadow-slate-950/50`}
+                          className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/60`}
                         >
                           {textoBotonSeccion(sec.id, sec.label)}
                         </button>
@@ -1387,58 +1478,80 @@ export default function BienvenidaContenido() {
 
                       {/* Contenido: mensaje o carrusel */}
                       {sinOfertas ? (
-                        <p className="text-[11px] text-slate-200/85">
+                        <p className="text-[12px] text-slate-200/85">
                           En cuanto haya una oferta interesante para {sec.label}, la verás aquí.
                         </p>
                       ) : (
-                        <div className="mt-2 -mx-2 overflow-x-auto pb-2">
-                          <div className="flex gap-3 px-2 min-w-full">
+                        <div
+                          className="mt-2 -mx-2 overflow-x-auto pb-3"
+                          ref={(el) => {
+                            carruselRefs.current[sec.id] = el;
+                          }}
+                        >
+                          <div className="flex gap-4 px-2 min-w-full">
                             {ofertasSeccion.map((oferta) => (
                               <div
                                 key={oferta.id}
-                                className="min-w-[260px] max-w-xs rounded-2xl bg-slate-950/85 border border-slate-700 px-4 py-3 flex flex-col justify-between"
+                                className={`
+                                  relative overflow-hidden
+                                  min-w-[280px] max-w-xs
+                                  rounded-2xl border ${cfg?.border ?? "border-slate-700"}
+                                  bg-gradient-to-br ${cardGradient}
+                                  ${cardGlow}
+                                  px-4 py-3
+                                  flex flex-col justify-between
+                                `}
                               >
-                                <div className="flex-1 space-y-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span
-                                      className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
-                                    >
-                                      {cfg?.label || sec.label}
-                                    </span>
-                                    {oferta.destacada && (
-                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-300 border border-yellow-200/40">
-                                        Destacada
+                                {/* brillo interior */}
+                                <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
+                                      >
+                                        {cfg?.label || sec.label}
                                       </span>
-                                    )}
+                                      {oferta.destacada && (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
+                                          Destacada
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Fecha arriba a la derecha */}
+                                    <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
+                                      {formFecha(oferta.creadaEn)}
+                                    </span>
                                   </div>
-                                  <h4 className="text-sm font-semibold text-slate-50">
+
+                                  <h4 className="text-sm md:text-base font-semibold text-slate-50">
                                     {oferta.titulo}
                                   </h4>
-                                  <p className="text-xs text-slate-200/80">
+                                  <p className="text-xs md:text-sm text-slate-100/90">
                                     {oferta.descripcionCorta}
                                   </p>
                                 </div>
 
-                                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                                  <span className="whitespace-nowrap">
-                                    {formFecha(oferta.creadaEn)}
-                                  </span>
-
+                                <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
                                   {tipoSec === "LUZ" ||
                                   tipoSec === "GAS" ||
                                   tipoSec === "TELEFONIA" ? (
                                     <button
                                       onClick={() =>
-                                        irAComparadorConOferta(tipoSec, oferta)
+                                        irAComparadorConOferta(
+                                          tipoSec as TipoOferta,
+                                          oferta
+                                        )
                                       }
-                                      className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
+                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
                                     >
                                       Ver en comparador
                                     </button>
                                   ) : (
                                     <button
                                       onClick={sec.onClick}
-                                      className={`px-3 py-1 rounded-full text-[11px] font-semibold text-white ${btnClass}`}
+                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
                                     >
                                       Ir a {sec.label}
                                     </button>
@@ -1454,6 +1567,7 @@ export default function BienvenidaContenido() {
                 })}
               </section>
             )}
+
 
             <footer className="pt-4 border-top border-slate-800 mt-2 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
               <span>© 2025 Impulso Energético</span>
