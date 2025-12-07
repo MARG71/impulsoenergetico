@@ -1526,12 +1526,20 @@ export default function BienvenidaContenido() {
                                   } (${filtroActual})`}
                             </span>
                           </div>
-                          <h3 className="text-lg md:text-xl font-semibold">
+                          <h3 className="text-xl md:text-2xl font-extrabold text-slate-50 flex items-center gap-2">
+                            <span className="h-[3px] w-6 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.9)]" />
                             {sec.label}
                           </h3>
-                          <p className="text-[11px] md:text-xs text-slate-200/80">
-                            {descripcionPorSeccion(sec.id)}
-                          </p>
+
+                          <div
+                            className="mt-1 inline-flex max-w-3xl rounded-2xl bg-slate-900/70 border border-slate-600/80 px-3 py-2 shadow-[0_0_20px_rgba(15,23,42,0.9)]"
+                          >
+                            <p className="text-sm md:text-base font-semibold text-slate-100 leading-snug">
+                              <span className="bg-gradient-to-r from-emerald-300 via-emerald-100 to-slate-100 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(16,185,129,0.55)]">
+                                {descripcionPorSeccion(sec.id)}
+                              </span>
+                            </p>
+                          </div>
                           {/* KPIs numéricos */}
                           <div className="flex gap-2 flex-wrap mt-1">
                             {(kpiPorSeccion[sec.id] ?? []).map((kpi) => (
