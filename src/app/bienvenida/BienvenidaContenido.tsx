@@ -1513,71 +1513,71 @@ export default function BienvenidaContenido() {
                   if (tipoSec === "LUZ") {
                     cardGradient =
                       "from-emerald-500/30 via-emerald-900/30 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(16,185,129,0.75)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(16,185,129,0.85)]";
                   } else if (tipoSec === "GAS") {
                     cardGradient =
                       "from-orange-500/30 via-orange-900/30 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(249,115,22,0.75)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(249,115,22,0.85)]";
                   } else if (tipoSec === "TELEFONIA") {
                     cardGradient =
                       "from-sky-500/30 via-sky-900/30 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(56,189,248,0.85)]";
                   } else if (tipoSec === "SEGUROS") {
                     cardGradient =
                       "from-slate-400/35 via-slate-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(148,163,184,0.75)]";
+                    cardGlow = "shadow-[0_0_24px_rgba(148,163,184,0.9)]";
                   } else if (tipoSec === "GANGAS") {
                     cardGradient =
                       "from-pink-500/35 via-rose-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(244,114,182,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(244,114,182,0.9)]";
                   } else if (tipoSec === "HIPOTECAS") {
                     cardGradient =
                       "from-emerald-500/30 via-emerald-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(16,185,129,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(16,185,129,0.9)]";
                   } else if (tipoSec === "REPUESTOS") {
                     cardGradient =
                       "from-orange-400/35 via-amber-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(251,146,60,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(251,146,60,0.9)]";
                   } else if (tipoSec === "PLADUR") {
                     cardGradient =
                       "from-zinc-400/35 via-zinc-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(161,161,170,0.8)]";
+                    cardGlow = "shadow-[0_0_24px_rgba(161,161,170,0.9)]";
                   } else if (tipoSec === "FERRETERIA") {
                     cardGradient =
                       "from-lime-400/35 via-lime-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(132,204,22,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(132,204,22,0.9)]";
                   } else if (tipoSec === "INMOBILIARIA") {
                     cardGradient =
                       "from-rose-500/35 via-rose-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(244,63,94,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(244,63,94,0.9)]";
                   } else if (tipoSec === "VIAJES") {
                     cardGradient =
                       "from-indigo-500/35 via-indigo-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(129,140,248,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(129,140,248,0.9)]";
                   } else if (tipoSec === "SOLAR") {
                     cardGradient =
                       "from-amber-400/35 via-amber-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(251,191,36,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(251,191,36,0.9)]";
                   } else if (tipoSec === "AEROTERMIA") {
                     cardGradient =
                       "from-cyan-400/35 via-cyan-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(34,211,238,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(34,211,238,0.9)]";
                   } else if (tipoSec === "BATERIA") {
                     cardGradient =
                       "from-purple-500/35 via-purple-900/40 to-slate-950";
-                    cardGlow = "shadow-[0_0_22px_rgba(168,85,247,0.8)]";
+                    cardGlow = "shadow-[0_0_26px_rgba(168,85,247,0.9)]";
                   }
 
                   return (
                     <div
                       key={sec.id}
-                      className={`rounded-2xl border p-5 ${bgSection}`}
+                      className={`rounded-2xl border p-5 md:p-6 ${bgSection} shadow-[0_0_30px_rgba(15,23,42,0.9)]`}
                     >
                       {/* Cabecera de la sección */}
-                      <div className="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
-                        <div className="space-y-1">
+                      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+                        <div className="space-y-2 max-w-3xl">
                           <div className="flex items-center gap-2 text-xs text-slate-200/85">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/60 border border-slate-600/80">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 border border-slate-600/80 shadow-[0_0_16px_rgba(15,23,42,1)]">
                               <span className="text-base">{sec.icon}</span>
                               <span className="font-semibold uppercase tracking-wide">
                                 {sec.label}
@@ -1586,22 +1586,19 @@ export default function BienvenidaContenido() {
                             <span className="text-[11px] opacity-80">
                               {totalSeccion === 0
                                 ? "Sin ofertas para esta sección"
-                                : `${totalSeccion} oferta(s) totales · Mostrando ${
-                                    ofertasSeccion.length
-                                  } (${filtroActual})`}
+                                : `${totalSeccion} oferta(s) totales · Mostrando ${ofertasSeccion.length} (${filtroActual})`}
                             </span>
                           </div>
-                          <h3 className="text-xl md:text-2xl font-extrabold text-slate-50 flex items-center gap-2">
-                            <span className="h-[3px] w-6 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.9)]" />
+
+                          <h3 className="text-2xl md:text-3xl font-black tracking-tight text-slate-50 flex items-center gap-3">
+                            <span className="h-[3px] w-8 rounded-full bg-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.9)]" />
                             {sec.label}
                           </h3>
 
-                          <div
-                            className="mt-1 inline-flex max-w-3xl rounded-2xl bg-slate-900/70 border border-slate-600/80 px-3 py-2 shadow-[0_0_20px_rgba(15,23,42,0.9)]"
-                          >
+                          <div className="mt-1 inline-flex max-w-3xl rounded-2xl bg-slate-900/80 border border-slate-600/80 px-3 py-2 shadow-[0_0_22px_rgba(15,23,42,0.95)]">
                             <p className="text-sm md:text-base font-semibold text-slate-100 leading-snug">
                               <span className="bg-gradient-to-r from-emerald-300 via-emerald-100 to-slate-100 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(16,185,129,0.55)]">
-                                {descripcionPorSeccion(sec.id)}
+                                {descripcionPorSeccion[sec.id]}
                               </span>
                             </p>
                           </div>
@@ -1613,8 +1610,8 @@ export default function BienvenidaContenido() {
                                 <div
                                   key={idx}
                                   className="inline-flex items-baseline gap-1 rounded-full 
-                                            bg-slate-950/80 border border-slate-600/80 
-                                            px-3 py-1 shadow-[0_0_16px_rgba(15,23,42,0.9)]"
+                                            bg-slate-950/90 border border-slate-600/80 
+                                            px-3 py-1 shadow-[0_0_18px_rgba(15,23,42,0.95)]"
                                 >
                                   <span className="text-[10px] md:text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                                     {chip.label}
@@ -1626,27 +1623,12 @@ export default function BienvenidaContenido() {
                               ))}
                             </div>
                           )}
-
-
-                          {/* KPIs numéricos */}
-                          <div className="flex gap-2 flex-wrap mt-1">
-                            {(kpiPorSeccion[sec.id] ?? []).map((kpi) => (
-                              <span
-                                key={kpi.label}
-                                className="px-2 py-1 rounded-full text-[10px] font-semibold bg-slate-900/60 border border-slate-700 shadow-[0_0_8px_rgba(255,255,255,0.15)]"
-                              >
-                                <span className="opacity-80">{kpi.label}:</span>{" "}
-                                <span className="text-emerald-300 font-bold">{kpi.value}</span>
-                              </span>
-                            ))}
-                          </div>
-
                         </div>
 
                         {/* CTA + filtros */}
                         <div className="flex flex-col items-stretch gap-2 md:items-end">
                           {/* Filtros */}
-                          <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/70 border border-slate-700 px-1 py-1">
+                          <div className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 border border-slate-700 px-1 py-1 shadow-[0_0_18px_rgba(15,23,42,0.9)]">
                             {[
                               { id: "todas", label: "Todas" },
                               { id: "destacadas", label: "Destacadas" },
@@ -1668,7 +1650,7 @@ export default function BienvenidaContenido() {
                                   }
                                   className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
                                     activo
-                                      ? "bg-emerald-500 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
+                                      ? "bg-emerald-500 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.9)]"
                                       : "text-slate-200 hover:bg-slate-800/80"
                                   }`}
                                 >
@@ -1681,18 +1663,16 @@ export default function BienvenidaContenido() {
                           {/* CTA grande */}
                           <button
                             onClick={sec.onClick}
-                            className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/60`}
+                            className={`inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs md:text-sm font-semibold text-white ${btnClass} shadow-md shadow-slate-950/80 hover:-translate-y-[1px] transition-transform`}
                           >
                             {textoBotonSeccion(sec.id, sec.label)}
                           </button>
                         </div>
                       </div>
 
-                      {/* Contenido: mensaje / catálogo / carrusel */}
-
                       {/* 1) Mensaje cuando no hay ofertas */}
                       {sinOfertas && (
-                        <p className="text-[12px] text-slate-200/85">
+                        <p className="text-[12px] md:text-sm text-slate-200/85 mt-1">
                           En cuanto haya una oferta interesante para {sec.label}, la verás aquí.
                         </p>
                       )}
@@ -1720,9 +1700,7 @@ export default function BienvenidaContenido() {
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                             <input
                               value={busquedaTarifasLuz}
-                              onChange={(e) =>
-                                setBusquedaTarifasLuz(e.target.value)
-                              }
+                              onChange={(e) => setBusquedaTarifasLuz(e.target.value)}
                               placeholder="Buscar por compañía, tarifa, anexo, tipo..."
                               className="w-full md:max-w-sm rounded-full bg-slate-900/80 border border-emerald-500/70 px-4 py-2 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
                             />
@@ -1745,54 +1723,22 @@ export default function BienvenidaContenido() {
                                   <table className="w-full table-fixed text-[11px] md:text-xs">
                                     <thead>
                                       <tr className="bg-emerald-500 text-slate-950 uppercase tracking-[0.14em] font-semibold">
-                                        <th className="px-3 py-2 text-left">
-                                          Compañía
-                                        </th>
-                                        <th className="px-3 py-2 text-left">
-                                          Tarifa
-                                        </th>
-                                        <th className="px-3 py-2 text-left">
-                                          Anexo
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.P.1
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.P.2
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.P.3
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.P.4
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.P.5
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.P.6
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.E.1
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.E.2
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.E.3
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.E.4
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.E.5
-                                        </th>
-                                        <th className="px-2 py-2 text-center">
-                                          P.E.6
-                                        </th>
-                                        <th className="px-3 py-2 text-right">
-                                          Acción
-                                        </th>
+                                        <th className="px-3 py-2 text-left">Compañía</th>
+                                        <th className="px-3 py-2 text-left">Tarifa</th>
+                                        <th className="px-3 py-2 text-left">Anexo</th>
+                                        <th className="px-2 py-2 text-center">P.P.1</th>
+                                        <th className="px-2 py-2 text-center">P.P.2</th>
+                                        <th className="px-2 py-2 text-center">P.P.3</th>
+                                        <th className="px-2 py-2 text-center">P.P.4</th>
+                                        <th className="px-2 py-2 text-center">P.P.5</th>
+                                        <th className="px-2 py-2 text-center">P.P.6</th>
+                                        <th className="px-2 py-2 text-center">P.E.1</th>
+                                        <th className="px-2 py-2 text-center">P.E.2</th>
+                                        <th className="px-2 py-2 text-center">P.E.3</th>
+                                        <th className="px-2 py-2 text-center">P.E.4</th>
+                                        <th className="px-2 py-2 text-center">P.E.5</th>
+                                        <th className="px-2 py-2 text-center">P.E.6</th>
+                                        <th className="px-3 py-2 text-right">Acción</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -1897,16 +1843,16 @@ export default function BienvenidaContenido() {
 
                       {/* 3) Carrusel de ofertas (solo si hay ofertas) */}
                       {!sinOfertas && (
-                        <div className="relative mt-2 pb-3">
+                        <div className="relative mt-4 pb-4">
                           {/* FLECHA IZQUIERDA */}
                           <button
                             onClick={() => scrollSeccion(sec.id, "left")}
                             className="
                               absolute left-2 top-1/2 -translate-y-1/2 z-20
-                              bg-slate-900/70 backdrop-blur-sm border border-slate-600
+                              bg-slate-950/90 backdrop-blur-sm border border-slate-600
                               hover:bg-slate-800 text-slate-100
                               w-9 h-9 rounded-full flex items-center justify-center
-                              shadow-[0_0_12px_rgba(0,0,0,0.6)]
+                              shadow-[0_0_16px_rgba(0,0,0,0.8)]
                             "
                           >
                             ◀
@@ -1917,23 +1863,23 @@ export default function BienvenidaContenido() {
                             onClick={() => scrollSeccion(sec.id, "right")}
                             className="
                               absolute right-2 top-1/2 -translate-y-1/2 z-20
-                              bg-slate-900/70 backdrop-blur-sm border border-slate-600
+                              bg-slate-950/90 backdrop-blur-sm border border-slate-600
                               hover:bg-slate-800 text-slate-100
                               w-9 h-9 rounded-full flex items-center justify-center
-                              shadow-[0_0_12px_rgba(0,0,0,0.6)]
+                              shadow-[0_0_16px_rgba(0,0,0,0.8)]
                             "
                           >
                             ▶
                           </button>
 
-                          {/* CARRUSEL */}
+                          {/* CARRUSEL -> padding lateral para que NO se monten flechas y tarjetas */}
                           <div
-                            className="overflow-x-auto -mx-2 px-2"
+                            className="overflow-x-auto px-10"
                             ref={(el) => {
                               carruselRefs.current[sec.id] = el;
                             }}
                           >
-                            <div className="flex gap-4 min-w-full">
+                            <div className="flex gap-4 min-w-full pb-1">
                               {ofertasSeccion.map((oferta) => (
                                 <div
                                   key={oferta.id}
@@ -1945,6 +1891,8 @@ export default function BienvenidaContenido() {
                                     ${cardGlow}
                                     px-4 py-3
                                     flex flex-col justify-between
+                                    transition-transform duration-300
+                                    hover:-translate-y-1
                                   `}
                                 >
                                   {/* brillo interior */}
@@ -1970,10 +1918,10 @@ export default function BienvenidaContenido() {
                                       </span>
                                     </div>
 
-                                    <h4 className="text-sm md:text-base font-semibold text-slate-50">
+                                    <h4 className="text-base md:text-lg font-bold text-slate-50">
                                       {oferta.titulo}
                                     </h4>
-                                    <p className="text-xs md:text-sm text-slate-100/90">
+                                    <p className="text-sm md:text-base text-slate-100/90">
                                       {oferta.descripcionCorta}
                                     </p>
                                   </div>
@@ -2013,6 +1961,7 @@ export default function BienvenidaContenido() {
                 })}
               </section>
             )}
+
 
 
 
