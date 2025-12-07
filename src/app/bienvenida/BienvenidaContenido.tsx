@@ -955,6 +955,24 @@ export default function BienvenidaContenido() {
     return ofertasFiltradas.slice(0, 8);
   }, [busqueda, ofertasFiltradas]);
 
+  // 🔔 Cuántos días consideramos que una oferta es "NUEVA"
+  const DIAS_OFERTA_NUEVA = 15;
+
+  /** Devuelve true si la oferta es reciente (NUEVA) */
+  function esOfertaNueva(oferta: Oferta): boolean {
+    if (!oferta.creadaEn) return false;
+
+    const fecha = new Date(oferta.creadaEn);
+    if (Number.isNaN(fecha.getTime())) return false;
+
+    const ahora = new Date();
+    const haceNDias = new Date();
+    haceNDias.setDate(ahora.getDate() - DIAS_OFERTA_NUEVA);
+
+    return fecha >= haceNDias;
+  }
+
+
   const formFecha = (f?: string | null) =>
     !f
       ? ""
@@ -1299,12 +1317,14 @@ return (
                 {sugerencias.length > 0 && (
                   <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-slate-950/95 border border-slate-700 shadow-xl max-h-72 overflow-y-auto z-20">
                     {sugerencias.map((oferta) => {
-                      const tipoNorm = oferta.tipo; // ya es TipoOferta
+                      const tipoNorm = oferta.tipo; // TipoOferta
                       const cfg = getVisualConfigPorTipo(tipoNorm);
 
                       const pillClass =
                         cfg?.bgPill ??
                         "bg-slate-800 text-slate-100 border border-slate-600";
+
+                      const esNueva = esOfertaNueva(oferta);
 
                       return (
                         <button
@@ -1313,24 +1333,32 @@ return (
                           onClick={() => manejarClickSugerencia(oferta)}
                           className="w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-slate-900/90 text-xs md:text-sm border-b border-slate-800 last:border-b-0"
                         >
-                          <span
-                            className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${pillClass}`}
-                          >
-                            {cfg?.label ?? tipoNorm}
-                          </span>
-                          <span className="flex-1">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`mt-0.5 inline-flex shrink-0 items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide ${pillClass}`}
+                              >
+                                {cfg?.label ?? tipoNorm}
+                              </span>
+                              {esNueva && (
+                                <span className="mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-lime-400 text-slate-950">
+                                  NUEVA
+                                </span>
+                              )}
+                            </div>
                             <span className="block font-semibold text-slate-50">
                               {oferta.titulo}
                             </span>
                             <span className="block text-[11px] text-slate-300 line-clamp-1">
                               {oferta.descripcionCorta || oferta.descripcionLarga}
                             </span>
-                          </span>
+                          </div>
                         </button>
                       );
                     })}
                   </div>
                 )}
+
 
               </div>
             </div>
@@ -1404,14 +1432,28 @@ return (
 
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {ofertasDestacadas.map((oferta) => {
+                  const esNueva = esOfertaNueva(oferta);
+
                   const tipoNorm = oferta.tipo; // TipoOferta
                   const cfg = getVisualConfigPorTipo(tipoNorm);
-                  const { gradient: cardGradient, glow: cardGlow } = getCardStylePorTipo(tipoNorm);
+                  const { gradient: cardGradient, glow: cardGlow } =
+                    getCardStylePorTipo(tipoNorm);
 
                   const borderClass = cfg?.border ?? "border-slate-700";
                   const pillClass =
                     cfg?.bgPill ??
                     "bg-slate-800 text-slate-100 border border-slate-600";
+
+                  // Texto que mostramos en la pill de tipo
+                  const labelTipo =
+                    cfg?.label ??
+                    (tipoNorm === "LUZ"
+                      ? "Luz IMPULSO"
+                      : tipoNorm === "GAS"
+                      ? "Gas IMPULSO"
+                      : tipoNorm === "TELEFONIA"
+                      ? "Telefonía IMPULSO"
+                      : tipoNorm);
 
                   return (
                     <div
@@ -1429,15 +1471,27 @@ return (
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
-                          >
-                            {cfg?.label ?? tipoNorm}
-                          </span>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/15 text-yellow-300 border border-yellow-400/30">
-                            Destacada
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${pillClass}`}
+                            >
+                              {labelTipo}
+                            </span>
+
+                            {esNueva && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-lime-400 text-slate-950">
+                                NUEVA
+                              </span>
+                            )}
+                          </div>
+
+                          {oferta.destacada && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-400/15 text-yellow-300 border border-yellow-400/30">
+                              Destacada
+                            </span>
+                          )}
                         </div>
+
                         <h4 className="text-sm md:text-base font-semibold text-slate-50">
                           {oferta.titulo}
                         </h4>
@@ -1454,9 +1508,7 @@ return (
                         </span>
                         {leadOK ? (
                           <button
-                            onClick={() =>
-                              irAComparadorConOferta(tipoNorm, oferta)
-                            }
+                            onClick={() => irAComparadorConOferta(tipoNorm, oferta)}
                             className="px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition"
                           >
                             Ver en comparador
@@ -1473,12 +1525,11 @@ return (
                     </div>
                   );
                 })}
-
-
-
               </div>
             </section>
           )}
+
+       
 
           {/* 🔥 BLOQUE: CARRUSEL DE OFERTAS POR CADA SECCIÓN DEL MENÚ */}
           {!loading && !error && (
@@ -1932,15 +1983,16 @@ return (
                           }}
                         >
                           <div className="flex gap-4 min-w-full pb-1">
-                            {ofertasSeccion.map((oferta) => (
-                              <div
-                                key={oferta.id}
-                                className={`
+                            {ofertasSeccion.map((oferta) => {
+                              const esNueva = esOfertaNueva(oferta);
+
+                              return (
+                                <div
+                                  key={oferta.id}
+                                  className={`
                                     relative overflow-hidden
                                     min-w-[280px] max-w-xs
-                                    rounded-2xl border ${
-                                      cfg?.border ?? "border-slate-700"
-                                    }
+                                    rounded-2xl border ${cfg?.border ?? "border-slate-700"}
                                     bg-gradient-to-br ${cardGradient}
                                     ${cardGlow}
                                     px-4 py-3
@@ -1948,63 +2000,68 @@ return (
                                     transition-transform duration-300
                                     hover:-translate-y-1
                                   `}
-                              >
-                                <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
+                                >
+                                  <span className="pointer-events-none absolute -right-8 -top-8 h-16 w-16 rounded-full bg-white/10 blur-xl opacity-40" />
 
-                                <div className="flex-1 space-y-2">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
-                                      >
-                                        {cfg?.label || sec.label}
-                                      </span>
-                                      {oferta.destacada && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
-                                          Destacada
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <span
+                                          className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ${pillClass}`}
+                                        >
+                                          {cfg?.label || sec.label}
                                         </span>
-                                      )}
+
+                                        {oferta.destacada && (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-yellow-50/10 text-yellow-200 border border-yellow-200/40">
+                                            Destacada
+                                          </span>
+                                        )}
+
+                                        {esNueva && (
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-lime-400 text-slate-950">
+                                            NUEVA
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
+                                        {formFecha(oferta.creadaEn)}
+                                      </span>
                                     </div>
-                                    <span className="text-[10px] text-slate-100/80 whitespace-nowrap">
-                                      {formFecha(oferta.creadaEn)}
-                                    </span>
+
+                                    <h4 className="text-base md:text-lg font-bold text-slate-50">
+                                      {oferta.titulo}
+                                    </h4>
+                                    <p className="text-sm md:text-base text-slate-100/90">
+                                      {oferta.descripcionCorta}
+                                    </p>
                                   </div>
 
-                                  <h4 className="text-base md:text-lg font-bold text-slate-50">
-                                    {oferta.titulo}
-                                  </h4>
-                                  <p className="text-sm md:text-base text-slate-100/90">
-                                    {oferta.descripcionCorta}
-                                  </p>
+                                  <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
+                                    {tipoSec === "LUZ" || tipoSec === "GAS" || tipoSec === "TELEFONIA" ? (
+                                      <button
+                                        onClick={() =>
+                                          irAComparadorConOferta(tipoSec as TipoOferta, oferta)
+                                        }
+                                        className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
+                                      >
+                                        Ver en comparador
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={sec.onClick}
+                                        className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
+                                      >
+                                        Ir a {sec.label}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-
-                                <div className="mt-3 flex items-center justify-end text-[11px] text-slate-100">
-                                  {tipoSec === "LUZ" ||
-                                  tipoSec === "GAS" ||
-                                  tipoSec === "TELEFONIA" ? (
-                                    <button
-                                      onClick={() =>
-                                        irAComparadorConOferta(
-                                          tipoSec as TipoOferta,
-                                          oferta
-                                        )
-                                      }
-                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
-                                    >
-                                      Ver en comparador
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={sec.onClick}
-                                      className={`px-3 py-1.5 rounded-full text-[11px] md:text-xs font-semibold text-white ${btnClass}`}
-                                    >
-                                      Ir a {sec.label}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
+
                         </div>
                       </div>
                     )}
