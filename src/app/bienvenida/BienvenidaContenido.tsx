@@ -225,6 +225,69 @@ function descripcionPorSeccion(id: string): string {
   }
 }
 
+// 🔥 KPI por sección (números potentes)
+const kpiPorSeccion: Record<
+  string,
+  { label: string; value: string }[]
+> = {
+  luz: [
+    { label: "Ahorro medio", value: "32% anual" },
+    { label: "Clientes felices", value: "+3.200" },
+  ],
+  gas: [
+    { label: "Ahorro anual", value: "Hasta 148€" },
+    { label: "Estabilidad", value: "Precios fijos 12 meses" },
+  ],
+  telefonia: [
+    { label: "Fibra + Móvil", value: "desde 29,90€" },
+    { label: "Cobertura", value: "Más de 99%" },
+  ],
+  solar: [
+    { label: "Retorno", value: "3-5 años" },
+    { label: "Ahorro", value: "-70% consumo" },
+  ],
+  aerotermia: [
+    { label: "Ahorro", value: "-65%" },
+    { label: "Eficiencia", value: "A+++ garantizado" },
+  ],
+  hermes: [
+    { label: "Autonomía", value: "Hasta 48h" },
+    { label: "Inteligencia IA", value: "Ahorro automático" },
+  ],
+  repuestos: [
+    { label: "Marcas disponibles", value: "+4.000" },
+    { label: "Entrega", value: "24-48h" },
+  ],
+  seguros: [
+    { label: "Comparativa", value: "+12 compañías" },
+    { label: "Precio medio", value: "Hasta -28%" },
+  ],
+  gangas: [
+    { label: "Descuentos", value: "Hasta -80%" },
+    { label: "Unidades", value: "Muy limitadas" },
+  ],
+  hipotecas: [
+    { label: "Revisión cuota", value: "Hasta -38%" },
+    { label: "Tipos fijos", value: "desde 1,69%" },
+  ],
+  ferreteria: [
+    { label: "Productos", value: "+20.000" },
+    { label: "Ofertas", value: "diarias" },
+  ],
+  inmobiliaria: [
+    { label: "Gestiones", value: "+1.000/año" },
+    { label: "Rentabilidad", value: "hasta 8%" },
+  ],
+  viajes: [
+    { label: "Experiencias", value: "únicas" },
+    { label: "Ofertas", value: "actualizadas" },
+  ],
+  pladur: [
+    { label: "Montajes", value: "rápidos" },
+    { label: "Garantía", value: "100%" },
+  ],
+};
+
 
 /** Texto para el botón grande de cada sección en la parte de ofertas */
 const textoBotonSeccion = (seccionId: string, label: string) => {
@@ -1469,6 +1532,19 @@ export default function BienvenidaContenido() {
                           <p className="text-[11px] md:text-xs text-slate-200/80">
                             {descripcionPorSeccion(sec.id)}
                           </p>
+                          {/* KPIs numéricos */}
+                          <div className="flex gap-2 flex-wrap mt-1">
+                            {(kpiPorSeccion[sec.id] ?? []).map((kpi) => (
+                              <span
+                                key={kpi.label}
+                                className="px-2 py-1 rounded-full text-[10px] font-semibold bg-slate-900/60 border border-slate-700 shadow-[0_0_8px_rgba(255,255,255,0.15)]"
+                              >
+                                <span className="opacity-80">{kpi.label}:</span>{" "}
+                                <span className="text-emerald-300 font-bold">{kpi.value}</span>
+                              </span>
+                            ))}
+                          </div>
+
                         </div>
 
                         {/* CTA + filtros */}
