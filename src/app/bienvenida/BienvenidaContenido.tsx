@@ -955,6 +955,12 @@ export default function BienvenidaContenido() {
     return ofertasFiltradas.slice(0, 8);
   }, [busqueda, ofertasFiltradas]);
 
+    const totalNuevasGlobal = useMemo(
+      () => ofertasFiltradas.filter((o) => esOfertaNueva(o)).length,
+      [ofertasFiltradas]
+    );
+
+
   // 🔔 Cuántos días consideramos que una oferta es "NUEVA"
   const DIAS_OFERTA_NUEVA = 15;
 
@@ -971,6 +977,7 @@ export default function BienvenidaContenido() {
 
     return fecha >= haceNDias;
   }
+
 
 
   const formFecha = (f?: string | null) =>
@@ -1300,9 +1307,20 @@ return (
           {/* BUSCADOR OFERTAS */}
           <section className="rounded-2xl bg-slate-950/70 border border-slate-800 p-4 md:p-5 space-y-3">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <h2 className="text-sm md:text-base font-semibold">
-                Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
-              </h2>
+              {/* Título + contador de nuevas */}
+              <div className="flex flex-col gap-1">
+                <h2 className="text-sm md:text-base font-semibold">
+                  Ofertas destacadas {leadOK ? "(desbloqueadas)" : "(bloqueadas)"}
+                </h2>
+
+                {totalNuevasGlobal > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-lime-400/15 text-lime-200 border border-lime-400/40 w-fit">
+                    {totalNuevasGlobal} oferta(s) NUEVA(s) en los últimos {DIAS_OFERTA_NUEVA} días
+                  </span>
+                )}
+              </div>
+
+              {/* Input + sugerencias */}
               <div className="relative w-full">
                 <input
                   value={busqueda}
@@ -1358,10 +1376,9 @@ return (
                     })}
                   </div>
                 )}
-
-
               </div>
             </div>
+
             <p className="text-[11px] text-slate-300/80">
               {loading
                 ? "Cargando ofertas…"
@@ -1372,6 +1389,7 @@ return (
                 : `${ofertasFiltradas.length} oferta(s) encontradas.`}
             </p>
           </section>
+
 
           {/* SECCIONES (botones de la izquierda) */}
           <nav className="rounded-3xl bg-slate-900/80 border border-slate-600/70 p-5 shadow-[0_0_40px_rgba(15,23,42,0.75)] space-y-4">
@@ -1605,11 +1623,29 @@ return (
                               {sec.label}
                             </span>
                           </span>
-                          <span className="text-[11px] opacity-80">
-                            {totalSeccion === 0
-                              ? "Sin ofertas para esta sección"
-                              : `${totalSeccion} oferta(s) totales · Mostrando ${ofertasSeccion.length} (${filtroActual})`}
-                          </span>
+                          {(() => {
+                            const nuevasEnSeccion = ofertasSeccion.filter((o) => esOfertaNueva(o)).length;
+
+                            if (totalSeccion === 0) {
+                              return (
+                                <span className="text-[11px] opacity-80">
+                                  Sin ofertas para esta sección
+                                </span>
+                              );
+                            }
+
+                            return (
+                              <span className="text-[11px] opacity-80">
+                                {totalSeccion} oferta(s) totales · Mostrando {ofertasSeccion.length} ({filtroActual})
+                                {nuevasEnSeccion > 0 && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-lime-400/20 text-lime-200 border border-lime-400/50">
+                                    {nuevasEnSeccion} NUEVA(s)
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })()}
+
                         </div>
 
                         {/* Título grande de sección */}
