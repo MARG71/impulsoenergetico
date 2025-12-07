@@ -586,118 +586,141 @@ export default function BienvenidaContenido() {
 
   // 🔹 Config de secciones para los botones tipo tarjeta (neón)
   // 🔹 Config de secciones para los botones tipo tarjeta (neón)
-  const secciones = [
-    {
-      id: "luz",
-      label: "Luz IMPULSO",
-      icon: "💡",
-      bgClass:
-        "bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-slate-950/90",
-      ringClass: "ring-emerald-400/70 group-hover:ring-emerald-200/90",
-      onClick: () => irAComparador("LUZ" as TipoOferta),
-    },
-    {
-      id: "gas",
-      label: "Gas IMPULSO",
-      icon: "🔥",
-      bgClass:
-        "bg-gradient-to-br from-orange-500/30 via-orange-500/10 to-slate-950/90",
-      ringClass: "ring-orange-400/70 group-hover:ring-orange-200/90",
-      onClick: () => irAComparador("GAS" as TipoOferta),
-    },
-    {
-      id: "telefonia",
-      label: "Telefonía IMPULSO",
-      icon: "📶",
-      bgClass:
-        "bg-gradient-to-br from-sky-500/30 via-sky-500/10 to-slate-950/90",
-      ringClass: "ring-sky-400/70 group-hover:ring-sky-200/90",
-      onClick: () => irAComparador("TELEFONIA" as TipoOferta),
-    },
-    {
-      id: "solar",
-      label: "Solar IMPULSO",
-      icon: "☀️",
-      bgClass:
-        "bg-gradient-to-br from-amber-400/35 via-amber-400/10 to-slate-950/90",
-      ringClass: "ring-amber-300/70 group-hover:ring-amber-100/90",
-      onClick: () => router.push(`/solar${buildQuery()}`),
-    },
-    {
-      id: "aerotermia",
-      label: "Aerotermia y Geotermia IMPULSO",
-      icon: "🌬️",
-      bgClass:
-        "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
-      ringClass: "ring-cyan-300/70 group-hover:ring-cyan-100/90",
-      onClick: () => router.push(`/aerotermia${buildQuery()}`),
-    },
-    {
-      id: "hermes",
-      label: "Batería IA",
-      icon: "🔋",
-      bgClass:
-        "bg-gradient-to-br from-purple-500/35 via-purple-500/10 to-slate-950/90",
-      ringClass: "ring-purple-400/70 group-hover:ring-purple-200/90",
-      onClick: () => router.push(`/bateria-hermes${buildQuery()}`),
-    },
-    {
-      id: "ferreteria",
-      label: "Ferretería BRICOTITAN",
-      icon: "🔩",
-      bgClass:
-        "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
-      ringClass: "ring-lime-300/70 group-hover:ring-lime-100/90",
-      onClick: () => router.push(`/ferreteria${buildQuery()}`),
-    },
-    {
-      id: "inmobiliaria",
-      label: "Inmobiliaria IMPULSO",
-      icon: "🏡",
-      bgClass:
-        "bg-gradient-to-br from-rose-500/35 via-rose-500/10 to-slate-950/90",
-      ringClass: "ring-rose-400/70 group-hover:ring-rose-200/90",
-      onClick: () => router.push(`/inmobiliaria${buildQuery()}`),
-    },
-    {
-      id: "viajes",
-      label: "Viajes VIAJANDO CON MERY",
-      icon: "✈️",
-      bgClass:
-        "bg-gradient-to-br from-indigo-500/35 via-indigo-500/10 to-slate-950/90",
-      ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
-      onClick: () => router.push(`/viajes${buildQuery()}`),
-    },
-    {
-      id: "repuestos",
-      label: "Repuestos RAPID",
-      icon: "🚗",
-      bgClass:
-        "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
-      ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
-      onClick: () => router.push(`/repuestos${buildQuery()}`),
-    },
-    {
-      id: "seguros",
-      label: "Seguros IMPULSO",
-      icon: "🛡️",
-      bgClass:
-        "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
-      ringClass: "ring-slate-300/70 group-hover:ring-slate-100/90",
-      onClick: () => router.push(`/seguros${buildQuery()}`),
-    },
+const secciones = [
+  {
+    id: "luz",
+    label: "Luz IMPULSO",
+    icon: "💡",
+    bgClass:
+      "bg-gradient-to-br from-emerald-500/30 via-emerald-500/10 to-slate-950/90",
+    ringClass: "ring-emerald-400/70 group-hover:ring-emerald-200/90",
+    onClick: () => irAComparador("LUZ" as TipoOferta),
+  },
+  {
+    id: "gas",
+    label: "Gas IMPULSO",
+    icon: "🔥",
+    bgClass:
+      "bg-gradient-to-br from-orange-500/30 via-orange-500/10 to-slate-950/90",
+    ringClass: "ring-orange-400/70 group-hover:ring-orange-200/90",
+    onClick: () => irAComparador("GAS" as TipoOferta),
+  },
+  {
+    id: "telefonia",
+    label: "Telefonía IMPULSO",
+    icon: "📶",
+    bgClass:
+      "bg-gradient-to-br from-sky-500/30 via-sky-500/10 to-slate-950/90",
+    ringClass: "ring-sky-400/70 group-hover:ring-sky-200/90",
+    onClick: () => irAComparador("TELEFONIA" as TipoOferta),
+  },
+  {
+    id: "solar",
+    label: "Solar IMPULSO",
+    icon: "☀️",
+    bgClass:
+      "bg-gradient-to-br from-amber-400/35 via-amber-400/10 to-slate-950/90",
+    ringClass: "ring-amber-300/70 group-hover:ring-amber-100/90",
+    onClick: () => router.push(`/solar${buildQuery()}`),
+  },
+  {
+    id: "aerotermia",
+    label: "Aerotermia y Geotermia IMPULSO",
+    icon: "🌬️",
+    bgClass:
+      "bg-gradient-to-br from-cyan-400/30 via-cyan-400/10 to-slate-950/90",
+    ringClass: "ring-cyan-300/70 group-hover:ring-cyan-100/90",
+    onClick: () => router.push(`/aerotermia${buildQuery()}`),
+  },
+  {
+    id: "hermes",
+    label: "Batería IA",
+    icon: "🔋",
+    bgClass:
+      "bg-gradient-to-br from-purple-500/35 via-purple-500/10 to-slate-950/90",
+    ringClass: "ring-purple-400/70 group-hover:ring-purple-200/90",
+    onClick: () => router.push(`/bateria-hermes${buildQuery()}`),
+  },
+  {
+    id: "ferreteria",
+    label: "Ferretería BRICOTITAN",
+    icon: "🔩",
+    bgClass:
+      "bg-gradient-to-br from-lime-400/35 via-lime-400/10 to-slate-950/90",
+    ringClass: "ring-lime-300/70 group-hover:ring-lime-100/90",
+    onClick: () => router.push(`/ferreteria${buildQuery()}`),
+  },
+  {
+    id: "inmobiliaria",
+    label: "Inmobiliaria IMPULSO",
+    icon: "🏡",
+    bgClass:
+      "bg-gradient-to-br from-rose-500/35 via-rose-500/10 to-slate-950/90",
+    ringClass: "ring-rose-400/70 group-hover:ring-rose-200/90",
+    onClick: () => router.push(`/inmobiliaria${buildQuery()}`),
+  },
+  {
+    id: "viajes",
+    label: "Viajes VIAJANDO CON MERY",
+    icon: "✈️",
+    bgClass:
+      "bg-gradient-to-br from-indigo-500/35 via-indigo-500/10 to-slate-950/90",
+    ringClass: "ring-indigo-400/70 group-hover:ring-indigo-200/90",
+    onClick: () => router.push(`/viajes${buildQuery()}`),
+  },
+  {
+    id: "repuestos",
+    label: "Repuestos RAPID",
+    icon: "🚗",
+    bgClass:
+      "bg-gradient-to-br from-orange-400/35 via-orange-400/10 to-slate-950/90",
+    ringClass: "ring-orange-300/70 group-hover:ring-orange-100/90",
+    onClick: () => router.push(`/repuestos${buildQuery()}`),
+  },
+  {
+    id: "seguros",
+    label: "Seguros IMPULSO",
+    icon: "🛡️",
+    bgClass:
+      "bg-gradient-to-br from-slate-400/35 via-slate-400/10 to-slate-950/90",
+    ringClass: "ring-slate-300/70 group-hover:ring-slate-100/90",
+    onClick: () => router.push(`/seguros${buildQuery()}`),
+  },
 
-    // ⭐ NUEVO BOTÓN PLADUR DICOPLAC
-    {
-      id: "pladur",
-      label: "Pladur DICOPLAC",
-      icon: "🏗️",
-      bgClass:
-        "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
-      ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
-      onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
-    },
-  ];
+  // ⭐ NUEVA SECCIÓN: LA TIENDA DE LAS GANGAS
+  {
+    id: "gangas",
+    label: "La Tienda de las Gangas",
+    icon: "🛍️",
+    bgClass:
+      "bg-gradient-to-br from-pink-500/35 via-pink-500/10 to-slate-950/90",
+    ringClass: "ring-pink-300/70 group-hover:ring-pink-100/90",
+    onClick: () => router.push(`/gangas${buildQuery()}`),
+  },
+
+  // ⭐ NUEVA SECCIÓN: HIPOTECAS Y FINANCIACIÓN IMPULSO
+  {
+    id: "hipotecas",
+    label: "Hipotecas y Financiación IMPULSO",
+    icon: "🏦",
+    bgClass:
+      "bg-gradient-to-br from-emerald-500/35 via-emerald-500/10 to-slate-950/90",
+    ringClass: "ring-emerald-300/70 group-hover:ring-emerald-100/90",
+    onClick: () => router.push(`/hipotecas-financiacion${buildQuery()}`),
+  },
+
+  // ⭐ NUEVO BOTÓN PLADUR DICOPLAC
+  {
+    id: "pladur",
+    label: "Pladur DICOPLAC",
+    icon: "🏗️",
+    bgClass:
+      "bg-gradient-to-br from-zinc-400/35 via-zinc-400/10 to-slate-950/90",
+    ringClass: "ring-zinc-300/70 group-hover:ring-zinc-100/90",
+    onClick: () => router.push(`/pladur-dicoplac${buildQuery()}`),
+  },
+];
+
 
 
   // accesos rápidos
