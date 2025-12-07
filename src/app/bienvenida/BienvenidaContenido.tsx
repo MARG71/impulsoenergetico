@@ -1406,28 +1406,7 @@ return (
                 {ofertasDestacadas.map((oferta) => {
                   const tipoNorm = oferta.tipo; // TipoOferta
                   const cfg = getVisualConfigPorTipo(tipoNorm);
-
-                  let cardGradient =
-                    "from-slate-700/40 via-slate-950 to-slate-950";
-                  let cardGlow =
-                    "shadow-[0_0_18px_rgba(148,163,184,0.45)]";
-
-                  if (tipoNorm === "LUZ") {
-                    cardGradient =
-                      "from-emerald-500/30 via-emerald-900/30 to-slate-950";
-                    cardGlow =
-                      "shadow-[0_0_22px_rgba(16,185,129,0.75)]";
-                  } else if (tipoNorm === "GAS") {
-                    cardGradient =
-                      "from-orange-500/30 via-orange-900/30 to-slate-950";
-                    cardGlow =
-                      "shadow-[0_0_22px_rgba(249,115,22,0.75)]";
-                  } else if (tipoNorm === "TELEFONIA") {
-                    cardGradient =
-                      "from-sky-500/30 via-sky-900/30 to-slate-950";
-                    cardGlow =
-                      "shadow-[0_0_22px_rgba(56,189,248,0.75)]";
-                  }
+                  const { gradient: cardGradient, glow: cardGlow } = getCardStylePorTipo(tipoNorm);
 
                   const borderClass = cfg?.border ?? "border-slate-700";
                   const pillClass =
@@ -1494,6 +1473,7 @@ return (
                     </div>
                   );
                 })}
+
 
 
               </div>
