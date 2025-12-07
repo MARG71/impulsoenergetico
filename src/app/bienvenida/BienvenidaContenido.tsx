@@ -225,6 +225,71 @@ function descripcionPorSeccion(id: string): string {
   }
 }
 
+// 📊 Mini-resumen numérico por sección (chips)
+const resumenNumericoPorSeccion: Record<
+  string,
+  { label: string; value: string }[]
+> = {
+  luz: [
+    { label: "Ahorro medio clientes", value: "≈ 220 €/año" },
+    { label: "Descuento potencia", value: "hasta 35%" },
+    { label: "Comercializadoras", value: "+25 analizadas" },
+  ],
+  gas: [
+    { label: "Consumo optimizado", value: "hasta 20%" },
+    { label: "Clientes satisfechos", value: "+1.500" },
+  ],
+  telefonia: [
+    { label: "Packs convergentes", value: "Fibra + Móvil + TV" },
+    { label: "Ahorro medio", value: "≈ 18 €/mes" },
+  ],
+  solar: [
+    { label: "Retorno inversión", value: "5-7 años" },
+    { label: "Ahorro factura", value: "hasta 60%" },
+  ],
+  aerotermia: [
+    { label: "Ahorro calefacción", value: "hasta 70%" },
+    { label: "Financiación", value: "hasta 120 meses" },
+  ],
+  hermes: [
+    { label: "Autonomía", value: "hasta 85%" },
+    { label: "Gestión IA", value: "24/7 en la nube" },
+  ],
+  ferreteria: [
+    { label: "Productos activos", value: "+3.000" },
+    { label: "Entrega", value: "24-48 h" },
+  ],
+  inmobiliaria: [
+    { label: "Operaciones anuales", value: "+80" },
+    { label: "Ahorro medio comprador", value: "≈ 9.000 €" },
+  ],
+  viajes: [
+    { label: "Descuento socios", value: "hasta 15%" },
+    { label: "Viajes organizados", value: "+40/año" },
+  ],
+  repuestos: [
+    { label: "Disponibilidad", value: "+20.000 ref." },
+    { label: "Entrega rápida", value: "24-48 h" },
+  ],
+  seguros: [
+    { label: "Compañías", value: "+15 comparadas" },
+    { label: "Ahorro pólizas", value: "hasta 30%" },
+  ],
+  gangas: [
+    { label: "Descuentos", value: "hasta 70%" },
+    { label: "Unidades limitadas", value: "stock diario" },
+  ],
+  hipotecas: [
+    { label: "Mejora cuota", value: "hasta 40%" },
+    { label: "Operaciones financiadas", value: "+200" },
+  ],
+  pladur: [
+    { label: "Proyectos/año", value: "+120" },
+    { label: "Plazos de obra", value: "desde 7 días" },
+  ],
+};
+
+
 // 🔥 KPI por sección (números potentes)
 const kpiPorSeccion: Record<
   string,
@@ -1540,6 +1605,29 @@ export default function BienvenidaContenido() {
                               </span>
                             </p>
                           </div>
+
+                          {/* Chips numéricos por sección */}
+                          {(resumenNumericoPorSeccion[sec.id] ?? []).length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {resumenNumericoPorSeccion[sec.id]!.map((chip, idx) => (
+                                <div
+                                  key={idx}
+                                  className="inline-flex items-baseline gap-1 rounded-full 
+                                            bg-slate-950/80 border border-slate-600/80 
+                                            px-3 py-1 shadow-[0_0_16px_rgba(15,23,42,0.9)]"
+                                >
+                                  <span className="text-[10px] md:text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                    {chip.label}
+                                  </span>
+                                  <span className="text-xs md:text-sm font-bold text-emerald-300">
+                                    {chip.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+
                           {/* KPIs numéricos */}
                           <div className="flex gap-2 flex-wrap mt-1">
                             {(kpiPorSeccion[sec.id] ?? []).map((kpi) => (
