@@ -361,8 +361,7 @@ export default function ComparadorContenido() {
       let pctClientePool = 0; // 0..1
 
       try {
-        const lugarParaComision =
-          idLugarQR || lugarId || null; // QR > URL > localStorage
+        const lugarParaComision = idLugarQR || lugarId || null; // QR > URL > localStorage
 
         if (lugarParaComision) {
           const respPct = await fetch(
@@ -371,14 +370,13 @@ export default function ComparadorContenido() {
 
           if (respPct.ok) {
             const dataPct = await respPct.json();
-            pctClientePool = Number(dataPct.pctCliente) || 0; // por ejemplo 0.15
+            pctClientePool = Number(dataPct.pctCliente) || 0; // ej: 0.15
           }
         }
       } catch (e) {
         console.error("Error obteniendo pctClientePool:", e);
         pctClientePool = 0; // si falla, todo el pool es para Impulso
       }
-
 
       // 3) Calcular coste, ahorro y comisión para cada tarifa
       const resultadosCalculados = items.map((oferta: any) => {
@@ -392,7 +390,7 @@ export default function ComparadorContenido() {
           P6: toNum(oferta.precioKwhP6),
         };
 
-        // Precios de potencia (€/kW·día) por periodo
+        // Precios de potencia (€/kW·AÑO) por periodo
         const precioPotencia: Record<string, number> = {
           P1: toNum(oferta.precioPotenciaP1),
           P2: toNum(oferta.precioPotenciaP2),
@@ -410,14 +408,13 @@ export default function ComparadorContenido() {
           costeEnergia += kwh * precio;
         });
 
-        // 3.2) Coste de potencia (precioPotencia en €/kW·AÑO, prorrateado por días)
+        // 3.2) Coste de potencia (€/kW·año, prorrateado por días de la factura)
         let costePotencia = 0;
         periodosPotencia.forEach((p) => {
           const kw = parseFloat(potencias[p]) || 0;
           const precioAnual = precioPotencia[p] || 0; // €/kW·año
           costePotencia += kw * precioAnual * (diasFactura / 365);
         });
-
 
         // 3.3) Impuesto de electricidad + IVA siguiendo factura real
         const baseEnergiaPotencia = costeEnergia + costePotencia;
@@ -447,36 +444,18 @@ export default function ComparadorContenido() {
           return consumoAnualKWh >= desde && consumoAnualKWh <= hasta;
         });
 
-        // base del Excel: lo que TÚ cobras (pool total antes de repartir)
-        const comisionKwhBase = toNum(oferta.comisionKwhAdminBase);
-
-        // si el tramo tiene valor definido, lo usamos (aunque sea 0)
-        let comisionKwh = comisionKwhBase;
-        if (
-          tramo &&
-          tramo.comisionKwhAdmin !== null &&
-          tramo.comisionKwhAdmin !== undefined
-        ) {
-          comisionKwh = toNum(tramo.comisionKwhAdmin);
-        }
-
-        // Excels en cént/kWh -> pasamos a €/kWh si hace falta
-        if (comisionKwh > 1) {
-          comisionKwh = comisionKwh / 100;
-        }
-
+        // 💰 Comisión ANUAL del Excel (lo que cobra Impulso: pool total)
         const comisionFijaTramoRaw = tramo
           ? toNum(tramo.comisionFijaAdmin)
           : 0;
 
-        // 1️⃣ Comisión pool total (la del Excel, ya en €)
-        const comisionPool =
-          consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
+        // Comisión pool total (anual) = directamente la del Excel
+        const comisionPool = comisionFijaTramoRaw;
 
-        // 2️⃣ Parte del pool que va al Cliente (según Lugar/defaults)
+        // Parte del pool que va al Cliente según % (Lugar / defaults)
         const comisionCliente = comisionPool * pctClientePool;
 
-        // 3️⃣ Comisión neta para Impulso + Agente + Lugar
+        // Comisión neta para Impulso (pool - cliente)
         const comisionNeta = comisionPool - comisionCliente;
 
         // Precio medio kWh solo como dato informativo
@@ -488,18 +467,16 @@ export default function ComparadorContenido() {
           compañia: oferta.compania,
           tarifa: oferta.nombre || oferta.anexoPrecio || "",
           precio_kwh: precioMedioKwh,
-          comision_kwh: comisionKwh,
+          comision_kwh: 0, // ahora solo usamos comisión anual fija
           consumoTotal,
           coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
-          comision: comisionNeta,          // 👈 AHORA SÍ existe
+          comision: comisionNeta,
           // si quisieras guardar más detalle:
           // comisionPool,
           // comisionCliente,
         };
-
-
       });
 
       // 🔹 QUITAR tarifas con coste 0 (o casi 0)
