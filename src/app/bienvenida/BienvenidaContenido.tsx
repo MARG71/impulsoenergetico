@@ -730,6 +730,7 @@ export default function BienvenidaContenido() {
   }, [lugarId]);
 
   useEffect(() => {
+    // 1) Siempre rellenamos el formulario con el nombre actual (si lo hay)
     setFormNombre(nombre || "");
 
     try {
@@ -737,13 +738,23 @@ export default function BienvenidaContenido() {
       const storedEmail = localStorage.getItem("clienteEmail");
       const storedTel = localStorage.getItem("clienteTelefono");
 
-      if (storedNombre) setFormNombre(storedNombre);
+      // 2) Rellenamos el formulario con lo que haya en localStorage
+      if (storedNombre) {
+        setFormNombre(storedNombre);
+      }
       if (storedEmail) setFormEmail(storedEmail);
       if (storedTel) setFormTelefono(storedTel);
+
+      // 3) Si NO hay nombre en estado pero SÍ en localStorage,
+      //    usamos también ese nombre para la cabecera "Hola, NOMBRE"
+      if (!nombre && storedNombre) {
+        setNombre(storedNombre);
+      }
     } catch {
       // ignore
     }
   }, [nombre]);
+
 
   const buildQuery = (extra?: Record<string, string>) => {
     const p = new URLSearchParams();
