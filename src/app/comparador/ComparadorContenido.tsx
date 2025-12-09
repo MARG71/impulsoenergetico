@@ -444,13 +444,19 @@ export default function ComparadorContenido() {
           return consumoAnualKWh >= desde && consumoAnualKWh <= hasta;
         });
 
-        // 💰 Comisión ANUAL del Excel (lo que cobra Impulso: pool total)
-        const comisionFijaTramoRaw = tramo
-          ? toNum(tramo.comisionFijaAdmin)
-          : 0;
+        // 💰 Comisión ANUAL del Excel:
+        // - Si algún día rellenas comisionFijaAdmin la usamos.
+        // - Si no, usamos comisionKwhAdmin como comisión anual fija.
+        let comisionAnualPool = 0;
 
-        // Comisión pool total (anual) = directamente la del Excel
-        const comisionPool = comisionFijaTramoRaw;
+        if (tramo) {
+          const fija = toNum(tramo.comisionFijaAdmin);    // ahora mismo null en BD
+          const desdeExcel = toNum(tramo.comisionKwhAdmin); // 34.56, 51.84, 71.04...
+
+          comisionAnualPool = fija || desdeExcel;
+        }
+
+        const comisionPool = comisionAnualPool;
 
         // Parte del pool que va al Cliente según % (Lugar / defaults)
         const comisionCliente = comisionPool * pctClientePool;
@@ -467,7 +473,7 @@ export default function ComparadorContenido() {
           compañia: oferta.compania,
           tarifa: oferta.nombre || oferta.anexoPrecio || "",
           precio_kwh: precioMedioKwh,
-          comision_kwh: 0, // ahora solo usamos comisión anual fija
+          comision_kwh: 0, // usamos comisión anual fija
           consumoTotal,
           coste: costeTotalTarifa,
           ahorro,
@@ -538,8 +544,6 @@ export default function ComparadorContenido() {
       );
     }
   };
-
-
 
 
   const tituloComparador =
