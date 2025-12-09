@@ -290,6 +290,7 @@ export default function ComparadorContenido() {
     const alquilerNum = parseFloat(alquiler) || 0;
     const otrosNum = parseFloat(otros) || 0;
 
+    // Extras que añadimos al final (solo IVA)
     const extras = reactivaNum + excesoNum + alquilerNum + otrosNum;
 
     // Helper para parsear números que vienen como string (Decimal)
@@ -327,7 +328,7 @@ export default function ComparadorContenido() {
       }
 
       // 3) Calcular coste, ahorro y comisión para cada tarifa
-      const resultadosCalculados = items.map((oferta) => {
+      const resultadosCalculados = items.map((oferta: any) => {
         // Precios de energía (€/kWh) por periodo
         const precioEnergia: Record<string, number> = {
           P1: toNum(oferta.precioKwhP1),
@@ -338,7 +339,7 @@ export default function ComparadorContenido() {
           P6: toNum(oferta.precioKwhP6),
         };
 
-        // Precios de potencia (€/kW·año) por periodo
+        // Precios de potencia (€/kW·día) por periodo
         const precioPotencia: Record<string, number> = {
           P1: toNum(oferta.precioPotenciaP1),
           P2: toNum(oferta.precioPotenciaP2),
@@ -356,35 +357,32 @@ export default function ComparadorContenido() {
           costeEnergia += kwh * precio;
         });
 
-        // 3.2) Coste de potencia prorrateado por días
+        // 3.2) Coste de potencia (precioPotencia en €/kW·DÍA)
         let costePotencia = 0;
         periodosPotencia.forEach((p) => {
           const kw = parseFloat(potencias[p]) || 0;
-          const precio = precioPotencia[p] || 0; // €/kW·año
-          costePotencia += kw * precio * (diasFactura / 365);
+          const precioDia = precioPotencia[p] || 0; // €/kW·día
+          costePotencia += kw * precioDia * diasFactura;
         });
 
-        let base = costeEnergia + costePotencia;
+        // 3.3) Impuesto de electricidad + IVA siguiendo factura real
+        const baseEnergiaPotencia = costeEnergia + costePotencia;
+        const impElecImporte = baseEnergiaPotencia * impElecNum;
+        const baseConImpElec = baseEnergiaPotencia + impElecImporte;
 
-        // 3.3) Impuesto electricidad + IVA
-        const impElec = base * impElecNum;
-        base += impElec;
-        const ivaImporte = base * ivaNum;
-        base += ivaImporte;
+        const subtotalAntesIVA = baseConImpElec + extras;
+        const ivaImporte = subtotalAntesIVA * ivaNum;
 
-        // 3.4) Extras (reactiva, exceso, alquiler, otros)
-        const costeTotalTarifa = base + extras;
+        const costeTotalTarifa = subtotalAntesIVA + ivaImporte;
 
-        // 3.5) Ahorro frente a la factura actual
+        // 3.4) Ahorro frente a la factura actual
         const ahorro = facturaNum - costeTotalTarifa;
-        const ahorroPct =
-          facturaNum > 0 ? (ahorro / facturaNum) * 100 : 0;
+        const ahorroPct = facturaNum > 0 ? (ahorro / facturaNum) * 100 : 0;
 
-        // 3.6) Comisión: buscar tramo adecuado
+        // 3.5) Comisión: buscar tramo adecuado
         const consumoAnualKWh = consumoAnualNum;
         const tramos: any[] = oferta.tramos || [];
 
-        // Busca el tramo cuyo rango contenga el consumo anual
         const tramo = tramos.find((t) => {
           const desde = toNum(t.consumoDesdeKWh);
           const hasta =
@@ -396,58 +394,57 @@ export default function ComparadorContenido() {
         });
 
         const comisionKwhBase = toNum(oferta.comisionKwhAdminBase);
-        const comisionKwhTramo = tramo ? toNum(tramo.comisionKwhAdmin) : 0;
-        const comisionFijaTramoRaw = tramo
-          ? toNum(tramo.comisionFijaAdmin)
-          : 0;
 
-        // 🔹 Comisión variable €/kWh
-        let comisionKwh = comisionKwhTramo || comisionKwhBase || 0;
+        // si el tramo tiene valor definido, lo usamos (aunque sea 0)
+        let comisionKwh = comisionKwhBase;
+        if (
+          tramo &&
+          tramo.comisionKwhAdmin !== null &&
+          tramo.comisionKwhAdmin !== undefined
+        ) {
+          comisionKwh = toNum(tramo.comisionKwhAdmin);
+        }
 
-        // ⚠ Tus excels traen la comisión en CÉNTIMOS/kWh (40.96 = 0,4096 €/kWh)
-        //    Si el valor es > 1, lo interpretamos como céntimos y lo pasamos a euros
+        // Excels en cént/kWh -> pasamos a €/kWh si hace falta
         if (comisionKwh > 1) {
           comisionKwh = comisionKwh / 100;
         }
 
-        // 🔹 Comisión fija (por si la usas ahora o más adelante)
-        let comisionFijaTramo = comisionFijaTramoRaw || 0;
-        // Si algún día subes comisiones fijas en céntimos muy grandes,
-        // podemos normalizarlas igual. De momento lo dejamos así.
+        const comisionFijaTramoRaw = tramo
+          ? toNum(tramo.comisionFijaAdmin)
+          : 0;
 
-        // Comisión total anual (variable + fija)
-        const comision = consumoAnualKWh * comisionKwh + comisionFijaTramo;
+        const comision = consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
 
-        // Precio medio kWh solo como dato informativo
         const precioMedioKwh =
           consumoTotal > 0 ? costeEnergia / consumoTotal : 0;
 
-          return {
-            id: oferta.id,
-            compañia: oferta.compania,
-            tarifa: oferta.nombre || oferta.anexoPrecio || "",
-            precio_kwh: precioMedioKwh,
-            comision_kwh: comisionKwh,
-            consumoTotal,
-            coste: costeTotalTarifa,
-            ahorro,
-            ahorroPct,
-            comision,
-          };
-        });
+        return {
+          id: oferta.id,
+          compañia: oferta.compania,
+          tarifa: oferta.nombre || oferta.anexoPrecio || "",
+          precio_kwh: precioMedioKwh,
+          comision_kwh: comisionKwh,
+          consumoTotal,
+          coste: costeTotalTarifa,
+          ahorro,
+          ahorroPct,
+          comision,
+        };
+      });
 
-        // 🔹 QUITAR tarifas con coste 0 (o casi 0)
-        const resultadosFiltrados = resultadosCalculados.filter(
-          (r) => r.coste && r.coste > 0.01
-        );
+      // 🔹 QUITAR tarifas con coste 0 (o casi 0)
+      const resultadosFiltrados = resultadosCalculados.filter(
+        (r) => r.coste && r.coste > 0.01
+      );
 
-        // Ordenamos por ahorro (mayor primero)
-        resultadosFiltrados.sort((a, b) => b.ahorro - a.ahorro);
+      // Ordenamos por ahorro (mayor primero)
+      resultadosFiltrados.sort((a, b) => b.ahorro - a.ahorro);
 
-        setResultados(resultadosFiltrados);
-        setOrden("ahorro");
+      setResultados(resultadosFiltrados);
+      setOrden("ahorro");
 
-      // 4) Guardar la comparativa en BD como hacías antes
+      // 4) Guardar la comparativa en BD
       try {
         const resSave = await fetch("/api/comparativas", {
           method: "POST",
@@ -478,7 +475,7 @@ export default function ComparadorContenido() {
               alquiler,
               otros,
             },
-            resultados: resultadosCalculados,
+            resultados: resultadosFiltrados,
             tipo: tipoComparador,
             ofertaId: ofertaId ? Number(ofertaId) : undefined,
           }),
@@ -495,6 +492,7 @@ export default function ComparadorContenido() {
       );
     }
   };
+
 
 
 
