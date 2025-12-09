@@ -1291,6 +1291,12 @@ export default function BienvenidaContenido() {
     );
   };
 
+    // Nombre que vamos a enseñar en la cabecera:
+  // 1º el que venga de la URL (`nombre`)
+  // 2º si no, el del formulario / localStorage (`formNombre`)
+  const nombreParaMostrar = nombre || formNombre || null;
+
+
 
 return (
   <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
@@ -1300,7 +1306,7 @@ return (
         <aside className="space-y-6">
           {/* BLOQUE SUPERIOR: logo + bienvenida + club */}
           <HeroBienvenida
-            nombre={nombre}
+            nombre={nombreParaMostrar}
             agenteId={agenteId}
             lugarId={lugarId}
             accesosRapidos={accesosRapidos}
