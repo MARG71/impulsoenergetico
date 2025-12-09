@@ -357,13 +357,14 @@ export default function ComparadorContenido() {
           costeEnergia += kwh * precio;
         });
 
-        // 3.2) Coste de potencia (precioPotencia en €/kW·DÍA)
+        // 3.2) Coste de potencia (precioPotencia en €/kW·AÑO, prorrateado por días)
         let costePotencia = 0;
         periodosPotencia.forEach((p) => {
           const kw = parseFloat(potencias[p]) || 0;
-          const precioDia = precioPotencia[p] || 0; // €/kW·día
-          costePotencia += kw * precioDia * diasFactura;
+          const precioAnual = precioPotencia[p] || 0; // €/kW·año
+          costePotencia += kw * precioAnual * (diasFactura / 365);
         });
+
 
         // 3.3) Impuesto de electricidad + IVA siguiendo factura real
         const baseEnergiaPotencia = costeEnergia + costePotencia;
@@ -414,7 +415,13 @@ export default function ComparadorContenido() {
           ? toNum(tramo.comisionFijaAdmin)
           : 0;
 
-        const comision = consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
+        let comision = comisionFijaTramoRaw;
+
+        // Solo aplicamos comisión variable si realmente hay valor
+        if (comisionKwh !== 0) {
+          comision = consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
+        }
+
 
         const precioMedioKwh =
           consumoTotal > 0 ? costeEnergia / consumoTotal : 0;
