@@ -357,6 +357,29 @@ export default function ComparadorContenido() {
         return;
       }
 
+      // 2.5) Obtener % Cliente (POOL) para este lugar
+      let pctClientePool = 0; // 0..1
+
+      try {
+        const lugarParaComision =
+          idLugarQR || lugarId || null; // QR > URL > localStorage
+
+        if (lugarParaComision) {
+          const respPct = await fetch(
+            `/api/comisiones/pct-cliente?lugarId=${lugarParaComision}`
+          );
+
+          if (respPct.ok) {
+            const dataPct = await respPct.json();
+            pctClientePool = Number(dataPct.pctCliente) || 0; // por ejemplo 0.15
+          }
+        }
+      } catch (e) {
+        console.error("Error obteniendo pctClientePool:", e);
+        pctClientePool = 0; // si falla, todo el pool es para Impulso
+      }
+
+
       // 3) Calcular coste, ahorro y comisión para cada tarifa
       const resultadosCalculados = items.map((oferta: any) => {
         // Precios de energía (€/kWh) por periodo
@@ -424,6 +447,7 @@ export default function ComparadorContenido() {
           return consumoAnualKWh >= desde && consumoAnualKWh <= hasta;
         });
 
+        // base del Excel: lo que TÚ cobras (pool total antes de repartir)
         const comisionKwhBase = toNum(oferta.comisionKwhAdminBase);
 
         // si el tramo tiene valor definido, lo usamos (aunque sea 0)
@@ -445,29 +469,17 @@ export default function ComparadorContenido() {
           ? toNum(tramo.comisionFijaAdmin)
           : 0;
 
-        let comision = comisionFijaTramoRaw;
+        // 1️⃣ Comisión pool total (la del Excel, ya en €)
+        const comisionPool =
+          consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
 
-        // Solo aplicamos comisión variable si realmente hay valor
-        if (comisionKwh !== 0) {
-          // Comisión TOTAL que entra (pool) según Excel / tramos
-          const comisionPool =
-            consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
+        // 2️⃣ Parte del pool que va al Cliente (según Lugar/defaults)
+        const comisionCliente = comisionPool * pctClientePool;
 
-          // % cliente efectivo (0..1). Si por lo que sea viene mal, forzamos rango.
-          const pctClienteEfectivo = Math.min(
-            1,
-            Math.max(0, pctCliente || 0)
-          );
+        // 3️⃣ Comisión neta para Impulso + Agente + Lugar
+        const comisionNeta = comisionPool - comisionCliente;
 
-          // Parte que se va al cliente (club / lugar)
-          const comisionCliente = comisionPool * pctClienteEfectivo;
-
-          // Lo que queda para Impulso + agente + lugar
-          const comisionNeta = comisionPool - comisionCliente;
-
-        }
-
-
+        // Precio medio kWh solo como dato informativo
         const precioMedioKwh =
           consumoTotal > 0 ? costeEnergia / consumoTotal : 0;
 
@@ -481,11 +493,12 @@ export default function ComparadorContenido() {
           coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
-          comision: comisionNeta,          // 👈 antes era comisionPool
-          // si quieres guardar más detalle:
+          comision: comisionNeta,          // 👈 AHORA SÍ existe
+          // si quisieras guardar más detalle:
           // comisionPool,
           // comisionCliente,
         };
+
 
       });
 
