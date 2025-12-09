@@ -17,6 +17,8 @@ import {
 type TipoComparador = "luz" | "gas" | "telefonia";
 
 export default function ComparadorContenido() {
+  const [pctCliente, setPctCliente] = useState<number>(0);
+
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -130,6 +132,34 @@ export default function ComparadorContenido() {
       }
     }
   }, [searchParams]);
+
+  // 🔁 Cargar %Cliente efectivo (Lugar -> Defaults globales)
+  useEffect(() => {
+    const idLugarEfectivo = idLugarQR || lugarId;
+
+    if (!idLugarEfectivo) return;
+
+    const cargarPctCliente = async () => {
+      try {
+        const res = await fetch(
+          `/api/comisiones/pct-cliente?lugarId=${idLugarEfectivo}`
+        );
+        if (!res.ok) {
+          console.warn("No se pudo obtener pctCliente, uso 0");
+          return;
+        }
+        const data = await res.json();
+        if (typeof data.pctCliente === "number") {
+          setPctCliente(data.pctCliente); // 0..1
+        }
+      } catch (error) {
+        console.error("Error cargando pctCliente:", error);
+      }
+    };
+
+    cargarPctCliente();
+  }, [idLugarQR, lugarId]);
+
 
   // 🔁 Recalcular consumo anual
   useEffect(() => {
@@ -419,7 +449,22 @@ export default function ComparadorContenido() {
 
         // Solo aplicamos comisión variable si realmente hay valor
         if (comisionKwh !== 0) {
-          comision = consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
+          // Comisión TOTAL que entra (pool) según Excel / tramos
+          const comisionPool =
+            consumoAnualKWh * comisionKwh + comisionFijaTramoRaw;
+
+          // % cliente efectivo (0..1). Si por lo que sea viene mal, forzamos rango.
+          const pctClienteEfectivo = Math.min(
+            1,
+            Math.max(0, pctCliente || 0)
+          );
+
+          // Parte que se va al cliente (club / lugar)
+          const comisionCliente = comisionPool * pctClienteEfectivo;
+
+          // Lo que queda para Impulso + agente + lugar
+          const comisionNeta = comisionPool - comisionCliente;
+
         }
 
 
@@ -436,8 +481,12 @@ export default function ComparadorContenido() {
           coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
-          comision,
+          comision: comisionNeta,          // 👈 antes era comisionPool
+          // si quieres guardar más detalle:
+          // comisionPool,
+          // comisionCliente,
         };
+
       });
 
       // 🔹 QUITAR tarifas con coste 0 (o casi 0)
