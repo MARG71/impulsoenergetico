@@ -36,7 +36,15 @@ export function HeroBienvenida({
   clubColorAcento,
   onAbrirModal,
   onIrALuz,
+
+
+
+
 }: HeroBienvenidaProps) {
+
+
+  const nombreVisible = nombre?.trim() || null;
+  
   return (
     <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/50 p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch shadow-xl shadow-emerald-500/30">
       {/* Columna logo + contacto + claim */}
@@ -89,22 +97,23 @@ export function HeroBienvenida({
           </div>
 
           <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold leading-tight">
-            {nombre && (
-              <>
+            {nombreVisible && (
+                <>
                 Hola,{" "}
                 <span className="text-emerald-400 font-extrabold">
-                  {nombre}
+                    {nombreVisible}
                 </span>{" "}
                 👋
                 <br />
-              </>
+                </>
             )}
             Ahorra en tus facturas y{" "}
             <span className="text-amber-300 font-extrabold">
-              gana comisiones
+                gana comisiones
             </span>{" "}
             desde hoy.
           </h1>
+
 
           <p className="mt-2 text-xs text-amber-300 font-bold">
             VERSIÓN CON PLADUR ACTIVADA
