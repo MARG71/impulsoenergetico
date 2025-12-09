@@ -478,11 +478,14 @@ export default function ComparadorContenido() {
           coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
-          comision: comisionNeta,
+          // 👇 ahora mostramos lo que se paga al cliente
+          comision: comisionCliente,
           // si quisieras guardar más detalle:
           // comisionPool,
           // comisionCliente,
+          // comisionNeta,
         };
+
       });
 
       // 🔹 QUITAR tarifas con coste 0 (o casi 0)
