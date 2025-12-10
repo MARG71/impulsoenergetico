@@ -77,6 +77,9 @@ export default function ComparadorContenido() {
     "ahorro"
   );
 
+  // 🔍 Buscador de resultados
+  const [busqueda, setBusqueda] = useState("");
+
   const ordenarResultados = (
     criterio: "compañia" | "ahorro" | "comision"
   ) => {
@@ -587,6 +590,22 @@ export default function ComparadorContenido() {
     return qs ? `?${qs}` : "";
   };
 
+  // 🔍 Filtrado por búsqueda sobre resultados
+  const resultadosFiltradosBusqueda = resultados.filter((r) => {
+    if (!busqueda.trim()) return true;
+    const q = busqueda.toLowerCase();
+    const campos = [
+      r.compañia,
+      r.tarifa,
+      r.coste,
+      r.ahorro,
+      r.comision,
+    ];
+    return campos.some((c: any) =>
+      (c ?? "").toString().toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-8 md:py-8">
       {/* CABECERA IMPULSO: LOGO + TITULO + INFO QR/OFER + BOTÓN VOLVER */}
@@ -605,16 +624,16 @@ export default function ComparadorContenido() {
                 />
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
+                <p className="text-[11px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
                   ESTUDIO PERSONALIZADO
                 </p>
-                <h1 className="text-xl md:text-3xl font-extrabold leading-tight">
+                <h1 className="text-2xl md:text-4xl font-extrabold leading-tight">
                   {tituloComparador}
                 </h1>
                 {ofertaNombre && (
-                  <p className="mt-1 text-xs md:text-sm text-amber-200">
+                  <p className="mt-1 text-sm md:text-base text-amber-200 font-semibold">
                     Oferta seleccionada:{" "}
-                    <span className="font-semibold text-amber-300">
+                    <span className="font-bold text-amber-300">
                       {ofertaNombre}
                     </span>
                   </p>
@@ -623,12 +642,12 @@ export default function ComparadorContenido() {
             </div>
 
             {/* Info de trazabilidad (agente / lugar / oferta) */}
-            <div className="w-full md:w-auto text-xs md:text-sm text-slate-300 text-left md:text-right space-y-1">
+            <div className="w-full md:w-auto text-xs md:text-sm text-slate-300 text-left md:text-right space-y-1 font-semibold">
               {(agenteId || lugarId) && (
                 <>
                   {agenteId && (
                     <div>
-                      <span className="font-semibold text-slate-100">
+                      <span className="text-slate-100">
                         Agente ID:
                       </span>{" "}
                       {agenteId}
@@ -636,7 +655,7 @@ export default function ComparadorContenido() {
                   )}
                   {lugarId && (
                     <div>
-                      <span className="font-semibold text-slate-100">
+                      <span className="text-slate-100">
                         Lugar ID:
                       </span>{" "}
                       {lugarId}
@@ -646,13 +665,11 @@ export default function ComparadorContenido() {
               )}
               {ofertaId && (
                 <div>
-                  <span className="font-semibold text-slate-100">
-                    Oferta ID:
-                  </span>{" "}
+                  <span className="text-slate-100">Oferta ID:</span>{" "}
                   {ofertaId}
                 </div>
               )}
-              <div className="pt-2 text-[10px] opacity-80">
+              <div className="pt-2 text-[11px] opacity-80 font-normal">
                 Datos de QR y oferta guardados para trazabilidad de
                 clientes y comisiones.
               </div>
@@ -666,7 +683,7 @@ export default function ComparadorContenido() {
               onClick={() =>
                 router.push(`/bienvenida${buildBackQuery()}`)
               }
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs md:text-sm font-semibold shadow-md shadow-emerald-500/40"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-base font-bold shadow-md shadow-emerald-500/40"
             >
               <span>⬅</span>
               <span>Volver a la pantalla de bienvenida</span>
@@ -683,7 +700,7 @@ export default function ComparadorContenido() {
               <button
                 key={tipo}
                 onClick={() => setTipoComparador(tipo)}
-                className={`px-4 md:px-6 py-2 rounded-full text-xs md:text-sm font-semibold shadow transition-all 
+                className={`px-4 md:px-6 py-2 rounded-full text-sm md:text-base font-bold shadow transition-all 
                 ${
                   tipoComparador === tipo
                     ? "bg-emerald-400 text-slate-900 shadow-emerald-400/60"
@@ -698,11 +715,11 @@ export default function ComparadorContenido() {
           )}
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] md:text-sm text-slate-200">
+        <div className="flex items-center gap-3 text-xs md:text-sm text-slate-200">
           <span className="hidden md:inline-block animate-bounce text-xl">
             ⬅️
           </span>
-          <span>
+          <span className="font-semibold">
             Elige el tipo de estudio que quieres hacer con tu factura.
           </span>
         </div>
@@ -721,18 +738,18 @@ export default function ComparadorContenido() {
                 height={140}
                 className="drop-shadow-[0_0_16px_rgba(16,231,152,0.75)]"
               />
-              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-100 font-semibold">
+              <p className="text-xs md:text-sm uppercase tracking-[0.22em] text-emerald-100 font-bold">
                 Datos de la factura
               </p>
             </div>
 
-            <h2 className="text-lg font-bold">
+            <h2 className="text-xl md:text-2xl font-extrabold">
               Introduce los datos para tu comparativa
             </h2>
 
             <form
               onSubmit={handleSubmit}
-              className="space-y-3 text-xs md:text-sm"
+              className="space-y-3 text-sm md:text-base"
             >
               <div className="space-y-2">
                 <div>
@@ -851,12 +868,12 @@ export default function ComparadorContenido() {
                 <div className="grid grid-cols-3 gap-2">
                   {periodosConsumo.map((p) => (
                     <div key={p} className="space-y-1">
-                      <span className="text-[11px] text-emerald-100">
+                      <span className="text-xs text-emerald-100 font-semibold">
                         Periodo {p}
                       </span>
                       <input
                         type="number"
-                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
                         value={consumoPeriodos[p]}
                         onChange={(e) =>
                           handlePeriodoChange(e, p)
@@ -871,7 +888,7 @@ export default function ComparadorContenido() {
                 type="text"
                 readOnly
                 placeholder="Consumo anual (kWh)"
-                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-emerald-100 text-sm"
+                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-emerald-100 text-sm font-semibold"
                 value={consumoAnual}
               />
 
@@ -882,12 +899,12 @@ export default function ComparadorContenido() {
                 <div className="grid grid-cols-3 gap-2">
                   {periodosPotencia.map((p) => (
                     <div key={p} className="space-y-1">
-                      <span className="text-[11px] text-emerald-100">
+                      <span className="text-xs text-emerald-100 font-semibold">
                         Periodo {p}
                       </span>
                       <input
                         type="number"
-                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
                         value={potencias[p]}
                         onChange={(e) =>
                           handlePotenciaChange(e, p)
@@ -899,7 +916,7 @@ export default function ComparadorContenido() {
               </div>
 
               <select
-                className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/80 font-semibold"
                 value={impuestoElectricidad}
                 onChange={(e) =>
                   setImpuestoElectricidad(e.target.value)
@@ -914,7 +931,7 @@ export default function ComparadorContenido() {
               </select>
 
               <select
-                className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/80 font-semibold"
                 value={territorio}
                 onChange={(e) =>
                   setTerritorio(e.target.value)
@@ -969,7 +986,7 @@ export default function ComparadorContenido() {
 
               <button
                 type="submit"
-                className="w-full mt-1 rounded-full bg-emerald-400 text-slate-950 py-2.5 text-sm font-bold shadow-[0_0_24px_rgba(16,185,129,0.7)] hover:bg-emerald-300 transition"
+                className="w-full mt-1 rounded-full bg-emerald-400 text-slate-950 py-2.5 text-base font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.7)] hover:bg-emerald-300 transition"
               >
                 Ver ofertas y comisiones
               </button>
@@ -980,10 +997,10 @@ export default function ComparadorContenido() {
           <div className="md:col-span-2 rounded-3xl bg-slate-950/90 border border-slate-800 p-4 md:p-6 shadow-[0_0_28px_rgba(15,23,42,0.9)]">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-lg font-bold text-emerald-300">
+                <h2 className="text-xl md:text-2xl font-extrabold text-emerald-300">
                   Resultados de tu estudio
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="text-sm md:text-base text-slate-400 font-semibold">
                   Comparamos coste de factura, ahorro estimado y comisión
                   para Impulso Energético.
                 </p>
@@ -993,10 +1010,10 @@ export default function ComparadorContenido() {
                 direccionCliente ||
                 nombreAgente ||
                 nombreLugar) && (
-                <div className="text-[11px] md:text-xs text-slate-200 md:text-right space-y-0.5">
+                <div className="text-xs md:text-sm text-slate-200 md:text-right space-y-0.5">
                   {nombreCliente && (
                     <div>
-                      <span className="font-semibold">
+                      <span className="font-bold">
                         Cliente:
                       </span>{" "}
                       {nombreCliente}
@@ -1004,7 +1021,7 @@ export default function ComparadorContenido() {
                   )}
                   {direccionCliente && (
                     <div>
-                      <span className="font-semibold">
+                      <span className="font-bold">
                         Dirección:
                       </span>{" "}
                       {direccionCliente}
@@ -1012,7 +1029,7 @@ export default function ComparadorContenido() {
                   )}
                   {nombreAgente && (
                     <div>
-                      <span className="font-semibold">
+                      <span className="font-bold">
                         Agente:
                       </span>{" "}
                       {nombreAgente}
@@ -1020,19 +1037,19 @@ export default function ComparadorContenido() {
                   )}
                   {nombreLugar && (
                     <div>
-                      <span className="font-semibold">
+                      <span className="font-bold">
                         Lugar:
                       </span>{" "}
                       {nombreLugar}
                     </div>
                   )}
                   {agenteId && (
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[11px] text-slate-400">
                       ID Agente: {agenteId}
                     </div>
                   )}
                   {lugarId && (
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[11px] text-slate-400">
                       ID Lugar: {lugarId}
                     </div>
                   )}
@@ -1040,12 +1057,12 @@ export default function ComparadorContenido() {
               )}
             </div>
 
-            {/* BOTONES DE ORDENACIÓN + GRÁFICA */}
+            {/* BOTONES DE ORDENACIÓN + GRÁFICA + BUSCADOR */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-              <div className="flex flex-wrap gap-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
                 <button
                   onClick={() => ordenarResultados("compañia")}
-                  className={`px-3 py-1.5 rounded-full border text-xs ${
+                  className={`px-3 py-1.5 rounded-full border font-semibold ${
                     orden === "compañia"
                       ? "bg-emerald-400 text-slate-900 border-emerald-300"
                       : "bg-slate-900 text-slate-100 border-slate-700 hover:bg-slate-800"
@@ -1055,7 +1072,7 @@ export default function ComparadorContenido() {
                 </button>
                 <button
                   onClick={() => ordenarResultados("ahorro")}
-                  className={`px-3 py-1.5 rounded-full border text-xs ${
+                  className={`px-3 py-1.5 rounded-full border font-semibold ${
                     orden === "ahorro"
                       ? "bg-emerald-400 text-slate-900 border-emerald-300"
                       : "bg-slate-900 text-slate-100 border-slate-700 hover:bg-slate-800"
@@ -1065,7 +1082,7 @@ export default function ComparadorContenido() {
                 </button>
                 <button
                   onClick={() => ordenarResultados("comision")}
-                  className={`px-3 py-1.5 rounded-full border text-xs ${
+                  className={`px-3 py-1.5 rounded-full border font-semibold ${
                     orden === "comision"
                       ? "bg-emerald-400 text-slate-900 border-emerald-300"
                       : "bg-slate-900 text-slate-100 border-slate-700 hover:bg-slate-800"
@@ -1073,11 +1090,20 @@ export default function ComparadorContenido() {
                 >
                   Ordenar por comisión
                 </button>
+
+                {/* 🔍 Buscador al lado de los botones */}
+                <input
+                  type="text"
+                  placeholder="Buscar en resultados..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="mt-2 md:mt-0 md:ml-2 px-3 py-1.5 rounded-full bg-slate-900 text-slate-100 border border-slate-600 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/80 placeholder:text-slate-400 min-w-[180px]"
+                />
               </div>
 
               <button
                 onClick={() => setMostrarGrafica(!mostrarGrafica)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-slate-950 text-xs md:text-sm font-semibold shadow-[0_0_18px_rgba(16,185,129,0.6)] hover:bg-emerald-400"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-slate-950 text-xs md:text-sm font-bold shadow-[0_0_18px_rgba(16,185,129,0.6)] hover:bg-emerald-400"
               >
                 📊 {mostrarGrafica ? "Ocultar gráfica" : "Ver gráfica"}
               </button>
@@ -1091,7 +1117,7 @@ export default function ComparadorContenido() {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={resultados}
+                      data={resultadosFiltradosBusqueda}
                       margin={{
                         top: 5,
                         right: 20,
@@ -1118,8 +1144,8 @@ export default function ComparadorContenido() {
               </div>
             )}
 
-            {resultados.length === 0 ? (
-              <p className="text-xs md:text-sm text-slate-400">
+            {resultadosFiltradosBusqueda.length === 0 ? (
+              <p className="text-sm md:text-base text-slate-400">
                 Introduce los datos de la factura y pulsa{" "}
                 <span className="text-emerald-300 font-semibold">
                   “Ver ofertas y comisiones”
@@ -1128,30 +1154,30 @@ export default function ComparadorContenido() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs md:text-sm text-left border-separate border-spacing-y-2">
+                <table className="w-full text-sm md:text-base text-left border-separate border-spacing-y-2">
                   <thead className="bg-slate-900/90">
                     <tr className="text-slate-200">
-                      <th className="px-4 py-2 font-semibold">#</th>
-                      <th className="px-4 py-2 font-semibold">
+                      <th className="px-4 py-2 font-bold">#</th>
+                      <th className="px-4 py-2 font-bold">
                         Compañía
                       </th>
-                      <th className="px-4 py-2 font-semibold">
+                      <th className="px-4 py-2 font-bold">
                         Tarifa
                       </th>
-                      <th className="px-4 py-2 font-semibold text-right">
+                      <th className="px-4 py-2 font-bold text-right">
                         Coste estimado
                       </th>
-                      <th className="px-4 py-2 font-semibold text-right">
+                      <th className="px-4 py-2 font-bold text-right">
                         Ahorro
                       </th>
-                      <th className="px-4 py-2 font-semibold text-right">
+                      <th className="px-4 py-2 font-bold text-right">
                         Comisión
                       </th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>
                   <tbody>
-                    {resultados.map((r, i) => (
+                    {resultadosFiltradosBusqueda.map((r, i) => (
                       <tr
                         key={r.id}
                         className="bg-slate-900/80 border border-slate-700/80 rounded-xl shadow-sm"
@@ -1159,10 +1185,10 @@ export default function ComparadorContenido() {
                         <td className="px-4 py-2 font-bold text-slate-400">
                           #{i + 1}
                         </td>
-                        <td className="px-4 py-2 font-semibold text-slate-50">
+                        <td className="px-4 py-2 font-bold text-slate-50">
                           {r.compañia}
                         </td>
-                        <td className="px-4 py-2 text-slate-200">
+                        <td className="px-4 py-2 text-slate-200 font-semibold">
                           {r.tarifa}
                         </td>
                         <td className="px-4 py-2 text-right font-semibold text-slate-50">
@@ -1173,7 +1199,7 @@ export default function ComparadorContenido() {
                             {r.ahorro.toFixed(2)} €
                           </span>
                           <br />
-                          <span className="text-amber-300 font-bold text-[11px]">
+                          <span className="text-amber-300 font-bold text-xs">
                             {r.ahorroPct.toFixed(0)}%
                           </span>
                         </td>
@@ -1182,7 +1208,7 @@ export default function ComparadorContenido() {
                         </td>
                         <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                           <button
-                            className="mb-1 inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-[11px] font-semibold hover:bg-emerald-400"
+                            className="mb-1 inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-xs md:text-sm font-semibold hover:bg-emerald-400"
                             onClick={() =>
                               alert(`Contratar ${r.compañia}`)
                             }
@@ -1190,7 +1216,7 @@ export default function ComparadorContenido() {
                             Contratar
                           </button>
                           <button
-                            className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-800 text-slate-50 text-[11px] font-semibold hover:bg-slate-700"
+                            className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-800 text-slate-50 text-xs md:text-sm font-semibold hover:bg-slate-700"
                             onClick={() =>
                               alert(
                                 `Descargar PDF para ${r.compañia}`
