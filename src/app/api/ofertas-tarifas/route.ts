@@ -1,4 +1,3 @@
-// src/app/api/ofertas-tarifas/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -21,9 +20,8 @@ export async function GET(req: Request) {
     if (activa === "true") where.activa = true;
     if (activa === "false") where.activa = false;
 
-    // 🔹 Nuevo: filtrar también por tipoCliente (enum Prisma: RESIDENCIAL / PYME)
+    // 🔹 Filtrar también por tipoCliente (enum Prisma: RESIDENCIAL / PYME)
     if (tipoCliente) {
-      // lo mandamos desde el comparador como "RESIDENCIAL" o "PYME"
       where.tipoCliente = tipoCliente as any;
     }
 
@@ -35,7 +33,6 @@ export async function GET(req: Request) {
           orderBy: { consumoDesdeKWh: "asc" },
         },
       },
-      // puedes mantener creadaEn desc o cambiar si quieres otro orden
       orderBy: { creadaEn: "desc" },
     });
 
@@ -65,7 +62,7 @@ export async function POST(req: Request) {
         activa: body.activa ?? true,
         destacada: body.destacada ?? false,
 
-        // 👇 OJO: nombre correcto del campo en Prisma
+        // Nuevo: guardamos el tipoCliente si lo mandas desde el CRM
         tipoCliente: body.tipoCliente ?? null,   // 'RESIDENCIAL' | 'PYME'
 
         precioKwhP1: body.precioKwhP1,
@@ -88,7 +85,6 @@ export async function POST(req: Request) {
     );
   }
 }
-
 
 export async function DELETE(req: Request) {
   try {

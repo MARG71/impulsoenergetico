@@ -15,6 +15,7 @@ import {
 } from "recharts";
 
 type TipoComparador = "luz" | "gas" | "telefonia";
+type TipoClienteCatalogo = "RESIDENCIAL" | "PYME";
 
 export default function ComparadorContenido() {
   const [pctCliente, setPctCliente] = useState<number>(0);
@@ -37,7 +38,10 @@ export default function ComparadorContenido() {
     useState<TipoComparador>("luz");
   const [nombreAgente, setNombreAgente] = useState("");
   const [nombreLugar, setNombreLugar] = useState("");
-  const [tipoCliente, setTipoCliente] = useState("particular");
+
+  const [tipoCliente, setTipoCliente] =
+    useState<TipoClienteCatalogo>("RESIDENCIAL");
+
   const [tipoTarifa, setTipoTarifa] = useState("fija");
   const [nombreTarifa, setNombreTarifa] = useState("2.0TD");
   const [cups, setCups] = useState("");
@@ -160,7 +164,6 @@ export default function ComparadorContenido() {
     cargarPctCliente();
   }, [idLugarQR, lugarId]);
 
-
   // 🔁 Recalcular consumo anual
   useEffect(() => {
     const suma = periodosConsumo.reduce(
@@ -192,7 +195,12 @@ export default function ComparadorContenido() {
         setDireccionCliente(data.cliente?.direccion || "");
         setResultados(data.resultados || []);
         const df = data.datosFactura || {};
-        setTipoCliente(df.tipoCliente || "particular");
+
+        // antiguas comparativas pueden tener otros valores -> normalizamos
+        setTipoCliente(
+          df.tipoCliente === "PYME" ? "PYME" : "RESIDENCIAL"
+        );
+
         setCups(df.cups || "");
         setFechaInicio(df.fechaInicio || "");
         setFechaFin(df.fechaFin || "");
@@ -239,7 +247,7 @@ export default function ComparadorContenido() {
   // 🔁 Reset si no hay comparativa cargada
   useEffect(() => {
     if (!comparativaId) {
-      setTipoCliente("particular");
+      setTipoCliente("RESIDENCIAL");
       setTipoTarifa("fija");
       setNombreTarifa("2.0TD");
       setCups("");
@@ -333,22 +341,18 @@ export default function ComparadorContenido() {
       // 2) Cargar tarifas reales desde la API
       const subtipo = nombreTarifa || "2.0TD"; // 2.0TD / 3.0TD / 6.1TD / 6.2TD
 
-      // 🔹 Mapear el tipo de cliente del formulario al enum de BD
-      //   - particular   -> RESIDENCIAL
-      //   - autónomo/empresa/comunidad -> PYME
-      const tipoClienteCatalogo =
-        tipoCliente === "particular" ? "RESIDENCIAL" : "PYME";
-
       const res = await fetch(
         `/api/ofertas-tarifas?tipo=LUZ` +
           `&subtipo=${encodeURIComponent(subtipo)}` +
           `&activa=true` +
-          `&tipoCliente=${tipoClienteCatalogo}`
+          `&tipoCliente=${encodeURIComponent(tipoCliente)}`
       );
 
-
       if (!res.ok) {
-        console.error("Error HTTP al obtener ofertas-tarifa:", res.status);
+        console.error(
+          "Error HTTP al obtener ofertas-tarifa:",
+          res.status
+        );
         alert(
           "Ha habido un problema al calcular la comparativa con las tarifas reales."
         );
@@ -437,7 +441,8 @@ export default function ComparadorContenido() {
 
         // 3.4) Ahorro frente a la factura actual
         const ahorro = facturaNum - costeTotalTarifa;
-        const ahorroPct = facturaNum > 0 ? (ahorro / facturaNum) * 100 : 0;
+        const ahorroPct =
+          facturaNum > 0 ? (ahorro / facturaNum) * 100 : 0;
 
         // 3.5) Comisión: buscar tramo adecuado
         const consumoAnualKWh = consumoAnualNum;
@@ -446,21 +451,22 @@ export default function ComparadorContenido() {
         const tramo = tramos.find((t) => {
           const desde = toNum(t.consumoDesdeKWh);
           const hasta =
-            t.consumoHastaKWh === null || t.consumoHastaKWh === undefined
+            t.consumoHastaKWh === null ||
+            t.consumoHastaKWh === undefined
               ? null
               : toNum(t.consumoHastaKWh);
           if (hasta === null) return consumoAnualKWh >= desde;
-          return consumoAnualKWh >= desde && consumoAnualKWh <= hasta;
+          return (
+            consumoAnualKWh >= desde && consumoAnualKWh <= hasta
+          );
         });
 
         // 💰 Comisión ANUAL del Excel:
-        // - Si algún día rellenas comisionFijaAdmin la usamos.
-        // - Si no, usamos comisionKwhAdmin como comisión anual fija.
         let comisionAnualPool = 0;
 
         if (tramo) {
-          const fija = toNum(tramo.comisionFijaAdmin);    // ahora mismo null en BD
-          const desdeExcel = toNum(tramo.comisionKwhAdmin); // 34.56, 51.84, 71.04...
+          const fija = toNum(tramo.comisionFijaAdmin); // ahora mismo null en BD
+          const desdeExcel = toNum(tramo.comisionKwhAdmin); // 34.56, 51.84...
 
           comisionAnualPool = fija || desdeExcel;
         }
@@ -487,14 +493,12 @@ export default function ComparadorContenido() {
           coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
-          // 👇 ahora mostramos lo que se paga al cliente
+          // 👇 mostramos lo que se paga al cliente
           comision: comisionCliente,
-          // si quisieras guardar más detalle:
           // comisionPool,
           // comisionCliente,
           // comisionNeta,
         };
-
       });
 
       // 🔹 QUITAR tarifas con coste 0 (o casi 0)
@@ -556,7 +560,6 @@ export default function ComparadorContenido() {
       );
     }
   };
-
 
   const tituloComparador =
     tipoComparador === "luz"
@@ -768,13 +771,13 @@ export default function ComparadorContenido() {
                     className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
                     value={tipoCliente}
                     onChange={(e) =>
-                      setTipoCliente(e.target.value)
+                      setTipoCliente(
+                        e.target.value as TipoClienteCatalogo
+                      )
                     }
                   >
-                    <option value="particular">Particular</option>
-                    <option value="autonomo">Autónomo</option>
-                    <option value="empresa">Empresa</option>
-                    <option value="comunidad">Comunidad</option>
+                    <option value="RESIDENCIAL">Residencial</option>
+                    <option value="PYME">Pyme</option>
                   </select>
                 </div>
               </div>
@@ -1089,7 +1092,12 @@ export default function ComparadorContenido() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={resultados}
-                      margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                      margin={{
+                        top: 5,
+                        right: 20,
+                        left: 0,
+                        bottom: 5,
+                      }}
                     >
                       <XAxis dataKey="compañia" stroke="#e5e7eb" />
                       <YAxis stroke="#e5e7eb" />
