@@ -332,11 +332,20 @@ export default function ComparadorContenido() {
     try {
       // 2) Cargar tarifas reales desde la API
       const subtipo = nombreTarifa || "2.0TD"; // 2.0TD / 3.0TD / 6.1TD / 6.2TD
+
+      // 🔹 Mapear el tipo de cliente del formulario al enum de BD
+      //   - particular   -> RESIDENCIAL
+      //   - autónomo/empresa/comunidad -> PYME
+      const tipoClienteCatalogo =
+        tipoCliente === "particular" ? "RESIDENCIAL" : "PYME";
+
       const res = await fetch(
-        `/api/ofertas-tarifas?tipo=LUZ&subtipo=${encodeURIComponent(
-          subtipo
-        )}&activa=true`
+        `/api/ofertas-tarifas?tipo=LUZ` +
+          `&subtipo=${encodeURIComponent(subtipo)}` +
+          `&activa=true` +
+          `&tipoCliente=${tipoClienteCatalogo}`
       );
+
 
       if (!res.ok) {
         console.error("Error HTTP al obtener ofertas-tarifa:", res.status);

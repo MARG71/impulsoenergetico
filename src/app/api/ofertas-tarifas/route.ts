@@ -4,19 +4,28 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/ofertas-tarifas?tipo=LUZ&subtipo=2.0TD&activa=true
+// GET /api/ofertas-tarifas?tipo=LUZ&subtipo=2.0TD&activa=true&tipoCliente=RESIDENCIAL
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const tipo = searchParams.get("tipo");       // 'LUZ'|'GAS'|'TELEFONIA'
-    const subtipo = searchParams.get("subtipo"); // '2.0TD'|'3.0TD'|'6.1TD'
-    const activa = searchParams.get("activa");   // 'true'|'false'|null
+
+    const tipo = searchParams.get("tipo");          // 'LUZ' | 'GAS' | 'TELEFONIA'
+    const subtipo = searchParams.get("subtipo");    // '2.0TD' | '3.0TD' | '6.1TD'...
+    const activa = searchParams.get("activa");      // 'true' | 'false' | null
+    const tipoCliente = searchParams.get("tipoCliente"); // 'RESIDENCIAL' | 'PYME' | null
 
     const where: any = {};
+
     if (tipo) where.tipo = tipo as any;
     if (subtipo) where.subtipo = subtipo;
     if (activa === "true") where.activa = true;
     if (activa === "false") where.activa = false;
+
+    // 🔹 Nuevo: filtrar también por tipoCliente (enum Prisma: RESIDENCIAL / PYME)
+    if (tipoCliente) {
+      // lo mandamos desde el comparador como "RESIDENCIAL" o "PYME"
+      where.tipoCliente = tipoCliente as any;
+    }
 
     const items = await prisma.ofertaTarifa.findMany({
       where,
@@ -26,6 +35,7 @@ export async function GET(req: Request) {
           orderBy: { consumoDesdeKWh: "asc" },
         },
       },
+      // puedes mantener creadaEn desc o cambiar si quieres otro orden
       orderBy: { creadaEn: "desc" },
     });
 
@@ -54,6 +64,10 @@ export async function POST(req: Request) {
         descripcion: body.descripcion,
         activa: body.activa ?? true,
         destacada: body.destacada ?? false,
+
+        // 👇 OJO: nombre correcto del campo en Prisma
+        tipoCliente: body.tipoCliente ?? null,   // 'RESIDENCIAL' | 'PYME'
+
         precioKwhP1: body.precioKwhP1,
         precioKwhP2: body.precioKwhP2,
         precioKwhP3: body.precioKwhP3,
@@ -74,6 +88,7 @@ export async function POST(req: Request) {
     );
   }
 }
+
 
 export async function DELETE(req: Request) {
   try {
