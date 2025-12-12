@@ -1208,13 +1208,37 @@ export default function ComparadorContenido() {
                         </td>
                         <td className="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                           <button
-                            className="mb-1 inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-xs md:text-sm font-semibold hover:bg-emerald-400"
-                            onClick={() =>
-                              alert(`Contratar ${r.compañia}`)
-                            }
+                            className="mb-1 inline-flex items-center px-3 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-[11px] font-semibold hover:bg-emerald-400"
+                            onClick={() => {
+                              const params = new URLSearchParams();
+
+                              // datos de la tarifa seleccionada
+                              params.set("ofertaId", String(r.id));
+                              params.set("compania", String(r.compañia || ""));
+                              params.set("tarifa", String(r.tarifa || ""));
+
+                              // trazabilidad
+                              if (agenteId) params.set("agenteId", agenteId);
+                              if (lugarId) params.set("lugarId", lugarId);
+
+                              // si venimos de QR
+                              if (idAgenteQR) params.set("idAgente", idAgenteQR);
+                              if (idLugarQR) params.set("idLugar", idLugarQR);
+
+                              // cliente (si ya lo escribió)
+                              if (nombreCliente) params.set("nombreCliente", nombreCliente);
+                              if (direccionCliente) params.set("direccionCliente", direccionCliente);
+
+                              // tipoCliente + tarifa
+                              params.set("tipoCliente", tipoCliente);
+                              params.set("nombreTarifa", nombreTarifa);
+
+                              router.push(`/contratar?${params.toString()}`);
+                            }}
                           >
                             Contratar
                           </button>
+
                           <button
                             className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-800 text-slate-50 text-xs md:text-sm font-semibold hover:bg-slate-700"
                             onClick={() =>

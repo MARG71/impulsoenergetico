@@ -88,11 +88,12 @@ model Agente {
 
   creadoEn DateTime @default(now())
 }
+
 model Lugar {
-  id        Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   nombre    String
   direccion String
-  qrCode    String  @unique
+  qrCode    String @unique
   agenteId  Int
 
   // % del POOL para el Cliente (0..1). Si es null, se usan defaults/overrides.
@@ -107,20 +108,20 @@ model Lugar {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
-  creadoEn  DateTime @default(now())
+  creadoEn DateTime @default(now())
 
   // --- Personalización landing ---
-  especial         Boolean  @default(false)
-  especialLogoUrl  String?
-  especialColor    String?
-  especialMensaje  String?
+  especial        Boolean @default(false)
+  especialLogoUrl String?
+  especialColor   String?
+  especialMensaje String?
 
   // --- Métrica para el contador de la landing ---
-  aportacionAcumulada Int   @default(0) // en euros
+  aportacionAcumulada Int @default(0) // en euros
 
   // NUEVO: cartel individual para lugares especiales
   especialCartelUrl String?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) // <- PASO 1: poner default inicial (SIN @updatedAt aún)
 }
@@ -313,7 +314,7 @@ enum TipoCliente {
 }
 
 model OfertaTarifa {
-  id               Int         @id @default(autoincrement())
+  id               Int        @id @default(autoincrement())
   tipo             TipoOferta
   subtipo          String
   compania         String
@@ -321,16 +322,16 @@ model OfertaTarifa {
   nombre           String
   descripcion      String?
   descripcionCorta String?
-  activa           Boolean     @default(true)
-  destacada        Boolean     @default(false)
+  activa           Boolean    @default(true)
+  destacada        Boolean    @default(false)
 
   // ENERGÍA (€/kWh)
-  precioKwhP1      Decimal? @db.Decimal(10, 6)
-  precioKwhP2      Decimal? @db.Decimal(10, 6)
-  precioKwhP3      Decimal? @db.Decimal(10, 6)
-  precioKwhP4      Decimal? @db.Decimal(10, 6)
-  precioKwhP5      Decimal? @db.Decimal(10, 6)
-  precioKwhP6      Decimal? @db.Decimal(10, 6)
+  precioKwhP1 Decimal? @db.Decimal(10, 6)
+  precioKwhP2 Decimal? @db.Decimal(10, 6)
+  precioKwhP3 Decimal? @db.Decimal(10, 6)
+  precioKwhP4 Decimal? @db.Decimal(10, 6)
+  precioKwhP5 Decimal? @db.Decimal(10, 6)
+  precioKwhP6 Decimal? @db.Decimal(10, 6)
 
   // POTENCIA (€/kW·año)
   precioPotenciaP1 Decimal? @db.Decimal(10, 6)
@@ -341,23 +342,22 @@ model OfertaTarifa {
   precioPotenciaP6 Decimal? @db.Decimal(10, 6)
 
   comisionKwhAdminBase Decimal? @db.Decimal(10, 6)
-  payload           Json?
+  payload              Json?
 
   // 🔹 NUEVOS
-  referencia       String?           // columna "Ref." del Excel
-  tipoCliente      TipoCliente?      // "RESIDENCIAL" o "PYME"
+  referencia  String? // columna "Ref." del Excel
+  tipoCliente TipoCliente? // "RESIDENCIAL" o "PYME"
 
-  tramos           OfertaTarifaTramo[]
-  ofertas          Oferta[]         @relation("TarifaAOferta")
+  tramos  OfertaTarifaTramo[]
+  ofertas Oferta[]            @relation("TarifaAOferta")
 
-  creadaEn         DateTime @default(now())
-  actualizadaEn    DateTime @updatedAt
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
 
   @@unique([tipo, subtipo, compania, nombre, anexoPrecio])
   @@index([tipo, subtipo, compania])
   @@index([tipo, subtipo, anexoPrecio])
 }
-
 
 model OfertaTarifaTramo {
   id             Int @id @default(autoincrement())
@@ -387,4 +387,44 @@ model OfertaTarifaTramo {
   @@unique([ofertaTarifaId, consumoDesdeKWh, consumoHastaKWh])
   @@index([ofertaTarifaId])
   @@index([consumoDesdeKWh, consumoHastaKWh])
+}
+
+model SolicitudContrato {
+  id       Int      @id @default(autoincrement()) // ✅
+  creadaEn DateTime @default(now())
+  estado   String   @default("PENDIENTE")
+
+  nombre              String
+  apellidos           String?
+  telefono            String
+  email               String?
+  dni                 String?
+  direccionSuministro String?
+  cups                String?
+  iban                String?
+
+  ofertaId     Int?
+  compania     String?
+  tarifa       String?
+  agenteId     Int?
+  lugarId      Int?
+  tipoCliente  String?
+  nombreTarifa String?
+
+  archivos SolicitudContratoArchivo[]
+}
+
+model SolicitudContratoArchivo {
+  id       Int      @id @default(autoincrement()) // ✅
+  creadaEn DateTime @default(now())
+
+  solicitudId    Int
+  url            String
+  publicId       String?
+  tipo           String?
+  nombreOriginal String?
+  mime           String?
+  size           Int?
+
+  solicitud SolicitudContrato @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 }
