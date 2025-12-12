@@ -390,9 +390,11 @@ model OfertaTarifaTramo {
 }
 
 model SolicitudContrato {
-  id       Int      @id @default(autoincrement()) // ✅
+  id       Int      @id @default(autoincrement())
   creadaEn DateTime @default(now())
   estado   String   @default("PENDIENTE")
+
+  tipoContratacion String? // ✅ AÑADIR
 
   nombre              String
   apellidos           String?
@@ -413,6 +415,7 @@ model SolicitudContrato {
 
   archivos SolicitudContratoArchivo[]
 }
+
 
 model SolicitudContratoArchivo {
   id       Int      @id @default(autoincrement()) // ✅

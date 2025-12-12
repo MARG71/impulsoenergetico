@@ -12,76 +12,42 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-type TipoContratacion = "PERSONA_FISICA" | "AUTONOMO" | "EMPRESA";
-
-type UploadKind =
-  | "FACTURA"
-  | "DNI_FRENTE"
-  | "DNI_DORSO"
-  | "RECIBO_AUTONOMO"
-  | "CIF"
-  | "OTRO";
-
-const requiredKindsByTipo: Record<TipoContratacion, UploadKind[]> = {
-  PERSONA_FISICA: ["DNI_FRENTE", "DNI_DORSO", "FACTURA"],
-  AUTONOMO: ["DNI_FRENTE", "DNI_DORSO", "FACTURA", "RECIBO_AUTONOMO"],
-  EMPRESA: ["DNI_FRENTE", "DNI_DORSO", "FACTURA", "CIF"],
-};
-
-function isUploadKind(v: string): v is UploadKind {
-  return [
-    "FACTURA",
-    "DNI_FRENTE",
-    "DNI_DORSO",
-    "RECIBO_AUTONOMO",
-    "CIF",
-    "OTRO",
-  ].includes(v);
-}
-
 async function fileToDataUri(file: File) {
   const ab = await file.arrayBuffer();
   const b64 = Buffer.from(ab).toString("base64");
   return `data:${file.type};base64,${b64}`;
 }
 
+function getStr(form: FormData, key: string) {
+  const v = form.get(key);
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function getNumOrNull(form: FormData, key: string) {
+  const v = getStr(form, key);
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
 
-    const nombre = String(form.get("nombre") || "").trim();
-    const apellidos = String(form.get("apellidos") || "").trim();
-    const telefono = String(form.get("telefono") || "").trim();
-    const email = String(form.get("email") || "").trim();
-    const dni = String(form.get("dni") || "").trim();
-    const direccion = String(form.get("direccion") || "").trim();
-    const cups = String(form.get("cups") || "").trim();
-    const iban = String(form.get("iban") || "").trim();
+    const nombre = getStr(form, "nombre");
+    const telefono = getStr(form, "telefono");
+    const direccion = getStr(form, "direccion");
 
-    const tipoContratacionRaw = String(form.get("tipoContratacion") || "PERSONA_FISICA");
-    const tipoContratacion: TipoContratacion =
-      tipoContratacionRaw === "AUTONOMO" || tipoContratacionRaw === "EMPRESA"
-        ? tipoContratacionRaw
-        : "PERSONA_FISICA";
-
-    // Campos obligatorios (como en pantalla)
-    if (!nombre || !apellidos || !telefono || !direccion) {
+    if (!nombre || !telefono || !direccion) {
       return NextResponse.json(
-        { error: "Faltan campos obligatorios (nombre, apellidos, teléfono, dirección)." },
+        { error: "Faltan campos obligatorios (nombre, teléfono, dirección)." },
         { status: 400 }
       );
     }
 
-    const ofertaId = Number(form.get("ofertaId") || 0) || null;
-    const compania = String(form.get("compania") || "");
-    const tarifa = String(form.get("tarifa") || "");
-    const agenteId = Number(form.get("agenteId") || 0) || null;
-    const lugarId = Number(form.get("lugarId") || 0) || null;
-    const tipoCliente = String(form.get("tipoCliente") || "");
-    const nombreTarifa = String(form.get("nombreTarifa") || "");
-
-    const files = form.getAll("files").filter(Boolean) as File[];
-    const filesKindsRaw = form.getAll("filesKinds").map((x) => String(x || "").trim());
+    // ✅ files bien tipados (solo File)
+    const files = form
+      .getAll("files")
+      .filter((v): v is File => v instanceof File);
 
     if (!files.length) {
       return NextResponse.json(
@@ -90,52 +56,61 @@ export async function POST(req: Request) {
       );
     }
 
-    // Alinear kinds con cada archivo
-    const filesKinds: UploadKind[] = files.map((_, idx) => {
-      const v = filesKindsRaw[idx] || "OTRO";
-      return isUploadKind(v) ? v : "OTRO";
-    });
+    // ✅ kinds por archivo (mismo orden que los files)
+    const kinds = form.getAll("filesKinds").map((k) => String(k || "OTRO"));
 
-    // Validación documentación obligatoria según tipo
-    const required = requiredKindsByTipo[tipoContratacion];
-    const missing = required.filter((k) => !filesKinds.includes(k));
-    if (missing.length) {
-      return NextResponse.json(
-        { error: `Falta documentación obligatoria: ${missing.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    const payload = {
+      nombre,
+      apellidos: getStr(form, "apellidos") || null,
+      telefono,
+      email: getStr(form, "email") || null,
+      dni: getStr(form, "dni") || null,
+      direccionSuministro: direccion || null,
+      cups: getStr(form, "cups") || null,
+      iban: getStr(form, "iban") || null,
+
+      tipoContratacion: getStr(form, "tipoContratacion") || null,
+
+      ofertaId: getNumOrNull(form, "ofertaId"),
+      compania: getStr(form, "compania") || null,
+      tarifa: getStr(form, "tarifa") || null,
+      agenteId: getNumOrNull(form, "agenteId"),
+      lugarId: getNumOrNull(form, "lugarId"),
+      tipoCliente: getStr(form, "tipoCliente") || null,
+      nombreTarifa: getStr(form, "nombreTarifa") || null,
+    };
 
     // 1) Crear solicitud
     const solicitud = await prisma.solicitudContrato.create({
       data: {
-        nombre,
-        apellidos,
-        telefono,
-        email,
-        dni,
-        direccionSuministro: direccion,
-        cups,
-        iban,
-        ofertaId,
-        compania,
-        tarifa,
-        agenteId,
-        lugarId,
-        tipoCliente,
-        nombreTarifa,
-        estado: "PENDIENTE",
+        nombre: payload.nombre,
+        apellidos: payload.apellidos,
+        telefono: payload.telefono,
+        email: payload.email,
+        dni: payload.dni,
+        direccionSuministro: payload.direccionSuministro,
+        cups: payload.cups,
+        iban: payload.iban,
 
-        // ⚠️ Si tu modelo tiene este campo, perfecto.
-        // Si Prisma te marca error aquí, dime y lo ajusto a tu schema real.
-        tipoContratacion,
-      } as any,
+        tipoContratacion: payload.tipoContratacion,
+
+        ofertaId: payload.ofertaId,
+        compania: payload.compania,
+        tarifa: payload.tarifa,
+        agenteId: payload.agenteId,
+        lugarId: payload.lugarId,
+        tipoCliente: payload.tipoCliente,
+        nombreTarifa: payload.nombreTarifa,
+
+        estado: "PENDIENTE",
+      },
+      select: { id: true },
     });
 
-    // 2) Subir archivos + guardar
+    // 2) Subir archivos + guardar en BD
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      const kind = filesKinds[i];
+      const kind = kinds[i] ?? "OTRO";
 
       const dataUri = await fileToDataUri(f);
 
