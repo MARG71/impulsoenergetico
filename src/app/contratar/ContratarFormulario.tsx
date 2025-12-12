@@ -51,6 +51,19 @@ const requiredKindsByTipo: Record<TipoContratacion, UploadKind[]> = {
   EMPRESA: ["DNI_FRENTE", "DNI_DORSO", "FACTURA", "CIF"],
 };
 
+function labelKind(kind: UploadKind) {
+  const map: Record<UploadKind, string> = {
+    FACTURA: "Factura completa",
+    DNI_FRENTE: "DNI (frontal)",
+    DNI_DORSO: "DNI (trasera)",
+    RECIBO_AUTONOMO: "Recibo autónomo",
+    CIF: "CIF empresa",
+    OTRO: "Otro",
+  };
+  return map[kind] ?? kind;
+}
+
+
 export default function ContratarFormulario() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -96,6 +109,8 @@ export default function ContratarFormulario() {
   const [direccion, setDireccion] = useState(meta.direccionCliente);
   const [cups, setCups] = useState("");
   const [iban, setIban] = useState("");
+  
+
 
   // ✅ ahora cada doc tiene su tipo
   const [uploadKind, setUploadKind] = useState<UploadKind>("FACTURA");
@@ -110,6 +125,25 @@ export default function ContratarFormulario() {
     const next = [...docs, ...arr].slice(0, maxFiles);
     setDocs(next);
   };
+
+  const [step, setStep] = useState<1 | 2>(1);
+
+    const canGoStep2 = Boolean(
+        nombre.trim() &&
+        apellidos.trim() &&
+        telefono.trim() &&
+        direccion.trim()
+    );
+
+
+    const gotoStep2 = () => {
+    if (!canGoStep2) {
+        alert("Completa los campos obligatorios (*).");
+        return;
+    }
+    setStep(2);
+    };
+
 
   const removeDoc = (idx: number) => {
     setDocs((prev) => prev.filter((_, i) => i !== idx));
@@ -214,10 +248,9 @@ export default function ContratarFormulario() {
     }
   };
 
-  return (
+return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-10 md:py-10 text-[15px] md:text-[16px] lg:text-[17px]">
       <div className="max-w-[1400px] mx-auto space-y-8">
-
         {/* Cabecera */}
         <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.35)] p-5 md:p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -240,9 +273,7 @@ export default function ContratarFormulario() {
                 </h1>
                 <p className="text-sm md:text-base text-slate-300 mt-1 font-semibold">
                   {meta.compania ? (
-                    <span className="font-extrabold text-emerald-200">
-                      {meta.compania}
-                    </span>
+                    <span className="font-extrabold text-emerald-200">{meta.compania}</span>
                   ) : null}
                   {meta.tarifa ? <span className="text-slate-300"> · {meta.tarifa}</span> : null}
                 </p>
@@ -261,163 +292,237 @@ export default function ContratarFormulario() {
 
         {/* 2 columnas */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-
           {/* Form */}
           <form
             onSubmit={submit}
             className="lg:col-span-3 rounded-3xl bg-slate-950/90 border border-slate-800 p-5 md:p-6 shadow-[0_0_28px_rgba(15,23,42,0.9)] space-y-6"
           >
-            {/* Tipo cliente */}
+            {/* Progreso */}
             <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
-              <label className="block text-[15px] md:text-[16px] font-extrabold text-slate-200 mb-2">
-
-                Tipo de cliente *
-              </label>
-              <select
-                className="inp font-extrabold"
-                value={tipoContratacion}
-                onChange={(e) => setTipoContratacion(e.target.value as TipoContratacion)}
-              >
-                <option value="PERSONA_FISICA">Persona física</option>
-                <option value="AUTONOMO">Autónomo</option>
-                <option value="EMPRESA">Empresa</option>
-              </select>
-              <p className="mt-2 text-xs md:text-sm text-slate-300 font-semibold">
-                Selecciona tu tipo para ver la documentación exacta que necesitamos.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Nombre *">
-                <input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-              </Field>
-              <Field label="Apellidos *">
-                <input className="inp" value={apellidos} onChange={(e) => setApellidos(e.target.value)} />
-              </Field>
-              <Field label="Teléfono *">
-                <input className="inp" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-              </Field>
-              <Field label="Email">
-                <input className="inp" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </Field>
-              <Field label="DNI/NIE">
-                <input className="inp" value={dni} onChange={(e) => setDni(e.target.value)} />
-              </Field>
-              <Field label="CUPS (si lo tienes)">
-                <input className="inp" value={cups} onChange={(e) => setCups(e.target.value)} />
-              </Field>
-              <Field label="Dirección de suministro *" className="md:col-span-2">
-                <input className="inp" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-              </Field>
-              <Field label="IBAN (si procede)" className="md:col-span-2">
-                <input className="inp" value={iban} onChange={(e) => setIban(e.target.value)} />
-              </Field>
-            </div>
-
-            {/* Docs */}
-            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-extrabold text-emerald-200">
-                    Documentación
-                  </h2>
-                  <p className="text-sm md:text-base text-slate-300 font-semibold">
-                    En ordenador puedes subir PDF/imagen. En móvil puedes hacer foto directamente.
-                  </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm md:text-base font-extrabold text-slate-200">
+                  Paso {step} de 2
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    className="px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-sm md:text-base font-extrabold"
-                    value={uploadKind}
-                    onChange={(e) => setUploadKind(e.target.value as UploadKind)}
-                  >
-                    <option value="FACTURA">Factura completa</option>
-                    <option value="DNI_FRENTE">DNI (frontal)</option>
-                    <option value="DNI_DORSO">DNI (trasera)</option>
-                    <option value="RECIBO_AUTONOMO">Recibo autónomo</option>
-                    <option value="CIF">CIF empresa</option>
-                    <option value="OTRO">Otro</option>
-                  </select>
-
-                  <input
-                    ref={inputFilesRef}
-                    type="file"
-                    className="hidden"
-                    multiple
-                    accept="image/*,application/pdf"
-                    onChange={(e) => addFiles(e.target.files, uploadKind)}
-                  />
-                  <input
-                    ref={inputCameraRef}
-                    type="file"
-                    className="hidden"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => addFiles(e.target.files, uploadKind)}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => inputFilesRef.current?.click()}
-                    className="px-4 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-sm md:text-lg font-bold"
-                  >
-                    📎 Subir archivos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => inputCameraRef.current?.click()}
-                    className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold"
-                  >
-                    📸 Hacer foto
-                  </button>
+                <div className="text-xs md:text-sm font-semibold text-slate-300">
+                  {step === 1 ? "Datos" : "Documentos"}
                 </div>
               </div>
 
-              {docs.length === 0 ? (
-                <div className="text-sm md:text-base text-slate-400 font-semibold">
-                  Aún no has añadido documentos.
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div
+                  className={`rounded-xl px-3 py-2 text-center font-extrabold text-sm md:text-base border ${
+                    step === 1
+                      ? "bg-emerald-400 text-slate-950 border-emerald-300"
+                      : "bg-slate-950/60 text-slate-200 border-slate-700"
+                  }`}
+                >
+                  1 · Datos
                 </div>
-              ) : (
-                <ul className="space-y-2">
-                  {docs.map((d, idx) => (
-                    <li
-                      key={`${d.file.name}-${idx}`}
-                      className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2"
-                    >
-                      <div className="text-sm md:text-base">
-                        <span className="font-extrabold text-slate-100">{d.file.name}</span>{" "}
-                        <span className="text-slate-400 font-semibold">
-                          ({Math.round(d.file.size / 1024)} KB) ·{" "}
-                          <span className="text-emerald-200 font-extrabold">{labelKind(d.kind)}</span>
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeDoc(idx)}
-                        className="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-xs md:text-sm font-bold"
-                      >
-                        Quitar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                <div
+                  className={`rounded-xl px-3 py-2 text-center font-extrabold text-sm md:text-base border ${
+                    step === 2
+                      ? "bg-emerald-400 text-slate-950 border-emerald-300"
+                      : "bg-slate-950/60 text-slate-200 border-slate-700"
+                  }`}
+                >
+                  2 · Documentos
+                </div>
+              </div>
+
+              <div className="mt-3 h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-400 transition-all"
+                  style={{ width: step === 1 ? "50%" : "100%" }}
+                />
+              </div>
+
+              <p className="mt-2 text-xs md:text-sm text-slate-300 font-semibold">
+                {step === 1
+                  ? "Completa los datos obligatorios y pulsa “Siguiente”."
+                  : "Sube la documentación requerida y pulsa “Enviar solicitud”."}
+              </p>
             </div>
 
-            <div className="flex justify-end">
-              <button
-                disabled={loading}
-                type="submit"
-                className="px-8 py-3.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-lg font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)] disabled:opacity-60"
-              >
-                {loading ? "Enviando…" : "Enviar solicitud"}
-              </button>
-            </div>
+            {/* PASO 1 */}
+            {step === 1 && (
+              <>
+                {/* Tipo cliente */}
+                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
+                  <label className="block text-[15px] md:text-[16px] font-extrabold text-slate-200 mb-2">
+                    Tipo de cliente *
+                  </label>
+                  <select
+                    className="inp font-extrabold"
+                    value={tipoContratacion}
+                    onChange={(e) => setTipoContratacion(e.target.value as TipoContratacion)}
+                  >
+                    <option value="PERSONA_FISICA">Persona física</option>
+                    <option value="AUTONOMO">Autónomo</option>
+                    <option value="EMPRESA">Empresa</option>
+                  </select>
+                  <p className="mt-2 text-xs md:text-sm text-slate-300 font-semibold">
+                    Selecciona tu tipo para ver la documentación exacta que necesitamos.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="Nombre *">
+                    <input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                  </Field>
+                  <Field label="Apellidos *">
+                    <input className="inp" value={apellidos} onChange={(e) => setApellidos(e.target.value)} />
+                  </Field>
+                  <Field label="Teléfono *">
+                    <input className="inp" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                  </Field>
+                  <Field label="Email">
+                    <input className="inp" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  </Field>
+                  <Field label="DNI/NIE">
+                    <input className="inp" value={dni} onChange={(e) => setDni(e.target.value)} />
+                  </Field>
+                  <Field label="CUPS (si lo tienes)">
+                    <input className="inp" value={cups} onChange={(e) => setCups(e.target.value)} />
+                  </Field>
+                  <Field label="Dirección de suministro *" className="md:col-span-2">
+                    <input className="inp" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+                  </Field>
+                  <Field label="IBAN (si procede)" className="md:col-span-2">
+                    <input className="inp" value={iban} onChange={(e) => setIban(e.target.value)} />
+                  </Field>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={gotoStep2}
+                    className="px-7 py-3 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-base font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)]"
+                  >
+                    Siguiente ➜
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* PASO 2 */}
+            {step === 2 && (
+              <>
+                {/* Docs */}
+                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-extrabold text-emerald-200">
+                        Documentación
+                      </h2>
+                      <p className="text-sm md:text-base text-slate-300 font-semibold">
+                        En ordenador puedes subir PDF/imagen. En móvil puedes hacer foto directamente.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        className="px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 text-sm md:text-base font-extrabold"
+                        value={uploadKind}
+                        onChange={(e) => setUploadKind(e.target.value as UploadKind)}
+                      >
+                        <option value="FACTURA">Factura completa</option>
+                        <option value="DNI_FRENTE">DNI (frontal)</option>
+                        <option value="DNI_DORSO">DNI (trasera)</option>
+                        <option value="RECIBO_AUTONOMO">Recibo autónomo</option>
+                        <option value="CIF">CIF empresa</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
+
+                      <input
+                        ref={inputFilesRef}
+                        type="file"
+                        className="hidden"
+                        multiple
+                        accept="image/*,application/pdf"
+                        onChange={(e) => addFiles(e.target.files, uploadKind)}
+                      />
+                      <input
+                        ref={inputCameraRef}
+                        type="file"
+                        className="hidden"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => addFiles(e.target.files, uploadKind)}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => inputFilesRef.current?.click()}
+                        className="px-4 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-sm md:text-lg font-bold"
+                      >
+                        📎 Subir archivos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => inputCameraRef.current?.click()}
+                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold"
+                      >
+                        📸 Hacer foto
+                      </button>
+                    </div>
+                  </div>
+
+                  {docs.length === 0 ? (
+                    <div className="text-sm md:text-base text-slate-400 font-semibold">
+                      Aún no has añadido documentos.
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {docs.map((d, idx) => (
+                        <li
+                          key={`${d.file.name}-${idx}`}
+                          className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2"
+                        >
+                          <div className="text-sm md:text-base">
+                            <span className="font-extrabold text-slate-100">{d.file.name}</span>{" "}
+                            <span className="text-slate-400 font-semibold">
+                              ({Math.round(d.file.size / 1024)} KB) ·{" "}
+                              <span className="text-emerald-200 font-extrabold">
+                                {labelKind(d.kind)}
+                              </span>
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeDoc(idx)}
+                            className="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-xs md:text-sm font-bold"
+                          >
+                            Quitar
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="px-6 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-base font-bold"
+                  >
+                    ⬅ Atrás
+                  </button>
+
+                  <button
+                    disabled={loading}
+                    type="submit"
+                    className="px-8 py-3.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-lg font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)] disabled:opacity-60"
+                  >
+                    {loading ? "Enviando…" : "Enviar solicitud"}
+                  </button>
+                </div>
+              </>
+            )}
           </form>
 
           {/* Leyenda */}
-          <aside className="rounded-3xl bg-slate-950/90 border border-emerald-500/30 p-6 md:p-7 shadow-[0_0_24px_rgba(16,185,129,0.25)] h-fit lg:sticky lg:top-6">
+          <aside className="lg:col-span-2 rounded-3xl bg-slate-950/90 border border-emerald-500/30 p-6 md:p-7 shadow-[0_0_24px_rgba(16,185,129,0.25)] h-fit lg:sticky lg:top-6">
             <h3 className="text-2xl md:text-3xl font-extrabold text-emerald-300">
               Documentación necesaria
             </h3>
@@ -437,12 +542,15 @@ export default function ContratarFormulario() {
             </ul>
 
             <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700 p-3 text-xs text-slate-300 font-semibold">
-              💡 Consejo: primero sube la <span className="text-emerald-200 font-extrabold">Factura</span> y luego el{" "}
+              💡 Consejo: primero sube la{" "}
+              <span className="text-emerald-200 font-extrabold">Factura</span> y luego el{" "}
               <span className="text-emerald-200 font-extrabold">DNI (frontal y trasera)</span>.
             </div>
 
             <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700 p-3 text-xs text-slate-300 font-semibold">
-              📱 En móvil: usa <span className="text-emerald-200 font-extrabold">Hacer foto</span> para fotografiar documentos.
+              📱 En móvil: usa{" "}
+              <span className="text-emerald-200 font-extrabold">Hacer foto</span> para fotografiar
+              documentos.
             </div>
           </aside>
         </div>
@@ -450,17 +558,16 @@ export default function ContratarFormulario() {
 
       <style jsx>{`
         .inp {
-            width: 100%;
-            padding: 0.85rem 1rem;
-            border-radius: 1rem;
-            background: rgba(2, 6, 23, 0.75);
-            border: 1px solid rgba(51, 65, 85, 1);
-            color: #fff;
-            outline: none;
-            font-weight: 750;
-            font-size: 1.05rem;
-            }
-
+          width: 100%;
+          padding: 0.85rem 1rem;
+          border-radius: 1rem;
+          background: rgba(2, 6, 23, 0.75);
+          border: 1px solid rgba(51, 65, 85, 1);
+          color: #fff;
+          outline: none;
+          font-weight: 750;
+          font-size: 1.05rem;
+        }
         .inp:focus {
           box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.55);
           border-color: rgba(52, 211, 153, 0.8);
@@ -468,18 +575,6 @@ export default function ContratarFormulario() {
       `}</style>
     </div>
   );
-}
-
-function labelKind(kind: UploadKind) {
-  const map: Record<UploadKind, string> = {
-    FACTURA: "Factura completa",
-    DNI_FRENTE: "DNI (frontal)",
-    DNI_DORSO: "DNI (trasera)",
-    RECIBO_AUTONOMO: "Recibo autónomo",
-    CIF: "CIF empresa",
-    OTRO: "Otro",
-  };
-  return map[kind] ?? kind;
 }
 
 function Field({
@@ -494,7 +589,6 @@ function Field({
   return (
     <div className={className}>
       <label className="block text-[15px] md:text-[16px] font-extrabold text-slate-200 mb-2">
-
         {label}
       </label>
       {children}
