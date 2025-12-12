@@ -23,7 +23,14 @@ export async function middleware(req: NextRequest) {
 
   // 🔓 Estas rutas ya las hacemos públicas vía config.matcher (abajo),
   // pero si en el futuro ampliamos matcher, esto nos protege igualmente.
-  const publicPaths = ['/login', '/unauthorized', '/bienvenida', '/registro']
+  const publicPaths = [
+  '/login',
+  '/unauthorized',
+  '/bienvenida',
+  '/registro',
+  '/contratar', // ✅ la página del formulario público
+]
+
   if (publicPaths.includes(path)) {
     return NextResponse.next()
   }
@@ -90,6 +97,7 @@ export const config = {
     // - unauthorized
     // - bienvenida (pública)
     // - registro (pública)
-    '/((?!api|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro).*)',
+    '/((?!api|api/solicitudes-contrato|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro|contratar).*)',
+
   ],
 }
