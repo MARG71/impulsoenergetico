@@ -103,7 +103,7 @@ importers:
         specifier: ^4
         version: 4.1.18
       '@types/node':
-        specifier: ^20
+        specifier: 20.19.26
         version: 20.19.26
       '@types/nodemailer':
         specifier: ^7.0.4
