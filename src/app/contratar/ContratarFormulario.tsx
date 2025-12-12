@@ -215,8 +215,9 @@ export default function ContratarFormulario() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-10 md:py-10">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-10 md:py-10 text-[15px] md:text-[16px] lg:text-[17px]">
+      <div className="max-w-[1400px] mx-auto space-y-8">
+
         {/* Cabecera */}
         <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.35)] p-5 md:p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -251,7 +252,7 @@ export default function ContratarFormulario() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-sm md:text-base font-bold"
+              className="px-5 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-sm md:text-lg font-bold"
             >
               ⬅ Volver
             </button>
@@ -259,15 +260,17 @@ export default function ContratarFormulario() {
         </div>
 
         {/* 2 columnas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
           {/* Form */}
           <form
             onSubmit={submit}
-            className="lg:col-span-2 rounded-3xl bg-slate-950/90 border border-slate-800 p-5 md:p-6 shadow-[0_0_28px_rgba(15,23,42,0.9)] space-y-6"
+            className="lg:col-span-3 rounded-3xl bg-slate-950/90 border border-slate-800 p-5 md:p-6 shadow-[0_0_28px_rgba(15,23,42,0.9)] space-y-6"
           >
             {/* Tipo cliente */}
             <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
-              <label className="block text-sm md:text-base font-extrabold text-slate-200 mb-2">
+              <label className="block text-[15px] md:text-[16px] font-extrabold text-slate-200 mb-2">
+
                 Tipo de cliente *
               </label>
               <select
@@ -357,14 +360,14 @@ export default function ContratarFormulario() {
                   <button
                     type="button"
                     onClick={() => inputFilesRef.current?.click()}
-                    className="px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-sm md:text-base font-bold"
+                    className="px-4 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-sm md:text-lg font-bold"
                   >
                     📎 Subir archivos
                   </button>
                   <button
                     type="button"
                     onClick={() => inputCameraRef.current?.click()}
-                    className="px-3 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-base font-extrabold"
+                    className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold"
                   >
                     📸 Hacer foto
                   </button>
@@ -406,7 +409,7 @@ export default function ContratarFormulario() {
               <button
                 disabled={loading}
                 type="submit"
-                className="px-7 py-3 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-base font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)] disabled:opacity-60"
+                className="px-8 py-3.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-lg font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)] disabled:opacity-60"
               >
                 {loading ? "Enviando…" : "Enviar solicitud"}
               </button>
@@ -414,8 +417,8 @@ export default function ContratarFormulario() {
           </form>
 
           {/* Leyenda */}
-          <aside className="rounded-3xl bg-slate-950/90 border border-emerald-500/30 p-5 shadow-[0_0_24px_rgba(16,185,129,0.25)] h-fit lg:sticky lg:top-6">
-            <h3 className="text-xl font-extrabold text-emerald-300">
+          <aside className="rounded-3xl bg-slate-950/90 border border-emerald-500/30 p-6 md:p-7 shadow-[0_0_24px_rgba(16,185,129,0.25)] h-fit lg:sticky lg:top-6">
+            <h3 className="text-2xl md:text-3xl font-extrabold text-emerald-300">
               Documentación necesaria
             </h3>
             <p className="text-sm text-slate-300 mt-1 font-semibold">
@@ -425,7 +428,7 @@ export default function ContratarFormulario() {
               </span>
             </p>
 
-            <ul className="mt-4 space-y-2 text-sm text-slate-100">
+            <ul className="mt-4 space-y-2 text-base text-slate-100">
               {requisitos[tipoContratacion].items.map((r) => (
                 <li key={r} className="font-semibold leading-relaxed">
                   ✅ {r}
@@ -447,16 +450,17 @@ export default function ContratarFormulario() {
 
       <style jsx>{`
         .inp {
-          width: 100%;
-          padding: 0.7rem 0.9rem;
-          border-radius: 0.9rem;
-          background: rgba(2, 6, 23, 0.75);
-          border: 1px solid rgba(51, 65, 85, 1);
-          color: #fff;
-          outline: none;
-          font-weight: 700;
-          font-size: 0.98rem;
-        }
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border-radius: 1rem;
+            background: rgba(2, 6, 23, 0.75);
+            border: 1px solid rgba(51, 65, 85, 1);
+            color: #fff;
+            outline: none;
+            font-weight: 750;
+            font-size: 1.05rem;
+            }
+
         .inp:focus {
           box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.55);
           border-color: rgba(52, 211, 153, 0.8);
@@ -489,7 +493,8 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="block text-sm md:text-base font-extrabold text-slate-200 mb-1">
+      <label className="block text-[15px] md:text-[16px] font-extrabold text-slate-200 mb-2">
+
         {label}
       </label>
       {children}
