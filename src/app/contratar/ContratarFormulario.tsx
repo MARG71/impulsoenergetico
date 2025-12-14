@@ -14,7 +14,14 @@ type UploadKind =
   | "CIF"
   | "OTRO";
 
-type DocItem = { file: File; kind: UploadKind };
+type UploadedDoc = {
+  kind: UploadKind;
+  url: string;
+  publicId: string;
+  nombreOriginal: string;
+  mime: string;
+  size: number;
+};
 
 const requisitos: Record<TipoContratacion, { title: string; items: string[] }> = {
   PERSONA_FISICA: {
@@ -63,7 +70,6 @@ function labelKind(kind: UploadKind) {
   return map[kind] ?? kind;
 }
 
-
 export default function ContratarFormulario() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -95,7 +101,7 @@ export default function ContratarFormulario() {
       nombreCliente: sp.get("nombreCliente") || "",
       direccionCliente: sp.get("direccionCliente") || "",
     };
-  }, [spKey]); // ✅
+  }, [spKey]);
 
   // datos que mete el cliente
   const [tipoContratacion, setTipoContratacion] =
@@ -109,55 +115,93 @@ export default function ContratarFormulario() {
   const [direccion, setDireccion] = useState(meta.direccionCliente);
   const [cups, setCups] = useState("");
   const [iban, setIban] = useState("");
-  
 
-
-  // ✅ ahora cada doc tiene su tipo
+  // docs
   const [uploadKind, setUploadKind] = useState<UploadKind>("FACTURA");
-  const [docs, setDocs] = useState<DocItem[]>([]);
+  const [docs, setDocs] = useState<UploadedDoc[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
-
-  const addFiles = (list: FileList | null, kind: UploadKind) => {
-    if (!list?.length) return;
-    const arr = Array.from(list).map((file) => ({ file, kind }));
-
-    const maxFiles = 12;
-    const next = [...docs, ...arr].slice(0, maxFiles);
-    setDocs(next);
-  };
-
   const [step, setStep] = useState<1 | 2>(1);
 
-    const canGoStep2 = Boolean(
-        nombre.trim() &&
-        apellidos.trim() &&
-        telefono.trim() &&
-        direccion.trim()
-    );
+  const canGoStep2 = Boolean(
+    nombre.trim() && apellidos.trim() && telefono.trim() && direccion.trim()
+  );
 
-
-    const gotoStep2 = () => {
+  const gotoStep2 = () => {
     if (!canGoStep2) {
-        alert("Completa los campos obligatorios (*).");
-        return;
+      alert("Completa los campos obligatorios (*).");
+      return;
     }
     setStep(2);
-    };
-
+  };
 
   const removeDoc = (idx: number) => {
     setDocs((prev) => prev.filter((_, i) => i !== idx));
   };
+
+  // ✅ Cloudinary direct upload (frontend)
+  async function uploadToCloudinary(file: File) {
+    const signRes = await fetch("/api/cloudinary-sign");
+    if (!signRes.ok) throw new Error("No se pudo obtener firma de subida.");
+    const sign = await signRes.json();
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("api_key", sign.apiKey);
+    fd.append("timestamp", String(sign.timestamp));
+    fd.append("signature", sign.signature);
+    fd.append("folder", sign.folder);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${sign.cloudName}/auto/upload`,
+      { method: "POST", body: fd }
+    );
+
+    if (!res.ok) throw new Error("Error subiendo a Cloudinary");
+    return res.json(); // secure_url, public_id...
+  }
+
+  async function addFilesCloudinary(list: FileList | null, kind: UploadKind) {
+    if (!list?.length) return;
+
+    setUploadError(null);
+    setUploading(true);
+
+    try {
+      const maxFiles = 12;
+      const files = Array.from(list);
+
+      for (const file of files) {
+        // límite total (con el valor más reciente)
+        if (docs.length >= maxFiles) break;
+
+        const up = await uploadToCloudinary(file);
+
+        const doc: UploadedDoc = {
+          kind,
+          url: up.secure_url,
+          publicId: up.public_id,
+          nombreOriginal: file.name,
+          mime: file.type,
+          size: file.size,
+        };
+
+        setDocs((prev) => [...prev, doc].slice(0, maxFiles));
+      }
+    } catch (e: any) {
+      setUploadError(e?.message || "Error subiendo archivos");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const validate = () => {
     // Campos obligatorios (mínimos)
     if (!nombre.trim()) return "Falta el nombre.";
     if (!telefono.trim()) return "Falta el teléfono.";
     if (!direccion.trim()) return "Falta la dirección de suministro.";
-
-    // Si quieres endurecer:
-    // if (!dni.trim()) return "Falta DNI/NIE.";
-    // if (!email.trim()) return "Falta email.";
 
     if (!docs.length) return "Debes subir la documentación obligatoria.";
 
@@ -166,17 +210,9 @@ export default function ContratarFormulario() {
     const missing = required.filter((k) => !docs.some((d) => d.kind === k));
 
     if (missing.length) {
-      const mapLabel: Record<UploadKind, string> = {
-        FACTURA: "Factura completa",
-        DNI_FRENTE: "DNI (frontal)",
-        DNI_DORSO: "DNI (trasera)",
-        RECIBO_AUTONOMO: "Recibo autónomo",
-        CIF: "CIF empresa",
-        OTRO: "Otro",
-      };
       return (
         "Falta documentación obligatoria: " +
-        missing.map((m) => mapLabel[m]).join(", ")
+        missing.map((m) => labelKind(m)).join(", ")
       );
     }
 
@@ -189,41 +225,42 @@ export default function ContratarFormulario() {
     const err = validate();
     if (err) return alert(err);
 
+    if (uploading) {
+      alert("Espera a que terminen de subirse los documentos…");
+      return;
+    }
+
     setLoading(true);
     try {
-      const fd = new FormData();
-
-      // datos cliente
-      fd.append("nombre", nombre);
-      fd.append("apellidos", apellidos);
-      fd.append("telefono", telefono);
-      fd.append("email", email);
-      fd.append("dni", dni);
-      fd.append("direccion", direccion);
-      fd.append("cups", cups);
-      fd.append("iban", iban);
-
-      // tipo contratación (nuevo)
-      fd.append("tipoContratacion", tipoContratacion);
-
-      // metadata
-      fd.append("ofertaId", meta.ofertaId);
-      fd.append("compania", meta.compania);
-      fd.append("tarifa", meta.tarifa);
-      fd.append("agenteId", meta.agenteId);
-      fd.append("lugarId", meta.lugarId);
-      fd.append("tipoCliente", meta.tipoCliente);
-      fd.append("nombreTarifa", meta.nombreTarifa);
-
-      // ✅ enviamos docs con su tipo (uno a uno)
-      docs.forEach((d) => {
-        fd.append("files", d.file, d.file.name);
-        fd.append("filesKinds", d.kind);
-      });
-
-      const res = await fetch("/api/solicitudes-contrato", {
+      const res = await fetch("/api/solicitudes-contrato-v2", {
         method: "POST",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // datos cliente
+          nombre,
+          apellidos,
+          telefono,
+          email,
+          dni,
+          direccion,
+          cups,
+          iban,
+
+          // tipo contratación
+          tipoContratacion,
+
+          // metadata
+          ofertaId: meta.ofertaId,
+          compania: meta.compania,
+          tarifa: meta.tarifa,
+          agenteId: meta.agenteId,
+          lugarId: meta.lugarId,
+          tipoCliente: meta.tipoCliente,
+          nombreTarifa: meta.nombreTarifa,
+
+          // docs ya subidos
+          documentos: docs,
+        }),
       });
 
       const data = await res.json();
@@ -248,7 +285,7 @@ export default function ContratarFormulario() {
     }
   };
 
-return (
+  return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-10 md:py-10 text-[15px] md:text-[16px] lg:text-[17px]">
       <div className="max-w-[1400px] mx-auto space-y-8">
         {/* Cabecera */}
@@ -273,9 +310,13 @@ return (
                 </h1>
                 <p className="text-sm md:text-base text-slate-300 mt-1 font-semibold">
                   {meta.compania ? (
-                    <span className="font-extrabold text-emerald-200">{meta.compania}</span>
+                    <span className="font-extrabold text-emerald-200">
+                      {meta.compania}
+                    </span>
                   ) : null}
-                  {meta.tarifa ? <span className="text-slate-300"> · {meta.tarifa}</span> : null}
+                  {meta.tarifa ? (
+                    <span className="text-slate-300"> · {meta.tarifa}</span>
+                  ) : null}
                 </p>
               </div>
             </div>
@@ -354,7 +395,9 @@ return (
                   <select
                     className="inp font-extrabold"
                     value={tipoContratacion}
-                    onChange={(e) => setTipoContratacion(e.target.value as TipoContratacion)}
+                    onChange={(e) =>
+                      setTipoContratacion(e.target.value as TipoContratacion)
+                    }
                   >
                     <option value="PERSONA_FISICA">Persona física</option>
                     <option value="AUTONOMO">Autónomo</option>
@@ -367,28 +410,60 @@ return (
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Field label="Nombre *">
-                    <input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                    />
                   </Field>
                   <Field label="Apellidos *">
-                    <input className="inp" value={apellidos} onChange={(e) => setApellidos(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={apellidos}
+                      onChange={(e) => setApellidos(e.target.value)}
+                    />
                   </Field>
                   <Field label="Teléfono *">
-                    <input className="inp" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                    />
                   </Field>
                   <Field label="Email">
-                    <input className="inp" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
                   </Field>
                   <Field label="DNI/NIE">
-                    <input className="inp" value={dni} onChange={(e) => setDni(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={dni}
+                      onChange={(e) => setDni(e.target.value)}
+                    />
                   </Field>
                   <Field label="CUPS (si lo tienes)">
-                    <input className="inp" value={cups} onChange={(e) => setCups(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={cups}
+                      onChange={(e) => setCups(e.target.value)}
+                    />
                   </Field>
                   <Field label="Dirección de suministro *" className="md:col-span-2">
-                    <input className="inp" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={direccion}
+                      onChange={(e) => setDireccion(e.target.value)}
+                    />
                   </Field>
                   <Field label="IBAN (si procede)" className="md:col-span-2">
-                    <input className="inp" value={iban} onChange={(e) => setIban(e.target.value)} />
+                    <input
+                      className="inp"
+                      value={iban}
+                      onChange={(e) => setIban(e.target.value)}
+                    />
                   </Field>
                 </div>
 
@@ -439,7 +514,10 @@ return (
                         className="hidden"
                         multiple
                         accept="image/*,application/pdf"
-                        onChange={(e) => addFiles(e.target.files, uploadKind)}
+                        onChange={(e) => {
+                          addFilesCloudinary(e.target.files, uploadKind);
+                          e.currentTarget.value = "";
+                        }}
                       />
                       <input
                         ref={inputCameraRef}
@@ -447,25 +525,41 @@ return (
                         className="hidden"
                         multiple
                         accept="image/*"
-                        onChange={(e) => addFiles(e.target.files, uploadKind)}
+                        onChange={(e) => {
+                          addFilesCloudinary(e.target.files, uploadKind);
+                          e.currentTarget.value = "";
+                        }}
                       />
 
                       <button
                         type="button"
                         onClick={() => inputFilesRef.current?.click()}
                         className="px-4 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-sm md:text-lg font-bold"
+                        disabled={uploading}
                       >
                         📎 Subir archivos
                       </button>
                       <button
                         type="button"
                         onClick={() => inputCameraRef.current?.click()}
-                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold"
+                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold disabled:opacity-60"
+                        disabled={uploading}
                       >
                         📸 Hacer foto
                       </button>
                     </div>
                   </div>
+
+                  {uploading && (
+                    <div className="text-sm md:text-base text-emerald-200 font-extrabold">
+                      Subiendo documentos a Cloudinary…
+                    </div>
+                  )}
+                  {uploadError && (
+                    <div className="text-sm md:text-base text-red-300 font-extrabold">
+                      {uploadError}
+                    </div>
+                  )}
 
                   {docs.length === 0 ? (
                     <div className="text-sm md:text-base text-slate-400 font-semibold">
@@ -475,13 +569,15 @@ return (
                     <ul className="space-y-2">
                       {docs.map((d, idx) => (
                         <li
-                          key={`${d.file.name}-${idx}`}
+                          key={`${d.publicId}-${idx}`}
                           className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2"
                         >
                           <div className="text-sm md:text-base">
-                            <span className="font-extrabold text-slate-100">{d.file.name}</span>{" "}
+                            <span className="font-extrabold text-slate-100">
+                              {d.nombreOriginal}
+                            </span>{" "}
                             <span className="text-slate-400 font-semibold">
-                              ({Math.round(d.file.size / 1024)} KB) ·{" "}
+                              ({Math.round(d.size / 1024)} KB) ·{" "}
                               <span className="text-emerald-200 font-extrabold">
                                 {labelKind(d.kind)}
                               </span>
@@ -491,6 +587,7 @@ return (
                             type="button"
                             onClick={() => removeDoc(idx)}
                             className="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-xs md:text-sm font-bold"
+                            disabled={uploading || loading}
                           >
                             Quitar
                           </button>
@@ -505,16 +602,17 @@ return (
                     type="button"
                     onClick={() => setStep(1)}
                     className="px-6 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-base font-bold"
+                    disabled={uploading || loading}
                   >
                     ⬅ Atrás
                   </button>
 
                   <button
-                    disabled={loading}
+                    disabled={loading || uploading}
                     type="submit"
                     className="px-8 py-3.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-lg font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)] disabled:opacity-60"
                   >
-                    {loading ? "Enviando…" : "Enviar solicitud"}
+                    {loading ? "Enviando…" : uploading ? "Subiendo docs…" : "Enviar solicitud"}
                   </button>
                 </div>
               </>
