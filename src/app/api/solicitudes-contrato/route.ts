@@ -36,8 +36,13 @@ function getNumOrNull(form: FormData, key: string) {
 
 export async function POST(req: Request) {
   try {
-    const form = await req.formData();
+    console.log("✅ POST solicitudes-contrato: ENTRA");
 
+    const form = await req.formData();
+    console.log("✅ POST solicitudes-contrato: formData OK");
+
+
+  
     const nombre = getStr(form, "nombre");
     const telefono = getStr(form, "telefono");
     const direccion = getStr(form, "direccion");
@@ -138,11 +143,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, id: solicitud.id });
-  } catch (err) {
-    console.error("POST /api/solicitudes-contrato", err);
-    return NextResponse.json(
-      { error: "Error interno creando la solicitud." },
-      { status: 500 }
-    );
-  }
+    } catch (err: any) {
+        console.error("❌ POST /api/solicitudes-contrato", err);
+        return NextResponse.json(
+        { ok: false, error: err?.message ?? String(err) },
+        { status: 500 }
+        );
+    }
 }
