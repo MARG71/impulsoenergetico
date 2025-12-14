@@ -200,13 +200,23 @@ export default function ContratarFormulario() {
         body: fd,
       });
 
-      const data = await res.json().catch(() => ({}));
+      let payload: any = null;
+      let payload: any = null;
+      let raw = "";
+
+      try {
+        raw = await res.text();
+        payload = raw ? JSON.parse(raw) : null;
+      } catch {
+      // era texto plano / html
+      }
 
       if (!res.ok) {
-        console.error(data);
-        alert(data?.error || "No se pudo enviar la solicitud.");
+        console.error("Respuesta no OK:", { status: res.status, raw, payload });
+        alert(payload?.error || raw || `Error ${res.status}: No se pudo enviar la solicitud.`);
         return;
       }
+
 
       alert("✅ Solicitud enviada. En breve te contactaremos.");
       router.push(
