@@ -12,6 +12,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
+export async function GET() {
+  return NextResponse.json({ ok: true, where: "app/api/solicitudes-contrato" });
+}
+
+
 async function fileToDataUri(file: File) {
   const ab = await file.arrayBuffer();
   const b64 = Buffer.from(ab).toString("base64");
