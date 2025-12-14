@@ -201,7 +201,7 @@ export default function ContratarFormulario() {
       });
 
       let payload: any = null;
-      let payload: any = null;
+      
       let raw = "";
 
       try {
