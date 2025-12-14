@@ -68,11 +68,10 @@ export async function POST(req: Request) {
     }
 
     // Archivos
-    const files = form
-      .getAll("files")
-      .filter((v): v is File => v instanceof File);
-
-    const kinds = form.getAll("filesKinds").map((k) => String(k || "OTRO")) as UploadKind[];
+    const files = form.getAll("files").filter((v): v is File => v instanceof File);
+    const kinds = form
+      .getAll("filesKinds")
+      .map((k) => String(k || "OTRO")) as UploadKind[];
 
     if (!files.length) {
       return NextResponse.json(
@@ -86,26 +85,23 @@ export async function POST(req: Request) {
     const missing = required.filter((k) => !kinds.includes(k));
     if (missing.length) {
       return NextResponse.json(
-        {
-          error:
-            "Falta documentación obligatoria: " +
-            missing.map((m) => labelKind(m)).join(", "),
-        },
+        { error: "Falta documentación obligatoria: " + missing.map(labelKind).join(", ") },
         { status: 400 }
       );
     }
 
-    // Límite total de adjuntos (recomendado)
+    // ⚠️ Límite recomendado en Vercel (adjuntos)
+    // Si quieres 15MB reales sin problemas -> subir a Cloudinary/Blob y mandar enlaces
     const totalBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
-    const MAX_TOTAL = 15 * 1024 * 1024; // 15MB
+    const MAX_TOTAL = 8 * 1024 * 1024; // 8MB recomendado
     if (totalBytes > MAX_TOTAL) {
       return NextResponse.json(
-        { error: "Los documentos pesan demasiado. Máximo 15MB en total." },
+        { error: "Los documentos pesan demasiado. Máximo 8MB en total." },
         { status: 400 }
       );
     }
 
-    // (Opcional) Guardar solicitud en BD (sin archivos)
+    // Guardar solicitud en BD (sin archivos)
     const solicitud = await prisma.solicitudContrato.create({
       data: {
         nombre,
@@ -133,13 +129,12 @@ export async function POST(req: Request) {
       select: { id: true },
     });
 
-    // Preparar adjuntos
+    // Adjuntos
     const attachments = await Promise.all(
       files.map(async (file, i) => {
         const kind = kinds[i] ?? "OTRO";
         const buffer = Buffer.from(await file.arrayBuffer());
 
-        // Renombrado “bonito”
         const safeName = file.name.replace(/[^\w.\-()]/g, "_");
         const prefix = labelKind(kind);
         const filename = `${prefix}__${safeName}`;
@@ -152,14 +147,16 @@ export async function POST(req: Request) {
       })
     );
 
-    // SMTP
+    // SMTP (IONOS)
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || "587");
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
     const to = process.env.CONTRATOS_TO;
-    const from = process.env.SMTP_FROM || user;
+
+    // ✅ IONOS suele exigir que "from" sea el mismo usuario autenticado
+    const from = user || "";
 
     if (!host || !user || !pass || !to || !from) {
       return NextResponse.json(
@@ -168,12 +165,21 @@ export async function POST(req: Request) {
       );
     }
 
+    // ✅ Transporter compatible con IONOS en 587 (STARTTLS)
     const transporter = nodemailer.createTransport({
       host,
       port,
-      secure: port === 465, // 465 true, 587 false
+      secure: false,       // ✅ 587 -> SIEMPRE false
+      requireTLS: true,    // ✅ fuerza STARTTLS
       auth: { user, pass },
+      tls: {
+        servername: host,  // ✅ importante en Vercel/serverless
+        rejectUnauthorized: true,
+      },
     });
+
+    // ✅ Esto ayuda a que en logs salga el motivo exacto si falla conexión/auth
+    await transporter.verify();
 
     const asunto = `📄 Nueva solicitud #${solicitud.id} — ${nombre} ${apellidos}`.trim();
 
@@ -194,6 +200,7 @@ export async function POST(req: Request) {
       `LugarId: ${getStr(form, "lugarId")}`,
       "",
       `Adjuntos: ${files.length}`,
+      `Tamaño total: ${Math.round(totalBytes / 1024)} KB`,
     ]
       .filter(Boolean)
       .join("\n");
@@ -203,24 +210,24 @@ export async function POST(req: Request) {
       to,
       subject: asunto,
       text: cuerpo,
+      replyTo: email || undefined,
       attachments,
     });
 
     return NextResponse.json({ ok: true, id: solicitud.id });
   } catch (err: any) {
-  console.error("POST /api/solicitudes-contrato", err);
+    console.error("POST /api/solicitudes-contrato", err);
 
-  return NextResponse.json(
-    {
-      error: "Error interno enviando la solicitud por email.",
-      detail:
-        err?.message ||
-        err?.response?.message ||
-        err?.response ||
-        JSON.stringify(err, Object.getOwnPropertyNames(err)),
-    },
-    { status: 500 }
-  );
-}
+    // Sacar detalle útil a logs + cliente
+    const detail =
+      err?.message ||
+      err?.response?.toString?.() ||
+      err?.response ||
+      JSON.stringify(err, Object.getOwnPropertyNames(err));
 
+    return NextResponse.json(
+      { error: "Error interno enviando la solicitud por email.", detail },
+      { status: 500 }
+    );
+  }
 }
