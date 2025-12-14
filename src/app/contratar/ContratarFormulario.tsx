@@ -14,14 +14,7 @@ type UploadKind =
   | "CIF"
   | "OTRO";
 
-type UploadedDoc = {
-  kind: UploadKind;
-  url: string;
-  publicId: string;
-  nombreOriginal: string;
-  mime: string;
-  size: number;
-};
+type DocItem = { file: File; kind: UploadKind };
 
 const requisitos: Record<TipoContratacion, { title: string; items: string[] }> = {
   PERSONA_FISICA: {
@@ -73,20 +66,16 @@ function labelKind(kind: UploadKind) {
 export default function ContratarFormulario() {
   const router = useRouter();
   const sp = useSearchParams();
-
-  // ✅ Dependencia estable para evitar warnings/rojos
   const spKey = sp.toString();
 
   const inputFilesRef = useRef<HTMLInputElement | null>(null);
   const inputCameraRef = useRef<HTMLInputElement | null>(null);
 
-  // ✅ Evitar TS rojo con capture="environment" (se setea por JS)
   useEffect(() => {
     const el = inputCameraRef.current;
     if (el) el.setAttribute("capture", "environment");
   }, []);
 
-  // metadata (viene del comparador)
   const meta = useMemo(() => {
     const agente = sp.get("agenteId") || sp.get("idAgente") || "";
     const lugar = sp.get("lugarId") || sp.get("idLugar") || "";
@@ -103,7 +92,6 @@ export default function ContratarFormulario() {
     };
   }, [spKey]);
 
-  // datos que mete el cliente
   const [tipoContratacion, setTipoContratacion] =
     useState<TipoContratacion>("PERSONA_FISICA");
 
@@ -116,13 +104,10 @@ export default function ContratarFormulario() {
   const [cups, setCups] = useState("");
   const [iban, setIban] = useState("");
 
-  // docs
   const [uploadKind, setUploadKind] = useState<UploadKind>("FACTURA");
-  const [docs, setDocs] = useState<UploadedDoc[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
+  const [docs, setDocs] = useState<DocItem[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [step, setStep] = useState<1 | 2>(1);
 
   const canGoStep2 = Boolean(
@@ -137,75 +122,25 @@ export default function ContratarFormulario() {
     setStep(2);
   };
 
+  const addFiles = (list: FileList | null, kind: UploadKind) => {
+    if (!list?.length) return;
+
+    const arr = Array.from(list).map((file) => ({ file, kind }));
+    const maxFiles = 12;
+
+    setDocs((prev) => [...prev, ...arr].slice(0, maxFiles));
+  };
+
   const removeDoc = (idx: number) => {
     setDocs((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // ✅ Cloudinary direct upload (frontend)
-  async function uploadToCloudinary(file: File) {
-    const signRes = await fetch("/api/cloudinary-sign");
-    if (!signRes.ok) throw new Error("No se pudo obtener firma de subida.");
-    const sign = await signRes.json();
-
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("api_key", sign.apiKey);
-    fd.append("timestamp", String(sign.timestamp));
-    fd.append("signature", sign.signature);
-    fd.append("folder", sign.folder);
-
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${sign.cloudName}/auto/upload`,
-      { method: "POST", body: fd }
-    );
-
-    if (!res.ok) throw new Error("Error subiendo a Cloudinary");
-    return res.json(); // secure_url, public_id...
-  }
-
-  async function addFilesCloudinary(list: FileList | null, kind: UploadKind) {
-    if (!list?.length) return;
-
-    setUploadError(null);
-    setUploading(true);
-
-    try {
-      const maxFiles = 12;
-      const files = Array.from(list);
-
-      for (const file of files) {
-        // límite total (con el valor más reciente)
-        if (docs.length >= maxFiles) break;
-
-        const up = await uploadToCloudinary(file);
-
-        const doc: UploadedDoc = {
-          kind,
-          url: up.secure_url,
-          publicId: up.public_id,
-          nombreOriginal: file.name,
-          mime: file.type,
-          size: file.size,
-        };
-
-        setDocs((prev) => [...prev, doc].slice(0, maxFiles));
-      }
-    } catch (e: any) {
-      setUploadError(e?.message || "Error subiendo archivos");
-    } finally {
-      setUploading(false);
-    }
-  }
-
   const validate = () => {
-    // Campos obligatorios (mínimos)
     if (!nombre.trim()) return "Falta el nombre.";
     if (!telefono.trim()) return "Falta el teléfono.";
     if (!direccion.trim()) return "Falta la dirección de suministro.";
-
     if (!docs.length) return "Debes subir la documentación obligatoria.";
 
-    // Validación por tipo
     const required = requiredKindsByTipo[tipoContratacion];
     const missing = required.filter((k) => !docs.some((d) => d.kind === k));
 
@@ -214,6 +149,13 @@ export default function ContratarFormulario() {
         "Falta documentación obligatoria: " +
         missing.map((m) => labelKind(m)).join(", ")
       );
+    }
+
+    // límite total (igual que backend)
+    const totalBytes = docs.reduce((acc, d) => acc + (d.file.size || 0), 0);
+    const MAX_TOTAL = 15 * 1024 * 1024;
+    if (totalBytes > MAX_TOTAL) {
+      return "Los documentos pesan demasiado. Máximo 15MB en total.";
     }
 
     return null;
@@ -225,45 +167,40 @@ export default function ContratarFormulario() {
     const err = validate();
     if (err) return alert(err);
 
-    if (uploading) {
-      alert("Espera a que terminen de subirse los documentos…");
-      return;
-    }
-
     setLoading(true);
     try {
-      const res = await fetch("/api/solicitudes-contrato-v2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // datos cliente
-          nombre,
-          apellidos,
-          telefono,
-          email,
-          dni,
-          direccion,
-          cups,
-          iban,
+      const fd = new FormData();
 
-          // tipo contratación
-          tipoContratacion,
+      fd.append("nombre", nombre);
+      fd.append("apellidos", apellidos);
+      fd.append("telefono", telefono);
+      fd.append("email", email);
+      fd.append("dni", dni);
+      fd.append("direccion", direccion);
+      fd.append("cups", cups);
+      fd.append("iban", iban);
 
-          // metadata
-          ofertaId: meta.ofertaId,
-          compania: meta.compania,
-          tarifa: meta.tarifa,
-          agenteId: meta.agenteId,
-          lugarId: meta.lugarId,
-          tipoCliente: meta.tipoCliente,
-          nombreTarifa: meta.nombreTarifa,
+      fd.append("tipoContratacion", tipoContratacion);
 
-          // docs ya subidos
-          documentos: docs,
-        }),
+      fd.append("ofertaId", meta.ofertaId);
+      fd.append("compania", meta.compania);
+      fd.append("tarifa", meta.tarifa);
+      fd.append("agenteId", meta.agenteId);
+      fd.append("lugarId", meta.lugarId);
+      fd.append("tipoCliente", meta.tipoCliente);
+      fd.append("nombreTarifa", meta.nombreTarifa);
+
+      docs.forEach((d) => {
+        fd.append("files", d.file, d.file.name);
+        fd.append("filesKinds", d.kind);
       });
 
-      const data = await res.json();
+      const res = await fetch("/api/solicitudes-contrato", {
+        method: "POST",
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         console.error(data);
@@ -273,9 +210,11 @@ export default function ContratarFormulario() {
 
       alert("✅ Solicitud enviada. En breve te contactaremos.");
       router.push(
-        `/bienvenida?agenteId=${encodeURIComponent(meta.agenteId)}&lugarId=${encodeURIComponent(
-          meta.lugarId
-        )}&nombre=${encodeURIComponent(nombre)}`
+        `/bienvenida?agenteId=${encodeURIComponent(
+          meta.agenteId
+        )}&lugarId=${encodeURIComponent(meta.lugarId)}&nombre=${encodeURIComponent(
+          nombre
+        )}`
       );
     } catch (err) {
       console.error(err);
@@ -288,7 +227,6 @@ export default function ContratarFormulario() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50 px-4 py-6 md:px-10 md:py-10 text-[15px] md:text-[16px] lg:text-[17px]">
       <div className="max-w-[1400px] mx-auto space-y-8">
-        {/* Cabecera */}
         <div className="rounded-3xl bg-slate-950/95 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.35)] p-5 md:p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4">
@@ -331,14 +269,11 @@ export default function ContratarFormulario() {
           </div>
         </div>
 
-        {/* 2 columnas */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Form */}
           <form
             onSubmit={submit}
             className="lg:col-span-3 rounded-3xl bg-slate-950/90 border border-slate-800 p-5 md:p-6 shadow-[0_0_28px_rgba(15,23,42,0.9)] space-y-6"
           >
-            {/* Progreso */}
             <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm md:text-base font-extrabold text-slate-200">
@@ -384,10 +319,8 @@ export default function ContratarFormulario() {
               </p>
             </div>
 
-            {/* PASO 1 */}
             {step === 1 && (
               <>
-                {/* Tipo cliente */}
                 <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
                   <label className="block text-[15px] md:text-[16px] font-extrabold text-slate-200 mb-2">
                     Tipo de cliente *
@@ -410,60 +343,28 @@ export default function ContratarFormulario() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Field label="Nombre *">
-                    <input
-                      className="inp"
-                      value={nombre}
-                      onChange={(e) => setNombre(e.target.value)}
-                    />
+                    <input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} />
                   </Field>
                   <Field label="Apellidos *">
-                    <input
-                      className="inp"
-                      value={apellidos}
-                      onChange={(e) => setApellidos(e.target.value)}
-                    />
+                    <input className="inp" value={apellidos} onChange={(e) => setApellidos(e.target.value)} />
                   </Field>
                   <Field label="Teléfono *">
-                    <input
-                      className="inp"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                    />
+                    <input className="inp" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
                   </Field>
                   <Field label="Email">
-                    <input
-                      className="inp"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
+                    <input className="inp" value={email} onChange={(e) => setEmail(e.target.value)} />
                   </Field>
                   <Field label="DNI/NIE">
-                    <input
-                      className="inp"
-                      value={dni}
-                      onChange={(e) => setDni(e.target.value)}
-                    />
+                    <input className="inp" value={dni} onChange={(e) => setDni(e.target.value)} />
                   </Field>
                   <Field label="CUPS (si lo tienes)">
-                    <input
-                      className="inp"
-                      value={cups}
-                      onChange={(e) => setCups(e.target.value)}
-                    />
+                    <input className="inp" value={cups} onChange={(e) => setCups(e.target.value)} />
                   </Field>
                   <Field label="Dirección de suministro *" className="md:col-span-2">
-                    <input
-                      className="inp"
-                      value={direccion}
-                      onChange={(e) => setDireccion(e.target.value)}
-                    />
+                    <input className="inp" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
                   </Field>
                   <Field label="IBAN (si procede)" className="md:col-span-2">
-                    <input
-                      className="inp"
-                      value={iban}
-                      onChange={(e) => setIban(e.target.value)}
-                    />
+                    <input className="inp" value={iban} onChange={(e) => setIban(e.target.value)} />
                   </Field>
                 </div>
 
@@ -479,10 +380,8 @@ export default function ContratarFormulario() {
               </>
             )}
 
-            {/* PASO 2 */}
             {step === 2 && (
               <>
-                {/* Docs */}
                 <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4 space-y-3">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
@@ -515,7 +414,7 @@ export default function ContratarFormulario() {
                         multiple
                         accept="image/*,application/pdf"
                         onChange={(e) => {
-                          addFilesCloudinary(e.target.files, uploadKind);
+                          addFiles(e.target.files, uploadKind);
                           e.currentTarget.value = "";
                         }}
                       />
@@ -526,7 +425,7 @@ export default function ContratarFormulario() {
                         multiple
                         accept="image/*"
                         onChange={(e) => {
-                          addFilesCloudinary(e.target.files, uploadKind);
+                          addFiles(e.target.files, uploadKind);
                           e.currentTarget.value = "";
                         }}
                       />
@@ -535,31 +434,18 @@ export default function ContratarFormulario() {
                         type="button"
                         onClick={() => inputFilesRef.current?.click()}
                         className="px-4 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-sm md:text-lg font-bold"
-                        disabled={uploading}
                       >
                         📎 Subir archivos
                       </button>
                       <button
                         type="button"
                         onClick={() => inputCameraRef.current?.click()}
-                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold disabled:opacity-60"
-                        disabled={uploading}
+                        className="px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm md:text-lg font-extrabold"
                       >
                         📸 Hacer foto
                       </button>
                     </div>
                   </div>
-
-                  {uploading && (
-                    <div className="text-sm md:text-base text-emerald-200 font-extrabold">
-                      Subiendo documentos a Cloudinary…
-                    </div>
-                  )}
-                  {uploadError && (
-                    <div className="text-sm md:text-base text-red-300 font-extrabold">
-                      {uploadError}
-                    </div>
-                  )}
 
                   {docs.length === 0 ? (
                     <div className="text-sm md:text-base text-slate-400 font-semibold">
@@ -569,15 +455,13 @@ export default function ContratarFormulario() {
                     <ul className="space-y-2">
                       {docs.map((d, idx) => (
                         <li
-                          key={`${d.publicId}-${idx}`}
+                          key={`${d.file.name}-${idx}`}
                           className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2"
                         >
                           <div className="text-sm md:text-base">
-                            <span className="font-extrabold text-slate-100">
-                              {d.nombreOriginal}
-                            </span>{" "}
+                            <span className="font-extrabold text-slate-100">{d.file.name}</span>{" "}
                             <span className="text-slate-400 font-semibold">
-                              ({Math.round(d.size / 1024)} KB) ·{" "}
+                              ({Math.round(d.file.size / 1024)} KB) ·{" "}
                               <span className="text-emerald-200 font-extrabold">
                                 {labelKind(d.kind)}
                               </span>
@@ -587,7 +471,6 @@ export default function ContratarFormulario() {
                             type="button"
                             onClick={() => removeDoc(idx)}
                             className="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-xs md:text-sm font-bold"
-                            disabled={uploading || loading}
                           >
                             Quitar
                           </button>
@@ -602,24 +485,22 @@ export default function ContratarFormulario() {
                     type="button"
                     onClick={() => setStep(1)}
                     className="px-6 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-50 text-base font-bold"
-                    disabled={uploading || loading}
                   >
                     ⬅ Atrás
                   </button>
 
                   <button
-                    disabled={loading || uploading}
+                    disabled={loading}
                     type="submit"
                     className="px-8 py-3.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-lg font-extrabold shadow-[0_0_24px_rgba(16,185,129,0.55)] disabled:opacity-60"
                   >
-                    {loading ? "Enviando…" : uploading ? "Subiendo docs…" : "Enviar solicitud"}
+                    {loading ? "Enviando…" : "Enviar solicitud"}
                   </button>
                 </div>
               </>
             )}
           </form>
 
-          {/* Leyenda */}
           <aside className="lg:col-span-2 rounded-3xl bg-slate-950/90 border border-emerald-500/30 p-6 md:p-7 shadow-[0_0_24px_rgba(16,185,129,0.25)] h-fit lg:sticky lg:top-6">
             <h3 className="text-2xl md:text-3xl font-extrabold text-emerald-300">
               Documentación necesaria
@@ -638,18 +519,6 @@ export default function ContratarFormulario() {
                 </li>
               ))}
             </ul>
-
-            <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700 p-3 text-xs text-slate-300 font-semibold">
-              💡 Consejo: primero sube la{" "}
-              <span className="text-emerald-200 font-extrabold">Factura</span> y luego el{" "}
-              <span className="text-emerald-200 font-extrabold">DNI (frontal y trasera)</span>.
-            </div>
-
-            <div className="mt-4 rounded-2xl bg-slate-900/80 border border-slate-700 p-3 text-xs text-slate-300 font-semibold">
-              📱 En móvil: usa{" "}
-              <span className="text-emerald-200 font-extrabold">Hacer foto</span> para fotografiar
-              documentos.
-            </div>
           </aside>
         </div>
       </div>
