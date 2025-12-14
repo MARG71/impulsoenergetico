@@ -207,11 +207,20 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, id: solicitud.id });
-  } catch (err) {
-    console.error("POST /api/solicitudes-contrato", err);
-    return NextResponse.json(
-      { error: "Error interno enviando la solicitud por email." },
-      { status: 500 }
-    );
-  }
+  } catch (err: any) {
+  console.error("POST /api/solicitudes-contrato", err);
+
+  return NextResponse.json(
+    {
+      error: "Error interno enviando la solicitud por email.",
+      detail:
+        err?.message ||
+        err?.response?.message ||
+        err?.response ||
+        JSON.stringify(err, Object.getOwnPropertyNames(err)),
+    },
+    { status: 500 }
+  );
+}
+
 }
