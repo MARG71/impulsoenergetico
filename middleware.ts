@@ -88,16 +88,15 @@ export async function middleware(req: NextRequest) {
 // 👇 Aquí marcamos qué rutas pasan por el middleware
 export const config = {
   matcher: [
-    // Todo lo que NO sea:
-    // - /api
-    // - estáticos de Next
-    // - favicon
-    // - tu logo
-    // - login
-    // - unauthorized
-    // - bienvenida (pública)
-    // - registro (pública)
-    '/((?!api|api/solicitudes-contrato|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro|contratar).*)',
-
+    '/dashboard/:path*',
+    '/agentes/:path*',
+    '/lugares/:path*',
+    '/leads/:path*',
+    '/fondos/:path*',
+    '/productos-ganaderos/:path*',
+    '/ofertas/:path*',
+    '/configuracion/:path*',
+    '/zona-lugar/:path*',
   ],
+
 }
