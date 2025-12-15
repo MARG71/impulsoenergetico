@@ -564,6 +564,71 @@ export default function ComparadorContenido() {
     }
   };
 
+  const verOfertaPDF = async (r: any) => {
+    try {
+      // “Anexo de precios” lo construimos con lo que YA tienes en pantalla.
+      // (Luego si quieres lo ampliamos con precios P1/P2/P3 etc. desde BD)
+      const anexoPrecios = [
+        `Compañía: ${r.compañia}`,
+        `Tarifa/Anexo: ${r.tarifa}`,
+        `Tipo cliente: ${tipoCliente}`,
+        `Nombre tarifa: ${nombreTarifa}`,
+        cups ? `CUPS: ${cups}` : "",
+        fechaInicio && fechaFin ? `Periodo: ${fechaInicio} a ${fechaFin}` : "",
+        "",
+        `Coste estimado: ${Number(r.coste).toFixed(2)} €`,
+        `Ahorro estimado: ${Number(r.ahorro).toFixed(2)} € (${Number(r.ahorroPct).toFixed(0)}%)`,
+        `Comisión cliente: ${Number(r.comision).toFixed(2)} €`,
+        "",
+        "Nota: Estimación calculada con los datos introducidos por el cliente. Sujeta a validación final.",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const payload = {
+        cliente: {
+          nombre: nombreCliente || "Sin nombre",
+          direccion: direccionCliente || "Sin dirección",
+          cups: cups || "",
+          fechaInicio: fechaInicio || "",
+          fechaFin: fechaFin || "",
+          tipoCliente,
+          nombreTarifa,
+        },
+        oferta: {
+          id: r.id,
+          compania: r.compañia,
+          tarifa: r.tarifa,
+          coste: Number(r.coste),
+          ahorro: Number(r.ahorro),
+          ahorroPct: Number(r.ahorroPct),
+          comision: Number(r.comision),
+          anexoPrecios,
+        },
+      };
+
+      const res = await fetch("/api/oferta-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || "No se pudo generar el PDF");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      console.error(e);
+      alert("Error generando el PDF");
+    }
+  };
+  
+
   const tituloComparador =
     tipoComparador === "luz"
       ? "Comparador de luz"
@@ -1241,14 +1306,11 @@ export default function ComparadorContenido() {
 
                           <button
                             className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-800 text-slate-50 text-xs md:text-sm font-semibold hover:bg-slate-700"
-                            onClick={() =>
-                              alert(
-                                `Descargar PDF para ${r.compañia}`
-                              )
-                            }
+                            onClick={() => verOfertaPDF(r)}
                           >
-                            PDF
+                            Ver oferta
                           </button>
+
                         </td>
                       </tr>
                     ))}
