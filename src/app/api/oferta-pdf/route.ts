@@ -290,11 +290,12 @@ export async function POST(req: Request) {
     const pdfBytes = await pdfDoc.save();
     const pdfBuffer = Buffer.from(pdfBytes);
 
+
     return new NextResponse(pdfBuffer, {
     status: 200,
     headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="oferta_${safe(payload.oferta.id)}_${safe(payload.cliente.nombre).replace(/\s+/g, "_")}.pdf"`,
+        "Content-Disposition": `inline; filename="oferta_${safe(ofertaId)}_${safe(clienteNombre).replace(/\s+/g, "_")}.pdf"`,
     },
     });
 
