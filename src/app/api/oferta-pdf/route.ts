@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs";
 import path from "path";
+import { Buffer } from "buffer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,13 @@ type Payload = {
 
 function safeText(v: any) {
   return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+
+// Helper para “sanear” valores en nombres de archivo
+function safe(v: any) {
+  return String(v ?? "")
+    .trim()
+    .replace(/[^\w\-]+/g, "_"); // deja letras/números/_/-
 }
 
 export async function POST(req: Request) {
@@ -280,14 +288,17 @@ export async function POST(req: Request) {
 
     // 4) Responder PDF
     const pdfBytes = await pdfDoc.save();
+    const pdfBuffer = Buffer.from(pdfBytes);
 
-    return new NextResponse(pdfBytes, {
-      status: 200,
-      headers: {
+    return new NextResponse(pdfBuffer, {
+    status: 200,
+    headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="oferta_${ofertaId || "impulso"}.pdf"`,
-      },
+        "Content-Disposition": `inline; filename="oferta_${safe(payload.oferta.id)}_${safe(payload.cliente.nombre).replace(/\s+/g, "_")}.pdf"`,
+    },
     });
+
+
   } catch (err: any) {
     console.error("POST /api/oferta-pdf", err);
     return NextResponse.json(
