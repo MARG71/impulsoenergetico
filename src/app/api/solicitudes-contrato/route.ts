@@ -45,20 +45,42 @@ function labelKind(kind: UploadKind) {
   return map[kind] ?? kind;
 }
 
+function escHtml(s: string) {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
 
-    // Datos mínimos
+    // Datos cliente
     const nombre = getStr(form, "nombre");
     const apellidos = getStr(form, "apellidos");
     const telefono = getStr(form, "telefono");
     const email = getStr(form, "email");
     const dni = getStr(form, "dni");
     const direccion = getStr(form, "direccion");
+    const cups = getStr(form, "cups");
+    const iban = getStr(form, "iban");
 
     const tipoContratacion = (getStr(form, "tipoContratacion") ||
       "PERSONA_FISICA") as TipoContratacion;
+
+    // Datos oferta
+    const ofertaId = getStr(form, "ofertaId");
+    const compania = getStr(form, "compania");
+    const tarifa = getStr(form, "tarifa"); // ✅ lo usaremos como "anexo de precios"
+    const nombreTarifa = getStr(form, "nombreTarifa");
+    const tipoCliente = getStr(form, "tipoCliente");
+
+    // Trazabilidad
+    const agenteId = getStr(form, "agenteId");
+    const lugarId = getStr(form, "lugarId");
 
     if (!nombre || !telefono || !direccion) {
       return NextResponse.json(
@@ -68,7 +90,10 @@ export async function POST(req: Request) {
     }
 
     // Archivos
-    const files = form.getAll("files").filter((v): v is File => v instanceof File);
+    const files = form
+      .getAll("files")
+      .filter((v): v is File => v instanceof File);
+
     const kinds = form
       .getAll("filesKinds")
       .map((k) => String(k || "OTRO")) as UploadKind[];
@@ -85,13 +110,16 @@ export async function POST(req: Request) {
     const missing = required.filter((k) => !kinds.includes(k));
     if (missing.length) {
       return NextResponse.json(
-        { error: "Falta documentación obligatoria: " + missing.map(labelKind).join(", ") },
+        {
+          error:
+            "Falta documentación obligatoria: " +
+            missing.map(labelKind).join(", "),
+        },
         { status: 400 }
       );
     }
 
-    // ⚠️ Límite recomendado en Vercel (adjuntos)
-    // Si quieres 15MB reales sin problemas -> subir a Cloudinary/Blob y mandar enlaces
+    // Límite recomendado
     const totalBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
     const MAX_TOTAL = 8 * 1024 * 1024; // 8MB recomendado
     if (totalBytes > MAX_TOTAL) {
@@ -111,18 +139,18 @@ export async function POST(req: Request) {
         dni: dni || null,
         direccionSuministro: direccion || null,
 
-        cups: getStr(form, "cups") || null,
-        iban: getStr(form, "iban") || null,
+        cups: cups || null,
+        iban: iban || null,
 
         tipoContratacion: tipoContratacion || null,
 
         ofertaId: getNumOrNull(form, "ofertaId"),
-        compania: getStr(form, "compania") || null,
-        tarifa: getStr(form, "tarifa") || null,
+        compania: compania || null,
+        tarifa: tarifa || null,
         agenteId: getNumOrNull(form, "agenteId"),
         lugarId: getNumOrNull(form, "lugarId"),
-        tipoCliente: getStr(form, "tipoCliente") || null,
-        nombreTarifa: getStr(form, "nombreTarifa") || null,
+        tipoCliente: tipoCliente || null,
+        nombreTarifa: nombreTarifa || null,
 
         estado: "PENDIENTE",
       },
@@ -147,15 +175,16 @@ export async function POST(req: Request) {
       })
     );
 
-    // SMTP (IONOS)
+    // SMTP
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || "587");
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
-    const to = process.env.CONTRATOS_TO;
+    // Destino
+    const to = process.env.CONTRATOS_TO || "contratosimpulso@gmail.com";
 
-    // ✅ IONOS suele exigir que "from" sea el mismo usuario autenticado
+    // IONOS: from = usuario autenticado
     const from = user || "";
 
     if (!host || !user || !pass || !to || !from) {
@@ -165,51 +194,106 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Transporter compatible con IONOS en 587 (STARTTLS)
     const transporter = nodemailer.createTransport({
       host,
       port,
-      secure: false,       // ✅ 587 -> SIEMPRE false
-      requireTLS: true,    // ✅ fuerza STARTTLS
+      secure: false, // 587
+      requireTLS: true,
       auth: { user, pass },
-      tls: {
-        servername: host,  // ✅ importante en Vercel/serverless
-        rejectUnauthorized: true,
-      },
+      tls: { servername: host, rejectUnauthorized: true },
     });
 
-    // ✅ Esto ayuda a que en logs salga el motivo exacto si falla conexión/auth
     await transporter.verify();
 
-    const asunto = `📄 Nueva solicitud #${solicitud.id} — ${nombre} ${apellidos}`.trim();
+    // ✅ ASUNTO: ID + nombre cliente
+    const nombreCompleto = `${nombre} ${apellidos}`.trim();
+    const asunto = `#${solicitud.id} — ${nombreCompleto}`;
 
-    const cuerpo = [
+    // ✅ TEXTO
+    const texto = [
+      `CONTRATO / SOLICITUD`,
       `Solicitud ID: ${solicitud.id}`,
-      `Tipo contratación: ${tipoContratacion}`,
-      "",
-      `Nombre: ${nombre} ${apellidos}`.trim(),
+      ``,
+      `CLIENTE`,
+      `Nombre: ${nombreCompleto}`,
       `Teléfono: ${telefono}`,
       email ? `Email: ${email}` : "",
       dni ? `DNI/NIE: ${dni}` : "",
       `Dirección: ${direccion}`,
-      "",
-      `Compañía: ${getStr(form, "compania")}`,
-      `Tarifa: ${getStr(form, "tarifa")}`,
-      `OfertaId: ${getStr(form, "ofertaId")}`,
-      `AgenteId: ${getStr(form, "agenteId")}`,
-      `LugarId: ${getStr(form, "lugarId")}`,
-      "",
+      cups ? `CUPS: ${cups}` : "",
+      iban ? `IBAN: ${iban}` : "",
+      ``,
+      `OFERTA CONTRATADA`,
+      compania ? `Compañía: ${compania}` : "",
+      tarifa ? `Anexo de precios: ${tarifa}` : "",
+      nombreTarifa ? `Nombre tarifa: ${nombreTarifa}` : "",
+      tipoCliente ? `Tipo cliente: ${tipoCliente}` : "",
+      ofertaId ? `OfertaId: ${ofertaId}` : "",
+      ``,
+      `TRAZABILIDAD`,
+      agenteId ? `AgenteId: ${agenteId}` : "",
+      lugarId ? `LugarId: ${lugarId}` : "",
+      ``,
+      `DOCUMENTOS`,
       `Adjuntos: ${files.length}`,
       `Tamaño total: ${Math.round(totalBytes / 1024)} KB`,
     ]
       .filter(Boolean)
       .join("\n");
 
+    // ✅ HTML
+    const html = `
+      <div style="font-family:Arial,sans-serif;line-height:1.4">
+        <h2 style="margin:0 0 8px">📄 CONTRATO / SOLICITUD</h2>
+        <p style="margin:0 0 12px">
+          <strong>Solicitud ID:</strong> ${solicitud.id}
+        </p>
+
+        <h3 style="margin:16px 0 8px">Cliente</h3>
+        <ul style="margin:0 0 12px;padding-left:18px">
+          <li><strong>Nombre:</strong> ${escHtml(nombreCompleto)}</li>
+          <li><strong>Teléfono:</strong> ${escHtml(telefono)}</li>
+          ${email ? `<li><strong>Email:</strong> ${escHtml(email)}</li>` : ""}
+          ${dni ? `<li><strong>DNI/NIE:</strong> ${escHtml(dni)}</li>` : ""}
+          <li><strong>Dirección:</strong> ${escHtml(direccion)}</li>
+          ${cups ? `<li><strong>CUPS:</strong> ${escHtml(cups)}</li>` : ""}
+          ${iban ? `<li><strong>IBAN:</strong> ${escHtml(iban)}</li>` : ""}
+        </ul>
+
+        <h3 style="margin:16px 0 8px">Oferta contratada</h3>
+        <ul style="margin:0 0 12px;padding-left:18px">
+          ${compania ? `<li><strong>Compañía:</strong> ${escHtml(compania)}</li>` : ""}
+          ${tarifa ? `<li><strong>Anexo de precios:</strong> ${escHtml(tarifa)}</li>` : ""}
+          ${nombreTarifa ? `<li><strong>Nombre tarifa:</strong> ${escHtml(nombreTarifa)}</li>` : ""}
+          ${tipoCliente ? `<li><strong>Tipo cliente:</strong> ${escHtml(tipoCliente)}</li>` : ""}
+          ${ofertaId ? `<li><strong>OfertaId:</strong> ${escHtml(ofertaId)}</li>` : ""}
+        </ul>
+
+        <h3 style="margin:16px 0 8px">Trazabilidad</h3>
+        <ul style="margin:0 0 12px;padding-left:18px">
+          ${agenteId ? `<li><strong>AgenteId:</strong> ${escHtml(agenteId)}</li>` : ""}
+          ${lugarId ? `<li><strong>LugarId:</strong> ${escHtml(lugarId)}</li>` : ""}
+        </ul>
+
+        <h3 style="margin:16px 0 8px">Documentos</h3>
+        <p style="margin:0">
+          <strong>Adjuntos:</strong> ${files.length}<br/>
+          <strong>Tamaño total:</strong> ${Math.round(totalBytes / 1024)} KB
+        </p>
+
+        <hr style="margin:18px 0"/>
+        <p style="margin:0;color:#666;font-size:12px">
+          Email generado automáticamente desde impulsoenergetico.es
+        </p>
+      </div>
+    `;
+
     await transporter.sendMail({
       from,
       to,
       subject: asunto,
-      text: cuerpo,
+      text: texto,
+      html,
       replyTo: email || undefined,
       attachments,
     });
@@ -218,7 +302,6 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("POST /api/solicitudes-contrato", err);
 
-    // Sacar detalle útil a logs + cliente
     const detail =
       err?.message ||
       err?.response?.toString?.() ||
