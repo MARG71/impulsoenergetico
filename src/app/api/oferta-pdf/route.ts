@@ -7,7 +7,22 @@ import { Buffer } from "buffer";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type EnergiaPotenciaMap = Partial<Record<"P1"|"P2"|"P3"|"P4"|"P5"|"P6", number>>;
+type PdfData = {
+  diasFactura: number;
+  periodosConsumo: string[];
+  periodosPotencia: string[];
+  consumoPeriodos: Record<string, string>;
+  potencias: Record<string, string>;
+  precioEnergia: Record<string, number>;
+  precioPotencia: Record<string, number>;
+  iva: number; // % ej: 21
+  impuestoElectricidad: number; // % ej: 5.113
+  reactiva: number;
+  exceso: number;
+  alquiler: number;
+  otros: number;
+  importeFactura: number;
+};
 
 type Payload = {
   cliente: {
@@ -27,40 +42,7 @@ type Payload = {
     comision?: string;
     idOferta?: string | number;
   };
-  // ✅ NUEVO: desglose tipo factura
-  detalle?: {
-    diasFactura?: number;
-
-    periodosConsumo?: Array<"P1"|"P2"|"P3"|"P4"|"P5"|"P6">;
-    periodosPotencia?: Array<"P1"|"P2"|"P3"|"P4"|"P5"|"P6">;
-
-    consumoPeriodos?: EnergiaPotenciaMap;  // kWh
-    potencias?: EnergiaPotenciaMap;        // kW
-
-    precioEnergia?: EnergiaPotenciaMap;    // €/kWh
-    precioPotencia?: EnergiaPotenciaMap;   // €/kW·año
-
-    costeEnergia?: number;
-    costePotencia?: number;
-
-    impuestoElectricidadPct?: number;      // ej 5.113
-    impuestoElectricidadImporte?: number;
-
-    alquiler?: number;
-    reactiva?: number;
-    exceso?: number;
-    otros?: number;
-
-    subtotalAntesIVA?: number;
-    ivaPct?: number;                       // ej 21
-    ivaImporte?: number;
-
-    total?: number;
-
-    facturaActual?: number; // opcional si quieres mostrarlo
-    ahorro?: number;
-    ahorroPct?: number;
-  };
+  pdf?: PdfData | null;
 };
 
 function safeText(v: any) {
@@ -78,17 +60,28 @@ function n(v: any): number {
 
 function eur(value: any) {
   const num = n(value);
-  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(num);
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+  }).format(num);
 }
 
 function num(value: any, dec = 2) {
   const x = n(value);
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(x);
+  return new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
+  }).format(x);
 }
 
 function pct(value: any, dec = 3) {
   const x = n(value);
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(x) + " %";
+  return (
+    new Intl.NumberFormat("es-ES", {
+      minimumFractionDigits: dec,
+      maximumFractionDigits: dec,
+    }).format(x) + " %"
+  );
 }
 
 function formatDateISO(iso?: string) {
@@ -98,32 +91,137 @@ function formatDateISO(iso?: string) {
   return new Intl.DateTimeFormat("es-ES").format(d);
 }
 
-function line(page: any, x1: number, y1: number, x2: number, y2: number, color = rgb(0.88, 0.9, 0.93)) {
-  page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: 1, color });
+function line(
+  page: any,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  color = rgb(0.88, 0.9, 0.93)
+) {
+  page.drawLine({
+    start: { x: x1, y: y1 },
+    end: { x: x2, y: y2 },
+    thickness: 1,
+    color,
+  });
 }
 
-function box(page: any, x: number, y: number, w: number, h: number, border = rgb(0.88, 0.9, 0.93), fill = rgb(1,1,1)) {
-  page.drawRectangle({ x, y, width: w, height: h, borderWidth: 1, borderColor: border, color: fill });
+function box(
+  page: any,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  border = rgb(0.88, 0.9, 0.93),
+  fill = rgb(1, 1, 1)
+) {
+  page.drawRectangle({
+    x,
+    y,
+    width: w,
+    height: h,
+    borderWidth: 1,
+    borderColor: border,
+    color: fill,
+  });
 }
 
 function sectionTitle(page: any, text: string, x: number, y: number, fontBold: any) {
-  page.drawText(text, { x, y, size: 10.5, font: fontBold, color: rgb(0.08, 0.12, 0.18) });
+  page.drawText(text, {
+    x,
+    y,
+    size: 10.5,
+    font: fontBold,
+    color: rgb(0.08, 0.12, 0.18),
+  });
 }
 
-function kv(page: any, label: string, value: string, x: number, y: number, font: any, fontBold: any, valueRightX?: number) {
-  page.drawText(label, { x, y, size: 9.6, font: fontBold, color: rgb(0.25, 0.3, 0.38) });
+function kv(
+  page: any,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  font: any,
+  fontBold: any,
+  valueRightX?: number
+) {
+  page.drawText(label, {
+    x,
+    y,
+    size: 9.6,
+    font: fontBold,
+    color: rgb(0.25, 0.3, 0.38),
+  });
+
   if (valueRightX) {
     const w = font.widthOfTextAtSize(value, 9.6);
-    page.drawText(value, { x: valueRightX - w, y, size: 9.6, font, color: rgb(0.06, 0.1, 0.16) });
+    page.drawText(value, {
+      x: valueRightX - w,
+      y,
+      size: 9.6,
+      font,
+      color: rgb(0.06, 0.1, 0.16),
+    });
   } else {
-    page.drawText(value, { x: x + 140, y, size: 9.6, font, color: rgb(0.06, 0.1, 0.16) });
+    page.drawText(value, {
+      x: x + 140,
+      y,
+      size: 9.6,
+      font,
+      color: rgb(0.06, 0.1, 0.16),
+    });
   }
 }
 
 export async function POST(req: Request) {
   try {
     const payload = (await req.json()) as Payload;
+    const pdf = payload.pdf || null;
 
+    const toNum = (v: any) => {
+      const k = Number(v);
+      return Number.isFinite(k) ? k : 0;
+    };
+
+    // ====== Calcular importes a partir de payload.pdf ======
+    let costePotencia = 0;
+    let costeEnergia = 0;
+
+    const diasFactura = pdf?.diasFactura ? toNum(pdf.diasFactura) : 30;
+    const ivaPct = pdf?.iva ? toNum(pdf.iva) : 21;
+    const impElecPct = pdf?.impuestoElectricidad ? toNum(pdf.impuestoElectricidad) : 5.113;
+
+    const reactiva = pdf ? toNum(pdf.reactiva) : 0;
+    const exceso = pdf ? toNum(pdf.exceso) : 0;
+    const alquiler = pdf ? toNum(pdf.alquiler) : 0;
+    const otros = pdf ? toNum(pdf.otros) : 0;
+    const extras = reactiva + exceso + alquiler + otros;
+
+    // Potencia
+    const periodosPot = pdf?.periodosPotencia?.length ? pdf.periodosPotencia : ["P1", "P2"];
+    for (const p of periodosPot) {
+      const kw = toNum(pdf?.potencias?.[p] || 0);
+      const precioAnual = toNum(pdf?.precioPotencia?.[p] || 0); // €/kW·año
+      costePotencia += kw * precioAnual * (diasFactura / 365);
+    }
+
+    // Energía
+    const periodosCon = pdf?.periodosConsumo?.length ? pdf.periodosConsumo : ["P1", "P2", "P3"];
+    for (const p of periodosCon) {
+      const kwh = toNum(pdf?.consumoPeriodos?.[p] || 0);
+      const precioKwh = toNum(pdf?.precioEnergia?.[p] || 0); // €/kWh
+      costeEnergia += kwh * precioKwh;
+    }
+
+    const baseEnergiaPotencia = costeEnergia + costePotencia;
+    const impElecImporte = baseEnergiaPotencia * (impElecPct / 100);
+    const subtotalAntesIVA = baseEnergiaPotencia + impElecImporte + extras;
+    const ivaImporte = subtotalAntesIVA * (ivaPct / 100);
+    const total = subtotalAntesIVA + ivaImporte;
+
+    // ====== Crear PDF ======
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595.28, 841.89]); // A4
     const { width, height } = page.getSize();
@@ -144,7 +242,7 @@ export async function POST(req: Request) {
     const cGray = rgb(0.35, 0.4, 0.48);
     const cLine = rgb(0.88, 0.9, 0.93);
     const cSoft = rgb(0.95, 0.97, 0.99);
-    const cAccent = rgb(0.10, 0.70, 0.55); // verde suave
+    const cAccent = rgb(0.10, 0.70, 0.55);
 
     // ===== CABECERA =====
     page.drawRectangle({ x: 0, y: height - 118, width, height: 118, color: cSoft });
@@ -167,6 +265,7 @@ export async function POST(req: Request) {
       font: fontBold,
       color: cDark,
     });
+
     page.drawText(`Referencia: ${ofertaId || "-"}`, {
       x: width - margin - 320,
       y: height - 62,
@@ -174,6 +273,7 @@ export async function POST(req: Request) {
       font,
       color: cGray,
     });
+
     page.drawText(`Fecha de emisión: ${fechaEmision}`, {
       x: width - margin - 320,
       y: height - 78,
@@ -209,47 +309,38 @@ export async function POST(req: Request) {
     kv(page, "Tarifa", tarifa, margin + colW + 24, topY - 52, font, fontBold);
     if (nombreTarifa) kv(page, "Nombre tarifa", nombreTarifa, margin + colW + 24, topY - 68, font, fontBold);
 
-    // Periodo facturación (si viene)
+    // Periodo facturación
     const fi = safeText(payload?.cliente?.fechaInicio);
     const ff = safeText(payload?.cliente?.fechaFin);
     if (fi || ff) {
-      page.drawText(`Periodo estimado: ${formatDateISO(fi) || "-"}  a  ${formatDateISO(ff) || "-"}`, {
-        x: margin,
-        y: topY - 104,
-        size: 9.2,
-        font,
-        color: cGray,
-      });
+      page.drawText(
+        `Periodo estimado: ${formatDateISO(fi) || "-"}  a  ${formatDateISO(ff) || "-"}`,
+        { x: margin, y: topY - 104, size: 9.2, font, color: cGray }
+      );
     }
 
     // ===== DESGLOSE ECONÓMICO =====
     let y = topY - 130;
-
     sectionTitle(page, "DESGLOSE ECONÓMICO (ESTIMADO)", margin, y, fontBold);
     y -= 10;
     line(page, margin, y, width - margin, y, cLine);
     y -= 14;
 
-    const detalle = payload.detalle || {};
     const right = width - margin;
-
-    const diasFactura = detalle.diasFactura ?? 30;
 
     // A) POTENCIA
     page.drawText("A) TÉRMINO DE POTENCIA", { x: margin, y, size: 10, font: fontBold, color: cDark });
     y -= 14;
 
-    const periodosPot = detalle.periodosPotencia || ["P1", "P2"];
-    const potencias = detalle.potencias || {};
-    const precioPot = detalle.precioPotencia || {};
     for (const p of periodosPot) {
-      const kw = n(potencias[p]);
-      const eurKwAnyo = n(precioPot[p]);
-      const txt = `• ${p}: ${num(kw, 2)} kW  ×  ${num(eurKwAnyo, 6)} €/kW·año`;
+      const kw = toNum(pdf?.potencias?.[p] || 0);
+      const eurKwAnyo = toNum(pdf?.precioPotencia?.[p] || 0);
+      const costeLinea = kw * eurKwAnyo * (diasFactura / 365);
+
+      const txt = `• ${p}: ${num(kw, 2)} kW × ${num(eurKwAnyo, 6)} €/kW·año × (${diasFactura} días/365) = ${eur(costeLinea)}`;
       page.drawText(txt, { x: margin + 12, y, size: 9.2, font, color: cGray });
       y -= 12;
     }
-    const costePotencia = n(detalle.costePotencia);
     kv(page, "Coste término potencia", eur(costePotencia), margin + 12, y, font, fontBold, right);
     y -= 16;
 
@@ -257,19 +348,15 @@ export async function POST(req: Request) {
     page.drawText("B) TÉRMINO DE ENERGÍA", { x: margin, y, size: 10, font: fontBold, color: cDark });
     y -= 14;
 
-    const periodosCon = detalle.periodosConsumo || ["P1", "P2", "P3"];
-    const consumos = detalle.consumoPeriodos || {};
-    const precioEn = detalle.precioEnergia || {};
-
     for (const p of periodosCon) {
-      const kwh = n(consumos[p]);
-      const eurKwh = n(precioEn[p]);
-      const subtotal = kwh * eurKwh;
-      const txt = `• ${p}: ${num(kwh, 2)} kWh × ${num(eurKwh, 6)} €/kWh = ${eur(subtotal)}`;
+      const kwh = toNum(pdf?.consumoPeriodos?.[p] || 0);
+      const eurKwh = toNum(pdf?.precioEnergia?.[p] || 0);
+      const subtotalLinea = kwh * eurKwh;
+
+      const txt = `• ${p}: ${num(kwh, 2)} kWh × ${num(eurKwh, 6)} €/kWh = ${eur(subtotalLinea)}`;
       page.drawText(txt, { x: margin + 12, y, size: 9.2, font, color: cGray });
       y -= 12;
     }
-    const costeEnergia = n(detalle.costeEnergia);
     kv(page, "Coste término energía", eur(costeEnergia), margin + 12, y, font, fontBold, right);
     y -= 16;
 
@@ -277,25 +364,22 @@ export async function POST(req: Request) {
     page.drawText("C) IMPUESTO SOBRE LA ELECTRICIDAD", { x: margin, y, size: 10, font: fontBold, color: cDark });
     y -= 14;
 
-    const base = costeEnergia + costePotencia;
-    const impPct = n(detalle.impuestoElectricidadPct);
-    const impImporte = n(detalle.impuestoElectricidadImporte);
+    page.drawText(`Base imponible (Energía + Potencia): ${eur(baseEnergiaPotencia)}`, {
+      x: margin + 12, y, size: 9.2, font, color: cGray
+    });
+    y -= 12;
 
-    page.drawText(`Base imponible (Energía + Potencia): ${eur(base)}`, { x: margin + 12, y, size: 9.2, font, color: cGray });
+    page.drawText(`Tipo impositivo: ${pct(impElecPct, 3)}`, {
+      x: margin + 12, y, size: 9.2, font, color: cGray
+    });
     y -= 12;
-    page.drawText(`Tipo impositivo: ${pct(impPct, 3)}`, { x: margin + 12, y, size: 9.2, font, color: cGray });
-    y -= 12;
-    kv(page, "Importe impuesto electricidad", eur(impImporte), margin + 12, y, font, fontBold, right);
+
+    kv(page, "Importe impuesto electricidad", eur(impElecImporte), margin + 12, y, font, fontBold, right);
     y -= 16;
 
     // D) OTROS CONCEPTOS
     page.drawText("D) OTROS CONCEPTOS", { x: margin, y, size: 10, font: fontBold, color: cDark });
     y -= 14;
-
-    const alquiler = n(detalle.alquiler);
-    const reactiva = n(detalle.reactiva);
-    const exceso = n(detalle.exceso);
-    const otros = n(detalle.otros);
 
     kv(page, "Alquiler contador", eur(alquiler), margin + 12, y, font, fontBold, right); y -= 12;
     kv(page, "Energía reactiva", eur(reactiva), margin + 12, y, font, fontBold, right); y -= 12;
@@ -306,13 +390,9 @@ export async function POST(req: Request) {
     line(page, margin, y, width - margin, y, cLine);
     y -= 14;
 
-    const subtotalAntesIVA = n(detalle.subtotalAntesIVA);
-    const ivaPct = n(detalle.ivaPct);
-    const ivaImporte = n(detalle.ivaImporte);
-    const total = n(detalle.total);
-
     kv(page, "Subtotal antes de IVA", eur(subtotalAntesIVA), margin, y, font, fontBold, right);
     y -= 14;
+
     kv(page, `IVA (${pct(ivaPct, 0)})`, eur(ivaImporte), margin, y, font, fontBold, right);
     y -= 18;
 
@@ -326,6 +406,7 @@ export async function POST(req: Request) {
       borderWidth: 1,
       borderColor: rgb(0.78, 0.92, 0.86),
     });
+
     page.drawText("IMPORTE TOTAL ESTIMADO", {
       x: margin + 12,
       y: y + 12,
@@ -333,8 +414,10 @@ export async function POST(req: Request) {
       font: fontBold,
       color: cDark,
     });
+
     const totalTxt = eur(total);
     const totalW = fontBold.widthOfTextAtSize(totalTxt, 14);
+
     page.drawText(totalTxt, {
       x: width - margin - 12 - totalW,
       y: y + 9,
@@ -342,36 +425,38 @@ export async function POST(req: Request) {
       font: fontBold,
       color: cAccent,
     });
+
     y -= 46;
 
-    // Comparativa / Ahorro
-    const ahorro = n(detalle.ahorro ?? payload.oferta.ahorro);
-    const ahorroPct = n(detalle.ahorroPct);
-    const facturaActual = n(detalle.facturaActual);
-
+    // COMPARATIVA Y AHORRO
     sectionTitle(page, "COMPARATIVA Y AHORRO", margin, y, fontBold);
     y -= 10;
     line(page, margin, y, width - margin, y, cLine);
     y -= 14;
 
+    const facturaActual = toNum(pdf?.importeFactura || 0);
     if (facturaActual > 0) {
       kv(page, "Factura actual (aportada)", eur(facturaActual), margin, y, font, fontBold, right);
       y -= 12;
     }
+
     kv(page, "Coste con esta oferta", eur(total), margin, y, font, fontBold, right);
     y -= 12;
 
-    const ahorroTxt = ahorroPct > 0 ? `${eur(ahorro)}  (${num(ahorroPct,0)}%)` : eur(ahorro);
-    kv(page, "Ahorro estimado", ahorroTxt, margin, y, font, fontBold, right);
+    // Mantén el texto que ya enseñas en comparador (porque suele venir "64,82 € 51%")
+    kv(page, "Ahorro estimado", safeText(payload?.oferta?.ahorro) || "-", margin, y, font, fontBold, right);
     y -= 18;
 
-    // Anexo/condiciones (si hay espacio)
-    const anexo = safeText(payload?.oferta?.anexoPrecios) || "Precios sujetos a validación final por la comercializadora. Estimación basada en los datos introducidos por el cliente y el periodo indicado.";
+    // ANEXO
+    const anexo =
+      safeText(payload?.oferta?.anexoPrecios) ||
+      "Precios sujetos a validación final por la comercializadora. Estimación basada en los datos introducidos por el cliente y el periodo indicado.";
+
     sectionTitle(page, "ANEXO DE PRECIOS / CONDICIONES", margin, y, fontBold);
     y -= 10;
 
     const anexoBoxH = 112;
-    box(page, margin, y - anexoBoxH, width - margin * 2, anexoBoxH, cLine, rgb(1,1,1));
+    box(page, margin, y - anexoBoxH, width - margin * 2, anexoBoxH, cLine, rgb(1, 1, 1));
 
     const lines = wrapText(anexo, 102);
     let ty = y - 16;
@@ -388,6 +473,7 @@ export async function POST(req: Request) {
     );
     page.drawText("Soporte: info@impulsoenergetico.es", { x: margin, y: 52, size: 8.8, font, color: cGray });
 
+    // Respuesta
     const pdfBytes = await pdfDoc.save();
     const pdfBuffer = Buffer.from(pdfBytes);
 
@@ -400,7 +486,6 @@ export async function POST(req: Request) {
         "Content-Disposition": `inline; filename="${filename}"`,
       },
     });
-
   } catch (err: any) {
     console.error("POST /api/oferta-pdf", err);
     return NextResponse.json(

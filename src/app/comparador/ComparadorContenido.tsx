@@ -491,17 +491,35 @@ export default function ComparadorContenido() {
           compañia: oferta.compania,
           tarifa: oferta.nombre || oferta.anexoPrecio || "",
           precio_kwh: precioMedioKwh,
-          comision_kwh: 0, // usamos comisión anual fija
           consumoTotal,
           coste: costeTotalTarifa,
           ahorro,
           ahorroPct,
-          // 👇 mostramos lo que se paga al cliente
           comision: comisionCliente,
-          // comisionPool,
-          // comisionCliente,
-          // comisionNeta,
+
+          // ✅ EXTRA para generar PDF con desglose real (sin 0)
+          __pdf: {
+            diasFactura,
+            periodosConsumo,
+            periodosPotencia,
+            consumoPeriodos: { ...consumoPeriodos }, // kWh por periodo (lo que metió el cliente)
+            potencias: { ...potencias },             // kW por periodo (lo que metió el cliente)
+
+            // precios de la oferta por periodo (lo que viene de BD y usas en cálculo)
+            precioEnergia,
+            precioPotencia,
+
+            // impuestos/extras que YA usas para calcular
+            iva: Number(iva) || 0,
+            impuestoElectricidad: Number(impuestoElectricidad) || 0,
+            reactiva: reactivaNum,
+            exceso: excesoNum,
+            alquiler: alquilerNum,
+            otros: otrosNum,
+            importeFactura: facturaNum,
+          },
         };
+
       });
 
       // 🔹 QUITAR tarifas con coste 0 (o casi 0)
@@ -1306,10 +1324,54 @@ export default function ComparadorContenido() {
 
                           <button
                             className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-800 text-slate-50 text-xs md:text-sm font-semibold hover:bg-slate-700"
-                            onClick={() => verOfertaPDF(r)}
+                            onClick={async () => {
+                              try {
+                                const body = {
+                                  cliente: {
+                                    nombre: nombreCliente || "",
+                                    direccion: direccionCliente || "",
+                                    cups: cups || "",
+                                    fechaInicio,
+                                    fechaFin,
+                                  },
+                                  oferta: {
+                                    compania: String(r.compañia || ""),
+                                    tarifa: String(r.tarifa || ""),
+                                    nombreTarifa: nombreTarifa,
+                                    anexoPrecios: String(r.tarifa || ""), // o el texto que quieras
+                                    costeEstimado: `${Number(r.coste || 0).toFixed(2)} €`,
+                                    ahorro: `${Number(r.ahorro || 0).toFixed(2)} € (${Number(r.ahorroPct || 0).toFixed(0)}%)`,
+                                    comision: `${Number(r.comision || 0).toFixed(2)} €`,
+                                    idOferta: String(r.id || ""),
+                                  },
+                                  // ✅ lo importante: desglose real
+                                  pdf: r.__pdf || null,
+                                };
+
+                                const res = await fetch("/api/oferta-pdf", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify(body),
+                                });
+
+                                if (!res.ok) {
+                                  const t = await res.text();
+                                  alert("No se pudo generar el PDF: " + t);
+                                  return;
+                                }
+
+                                const blob = await res.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                window.open(url, "_blank", "noopener,noreferrer");
+                              } catch (e) {
+                                console.error(e);
+                                alert("Error abriendo el PDF.");
+                              }
+                            }}
                           >
                             Ver oferta
                           </button>
+
 
                         </td>
                       </tr>
