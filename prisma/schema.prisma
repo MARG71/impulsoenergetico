@@ -37,11 +37,26 @@ model Comparativa {
   agenteId       Int
   lugarId        Int
 
+  // ✅ SOLAR / EXCEDENTE
+  tieneSolar        Boolean @default(false)
+  excedenteAnualKwh Float?
+  excedenteTarifaId Int?
+
+  // Snapshots opcionales (recomendado para mantener histórico coherente)
+  excedentePrecioKwhSnap Decimal? @db.Decimal(10, 6)
+  excedenteTipoSnap      String?
+
   cliente      Cliente                @relation(fields: [clienteId], references: [id])
   agente       Agente                 @relation(fields: [agenteId], references: [id])
   lugar        Lugar                  @relation(fields: [lugarId], references: [id])
   datosFactura DatosFactura?
   resultados   ResultadoComparativa[]
+
+  // ✅ relación a catálogo de excedentes
+  excedenteTarifa SolarExcedenteTarifa? @relation(fields: [excedenteTarifaId], references: [id])
+
+  @@index([tieneSolar])
+  @@index([excedenteTarifaId])
 }
 
 model ResultadoComparativa {
@@ -255,8 +270,6 @@ model ProductoGanadero {
  * =========
  */
 
-/// Defaults globales cuando Lugar/Agente no tienen valores propios ni hay override.
-/// Porcentajes 0..1 (ej: 0.30 = 30%)
 model GlobalComisionDefaults {
   id                Int      @id @default(1)
   defaultPctCliente Decimal  @db.Decimal(5, 4)
@@ -267,8 +280,6 @@ model GlobalComisionDefaults {
   @@map("global_comision_defaults")
 }
 
-/// Reglas específicas por Lugar (y opcionalmente Agente), filtrables por compañía/tarifa,
-/// con vigencia y prioridad. pctCliente aplica sobre POOL; pctLugar/pctAgente sobre REMANENTE.
 model ComisionOverride {
   id Int @id @default(autoincrement())
 
@@ -278,11 +289,9 @@ model ComisionOverride {
   agenteId Int?
   agente   Agente? @relation(fields: [agenteId], references: [id])
 
-  // Filtros opcionales
   compania String?
   tarifa   String?
 
-  // Si no son null, pisan el valor correspondiente (0..1)
   pctCliente Decimal? @db.Decimal(5, 4)
   pctLugar   Decimal? @db.Decimal(5, 4)
   pctAgente  Decimal? @db.Decimal(5, 4)
@@ -344,12 +353,15 @@ model OfertaTarifa {
   comisionKwhAdminBase Decimal? @db.Decimal(10, 6)
   payload              Json?
 
-  // 🔹 NUEVOS
-  referencia  String? // columna "Ref." del Excel
-  tipoCliente TipoCliente? // "RESIDENCIAL" o "PYME"
+  referencia  String?
+  tipoCliente TipoCliente?
 
   tramos  OfertaTarifaTramo[]
   ofertas Oferta[]            @relation("TarifaAOferta")
+
+  // ✅ NUEVO: configuración solar por tarifa base
+  solarConfigBase     OfertaTarifaSolarConfig?  @relation("SolarBase")
+  solarConfigEspecial OfertaTarifaSolarConfig[] @relation("SolarEspecial")
 
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
@@ -363,20 +375,16 @@ model OfertaTarifaTramo {
   id             Int @id @default(autoincrement())
   ofertaTarifaId Int
 
-  // Consumo anual en kWh (si el Excel trae mensual, conviertes al importar)
   consumoDesdeKWh Int
-  consumoHastaKWh Int? // null = sin tope superior
+  consumoHastaKWh Int?
 
-  // Comisión específica del tramo
-  comisionKwhAdmin  Decimal? @db.Decimal(10, 6) // €/kWh
-  comisionFijaAdmin Decimal? @db.Decimal(10, 2) // € fijos
+  comisionKwhAdmin  Decimal? @db.Decimal(10, 6)
+  comisionFijaAdmin Decimal? @db.Decimal(10, 2)
 
-  // Reparto por rol (opcional)
-  pctCliente Decimal? @db.Decimal(5, 4) // 0..1
-  pctLugar   Decimal? @db.Decimal(5, 4) // 0..1
-  pctAgente  Decimal? @db.Decimal(5, 4) // 0..1
+  pctCliente Decimal? @db.Decimal(5, 4)
+  pctLugar   Decimal? @db.Decimal(5, 4)
+  pctAgente  Decimal? @db.Decimal(5, 4)
 
-  // Vigencia por tramo (opcional)
   validFrom DateTime?
   validTo   DateTime?
   activo    Boolean   @default(true)
@@ -394,7 +402,7 @@ model SolicitudContrato {
   creadaEn DateTime @default(now())
   estado   String   @default("PENDIENTE")
 
-  tipoContratacion String? // ✅ AÑADIR
+  tipoContratacion String?
 
   nombre              String
   apellidos           String?
@@ -416,9 +424,8 @@ model SolicitudContrato {
   archivos SolicitudContratoArchivo[]
 }
 
-
 model SolicitudContratoArchivo {
-  id       Int      @id @default(autoincrement()) // ✅
+  id       Int      @id @default(autoincrement())
   creadaEn DateTime @default(now())
 
   solicitudId    Int
@@ -430,4 +437,73 @@ model SolicitudContratoArchivo {
   size           Int?
 
   solicitud SolicitudContrato @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+}
+
+// ======================
+// ✅ SOLAR / EXCEDENTES
+// ======================
+enum TipoCompensacionExcedente {
+  COMPENSACION
+  BATERIA_VIRTUAL
+  OTRO
+}
+
+enum LimiteCompensacionExcedente {
+  ENERGIA
+  TOTAL
+}
+
+model SolarExcedenteTarifa {
+  id        Int                         @id @default(autoincrement())
+  nombre    String
+  compania  String?
+  tipo      TipoCompensacionExcedente   @default(COMPENSACION)
+  limite    LimiteCompensacionExcedente @default(ENERGIA)
+  precioKwh Decimal?                    @db.Decimal(10, 6)
+  payload   Json?
+
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  comparativas             Comparativa[]
+  ofertaTarifaSolarConfigs OfertaTarifaSolarConfig[]
+
+  @@index([activa, tipo])
+  @@index([compania])
+}
+
+// ======================
+// ✅ CONFIG SOLAR POR TARIFA (NUEVO)
+// ======================
+enum ModoSolarTarifa {
+  MISMA_TARIFA
+  TARIFA_SOLAR_ESPECIAL
+}
+
+model OfertaTarifaSolarConfig {
+  id Int @id @default(autoincrement())
+
+  // Tarifa base del catálogo
+  ofertaTarifaBaseId Int
+  ofertaTarifaBase   OfertaTarifa @relation("SolarBase", fields: [ofertaTarifaBaseId], references: [id], onDelete: Cascade)
+
+  modo ModoSolarTarifa @default(MISMA_TARIFA)
+
+  // Si modo = TARIFA_SOLAR_ESPECIAL, esta apunta a la tarifa/anexo solar específico
+  ofertaTarifaSolarId Int?
+  ofertaTarifaSolar   OfertaTarifa? @relation("SolarEspecial", fields: [ofertaTarifaSolarId], references: [id])
+
+  // Compensación/pago por excedente (para ambos modos)
+  excedenteTarifaId Int?
+  excedenteTarifa   SolarExcedenteTarifa? @relation(fields: [excedenteTarifaId], references: [id])
+
+  activa Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@unique([ofertaTarifaBaseId])
+  @@index([modo, activa])
+  @@index([excedenteTarifaId])
 }

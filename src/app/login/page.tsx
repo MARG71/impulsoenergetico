@@ -30,9 +30,9 @@ export default function LoginPage() {
         console.log('🎯 Rol detectado en sesión:', role);
 
         if (role === 'ADMIN') {
-          router.push('/dashboard');
+          router.push('/pipeline-admin');
         } else if (role === 'AGENTE') {
-          router.push('/panel-agente');
+          router.push('/agente');
         } else if (role === 'LUGAR') {
           router.push('/zona-lugar');
         } else {
