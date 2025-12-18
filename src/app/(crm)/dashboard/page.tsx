@@ -219,10 +219,10 @@ export default function DashboardPage() {
           <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/20 via-amber-400/10 to-emerald-400/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.45)]">
             <div className="rounded-3xl bg-slate-950/95 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white drop-shadow-sm">
                   Centro de Control IMPULSO ENERGÉTICO
                 </h1>
-                <p className="mt-1 text-sm md:text-base text-slate-300 max-w-2xl">
+                <p className="mt-1 text-[14px] md:text-lg font-semibold text-slate-300 max-w-2xl">
                   Visión global de lo que hacen los clientes
                   <span className="font-semibold text-emerald-300">
                     {' '}
@@ -233,7 +233,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="flex flex-col items-end gap-2">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                <span className="text-[13px] font-extrabold uppercase tracking-wide text-slate-400">
                   Ver actividad de
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                     <h2 className="text-xl font-semibold text-white">
                       Actividad por tipo de servicio
                     </h2>
-                    <p className="text-xs md:text-sm text-slate-300 mt-1">
+                    <p className="text-[13px] md:text-[14px] font-semibold text-slate-300 mt-1">
                       Comparativas realizadas en{' '}
                       <span className="font-semibold text-emerald-300">
                         {tituloRango.toLowerCase()}
@@ -402,11 +402,11 @@ export default function DashboardPage() {
                         >
                           <div className="mt-1">
                             {ev.tipo === 'lead' ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-[11px] font-extrabold text-slate-950 shadow-lg shadow-emerald-500/40">
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-[13px] font-extrabold font-extrabold text-slate-950 shadow-lg shadow-emerald-500/40">
                                 QR
                               </span>
                             ) : (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-[11px] font-extrabold text-slate-950 shadow-lg shadow-orange-500/40">
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-[13px] font-extrabold text-slate-950 shadow-lg shadow-orange-500/40">
                                 C
                               </span>
                             )}
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                               <p className="text-sm font-semibold text-slate-50 truncate">
                                 {ev.descripcion}
                               </p>
-                              <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                              <span className="text-[13px] font-extrabold text-slate-400 whitespace-nowrap">
                                 {formatearFechaCorta(ev.fecha)}
                               </span>
                             </div>
@@ -428,7 +428,7 @@ export default function DashboardPage() {
                             {ev.tipo === 'lead' ? (
                               <button
                                 onClick={() => router.push('/panel-agente')}
-                                className="text-[11px] font-semibold text-emerald-300 hover:text-emerald-100"
+                                className="text-[13px] font-extrabold text-emerald-300 hover:text-emerald-100"
                               >
                                 Ver lead
                               </button>
@@ -437,7 +437,7 @@ export default function DashboardPage() {
                                 onClick={() =>
                                   router.push(`/comparador?id=${ev.id}`)
                                 }
-                                className="text-[11px] font-semibold text-orange-300 hover:text-orange-100"
+                                className="text-[13px] font-extrabold text-orange-300 hover:text-orange-100"
                               >
                                 Ver comp.
                               </button>
@@ -532,7 +532,7 @@ function Chip({
   variante?: "light" | "dark"
 }) {
   const base =
-    "px-3.5 py-1.5 rounded-full text-[11px] font-extrabold border transition"
+    "px-3.5 py-1.5 rounded-full text-[13px] font-extrabold border transition"
 
   if (activo) {
     return (
@@ -614,7 +614,7 @@ function KpiCard({
       hover:border-emerald-400/50 hover:shadow-[0_0_34px_rgba(16,185,129,0.16)]"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-300">
+        <p className="text-[13px] font-extrabold uppercase tracking-wider text-slate-300">
           {titulo}
         </p>
         <span
@@ -625,10 +625,10 @@ function KpiCard({
       </div>
 
       <div className="mt-4">
-        <p className="text-4xl font-extrabold text-white leading-none">
+        <p className="text-5xl font-extrabold text-white leading-none">
           {valor}
         </p>
-        <p className="text-xs md:text-sm text-slate-300 mt-2">
+        <p className="text-[13px] md:text-[14px] font-semibold text-slate-300 mt-2">
           {descripcion}
         </p>
       </div>
@@ -653,7 +653,7 @@ function ServicioCard({
         <span className="text-xs font-extrabold">{titulo}</span>
         <span className="text-2xl font-extrabold">{valor}</span>
       </div>
-      <span className="mt-1 block text-[11px] font-semibold opacity-80">
+      <span className="mt-1 block text-[13px] font-extrabold opacity-80">
         {subtitulo}
       </span>
     </div>
@@ -674,7 +674,7 @@ function ResumenFila({
     <div className="flex items-start justify-between gap-3 rounded-2xl bg-slate-950/70 border border-slate-800 px-4 py-3">
       <div className="flex-1">
         <p className="text-xs font-extrabold text-slate-50">{titulo}</p>
-        <p className="text-[11px] text-slate-300 mt-0.5">{descripcion}</p>
+        <p className="text-[13px] font-extrabold text-slate-300 mt-0.5">{descripcion}</p>
       </div>
       <p className="text-2xl font-extrabold text-emerald-300 ml-2">
         {valor}

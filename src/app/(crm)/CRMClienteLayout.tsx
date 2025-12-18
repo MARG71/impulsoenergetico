@@ -59,14 +59,17 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
       <Link
         href={href}
         className={cx(
-          "group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold transition",
+          "group flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-extrabold transition",
           activo
             ? "bg-white/12 border border-white/15 shadow-[0_0_24px_rgba(255,255,255,0.06)]"
-            : "hover:bg-white/8"
+            : "hover:bg-white/10"
         )}
+
       >
-        <span className={cx("text-base", activo ? "" : "opacity-90")}>{icon}</span>
-        <span className={cx("truncate", activo ? "text-yellow-200" : "text-white/90 group-hover:text-white")}>
+        <span className={cx("text-[18px]", activo ? "" : "opacity-90")}>{icon}</span>
+
+        <span className={cx("truncate font-extrabold", activo ? "text-yellow-200" : "text-white/90 group-hover:text-white")}>
+
           {label}
         </span>
         {activo && <span className="ml-auto text-[10px] text-white/60">●</span>}
@@ -94,24 +97,29 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
 
           {/* Usuario */}
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-            <div className="text-white font-extrabold leading-tight">{nombre}</div>
-            <div className="mt-1 inline-flex items-center gap-2 text-xs">
+            <div className="text-white text-[16px] font-extrabold leading-tight">{nombre}</div>
+
+            <div className="mt-2 inline-flex items-center gap-2 text-[13px] font-bold">
+
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.6)]" />
-              <span className="text-white/80">{rolLabel}</span>
+              <span className="text-white/85 font-extrabold uppercase tracking-wide">{rolLabel}</span>
+
             </div>
 
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="flex-1 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-3 py-2 text-xs font-semibold text-white transition"
+                className="flex-1 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-[13px] font-extrabold text-white transition"
+
               >
                 Cerrar sesión
               </button>
 
               <Link
                 href="/dashboard"
-                className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-3 py-2 text-xs font-extrabold text-slate-950 transition shadow-[0_0_18px_rgba(16,185,129,0.35)]"
+                className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition shadow-[0_0_18px_rgba(16,185,129,0.35)]"
+
                 title="Ir al dashboard"
               >
                 Ir
@@ -122,7 +130,8 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
           {/* Navegación */}
           <nav className="mt-5 space-y-5">
             <div>
-              <div className="px-2 text-[11px] uppercase tracking-wider text-white/60 mb-2">
+              <div className="px-2 text-[12px] font-extrabold uppercase tracking-widest text-white/70 mb-2">
+
                 Principal
               </div>
               <div className="space-y-1">
@@ -159,7 +168,8 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
             )}
           </nav>
 
-          <div className="mt-6 px-2 text-[11px] text-white/50">
+          <div className="mt-6 px-2 text-[12px] font-bold text-white/55">
+
             IMPULSO ENERGÉTICO · CRM
           </div>
         </aside>
