@@ -1,112 +1,92 @@
 // middleware.ts
-// middleware.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-// 🔹 Rutas que forman parte del CRM (solo ADMIN y AGENTE)
+const PUBLIC_PATHS = ["/login", "/unauthorized", "/bienvenida", "/registro", "/contratar"];
+
+// ✅ Dashboard común (cualquier rol autenticado)
+const DASHBOARD_COMMON_PREFIX = ["/dashboard"];
+
+// ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN para poder revisar si quieres
+const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
+
+// ✅ CRM solo ADMIN/AGENTE/SUPERADMIN
 const ADMIN_OR_AGENT_PATHS = [
+  "/pipeline-agentes",
+  "/agentes",
+  "/lugares",
+  "/leads",
+  "/fondos",
+  "/productos-ganaderos",
+  "/ofertas",
+  "/configuracion",
+  "/comparador",
+];
 
-  '/agentes',
-  '/lugares',
-  '/leads',
-  '/fondos',
-  '/productos-ganaderos',
-  '/ofertas',           // ajusta o añade más si tienes ruta específica
-  '/configuracion',     // ejemplo, por si la añades
-]
-
-// 🔹 Rutas de la zona cliente (LUGAR)
-const LUGAR_PATHS = ['/zona-lugar']
+// ✅ Rutas SOLO ADMIN/SUPERADMIN (si quieres refinar más aún)
+const ADMIN_ONLY_PREFIX = [
+  "/dashboard/comisiones",
+  "/crear-usuario",
+  "/productos-ganaderos",
+  "/ofertas",
+  "/agentes",
+  "/lugares/fondos",
+];
 
 export async function middleware(req: NextRequest) {
-  const path = req.nextUrl.pathname
+  const path = req.nextUrl.pathname;
 
-  // 🔓 Estas rutas ya las hacemos públicas vía config.matcher (abajo),
-  // pero si en el futuro ampliamos matcher, esto nos protege igualmente.
-  const publicPaths = [
-  '/login',
-  '/unauthorized',
-  '/bienvenida',
-  '/registro',
-  '/contratar', // ✅ la página del formulario público
-]
+  // Público
+  if (PUBLIC_PATHS.includes(path)) return NextResponse.next();
 
-  if (publicPaths.includes(path)) {
-    return NextResponse.next()
-  }
-
-  // 🔑 Leemos el token JWT de NextAuth
+  // Token
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
-  })
+  });
 
-  console.log('🛡️ Middleware: token recibido:', token)
-  console.log('➡️ Ruta solicitada:', path)
-
-  // 🧱 Si no hay token y no es ruta pública → al login
   if (!token) {
-    console.log('❌ No hay token, redirigiendo a /login')
-    return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const role = token.role as 'ADMIN' | 'AGENTE' | 'LUGAR' | undefined
+  const role = token.role as "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | undefined;
+  const isAdmin = role === "ADMIN" || role === "SUPERADMIN";
+  const isAgente = role === "AGENTE";
+  const isLugar = role === "LUGAR";
 
-  // ✅ /dashboard: cualquier rol autenticado
-  if (path === '/dashboard' || path.startsWith('/dashboard/')) {
+  // ✅ Dashboard común para TODOS los roles autenticados
+  if (DASHBOARD_COMMON_PREFIX.some((p) => path === p || path.startsWith(p + "/"))) {
     return NextResponse.next();
   }
 
+  // ✅ Admin-only (si coincide)
+  if (ADMIN_ONLY_PREFIX.some((p) => path === p || path.startsWith(p + "/"))) {
+    if (!isAdmin) return NextResponse.redirect(new URL("/unauthorized", req.url));
+    return NextResponse.next();
+  }
 
-  // Helpers para saber qué tipo de ruta es
+  // ✅ Zona Lugar
+  if (ZONA_LUGAR_PREFIX.some((p) => path === p || path.startsWith(p + "/"))) {
+    if (isLugar || isAdmin || isAgente) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
+  }
+
+  // ✅ CRM Admin/Agente
   const isAdminOrAgentPath = ADMIN_OR_AGENT_PATHS.some(
     (p) => path === p || path.startsWith(`${p}/`)
-  )
+  );
 
-  const isZonaLugarPath = LUGAR_PATHS.some(
-    (p) => path === p || path.startsWith(`${p}/`)
-  )
-
-  // 🎯 Zona del cliente: /zona-lugar
-  if (isZonaLugarPath) {
-    if (role === 'LUGAR' || role === 'ADMIN' || role === 'AGENTE') {
-      // Permitimos también ADMIN/AGENTE para que puedas ver su zona si quieres
-      return NextResponse.next()
-    }
-    console.log(`❌ Acceso denegado a /zona-lugar para rol ${role}`)
-    return NextResponse.redirect(new URL('/unauthorized', req.url))
-  }
-
-  // 🎯 CRM: dashboard, agentes, lugares, leads, etc.
   if (isAdminOrAgentPath) {
-    if (role === 'ADMIN' || role === 'AGENTE') {
-      return NextResponse.next()
-    }
-    console.log(`❌ Acceso denegado a zona CRM para rol ${role} en ruta ${path}`)
-    return NextResponse.redirect(new URL('/unauthorized', req.url))
+    if (isAdmin || isAgente) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ Para cualquier otra ruta que pase por el middleware:
-  // con estar autenticado (cualquier rol) es suficiente
-  return NextResponse.next()
+  // ✅ Resto: autenticado = OK
+  return NextResponse.next();
 }
 
-// 👇 Aquí marcamos qué rutas pasan por el middleware
-// 👇 Aquí marcamos qué rutas pasan por el middleware
 export const config = {
   matcher: [
-    // Todo lo que NO sea:
-    // - /api
-    // - estáticos de Next
-    // - favicon
-    // - tu logo
-    // - login
-    // - unauthorized
-    // - bienvenida (pública)
-    // - registro (pública)
-    '/((?!api|api/solicitudes-contrato|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro|contratar).*)',
-
+    "/((?!api|api/solicitudes-contrato|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro|contratar).*)",
   ],
-
-
-}
+};

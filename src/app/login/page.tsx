@@ -25,7 +25,7 @@ export default function LoginPage() {
       return;
     }
 
-    // ✅ TODOS AL MISMO SITIO
+    // ✅ SIEMPRE al dashboard (el middleware + /api/dashboard filtra por rol)
     router.push('/dashboard');
   };
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="w-full bg-blue-800 text-white py-2 rounded hover:bg-blue-900"
+          className="w-full bg-blue-800 text-white py-2 rounded hover:bg-blue-900 font-bold"
         >
           Entrar
         </button>
@@ -71,7 +71,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => router.push('/recuperar-clave')}
-            className="text-emerald-600 hover:text-emerald-500 underline-offset-2 hover:underline"
+            className="text-emerald-600 hover:text-emerald-500 underline-offset-2 hover:underline font-semibold"
           >
             Recuperar acceso
           </button>

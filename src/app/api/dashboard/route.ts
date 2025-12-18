@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 
+type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR";
+
 export async function GET(req: NextRequest) {
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -10,12 +12,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
-    const role = (token as any).role as "ADMIN" | "AGENTE" | "LUGAR" | undefined;
+    const role = (token as any).role as Rol | undefined;
     const agenteId = (token as any).agenteId ? Number((token as any).agenteId) : null;
     const lugarId = (token as any).lugarId ? Number((token as any).lugarId) : null;
 
-    // Helpers
-    const take = 200; // puedes bajar si quieres
+    const isAdmin = role === "ADMIN" || role === "SUPERADMIN";
+    const take = 200;
+
     const base = {
       role,
       user: {
@@ -27,8 +30,8 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    // ✅ ADMIN: ve todo
-    if (role === "ADMIN") {
+    // ✅ ADMIN / SUPERADMIN: ve todo
+    if (isAdmin) {
       const [comparativas, agentes, lugares, leads, ofertas] = await Promise.all([
         prisma.comparativa.findMany({
           orderBy: { fecha: "desc" },
@@ -39,7 +42,10 @@ export async function GET(req: NextRequest) {
             lugar: { select: { id: true, nombre: true, direccion: true } },
           },
         }),
-        prisma.agente.findMany({ orderBy: { id: "asc" } }),
+        prisma.agente.findMany({
+          orderBy: { id: "asc" },
+          select: { id: true, nombre: true, email: true, telefono: true },
+        }),
         prisma.lugar.findMany({
           orderBy: { id: "asc" },
           include: { agente: { select: { id: true, nombre: true } } },
@@ -52,7 +58,10 @@ export async function GET(req: NextRequest) {
             lugar: { select: { id: true, nombre: true } },
           },
         }),
-        prisma.oferta.findMany({ orderBy: { creadaEn: "desc" }, take }),
+        prisma.oferta.findMany({
+          orderBy: { creadaEn: "desc" },
+          take: 50,
+        }),
       ]);
 
       return NextResponse.json({ ...base, comparativas, agentes, lugares, leads, ofertas });
@@ -67,7 +76,7 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      const [comparativas, lugares, leads, ofertas] = await Promise.all([
+      const [comparativas, lugares, leads, ofertas, agente] = await Promise.all([
         prisma.comparativa.findMany({
           where: { agenteId },
           orderBy: { fecha: "desc" },
@@ -91,14 +100,16 @@ export async function GET(req: NextRequest) {
             lugar: { select: { id: true, nombre: true } },
           },
         }),
-        prisma.oferta.findMany({ where: { activa: true }, orderBy: { creadaEn: "desc" }, take: 50 }),
+        prisma.oferta.findMany({
+          where: { activa: true },
+          orderBy: { creadaEn: "desc" },
+          take: 50,
+        }),
+        prisma.agente.findUnique({
+          where: { id: agenteId },
+          select: { id: true, nombre: true, email: true, telefono: true },
+        }),
       ]);
-
-      // Agentes: para el AGENTE solo él (opcional)
-      const agente = await prisma.agente.findUnique({
-        where: { id: agenteId },
-        select: { id: true, nombre: true, email: true, telefono: true },
-      });
 
       return NextResponse.json({
         ...base,
@@ -146,7 +157,11 @@ export async function GET(req: NextRequest) {
             lugar: { select: { id: true, nombre: true } },
           },
         }),
-        prisma.oferta.findMany({ where: { activa: true }, orderBy: { creadaEn: "desc" }, take: 50 }),
+        prisma.oferta.findMany({
+          where: { activa: true },
+          orderBy: { creadaEn: "desc" },
+          take: 50,
+        }),
       ]);
 
       return NextResponse.json({
