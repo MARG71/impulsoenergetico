@@ -524,36 +524,73 @@ function Chip({
   activo,
   onClick,
   label,
-  variante = 'light',
+  variante = "light",
 }: {
   activo: boolean
   onClick: () => void
   label: string
-  variante?: 'light' | 'dark'
+  variante?: "light" | "dark"
 }) {
   const base =
-    'px-3 py-1 rounded-full text-[11px] font-semibold border transition-colors'
+    "px-3.5 py-1.5 rounded-full text-[11px] font-extrabold border transition"
+
   if (activo) {
     return (
       <button
         onClick={onClick}
-        className={`${base} ${
-          variante === 'dark'
-            ? 'bg-slate-900 text-white border-slate-100'
-            : 'bg-emerald-500 text-slate-950 border-emerald-400'
-        } shadow-md`}
+        className={[
+          base,
+          variante === "dark"
+            ? "bg-slate-200 text-slate-950 border-slate-100 shadow"
+            : "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.35)]",
+        ].join(" ")}
       >
         {label}
       </button>
     )
   }
+
   return (
     <button
       onClick={onClick}
-      className={`${base} bg-slate-950 text-slate-200 border-slate-700 hover:border-emerald-400/60 hover:text-emerald-200`}
+      className={[
+        base,
+        "bg-slate-950/60 text-slate-200 border-slate-700 hover:border-emerald-400/60 hover:text-emerald-200",
+      ].join(" ")}
     >
       {label}
     </button>
+  )
+}
+
+function SectionShell({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  right?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section className="rounded-3xl bg-slate-900/70 border border-slate-800 p-6 shadow-[0_0_50px_rgba(0,0,0,0.25)]">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <h2 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-3xl">
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {right}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -573,23 +610,27 @@ function KpiCard({
   return (
     <button
       onClick={onClick}
-      className="group rounded-3xl bg-slate-900/80 border border-slate-800 p-5 flex flex-col justify-between hover:border-emerald-400/70 hover:shadow-[0_0_30px_rgba(16,185,129,0.2)] transition text-left"
+      className="group rounded-3xl bg-slate-900/70 border border-slate-800 p-5 text-left transition
+      hover:border-emerald-400/50 hover:shadow-[0_0_34px_rgba(16,185,129,0.16)]"
     >
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-300">
           {titulo}
         </p>
         <span
-          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full text-slate-950 bg-gradient-to-r ${color} shadow-md`}
+          className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full text-slate-950 bg-gradient-to-r ${color} shadow`}
         >
           Ver gestión
         </span>
       </div>
+
       <div className="mt-4">
         <p className="text-4xl font-extrabold text-white leading-none">
           {valor}
         </p>
-        <p className="text-xs md:text-sm text-slate-300 mt-2">{descripcion}</p>
+        <p className="text-xs md:text-sm text-slate-300 mt-2">
+          {descripcion}
+        </p>
       </div>
     </button>
   )
@@ -607,17 +648,18 @@ function ServicioCard({
   tono: string
 }) {
   return (
-    <div
-      className={`rounded-2xl px-4 py-3 border ${tono} flex flex-col justify-between`}
-    >
+    <div className={`rounded-2xl px-4 py-3 border ${tono}`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold">{titulo}</span>
+        <span className="text-xs font-extrabold">{titulo}</span>
         <span className="text-2xl font-extrabold">{valor}</span>
       </div>
-      <span className="mt-1 text-[11px]">{subtitulo}</span>
+      <span className="mt-1 block text-[11px] font-semibold opacity-80">
+        {subtitulo}
+      </span>
     </div>
   )
 }
+
 
 function ResumenFila({
   titulo,
@@ -631,10 +673,12 @@ function ResumenFila({
   return (
     <div className="flex items-start justify-between gap-3 rounded-2xl bg-slate-950/70 border border-slate-800 px-4 py-3">
       <div className="flex-1">
-        <p className="text-xs font-semibold text-slate-50">{titulo}</p>
+        <p className="text-xs font-extrabold text-slate-50">{titulo}</p>
         <p className="text-[11px] text-slate-300 mt-0.5">{descripcion}</p>
       </div>
-      <p className="text-2xl font-extrabold text-emerald-300 ml-2">{valor}</p>
+      <p className="text-2xl font-extrabold text-emerald-300 ml-2">
+        {valor}
+      </p>
     </div>
   )
 }
