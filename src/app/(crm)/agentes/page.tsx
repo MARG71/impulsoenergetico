@@ -1,18 +1,5 @@
-"use client";
-
-import { Suspense } from "react";
-import AgenteContenido from "./AgenteContenido";
+import { redirect } from "next/navigation";
 
 export default function AgentePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">
-          Cargando panel del agente…
-        </div>
-      }
-    >
-      <AgenteContenido />
-    </Suspense>
-  );
+  redirect("/dashboard");
 }

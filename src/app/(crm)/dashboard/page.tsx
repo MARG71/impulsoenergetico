@@ -37,26 +37,23 @@ export default function DashboardPage() {
         setCargando(true);
 
         const res = await fetch("/api/dashboard");
-
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err?.error || "Error al cargar el dashboard");
+          throw new Error(err.error || "Error cargando dashboard");
         }
 
-        const json = await res.json().catch(() => ({}));
-        const data = json?.data || {};
+        const data = await res.json();
 
-        // Normalizamos todo para que nunca rompa aunque falten campos según rol
-        setLeads(Array.isArray(data.leads) ? data.leads : []);
-        setComparativas(Array.isArray(data.comparativas) ? data.comparativas : []);
-        setAgentes(Array.isArray(data.agentes) ? data.agentes : []);
-        setLugares(Array.isArray(data.lugares) ? data.lugares : []);
-        setOfertas(Array.isArray(data.ofertas) ? data.ofertas : []);
+        setComparativas(Array.isArray(data?.comparativas) ? data.comparativas : []);
+        setAgentes(Array.isArray(data?.agentes) ? data.agentes : []);
+        setLugares(Array.isArray(data?.lugares) ? data.lugares : []);
+        setLeads(Array.isArray(data?.leads) ? data.leads : []);
+        setOfertas(Array.isArray(data?.ofertas) ? data.ofertas : []);
 
         setError(null);
       } catch (err: any) {
         console.error("Error cargando datos:", err);
-        setError(err?.message || "Error al cargar datos del dashboard");
+        setError(err.message || "Error al cargar datos del dashboard");
       } finally {
         setCargando(false);
       }
@@ -64,6 +61,7 @@ export default function DashboardPage() {
 
     cargarDatos();
   }, []);
+
 
 
   const obtenerFecha = (item: any): Date | null => {

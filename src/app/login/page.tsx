@@ -12,6 +12,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
     const res = await signIn('credentials', {
       redirect: false,
@@ -21,28 +22,11 @@ export default function LoginPage() {
 
     if (res?.error) {
       setError('Credenciales incorrectas');
-    } else {
-      try {
-        const sessionRes = await fetch('/api/auth/session');
-        const sessionData = await sessionRes.json();
-        const role = sessionData?.user?.role;
-
-        console.log('🎯 Rol detectado en sesión:', role);
-
-        if (role === 'ADMIN') {
-          router.push('/pipeline-admin');
-        } else if (role === 'AGENTE') {
-          router.push('/agente');
-        } else if (role === 'LUGAR') {
-          router.push('/zona-lugar');
-        } else {
-          router.push('/unauthorized');
-        }
-      } catch (err) {
-        console.error('Error obteniendo sesión:', err);
-        router.push('/unauthorized');
-      }
+      return;
     }
+
+    // ✅ TODOS AL MISMO SITIO
+    router.push('/dashboard');
   };
 
   return (
@@ -82,7 +66,6 @@ export default function LoginPage() {
           Entrar
         </button>
 
-        {/* Bloque "¿Has olvidado tu contraseña?" dentro del formulario */}
         <p className="mt-3 text-[11px] text-slate-600 text-center">
           ¿Has olvidado tu contraseña?{' '}
           <button
