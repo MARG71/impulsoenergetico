@@ -34,43 +34,37 @@ export default function DashboardPage() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        setCargando(true)
-        const [resC, resA, resL, resLeads, resOfertas] = await Promise.all([
-          fetch('/api/comparativas'),
-          fetch('/api/agentes'),
-          fetch('/api/lugares'),
-          fetch('/api/leads'),
-          fetch('/api/ofertas'),
-        ])
+        setCargando(true);
 
-        if (!resC.ok || !resA.ok || !resL.ok || !resLeads.ok || !resOfertas.ok) {
-          throw new Error('Error al cargar alguna de las fuentes de datos')
+        const res = await fetch("/api/dashboard");
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error || "Error al cargar el dashboard");
         }
 
-        const [dataC, dataA, dataL, dataLeads, dataOfertas] = await Promise.all([
-          resC.json(),
-          resA.json(),
-          resL.json(),
-          resLeads.json(),
-          resOfertas.json(),
-        ])
+        const json = await res.json().catch(() => ({}));
+        const data = json?.data || {};
 
-        setComparativas(normalizarLista(dataC, 'comparativas'))
-        setAgentes(normalizarLista(dataA, 'agentes'))
-        setLugares(normalizarLista(dataL, 'lugares'))
-        setLeads(normalizarLista(dataLeads, 'leads'))
-        setOfertas(normalizarLista(dataOfertas, 'ofertas'))
-        setError(null)
+        // Normalizamos todo para que nunca rompa aunque falten campos según rol
+        setLeads(Array.isArray(data.leads) ? data.leads : []);
+        setComparativas(Array.isArray(data.comparativas) ? data.comparativas : []);
+        setAgentes(Array.isArray(data.agentes) ? data.agentes : []);
+        setLugares(Array.isArray(data.lugares) ? data.lugares : []);
+        setOfertas(Array.isArray(data.ofertas) ? data.ofertas : []);
+
+        setError(null);
       } catch (err: any) {
-        console.error('Error cargando datos:', err)
-        setError(err.message || 'Error al cargar datos del dashboard')
+        console.error("Error cargando datos:", err);
+        setError(err?.message || "Error al cargar datos del dashboard");
       } finally {
-        setCargando(false)
+        setCargando(false);
       }
-    }
+    };
 
-    cargarDatos()
-  }, [])
+    cargarDatos();
+  }, []);
+
 
   const obtenerFecha = (item: any): Date | null => {
     const raw =
