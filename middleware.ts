@@ -5,7 +5,7 @@ import { getToken } from 'next-auth/jwt'
 
 // 🔹 Rutas que forman parte del CRM (solo ADMIN y AGENTE)
 const ADMIN_OR_AGENT_PATHS = [
-  '/dashboard',
+
   '/agentes',
   '/lugares',
   '/leads',
@@ -52,6 +52,12 @@ export async function middleware(req: NextRequest) {
 
   const role = token.role as 'ADMIN' | 'AGENTE' | 'LUGAR' | undefined
 
+  // ✅ /dashboard: cualquier rol autenticado
+  if (path === '/dashboard' || path.startsWith('/dashboard/')) {
+    return NextResponse.next();
+  }
+
+
   // Helpers para saber qué tipo de ruta es
   const isAdminOrAgentPath = ADMIN_OR_AGENT_PATHS.some(
     (p) => path === p || path.startsWith(`${p}/`)
@@ -86,17 +92,21 @@ export async function middleware(req: NextRequest) {
 }
 
 // 👇 Aquí marcamos qué rutas pasan por el middleware
+// 👇 Aquí marcamos qué rutas pasan por el middleware
 export const config = {
   matcher: [
-    '/dashboard/:path*',
-    '/agentes/:path*',
-    '/lugares/:path*',
-    '/leads/:path*',
-    '/fondos/:path*',
-    '/productos-ganaderos/:path*',
-    '/ofertas/:path*',
-    '/configuracion/:path*',
-    '/zona-lugar/:path*',
+    // Todo lo que NO sea:
+    // - /api
+    // - estáticos de Next
+    // - favicon
+    // - tu logo
+    // - login
+    // - unauthorized
+    // - bienvenida (pública)
+    // - registro (pública)
+    '/((?!api|api/solicitudes-contrato|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro|contratar).*)',
+
   ],
+
 
 }
