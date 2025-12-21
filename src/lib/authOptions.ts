@@ -1,5 +1,4 @@
 // src/lib/authOptions.ts
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
@@ -7,11 +6,9 @@ import bcrypt from "bcryptjs";
 import type { JWT } from "next-auth/jwt";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-  },
+  pages: { signIn: "/login" },
+
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -20,55 +17,68 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
+        if (!credentials?.email || !credentials?.password) return null;
 
-        // Normalizar email
         const email = credentials.email.toString().trim().toLowerCase();
 
-        // Buscar usuario en la tabla Usuario
+        // ✅ seleccionamos solo lo necesario (y añadimos adminId)
         const user = await prisma.usuario.findUnique({
           where: { email },
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+            password: true,
+            rol: true,
+            adminId: true,
+            agenteId: true,
+            lugarId: true,
+          },
         });
 
-        if (!user || !user.password) return null;
+        if (!user?.password) return null;
 
         const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return null;
 
-        // Lo que devolvemos aquí se mete en `user` dentro del callback jwt
+        // ✅ IMPORTANTÍSIMO: devolver id como number + adminId
         return {
-          id: user.id.toString(),
+          id: user.id,
           name: user.nombre,
           email: user.email,
-          role: user.rol,
-          agenteId: user.agenteId,
-          lugarId: user.lugarId,
-        };
+          role: user.rol,           // SUPERADMIN | ADMIN | AGENTE | LUGAR | CLIENTE
+          adminId: user.adminId ?? null,
+          agenteId: user.agenteId ?? null,
+          lugarId: user.lugarId ?? null,
+        } as any;
       },
     }),
   ],
+
   callbacks: {
     async jwt({ token, user }) {
-      // user viene de authorize la primera vez
       if (user) {
         const u = user as any;
-        (token as JWT & any).id = u.id;
+        (token as JWT & any).id = u.id;                 // number
         (token as JWT & any).role = u.role;
-        (token as JWT & any).agenteId = u.agenteId;
-        (token as JWT & any).lugarId = u.lugarId;
+        (token as JWT & any).adminId = u.adminId ?? null;
+        (token as JWT & any).agenteId = u.agenteId ?? null;
+        (token as JWT & any).lugarId = u.lugarId ?? null;
       }
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = (token as any).id?.toString();
+        (session.user as any).id = (token as any).id;                 // number
         (session.user as any).role = (token as any).role;
-        (session.user as any).agenteId = (token as any).agenteId;
-        (session.user as any).lugarId = (token as any).lugarId;
+        (session.user as any).adminId = (token as any).adminId ?? null;
+        (session.user as any).agenteId = (token as any).agenteId ?? null;
+        (session.user as any).lugarId = (token as any).lugarId ?? null;
       }
       return session;
     },
   },
+
+  secret: process.env.NEXTAUTH_SECRET,
 };

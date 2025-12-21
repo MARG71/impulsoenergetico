@@ -1291,10 +1291,10 @@ export default function BienvenidaContenido() {
     );
   };
 
-    // Nombre que vamos a enseñar en la cabecera:
-  // 1º el que venga de la URL (`nombre`)
-  // 2º si no, el del formulario / localStorage (`formNombre`)
-  const nombreParaMostrar = nombre || formNombre || null;
+  // Nombre que mostraremos en la cabecera del Hero:
+  // 1º el que venga en la URL (?nombre=...)
+  // 2º si no, el que tengamos en el formulario / localStorage
+  const nombreParaMostrar = (nombre || formNombre || "").trim() || null;
 
 
 

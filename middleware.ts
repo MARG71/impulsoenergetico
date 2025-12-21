@@ -2,16 +2,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PUBLIC_PATHS = ["/login", "/unauthorized", "/bienvenida", "/registro", "/contratar"];
+type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+
+// ✅ Rutas públicas (no requieren sesión)
+const PUBLIC_PREFIX = ["/login", "/unauthorized", "/bienvenida", "/registro", "/contratar"];
 
 // ✅ Dashboard común (cualquier rol autenticado)
-const DASHBOARD_COMMON_PREFIX = ["/dashboard"];
+const DASHBOARD_PREFIX = ["/dashboard"];
 
-// ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN para poder revisar si quieres
+// ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN por si quieres revisar
 const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
 
-// ✅ CRM solo ADMIN/AGENTE/SUPERADMIN
-const ADMIN_OR_AGENT_PATHS = [
+// ✅ Rutas SOLO ADMIN/SUPERADMIN
+const ADMIN_ONLY_PREFIX = [
+  "/crear-usuario",
+  "/dashboard/comisiones",
+  "/lugares/fondos",
+];
+
+// ✅ CRM (ADMIN/AGENTE/SUPERADMIN)
+// ⚠️ Ojo: NO metas aquí rutas que ya estén en ADMIN_ONLY_PREFIX
+const CRM_PREFIX = [
   "/pipeline-agentes",
   "/agentes",
   "/lugares",
@@ -23,23 +34,19 @@ const ADMIN_OR_AGENT_PATHS = [
   "/comparador",
 ];
 
-// ✅ Rutas SOLO ADMIN/SUPERADMIN (si quieres refinar más aún)
-const ADMIN_ONLY_PREFIX = [
-  "/dashboard/comisiones",
-  "/crear-usuario",
-  "/productos-ganaderos",
-  "/ofertas",
-  "/agentes",
-  "/lugares/fondos",
-];
+function matchesPrefix(path: string, prefixes: string[]) {
+  return prefixes.some((p) => path === p || path.startsWith(p + "/"));
+}
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // Público
-  if (PUBLIC_PATHS.includes(path)) return NextResponse.next();
+  // ✅ 1) Público
+  if (matchesPrefix(path, PUBLIC_PREFIX)) {
+    return NextResponse.next();
+  }
 
-  // Token
+  // ✅ 2) Token
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
@@ -49,44 +56,43 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const role = token.role as "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | undefined;
-  const isAdmin = role === "ADMIN" || role === "SUPERADMIN";
+  const role = (token as any).role as Role | undefined;
+
+  const isSuperadmin = role === "SUPERADMIN";
+  const isAdmin = role === "ADMIN";
   const isAgente = role === "AGENTE";
   const isLugar = role === "LUGAR";
+  // const isCliente = role === "CLIENTE";
 
-  // ✅ Dashboard común para TODOS los roles autenticados
-  if (DASHBOARD_COMMON_PREFIX.some((p) => path === p || path.startsWith(p + "/"))) {
+  // ✅ 3) Dashboard (TODOS autenticados)
+  if (matchesPrefix(path, DASHBOARD_PREFIX)) {
     return NextResponse.next();
   }
 
-  // ✅ Admin-only (si coincide)
-  if (ADMIN_ONLY_PREFIX.some((p) => path === p || path.startsWith(p + "/"))) {
-    if (!isAdmin) return NextResponse.redirect(new URL("/unauthorized", req.url));
-    return NextResponse.next();
-  }
-
-  // ✅ Zona Lugar
-  if (ZONA_LUGAR_PREFIX.some((p) => path === p || path.startsWith(p + "/"))) {
-    if (isLugar || isAdmin || isAgente) return NextResponse.next();
+  // ✅ 4) Admin-only
+  if (matchesPrefix(path, ADMIN_ONLY_PREFIX)) {
+    if (isSuperadmin || isAdmin) return NextResponse.next();
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ CRM Admin/Agente
-  const isAdminOrAgentPath = ADMIN_OR_AGENT_PATHS.some(
-    (p) => path === p || path.startsWith(`${p}/`)
-  );
-
-  if (isAdminOrAgentPath) {
-    if (isAdmin || isAgente) return NextResponse.next();
+  // ✅ 5) Zona Lugar
+  if (matchesPrefix(path, ZONA_LUGAR_PREFIX)) {
+    if (isLugar || isSuperadmin || isAdmin || isAgente) return NextResponse.next();
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ Resto: autenticado = OK
+  // ✅ 6) CRM (Admin/Agente/Superadmin)
+  if (matchesPrefix(path, CRM_PREFIX)) {
+    if (isSuperadmin || isAdmin || isAgente) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
+  }
+
+  // ✅ 7) Resto: autenticado = OK
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/((?!api|api/solicitudes-contrato|_next/static|_next/image|favicon.ico|logo-impulso.jpeg|login|unauthorized|bienvenida|registro|contratar).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|logo-impulso.jpeg).*)",
   ],
 };

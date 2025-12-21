@@ -12,17 +12,24 @@ enum Rol {
   ADMIN
   AGENTE
   LUGAR
+  CLIENTE
 }
 
-
 model Cliente {
-  id           Int           @id @default(autoincrement())
-  nombre       String
-  direccion    String
-  email        String?       @unique
-  telefono     String?
-  comparativas Comparativa[]
-  contratos    Contrato[]
+  id              Int           @id @default(autoincrement())
+  nombre          String
+  direccion       String
+  email           String?       @unique
+  telefono        String?
+  comparativas    Comparativa[]
+  contratos       Contrato[]
+  ocultoParaAdmin Boolean       @default(false)
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminClientes", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model Comparativa {
@@ -44,7 +51,6 @@ model Comparativa {
   excedenteAnualKwh Float?
   excedenteTarifaId Int?
 
-  // Snapshots opcionales (recomendado para mantener histórico coherente)
   excedentePrecioKwhSnap Decimal? @db.Decimal(10, 6)
   excedenteTipoSnap      String?
 
@@ -54,11 +60,15 @@ model Comparativa {
   datosFactura DatosFactura?
   resultados   ResultadoComparativa[]
 
-  // ✅ relación a catálogo de excedentes
   excedenteTarifa SolarExcedenteTarifa? @relation(fields: [excedenteTarifaId], references: [id])
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminComparativas", fields: [adminId], references: [id])
 
   @@index([tieneSolar])
   @@index([excedenteTarifaId])
+  @@index([adminId])
 }
 
 model ResultadoComparativa {
@@ -84,6 +94,12 @@ model Contrato {
 
   cliente Cliente @relation(fields: [clienteId], references: [id])
   agente  Agente? @relation(fields: [agenteId], references: [id])
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminContratos", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model Agente {
@@ -92,7 +108,6 @@ model Agente {
   email    String  @unique
   telefono String?
 
-  // % del REMANENTE para el Agente (0..1). Si es null, se usan defaults/overrides.
   pctAgente Decimal? @db.Decimal(5, 4)
 
   contratos    Contrato[]
@@ -103,7 +118,14 @@ model Agente {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
-  creadoEn DateTime @default(now())
+  creadoEn        DateTime @default(now())
+  ocultoParaAdmin Boolean  @default(false)
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminAgentes", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model Lugar {
@@ -113,9 +135,7 @@ model Lugar {
   qrCode    String @unique
   agenteId  Int
 
-  // % del POOL para el Cliente (0..1). Si es null, se usan defaults/overrides.
   pctCliente Decimal? @db.Decimal(5, 4)
-  // % del REMANENTE para el Lugar (0..1). Si es null, se usan defaults/overrides.
   pctLugar   Decimal? @db.Decimal(5, 4)
 
   agente       Agente             @relation(fields: [agenteId], references: [id])
@@ -127,20 +147,24 @@ model Lugar {
 
   creadoEn DateTime @default(now())
 
-  // --- Personalización landing ---
   especial        Boolean @default(false)
   especialLogoUrl String?
   especialColor   String?
   especialMensaje String?
 
-  // --- Métrica para el contador de la landing ---
-  aportacionAcumulada Int @default(0) // en euros
+  aportacionAcumulada Int @default(0)
 
-  // NUEVO: cartel individual para lugares especiales
   especialCartelUrl String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) // <- PASO 1: poner default inicial (SIN @updatedAt aún)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+  ocultoParaAdmin Boolean  @default(false)
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminLugares", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model QR {
@@ -151,6 +175,12 @@ model QR {
 
   lugar  Lugar   @relation(fields: [lugarId], references: [id])
   agente Agente? @relation(fields: [agenteId], references: [id])
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminQRs", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model Usuario {
@@ -159,11 +189,35 @@ model Usuario {
   email    String @unique
   password String
   rol      Rol    @default(LUGAR)
+
+  // relación operativa
   agenteId Int?
   lugarId  Int?
 
   agente Agente? @relation(fields: [agenteId], references: [id])
   lugar  Lugar?  @relation(fields: [lugarId], references: [id])
+
+  // ✅ MULTI-ADMIN (TENANT)
+  // Para AGENTE/LUGAR/CLIENTE: adminId apunta al ADMIN dueño.
+  // Para ADMIN: puede ir null (y en código el tenantId = user.id).
+  // Para SUPERADMIN: null.
+  adminId  Int?
+  admin    Usuario?  @relation("AdminUsuarios", fields: [adminId], references: [id])
+  usuarios Usuario[] @relation("AdminUsuarios")
+
+  // ✅ relaciones “dueño” (para consultar todo por admin fácilmente)
+  agentesGestionados      Agente[]            @relation("AdminAgentes")
+  lugaresGestionados      Lugar[]             @relation("AdminLugares")
+  clientesGestionados     Cliente[]           @relation("AdminClientes")
+  comparativasGestionadas Comparativa[]       @relation("AdminComparativas")
+  leadsGestionados        Lead[]              @relation("AdminLeads")
+  qrsGestionados          QR[]                @relation("AdminQRs")
+  contratosGestionados    Contrato[]          @relation("AdminContratos")
+  ofertasGestionadas      Oferta[]            @relation("AdminOfertas")
+  productosGestionados    ProductoGanadero[]  @relation("AdminProductos")
+  solicitudesGestionadas  SolicitudContrato[] @relation("AdminSolicitudes")
+
+  @@index([adminId])
 }
 
 model Lead {
@@ -179,6 +233,12 @@ model Lead {
 
   agenteId Int?
   agente   Agente? @relation(fields: [agenteId], references: [id])
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminLeads", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model DatosFactura {
@@ -231,24 +291,25 @@ model ConfiguracionGlobal {
   fondoCartelUrl String
 }
 
-// ======================
-// Ofertas (marketing)
-// ======================
 model Oferta {
   id               Int      @id @default(autoincrement())
   titulo           String
   descripcion      String
   descripcionCorta String?
-  tipo             String // 'luz' | 'gas' | 'telefonia'
+  tipo             String
   destacada        Boolean  @default(false)
   activa           Boolean  @default(true)
   creadaEn         DateTime @default(now())
 
-  // Enlace opcional al catálogo (si esta oferta nace de una tarifa)
   ofertaTarifaId Int?
   ofertaTarifa   OfertaTarifa? @relation("TarifaAOferta", fields: [ofertaTarifaId], references: [id])
 
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminOfertas", fields: [adminId], references: [id])
+
   @@index([ofertaTarifaId])
+  @@index([adminId])
 }
 
 model ProductoGanadero {
@@ -264,6 +325,12 @@ model ProductoGanadero {
   imagenUrl   String
   activo      Boolean  @default(true)
   creadoEn    DateTime @default(now())
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminProductos", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 /**
@@ -310,9 +377,6 @@ model ComisionOverride {
   @@map("comision_override")
 }
 
-// ======================
-// Catálogo de tarifas
-// ======================
 enum TipoOferta {
   LUZ
   GAS
@@ -336,7 +400,6 @@ model OfertaTarifa {
   activa           Boolean    @default(true)
   destacada        Boolean    @default(false)
 
-  // ENERGÍA (€/kWh)
   precioKwhP1 Decimal? @db.Decimal(10, 6)
   precioKwhP2 Decimal? @db.Decimal(10, 6)
   precioKwhP3 Decimal? @db.Decimal(10, 6)
@@ -344,7 +407,6 @@ model OfertaTarifa {
   precioKwhP5 Decimal? @db.Decimal(10, 6)
   precioKwhP6 Decimal? @db.Decimal(10, 6)
 
-  // POTENCIA (€/kW·año)
   precioPotenciaP1 Decimal? @db.Decimal(10, 6)
   precioPotenciaP2 Decimal? @db.Decimal(10, 6)
   precioPotenciaP3 Decimal? @db.Decimal(10, 6)
@@ -361,7 +423,6 @@ model OfertaTarifa {
   tramos  OfertaTarifaTramo[]
   ofertas Oferta[]            @relation("TarifaAOferta")
 
-  // ✅ NUEVO: configuración solar por tarifa base
   solarConfigBase     OfertaTarifaSolarConfig?  @relation("SolarBase")
   solarConfigEspecial OfertaTarifaSolarConfig[] @relation("SolarEspecial")
 
@@ -424,6 +485,12 @@ model SolicitudContrato {
   nombreTarifa String?
 
   archivos SolicitudContratoArchivo[]
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminSolicitudes", fields: [adminId], references: [id])
+
+  @@index([adminId])
 }
 
 model SolicitudContratoArchivo {
@@ -441,9 +508,6 @@ model SolicitudContratoArchivo {
   solicitud SolicitudContrato @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 }
 
-// ======================
-// ✅ SOLAR / EXCEDENTES
-// ======================
 enum TipoCompensacionExcedente {
   COMPENSACION
   BATERIA_VIRTUAL
@@ -475,9 +539,6 @@ model SolarExcedenteTarifa {
   @@index([compania])
 }
 
-// ======================
-// ✅ CONFIG SOLAR POR TARIFA (NUEVO)
-// ======================
 enum ModoSolarTarifa {
   MISMA_TARIFA
   TARIFA_SOLAR_ESPECIAL
@@ -486,17 +547,14 @@ enum ModoSolarTarifa {
 model OfertaTarifaSolarConfig {
   id Int @id @default(autoincrement())
 
-  // Tarifa base del catálogo
   ofertaTarifaBaseId Int
   ofertaTarifaBase   OfertaTarifa @relation("SolarBase", fields: [ofertaTarifaBaseId], references: [id], onDelete: Cascade)
 
   modo ModoSolarTarifa @default(MISMA_TARIFA)
 
-  // Si modo = TARIFA_SOLAR_ESPECIAL, esta apunta a la tarifa/anexo solar específico
   ofertaTarifaSolarId Int?
   ofertaTarifaSolar   OfertaTarifa? @relation("SolarEspecial", fields: [ofertaTarifaSolarId], references: [id])
 
-  // Compensación/pago por excedente (para ambos modos)
   excedenteTarifaId Int?
   excedenteTarifa   SolarExcedenteTarifa? @relation(fields: [excedenteTarifaId], references: [id])
 

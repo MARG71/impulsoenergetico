@@ -214,7 +214,8 @@ export default function DashboardPage() {
   return (
     <CRMClienteLayout>
       <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="w-full max-w-[1600px] mx-auto space-y-6">
+
           {/* CABECERA */}
           <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-fuchsia-500/20 via-amber-400/10 to-emerald-400/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.45)]">
             <div className="rounded-3xl bg-slate-950/95 px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">

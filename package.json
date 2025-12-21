@@ -8,7 +8,11 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "deploy": "git add . && git commit -m \"deploy automático\" && git push",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed": "node prisma/seed.mjs"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
