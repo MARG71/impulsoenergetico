@@ -1,59 +1,46 @@
 // ✅ src/app/(crm)/CRMClienteLayout.tsx
-'use client'
+'use client';
 
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Toaster } from "sonner";
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: string;
-  roles?: Array<"ADMIN" | "AGENTE" | "LUGAR">;
-};
+import { MENU_BY_ROLE, type Role, type MenuItem } from "@/lib/menuConfig";
 
 function cx(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function groupLabel(g: MenuItem["group"]) {
+  if (g === "PRINCIPAL") return "Principal";
+  if (g === "GESTION") return "Gestión";
+  if (g === "AVANZADO") return "Avanzado";
+  return "Superadmin";
+}
+
 export default function CRMClienteLayout({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
 
-  const role = (session?.user as any)?.role as "ADMIN" | "AGENTE" | "LUGAR" | undefined;
-  const esAdmin = role === "ADMIN";
+  const role = (session?.user as any)?.role as Role | undefined;
 
   const nombre = session?.user?.name || "Usuario Impulso";
   const rolLabel =
-    role === "ADMIN" ? "Administrador" : role === "AGENTE" ? "Agente" : role === "LUGAR" ? "Lugar" : "";
+    role === "SUPERADMIN" ? "Superadmin"
+    : role === "ADMIN" ? "Administrador"
+    : role === "AGENTE" ? "Agente"
+    : role === "LUGAR" ? "Lugar"
+    : "";
 
-  const navPrincipal: NavItem[] = [
-    { href: "/dashboard", label: "Dashboard", icon: "📊", roles: ["ADMIN", "AGENTE", "LUGAR"] },
-    { href: "/pipeline-agentes", label: "Pipeline", icon: "🧩", roles: ["ADMIN", "AGENTE"] },
-    { href: "/zona-lugar", label: "Mi zona", icon: "🏪", roles: ["LUGAR"] },
-    { href: "/dashboard/historial", label: "Historial comparativas", icon: "📂", roles: ["ADMIN", "AGENTE", "LUGAR"] },
-    { href: "/comparador", label: "Comparador", icon: "🧮", roles: ["ADMIN", "AGENTE"] },
-  ];
+  const menu = role ? MENU_BY_ROLE[role] : [];
 
-  const navGestion: NavItem[] = [
-    { href: "/agentes", label: "Agentes", icon: "👤", roles: ["ADMIN"] },
-    { href: "/lugares", label: "Lugares", icon: "📍", roles: ["ADMIN", "AGENTE"] },
-    { href: "/lugares/fondos", label: "Fondos carteles", icon: "🖼️", roles: ["ADMIN"] },
-    { href: "/ofertas", label: "Ofertas", icon: "📢", roles: ["ADMIN"] },
-  ];
+  const grouped = menu.reduce<Record<string, MenuItem[]>>((acc, item) => {
+    (acc[item.group] ||= []).push(item);
+    return acc;
+  }, {});
 
-  const navExtra: NavItem[] = [
-    { href: "/dashboard/comisiones/defaults", label: "Defaults comisión", icon: "⚖️", roles: ["ADMIN"] },
-    { href: "/productos-ganaderos", label: "Productos ganaderos", icon: "🐄", roles: ["ADMIN"] },
-    { href: "/crear-usuario", label: "Crear acceso usuario", icon: "🔐", roles: ["ADMIN"] },
-  ];
-
-  const filtrar = (items: NavItem[]) =>
-    items.filter((i) => !i.roles || (role && i.roles.includes(role)));
-
-  const Item = ({ href, label, icon }: NavItem) => {
+  const Item = ({ href, label, icon }: MenuItem) => {
     const activo = pathname === href || pathname.startsWith(href + "/");
     return (
       <Link
@@ -64,18 +51,32 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
             ? "bg-white/12 border border-white/15 shadow-[0_0_24px_rgba(255,255,255,0.06)]"
             : "hover:bg-white/10"
         )}
-
       >
         <span className={cx("text-[18px]", activo ? "" : "opacity-90")}>{icon}</span>
-
-        <span className={cx("truncate font-extrabold", activo ? "text-yellow-200" : "text-white/90 group-hover:text-white")}>
-
+        <span
+          className={cx(
+            "truncate font-extrabold",
+            activo ? "text-yellow-200" : "text-white/90 group-hover:text-white"
+          )}
+        >
           {label}
         </span>
         {activo && <span className="ml-auto text-[10px] text-white/60">●</span>}
       </Link>
     );
   };
+
+  // Mientras carga sesión, evitamos flicker de menú
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900" />
+    );
+  }
+
+  // Si no hay sesión, renderiza children (middleware debería mandar a /login)
+  if (!session || !role) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
@@ -100,10 +101,10 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
             <div className="text-white text-[16px] font-extrabold leading-tight">{nombre}</div>
 
             <div className="mt-2 inline-flex items-center gap-2 text-[13px] font-bold">
-
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.6)]" />
-              <span className="text-white/85 font-extrabold uppercase tracking-wide">{rolLabel}</span>
-
+              <span className="text-white/85 font-extrabold uppercase tracking-wide">
+                {rolLabel}
+              </span>
             </div>
 
             <div className="mt-3 flex gap-2">
@@ -111,7 +112,6 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
                 type="button"
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex-1 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-[13px] font-extrabold text-white transition"
-
               >
                 Cerrar sesión
               </button>
@@ -119,7 +119,6 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
               <Link
                 href="/dashboard"
                 className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition shadow-[0_0_18px_rgba(16,185,129,0.35)]"
-
                 title="Ir al dashboard"
               >
                 Ir
@@ -129,55 +128,32 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
 
           {/* Navegación */}
           <nav className="mt-5 space-y-5">
-            <div>
-              <div className="px-2 text-[12px] font-extrabold uppercase tracking-widest text-white/70 mb-2">
+            {(["PRINCIPAL", "GESTION", "AVANZADO", "SUPERADMIN"] as const).map((g) => {
+              const items = grouped[g];
+              if (!items || items.length === 0) return null;
 
-                Principal
-              </div>
-              <div className="space-y-1">
-                {filtrar(navPrincipal).map((i) => (
-                  <Item key={i.href} {...i} />
-                ))}
-              </div>
-            </div>
-
-            {(esAdmin || role === "AGENTE") && (
-              <div>
-                <div className="px-2 text-[11px] uppercase tracking-wider text-white/60 mb-2">
-                  Gestión
+              return (
+                <div key={g}>
+                  <div className="px-2 text-[12px] font-extrabold uppercase tracking-widest text-white/70 mb-2">
+                    {groupLabel(g)}
+                  </div>
+                  <div className="space-y-1">
+                    {items.map((i) => (
+                      <Item key={i.href} {...i} />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  {filtrar(navGestion).map((i) => (
-                    <Item key={i.href} {...i} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {esAdmin && (
-              <div>
-                <div className="px-2 text-[11px] uppercase tracking-wider text-white/60 mb-2">
-                  Avanzado
-                </div>
-                <div className="space-y-1">
-                  {filtrar(navExtra).map((i) => (
-                    <Item key={i.href} {...i} />
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })}
           </nav>
 
           <div className="mt-6 px-2 text-[12px] font-bold text-white/55">
-
             IMPULSO ENERGÉTICO · CRM
           </div>
         </aside>
 
         {/* CONTENIDO */}
-        <main className="flex-1 p-6">
-          {children}
-        </main>
+        <main className="flex-1 p-6">{children}</main>
 
         <Toaster richColors position="top-center" />
       </div>

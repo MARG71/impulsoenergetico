@@ -1,4 +1,4 @@
-// middleware.ts
+// src/middleware.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
@@ -13,6 +13,9 @@ const DASHBOARD_PREFIX = ["/dashboard"];
 // ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN por si quieres revisar
 const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
 
+// ✅ SOLO SUPERADMIN
+const SUPERADMIN_ONLY_PREFIX = ["/admins"];
+
 // ✅ Rutas SOLO ADMIN/SUPERADMIN
 const ADMIN_ONLY_PREFIX = [
   "/crear-usuario",
@@ -21,7 +24,7 @@ const ADMIN_ONLY_PREFIX = [
 ];
 
 // ✅ CRM (ADMIN/AGENTE/SUPERADMIN)
-// ⚠️ Ojo: NO metas aquí rutas que ya estén en ADMIN_ONLY_PREFIX
+// ⚠️ Ojo: NO metas aquí rutas que ya estén en ADMIN_ONLY_PREFIX o SUPERADMIN_ONLY_PREFIX
 const CRM_PREFIX = [
   "/pipeline-agentes",
   "/agentes",
@@ -67,6 +70,12 @@ export async function middleware(req: NextRequest) {
   // ✅ 3) Dashboard (TODOS autenticados)
   if (matchesPrefix(path, DASHBOARD_PREFIX)) {
     return NextResponse.next();
+  }
+
+  // ✅ 3.5) Superadmin-only
+  if (matchesPrefix(path, SUPERADMIN_ONLY_PREFIX)) {
+    if (isSuperadmin) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
   // ✅ 4) Admin-only
