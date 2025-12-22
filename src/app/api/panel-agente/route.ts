@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
     const role = (token as any)?.role ?? null;
+
     if (!token || role !== "AGENTE") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }

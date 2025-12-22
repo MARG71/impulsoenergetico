@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Toaster } from "sonner";
 import { MENU_BY_ROLE, type Role, type MenuItem } from "@/lib/menuConfig";
@@ -22,6 +22,8 @@ function groupLabel(g: MenuItem["group"]) {
 export default function CRMClienteLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const role = (session?.user as any)?.role as Role | undefined;
 
@@ -32,6 +34,24 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
     : role === "AGENTE" ? "Agente"
     : role === "LUGAR" ? "Lugar"
     : "";
+
+  // ✅ tenantMode: solo para SUPERADMIN cuando hay ?adminId=
+  const adminIdParam = searchParams?.get("adminId");
+  const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
+  const tenantMode =
+    role === "SUPERADMIN" &&
+    Number.isFinite(adminIdContext) &&
+    (adminIdContext as number) > 0;
+
+  // ✅ si estamos en modo tenant, añadimos adminId a TODAS las rutas internas del menú
+  const withTenant = (href: string) => {
+    if (!tenantMode) return href;
+    if (!href.startsWith("/")) return href;
+    if (href.startsWith("/login") || href.startsWith("/unauthorized")) return href;
+
+    const hasQuery = href.includes("?");
+    return `${href}${hasQuery ? "&" : "?"}adminId=${adminIdContext}`;
+  };
 
   const menu = role ? MENU_BY_ROLE[role] : [];
 
@@ -44,7 +64,7 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
     const activo = pathname === href || pathname.startsWith(href + "/");
     return (
       <Link
-        href={href}
+        href={withTenant(href)}
         className={cx(
           "group flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-extrabold transition",
           activo
@@ -66,14 +86,12 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
     );
   };
 
-  // Mientras carga sesión, evitamos flicker de menú
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900" />
     );
   }
 
-  // Si no hay sesión, renderiza children (middleware debería mandar a /login)
   if (!session || !role) {
     return <>{children}</>;
   }
@@ -96,6 +114,35 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
             </div>
           </div>
 
+          {/* ✅ BANDA MODO TENANT */}
+          {tenantMode && (
+            <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
+              <div className="text-emerald-200 text-[12px] font-extrabold uppercase tracking-wider">
+                Modo tenant
+              </div>
+              <div className="text-white font-extrabold mt-1">
+                Viendo como Admin #{adminIdContext}
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/admins")}
+                  className="flex-1 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-[13px] font-extrabold text-white transition"
+                >
+                  Cambiar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/dashboard")}
+                  className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
+                >
+                  Salir
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Usuario */}
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
             <div className="text-white text-[16px] font-extrabold leading-tight">{nombre}</div>
@@ -117,7 +164,7 @@ export default function CRMClienteLayout({ children }: { children: React.ReactNo
               </button>
 
               <Link
-                href="/dashboard"
+                href={withTenant("/dashboard")}
                 className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition shadow-[0_0_18px_rgba(16,185,129,0.35)]"
                 title="Ir al dashboard"
               >
