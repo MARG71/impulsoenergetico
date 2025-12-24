@@ -44,8 +44,15 @@ export async function getTenantContext(req: NextRequest) {
     agenteId,
     lugarId,
     tokenAdminId,
-  };
-}
+
+    // ✅ Flags de conveniencia (para compatibilidad con tus rutas)
+    isSuperadmin: role === "SUPERADMIN",
+    isAdmin: role === "ADMIN",
+    isAgente: role === "AGENTE",
+    isLugar: role === "LUGAR",
+    isCliente: role === "CLIENTE",
+    };
+
 
 export function requireRoles(role: Rol, allowed: Rol[]) {
   return allowed.includes(role);

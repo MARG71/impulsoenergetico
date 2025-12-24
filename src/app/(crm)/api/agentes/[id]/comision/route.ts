@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
+const normPct01 = (v: any) => {
+  if (v === undefined || v === null || v === "") return undefined;
+  const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
+  if (Number.isNaN(n)) return undefined;
+  const p = n > 1 ? n / 100 : n; // 15 -> 0.15
+  return Math.max(0, Math.min(1, p));
+};
+
 export async function PUT(req: NextRequest, ctx: any) {
   const id = Number(ctx.params.id);
   if (Number.isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
@@ -15,19 +23,35 @@ export async function PUT(req: NextRequest, ctx: any) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const existe = await prisma.agente.findFirst({
-    where: tenantAdminId ? { id, adminId: tenantAdminId } : { id },
-    select: { id: true },
-  });
-  if (!existe) return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+  // SUPERADMIN global: obligamos a especificar tenant si quieres modificar
+  if (isSuperadmin && !tenantAdminId) {
+    return NextResponse.json(
+      { error: "SUPERADMIN debe indicar ?adminId=... para operar en un tenant" },
+      { status: 400 }
+    );
+  }
 
   const body = await req.json();
-  const data: any = {};
-  if (body.pctAgente !== undefined) data.pctAgente = body.pctAgente; // 0..1
+  const pctAgente = normPct01(body?.pctAgente);
+  if (pctAgente === undefined) {
+    return NextResponse.json({ error: "pctAgente inválido" }, { status: 400 });
+  }
 
-  const updated = await prisma.agente.update({
-    where: { id },
-    data,
+  // 🔒 Update seguro por tenant
+  const where: any = { id };
+  if (tenantAdminId) where.adminId = tenantAdminId;
+
+  const res = await prisma.agente.updateMany({
+    where,
+    data: { pctAgente },
+  });
+
+  if (res.count === 0) {
+    return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
+  }
+
+  const updated = await prisma.agente.findFirst({
+    where,
     select: { id: true, nombre: true, pctAgente: true, adminId: true },
   });
 
