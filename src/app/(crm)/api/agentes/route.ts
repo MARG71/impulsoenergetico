@@ -1,63 +1,46 @@
 // src/app/(crm)/api/agentes/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// src/app/(crm)/api/agentes/route.ts
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { sendAccessEmail } from "@/lib/sendAccessEmail";
-import { getTenantContext } from "@/lib/tenant";
-
-export const runtime = "nodejs";
+import { getTenantContext, requireRoles } from "@/lib/tenant";
 
 const normPct = (v: any) => {
   if (v === undefined || v === null || v === "") return undefined;
   const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
   if (Number.isNaN(n)) return undefined;
-  return n > 1 ? n / 100 : n; // 15 -> 0.15
+  return n > 1 ? n / 100 : n;
 };
 
-// GET /api/agentes?take=6&skip=0&q=texto&adminId=1 (solo SUPERADMIN)
-export async function GET(req: NextRequest) {
+// GET /api/agentes?take=6&skip=0&q=texto
+export async function GET(req: Request) {
   try {
-    const ctx = await getTenantContext(req);
+    const ctx = await getTenantContext(req as any);
     if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-    const { role, tenantAdminId, isSuperadmin, isAdmin, isAgente } = ctx;
-
-    // ✅ Permisos:
-    // SUPERADMIN: global o tenant
-    // ADMIN: solo su tenant
-    // AGENTE: puede listar SOLO su propio agente (para no romper su panel)
-    if (!(isSuperadmin || isAdmin || isAgente)) {
+    // Solo ADMIN y SUPERADMIN (y superadmin global/tenant)
+    if (!requireRoles(ctx.role, ["ADMIN", "SUPERADMIN"])) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { searchParams } = req.nextUrl;
-    const take = Number(searchParams.get("take") ?? 50);
+    const { searchParams } = new URL(req.url);
+    const take = Number(searchParams.get("take") ?? 6);
     const skip = Number(searchParams.get("skip") ?? 0);
     const q = searchParams.get("q")?.trim() ?? "";
 
-    let where: Prisma.AgenteWhereInput = {};
+    const where: Prisma.AgenteWhereInput = {};
 
-    // ✅ Tenant filter (si tenantAdminId existe)
-    if (tenantAdminId) where.adminId = tenantAdminId;
-
-    // ✅ Si es AGENTE, solo su agenteId (y dentro de su tenant)
-    if (isAgente) {
-      if (!ctx.agenteId) {
-        return NextResponse.json({ error: "AGENTE sin agenteId asociado" }, { status: 400 });
-      }
-      where.id = ctx.agenteId;
-    }
+    // 🔒 filtro por tenant si aplica
+    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
 
     if (q) {
-      where = {
-        ...where,
-        OR: [
-          { nombre: { contains: q, mode: "insensitive" } },
-          { email: { contains: q, mode: "insensitive" } },
-          { telefono: { contains: q, mode: "insensitive" } },
-        ],
-      };
+      where.OR = [
+        { nombre: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+        { telefono: { contains: q, mode: "insensitive" } },
+      ];
     }
 
     const items = await prisma.agente.findMany({
@@ -77,34 +60,27 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(items);
   } catch (e: any) {
-    console.error("[API][agentes][GET]", e);
-    return NextResponse.json({ error: e.message || "Error" }, { status: 500 });
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
 
-// POST /api/agentes  (ADMIN o SUPERADMIN EN MODO TENANT)
-export async function POST(req: NextRequest) {
+// POST /api/agentes { nombre, email, telefono?, pctAgente? }
+export async function POST(req: Request) {
   try {
-    const ctx = await getTenantContext(req);
+    const ctx = await getTenantContext(req as any);
     if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-    const { role, isSuperadmin, isAdmin, tenantAdminId, userId } = ctx;
-
-    // ✅ Reglas:
-    // - ADMIN: crea en su tenant (tenantAdminId = userId)
-    // - SUPERADMIN: solo puede crear si está en modo tenant (?adminId=...)
-    if (!(isAdmin || isSuperadmin)) {
+    if (!requireRoles(ctx.role, ["ADMIN", "SUPERADMIN"])) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    if (isSuperadmin && !tenantAdminId) {
+    // Si SUPERADMIN está en global (tenantAdminId=null), obligamos a elegir adminId
+    if (ctx.role === "SUPERADMIN" && !ctx.tenantAdminId) {
       return NextResponse.json(
-        { error: "SUPERADMIN debe indicar ?adminId=... para crear dentro de un tenant" },
+        { error: "SUPERADMIN debe indicar ?adminId=... para crear agentes dentro de un tenant" },
         { status: 400 }
       );
     }
-
-    const targetAdminId = isAdmin ? userId! : tenantAdminId!;
 
     const b = await req.json();
     const nombre = (b?.nombre ?? "").trim();
@@ -116,6 +92,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "nombre y email son obligatorios" }, { status: 400 });
     }
 
+    const adminId = ctx.tenantAdminId!; // aquí ya no es null
+
+    // Evitar duplicados
     const [agenteDup, usuarioDup] = await Promise.all([
       prisma.agente.findUnique({ where: { email } }),
       prisma.usuario.findUnique({ where: { email } }),
@@ -133,7 +112,7 @@ export async function POST(req: NextRequest) {
         nombre,
         email,
         telefono,
-        adminId: targetAdminId, // ✅ TENANT
+        adminId, // ✅ tenant
         ...(pctAgente !== undefined ? { pctAgente } : {}),
         usuarios: {
           create: [
@@ -142,7 +121,8 @@ export async function POST(req: NextRequest) {
               email,
               password: hashedPassword,
               rol: "AGENTE",
-              adminId: targetAdminId, // ✅ TENANT también en Usuario
+              adminId, // ✅ usuario agente también pertenece al tenant
+              agenteId: undefined,
             },
           ],
         },
@@ -175,7 +155,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (e: any) {
-    console.error("[API][agentes][POST]", e);
-    return NextResponse.json({ error: e.message || "Error" }, { status: 500 });
+    console.error("Error creando agente:", e);
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

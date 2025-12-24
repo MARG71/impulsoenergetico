@@ -1,10 +1,9 @@
 // src/app/(crm)/api/lugares/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// src/app/(crm)/api/lugares/route.ts
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { getTenantContext } from "@/lib/tenant";
-
-export const runtime = "nodejs";
+import { getTenantContext, requireRoles } from "@/lib/tenant";
 
 const toPct = (v: any) => {
   if (v === undefined || v === null || v === "") return null;
@@ -20,43 +19,30 @@ const cleanStr = (v: any) => {
   return s === "" ? null : s;
 };
 
-function tenantWhere(tenantAdminId: number | null) {
-  return tenantAdminId ? { adminId: tenantAdminId } : {};
-}
-
-// GET /api/lugares?take=6&skip=0&q=...&agenteId=...&adminId=... (adminId solo superadmin)
-export async function GET(req: NextRequest) {
+// GET /api/lugares
+export async function GET(req: Request) {
   try {
-    const ctx = await getTenantContext(req);
+    const ctx = await getTenantContext(req as any);
     if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-    const { isSuperadmin, isAdmin, isAgente, isLugar, tenantAdminId, agenteId, lugarId } = ctx;
-
-    // ✅ Permitimos leer a roles del CRM
-    if (!(isSuperadmin || isAdmin || isAgente || isLugar)) {
+    if (!requireRoles(ctx.role, ["ADMIN", "SUPERADMIN", "AGENTE"])) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { searchParams } = req.nextUrl;
-    const take = Number(searchParams.get("take") ?? 50);
+    const { searchParams } = new URL(req.url);
+    const take = Number(searchParams.get("take") ?? 6);
     const skip = Number(searchParams.get("skip") ?? 0);
     const q = searchParams.get("q")?.trim() ?? "";
     const agenteIdParam = searchParams.get("agenteId");
 
-    const where: Prisma.LugarWhereInput = {
-      ...tenantWhere(tenantAdminId),
-    };
+    const where: Prisma.LugarWhereInput = {};
 
-    // ✅ Si es AGENTE: solo sus lugares
-    if (isAgente) {
-      if (!agenteId) return NextResponse.json({ error: "AGENTE sin agenteId asociado" }, { status: 400 });
-      where.agenteId = agenteId;
-    }
+    // 🔒 tenant
+    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
 
-    // ✅ Si es LUGAR: solo su lugar
-    if (isLugar) {
-      if (!lugarId) return NextResponse.json({ error: "LUGAR sin lugarId asociado" }, { status: 400 });
-      where.id = lugarId;
+    // 🔒 si es AGENTE, solo sus lugares
+    if (ctx.role === "AGENTE" && ctx.agenteId) {
+      where.agenteId = ctx.agenteId;
     }
 
     if (q) {
@@ -67,10 +53,9 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    // Filtro agenteIdParam: solo si NO es LUGAR (porque LUGAR ya está fijado)
-    if (!isLugar && agenteIdParam) {
-      const aId = Number(agenteIdParam);
-      if (!Number.isNaN(aId)) where.agenteId = aId;
+    if (agenteIdParam && ctx.role !== "AGENTE") {
+      const agenteId = Number(agenteIdParam);
+      if (!Number.isNaN(agenteId)) where.agenteId = agenteId;
     }
 
     const lugares = await prisma.lugar.findMany({
@@ -84,9 +69,9 @@ export async function GET(req: NextRequest) {
         direccion: true,
         qrCode: true,
         agenteId: true,
-        adminId: true,
         pctLugar: true,
         pctCliente: true,
+        adminId: true,
         agente: { select: { id: true, nombre: true, email: true } },
         especial: true,
         especialLogoUrl: true,
@@ -99,32 +84,27 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(lugares);
   } catch (error: any) {
-    console.error("[API][lugares][GET]", error);
+    console.error("Error al obtener lugares:", error);
     return NextResponse.json({ error: error.message ?? "Error al obtener lugares" }, { status: 500 });
   }
 }
 
-// POST /api/lugares (ADMIN o SUPERADMIN en modo tenant)
-export async function POST(req: NextRequest) {
+// POST /api/lugares
+export async function POST(req: Request) {
   try {
-    const ctx = await getTenantContext(req);
+    const ctx = await getTenantContext(req as any);
     if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-    const { isAdmin, isSuperadmin, tenantAdminId, userId } = ctx;
-
-    if (!(isAdmin || isSuperadmin)) {
+    if (!requireRoles(ctx.role, ["ADMIN", "SUPERADMIN"])) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // SUPERADMIN debe crear dentro de un tenant concreto
-    if (isSuperadmin && !tenantAdminId) {
+    if (ctx.role === "SUPERADMIN" && !ctx.tenantAdminId) {
       return NextResponse.json(
         { error: "SUPERADMIN debe indicar ?adminId=... para crear lugares dentro de un tenant" },
         { status: 400 }
       );
     }
-
-    const targetAdminId = isAdmin ? userId! : tenantAdminId!;
 
     const body = await req.json();
     const nombre = (body?.nombre ?? "").trim();
@@ -142,12 +122,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Agente debe existir y ser del mismo tenant
+    const adminId = ctx.tenantAdminId!;
+
+    // Asegurar que el agente pertenece al tenant
     const agente = await prisma.agente.findFirst({
-      where: { id: agenteId, adminId: targetAdminId },
+      where: { id: agenteId, adminId },
       select: { id: true },
     });
-    if (!agente) return NextResponse.json({ error: "Agente no encontrado o no pertenece a tu admin" }, { status: 404 });
+    if (!agente) return NextResponse.json({ error: "Agente no encontrado en este tenant" }, { status: 404 });
 
     const lugar = await prisma.lugar.create({
       data: {
@@ -155,7 +137,7 @@ export async function POST(req: NextRequest) {
         direccion,
         qrCode,
         agenteId,
-        adminId: targetAdminId, // ✅ TENANT
+        adminId, // ✅ tenant
         pctCliente,
         pctLugar,
         especial: !!body?.especial,
@@ -189,7 +171,7 @@ export async function POST(req: NextRequest) {
     if (error?.code === "P2002") {
       return NextResponse.json({ error: "qrCode ya existe" }, { status: 409 });
     }
-    console.error("[API][lugares][POST]", error);
+    console.error("Error al crear lugar:", error);
     return NextResponse.json({ error: error.message ?? "Error al crear lugar" }, { status: 500 });
   }
 }
