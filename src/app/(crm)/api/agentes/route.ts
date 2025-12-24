@@ -121,11 +121,12 @@ export async function POST(req: Request) {
               email,
               password: hashedPassword,
               rol: "AGENTE",
-              adminId, // ✅ usuario agente también pertenece al tenant
-              agenteId: undefined,
+              adminId, // ✅ si quieres que pertenezca al tenant
+              // NO pongas agenteId aquí
             },
           ],
         },
+
       },
       include: { usuarios: true },
     });
