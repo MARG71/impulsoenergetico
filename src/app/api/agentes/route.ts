@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 import { hash } from "bcryptjs";
 import { sendAccessEmail } from "@/lib/sendAccessEmail";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const where: any = {};
 
   if (!isSuperadmin) {
-    // ADMIN (y otros roles si entraran): solo su tenant
+    // ADMIN (y otros roles si entrasen): solo su tenant
     if (!tenantAdminId) {
       return NextResponse.json(
         { error: "Config de tenant inválida" },
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   return NextResponse.json(agentes);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -75,12 +75,14 @@ export async function POST(req: Request) {
     );
   }
 
-  // En multi-tenant, siempre necesitamos saber a qué ADMIN cuelga este agente
   const adminId = ctx.tenantAdminId;
   if (!adminId) {
-    // SUPERADMIN debe entrar en /dashboard?adminId=XXX para crear agentes de ese tenant
+    // SUPERADMIN debe estar en modo tenant para crear agentes de ese admin
     return NextResponse.json(
-      { error: "Falta adminId: entra en el dashboard del tenant para crear agentes" },
+      {
+        error:
+          "Falta adminId. Entra en el dashboard de un tenant (/dashboard?adminId=XXX) para crear sus agentes.",
+      },
       { status: 400 }
     );
   }
