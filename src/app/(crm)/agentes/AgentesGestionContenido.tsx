@@ -64,11 +64,16 @@ export default function AgentesGestionContenido() {
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
+  // Campos formulario nuevo agente
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoTelefono, setNuevoTelefono] = useState("");
   const [nuevoPctAgente, setNuevoPctAgente] = useState("");
   const [nuevoOculto, setNuevoOculto] = useState(false);
+
+  // Select de admins (solo SUPERADMIN)
+  const [adminsDisponibles, setAdminsDisponibles] = useState<AdminInfo[]>([]);
+  const [adminSeleccionado, setAdminSeleccionado] = useState<string>("");
 
   const role: Rol | null =
     ((session?.user as any)?.rol as Rol | undefined) ??
@@ -78,8 +83,8 @@ export default function AgentesGestionContenido() {
   const isSuperadmin = role === "SUPERADMIN";
   const isAdmin = role === "ADMIN";
 
-  const adminId = searchParams.get("adminId");
-  const adminQuery = adminId ? `?adminId=${adminId}` : "";
+  const adminIdFromQuery = searchParams.get("adminId");
+  const adminQuery = adminIdFromQuery ? `?adminId=${adminIdFromQuery}` : "";
 
   const adminLabel = useMemo(() => {
     if (isAdmin) {
@@ -89,17 +94,18 @@ export default function AgentesGestionContenido() {
         "ADMIN"
       }`;
     }
-    if (isSuperadmin && adminId) {
-      return `Tenant seleccionado · adminId = ${adminId}`;
+    if (isSuperadmin && adminIdFromQuery) {
+      return `Tenant seleccionado · adminId = ${adminIdFromQuery}`;
     }
-    if (isSuperadmin && !adminId) {
-      return "Sin tenant seleccionado · elige un ADMIN en la sección “Admins” y entra con “Ver / Entrar”.";
+    if (isSuperadmin && !adminIdFromQuery) {
+      return "Sin tenant seleccionado · elige un ADMIN en la sección “Admins” y entra con “Ver / Entrar”, o selecciona un admin en el desplegable al crear un agente.";
     }
     return null;
-  }, [isAdmin, isSuperadmin, adminId, session]);
+  }, [isAdmin, isSuperadmin, adminIdFromQuery, session]);
 
-  const creacionBloqueada = isSuperadmin && !adminId;
-
+  // ─────────────────────
+  // Cargar agentes
+  // ─────────────────────
   useEffect(() => {
     if (status === "loading") return;
 
@@ -135,6 +141,45 @@ export default function AgentesGestionContenido() {
     cargar();
   }, [session, status, isSuperadmin, isAdmin, adminQuery]);
 
+  // ─────────────────────
+  // Cargar lista de admins (solo SUPERADMIN)
+  // ─────────────────────
+  useEffect(() => {
+    if (!isSuperadmin) return;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/admins");
+        const json = await res.json().catch(() => []);
+        if (res.ok && Array.isArray(json)) {
+          setAdminsDisponibles(json);
+        }
+      } catch (e) {
+        console.error("Error cargando admins para selector", e);
+      }
+    })();
+  }, [isSuperadmin]);
+
+  // Si eres SUPERADMIN y vienes con ?adminId=XXX, preseleccionamos ese admin
+  useEffect(() => {
+    if (
+      isSuperadmin &&
+      adminIdFromQuery &&
+      !adminSeleccionado &&
+      adminsDisponibles.length > 0
+    ) {
+      const existe = adminsDisponibles.some(
+        (a) => String(a.id) === adminIdFromQuery
+      );
+      if (existe) {
+        setAdminSeleccionado(adminIdFromQuery);
+      }
+    }
+  }, [isSuperadmin, adminIdFromQuery, adminSeleccionado, adminsDisponibles]);
+
+  // ─────────────────────
+  // Filtrado de la tabla
+  // ─────────────────────
   const agentesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda);
     return agentes.filter((a) => {
@@ -157,18 +202,22 @@ export default function AgentesGestionContenido() {
     });
   }, [agentes, busqueda, isSuperadmin]);
 
+  // ─────────────────────
+  // Crear agente
+  // ─────────────────────
   const handleCrearAgente = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (creacionBloqueada) {
-      toast.error(
-        "Selecciona primero un tenant (Admin) desde la sección “Admins” para crear agentes."
-      );
+    if (!nuevoNombre || !nuevoEmail) {
+      toast.error("Nombre y email son obligatorios");
       return;
     }
 
-    if (!nuevoNombre || !nuevoEmail) {
-      toast.error("Nombre y email son obligatorios");
+    // SUPERADMIN: debe tener o adminSeleccionado o adminIdFromQuery
+    if (isSuperadmin && !adminSeleccionado && !adminIdFromQuery) {
+      toast.error(
+        "Selecciona un administrador en el desplegable o entra en el dashboard de un tenant para crear agentes."
+      );
       return;
     }
 
@@ -182,6 +231,10 @@ export default function AgentesGestionContenido() {
           telefono: nuevoTelefono || null,
           pctAgente: toPct(nuevoPctAgente),
           ocultoParaAdmin: nuevoOculto,
+          // Para SUPERADMIN pasamos el admin elegido o el de la query.
+          adminSeleccionado: isSuperadmin
+            ? adminSeleccionado || adminIdFromQuery
+            : undefined,
         }),
       });
 
@@ -209,6 +262,9 @@ export default function AgentesGestionContenido() {
     }
   };
 
+  // ─────────────────────
+  // Eliminar agente
+  // ─────────────────────
   const handleEliminarAgente = async (id: number) => {
     if (!confirm("¿Seguro que quieres eliminar este agente?")) return;
     try {
@@ -230,16 +286,22 @@ export default function AgentesGestionContenido() {
     }
   };
 
+  // ─────────────────────
+  // Navegación
+  // ─────────────────────
   const irADetalle = (id: number) => {
     const base = `/agentes/${id}/detalle`;
-    router.push(adminId ? `${base}?adminId=${adminId}` : base);
+    router.push(adminIdFromQuery ? `${base}?adminId=${adminIdFromQuery}` : base);
   };
 
   const irAEditar = (id: number) => {
     const base = `/agentes/${id}`;
-    router.push(adminId ? `${base}?adminId=${adminId}` : base);
+    router.push(adminIdFromQuery ? `${base}?adminId=${adminIdFromQuery}` : base);
   };
 
+  // ─────────────────────
+  // Render
+  // ─────────────────────
   if (error) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
@@ -260,8 +322,9 @@ export default function AgentesGestionContenido() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 py-10 text-slate-50">
-      <div className="w-full max-w-[1400px] mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-8 py-10 text-slate-50">
+      {/* Contenedor ancho */}
+      <div className="w-full max-w-[1700px] mx-auto space-y-8">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
           <div className="rounded-3xl bg-slate-950/95 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -290,67 +353,100 @@ export default function AgentesGestionContenido() {
                 placeholder="Buscar por cualquier campo (nombre, email, teléfono, admin…) "
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-72 md:w-80 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm"
+                className="w-80 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm"
               />
             </div>
           </div>
         </header>
 
-        {/* CREACIÓN RÁPIDA */}
+        {/* CREACIÓN NUEVO AGENTE */}
         <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-6">
           <h2 className="text-xl font-bold mb-4">Crear nuevo agente</h2>
-          <form
-            onSubmit={handleCrearAgente}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
-          >
-            <div>
-              <Label className="text-xs text-slate-300 font-semibold">
-                Nombre
-              </Label>
-              <Input
-                className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
-                value={nuevoNombre}
-                onChange={(e) => setNuevoNombre(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-300 font-semibold">
-                Email
-              </Label>
-              <Input
-                type="email"
-                className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
-                value={nuevoEmail}
-                onChange={(e) => setNuevoEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-300 font-semibold">
-                Teléfono
-              </Label>
-              <Input
-                className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
-                value={nuevoTelefono}
-                onChange={(e) => setNuevoTelefono(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-300 font-semibold">
-                % Agente
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="ej. 15 o 0.15"
-                className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
-                value={nuevoPctAgente}
-                onChange={(e) => setNuevoPctAgente(e.target.value)}
-              />
+
+          <form onSubmit={handleCrearAgente} className="space-y-4">
+            {/* Selector de admin SOLO SUPERADMIN */}
+            {isSuperadmin && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-slate-300 font-semibold">
+                    Administrador asignado
+                  </Label>
+                  <select
+                    className="mt-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 w-full text-sm"
+                    value={adminSeleccionado}
+                    onChange={(e) => setAdminSeleccionado(e.target.value)}
+                  >
+                    <option value="">
+                      {adminIdFromQuery
+                        ? "Usar admin del tenant actual o seleccionar otro…"
+                        : "Seleccionar admin…"}
+                    </option>
+                    {adminsDisponibles.map((adm) => (
+                      <option key={adm.id} value={adm.id}>
+                        {adm.nombre} ({adm.email})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Si dejas esta opción sin elegir y estás en un dashboard de
+                    tenant, se usará el admin de ese tenant. Si no, deberás
+                    seleccionar un administrador.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Campos principales */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <Label className="text-xs text-slate-300 font-semibold">
+                  Nombre
+                </Label>
+                <Input
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
+                  value={nuevoNombre}
+                  onChange={(e) => setNuevoNombre(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 font-semibold">
+                  Email
+                </Label>
+                <Input
+                  type="email"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
+                  value={nuevoEmail}
+                  onChange={(e) => setNuevoEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 font-semibold">
+                  Teléfono
+                </Label>
+                <Input
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
+                  value={nuevoTelefono}
+                  onChange={(e) => setNuevoTelefono(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300 font-semibold">
+                  % Agente
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="ej. 15 o 0.15"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
+                  value={nuevoPctAgente}
+                  onChange={(e) => setNuevoPctAgente(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="md:col-span-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-2">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-2">
               <div className="flex items-center gap-2">
                 <input
                   id="oculto"
@@ -370,22 +466,21 @@ export default function AgentesGestionContenido() {
               <div className="flex flex-col items-start md:items-end gap-1">
                 <Button
                   type="submit"
-                  disabled={creacionBloqueada}
-                  className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-semibold px-8 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-semibold px-8 py-2"
                 >
                   Crear agente
                 </Button>
                 <p className="text-[11px] text-slate-400 font-medium">
                   Al crear el agente se genera un usuario y se envía un email
                   con sus credenciales de acceso. El agente quedará asignado al
-                  administrador indicado arriba (tenant actual).
+                  administrador indicado arriba (o al tenant actual).
                 </p>
               </div>
             </div>
           </form>
         </section>
 
-        {/* LISTADO */}
+        {/* LISTADO DE AGENTES */}
         <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-6">
           <h2 className="text-xl font-bold mb-4">Listado de agentes</h2>
 
@@ -395,7 +490,7 @@ export default function AgentesGestionContenido() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-sm md:text-base">
+              <table className="w-full text-[13px] md:text-[15px]">
                 <thead className="bg-slate-900/80 text-slate-300">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold">ID</th>

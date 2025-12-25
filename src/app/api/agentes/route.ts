@@ -4,6 +4,9 @@ import { getTenantContext } from "@/lib/tenant";
 import { hash } from "bcryptjs";
 import { sendAccessEmail } from "@/lib/sendAccessEmail";
 
+// =======================
+// GET /api/agentes
+// =======================
 export async function GET(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
@@ -17,7 +20,7 @@ export async function GET(req: NextRequest) {
   const where: any = {};
 
   if (!isSuperadmin) {
-    // ADMIN (y otros roles si entrasen): solo su tenant
+    // ADMIN (y otros roles si entrasen): solo su propio tenant
     if (!tenantAdminId) {
       return NextResponse.json(
         { error: "Config de tenant inválida" },
@@ -26,7 +29,7 @@ export async function GET(req: NextRequest) {
     }
     where.adminId = tenantAdminId;
   } else if (tenantAdminId) {
-    // SUPERADMIN en modo tenant
+    // SUPERADMIN en modo tenant /dashboard?adminId=XXX
     where.adminId = tenantAdminId;
   }
 
@@ -59,6 +62,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(agentes);
 }
 
+// =======================
+// POST /api/agentes
+// =======================
 export async function POST(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
@@ -74,7 +80,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { nombre, email, telefono, pctAgente, ocultoParaAdmin } = body || {};
+  const {
+    nombre,
+    email,
+    telefono,
+    pctAgente,
+    ocultoParaAdmin,
+    adminSeleccionado,
+  } = body || {};
 
   if (!nombre || !email) {
     return NextResponse.json(
@@ -83,17 +96,57 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const adminId = ctx.tenantAdminId;
+  // ─────────────────────────────
+  // Resolver adminId dueño del agente
+  // ─────────────────────────────
+  let adminId: number | null = null;
+
+  if (ctx.isSuperadmin) {
+    // 1) SUPERADMIN: intenta con adminSeleccionado (del selector o de la query)
+    if (adminSeleccionado) {
+      const parsed = Number(adminSeleccionado);
+      if (Number.isFinite(parsed)) {
+        adminId = parsed;
+      }
+    }
+
+    // 2) Si no hay adminSeleccionado, usa tenantAdminId (modo /dashboard?adminId=XXX)
+    if (!adminId && ctx.tenantAdminId) {
+      adminId = ctx.tenantAdminId;
+    }
+
+    // 3) Si sigue sin admin, error
+    if (!adminId) {
+      return NextResponse.json(
+        {
+          error:
+            "Debes seleccionar un administrador para este agente o entrar en el dashboard de un tenant (/dashboard?adminId=XXX).",
+        },
+        { status: 400 }
+      );
+    }
+  } else if (ctx.isAdmin) {
+    // ADMIN: siempre su propio id como adminId del tenant
+    if (!ctx.tenantAdminId) {
+      return NextResponse.json(
+        { error: "Config de tenant inválida (falta adminId)" },
+        { status: 400 }
+      );
+    }
+    adminId = ctx.tenantAdminId;
+  }
+
+  // Seguridad extra
   if (!adminId) {
-    // SUPERADMIN debe estar en modo tenant para crear agentes de ese admin
     return NextResponse.json(
-      {
-        error:
-          "Falta adminId. Entra en el dashboard de un tenant (/dashboard?adminId=XXX) para crear sus agentes.",
-      },
+      { error: "No se ha podido determinar el administrador del agente." },
       { status: 400 }
     );
   }
+
+  // ─────────────────────────────
+  // Crear usuario + agente
+  // ─────────────────────────────
 
   // Contraseña temporal
   const plainPassword = Math.random().toString(36).slice(-10);
