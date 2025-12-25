@@ -77,7 +77,7 @@ export async function getTenantContext(req: NextRequest): Promise<TenantContext>
   return {
     ok: true,
     role,
-    userId: userId ?? 0,
+    userId: userId ?? -1, // mejor que 0 (0 a veces confunde en lógica)
     tenantAdminId,
     agenteId,
     lugarId,

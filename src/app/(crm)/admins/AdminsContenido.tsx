@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+
 
 type AdminRow = {
   id: number;
@@ -149,9 +151,10 @@ export default function AdminsContenido() {
                     type="button"
                     onClick={() => router.push(`/dashboard?adminId=${a.id}`)}
                     className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
-                  >
-                    Ver como admin
-                  </button>
+                    >
+                    Entrar
+                   </button>
+
 
                   <button
                     type="button"

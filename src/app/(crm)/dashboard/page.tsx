@@ -15,7 +15,7 @@ type RangoDias = 0 | 1 | 7 | 30 // 0 = todo
 export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
 
   const role = (session?.user as any)?.role as
     | 'SUPERADMIN'
@@ -28,7 +28,8 @@ export default function DashboardPage() {
   // ✅ SUPERADMIN puede entrar en modo tenant con ?adminId=...
   const adminIdParam = searchParams?.get('adminId')
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null
-  const isValidAdminContext = Number.isFinite(adminIdContext) && (adminIdContext as number) > 0
+  const isValidAdminContext =
+    typeof adminIdContext === 'number' && Number.isFinite(adminIdContext) && adminIdContext > 0
 
   const [comparativas, setComparativas] = useState<Comparativa[]>([])
   const [agentes, setAgentes] = useState<Agente[]>([])
@@ -41,6 +42,10 @@ export default function DashboardPage() {
   const [rangoDias, setRangoDias] = useState<RangoDias>(1) // por defecto: HOY
 
   useEffect(() => {
+    // Esperamos a tener sesión cargada para no hacer peticiones con role = undefined
+    if (status === 'loading') return
+    if (!role) return
+
     const cargarDatos = async () => {
       try {
         setCargando(true)
@@ -51,7 +56,10 @@ export default function DashboardPage() {
             ? `?adminId=${adminIdContext}`
             : ''
 
-        const res = await fetch(`/api/dashboard${qs}`, { cache: 'no-store' })
+        const res = await fetch(`/api/dashboard${qs}`, {
+          cache: 'no-store',
+        })
+
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           throw new Error(err.error || 'Error cargando dashboard')
@@ -74,9 +82,8 @@ export default function DashboardPage() {
       }
     }
 
-    // Re-carga cuando cambia el rol o el adminIdContext (SUPERADMIN)
     cargarDatos()
-  }, [role, adminIdContext, isValidAdminContext])
+  }, [role, status, adminIdContext, isValidAdminContext])
 
   const obtenerFecha = (item: any): Date | null => {
     const raw =
@@ -237,7 +244,8 @@ export default function DashboardPage() {
                   Modo tenant activado
                 </div>
                 <div className="text-white/90 font-semibold mt-1">
-                  Estás viendo datos del admin (tenant) <span className="font-extrabold text-white">#{adminIdContext}</span>
+                  Estás viendo datos del admin (tenant){' '}
+                  <span className="font-extrabold text-white">#{adminIdContext}</span>
                 </div>
               </div>
 
@@ -284,7 +292,12 @@ export default function DashboardPage() {
                 <Chip activo={rangoDias === 1} onClick={() => setRangoDias(1)} label="Hoy" />
                 <Chip activo={rangoDias === 7} onClick={() => setRangoDias(7)} label="7 días" />
                 <Chip activo={rangoDias === 30} onClick={() => setRangoDias(30)} label="30 días" />
-                <Chip activo={rangoDias === 0} onClick={() => setRangoDias(0)} label="Todo" variante="dark" />
+                <Chip
+                  activo={rangoDias === 0}
+                  onClick={() => setRangoDias(0)}
+                  label="Todo"
+                  variante="dark"
+                />
               </div>
             </div>
           </div>
@@ -367,11 +380,36 @@ export default function DashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 text-xs">
-                <ServicioCard titulo="Luz" valor={resumen.comparativasLuz.length} subtitulo="Comparativas de electricidad" tono="bg-orange-50/90 border-orange-200 text-orange-900" />
-                <ServicioCard titulo="Gas" valor={resumen.comparativasGas.length} subtitulo="Comparativas de gas" tono="bg-amber-50/90 border-amber-200 text-amber-900" />
-                <ServicioCard titulo="Telefonía" valor={resumen.comparativasTel.length} subtitulo="Móvil, fibra, etc." tono="bg-sky-50/90 border-sky-200 text-sky-900" />
-                <ServicioCard titulo="Seguros" valor={resumen.comparativasSeguros.length} subtitulo="Seguros energéticos / hogar" tono="bg-violet-50/90 border-violet-200 text-violet-900" />
-                <ServicioCard titulo="Otros" valor={resumen.comparativasOtras.length} subtitulo="Otros servicios" tono="bg-slate-50/90 border-slate-200 text-slate-900" />
+                <ServicioCard
+                  titulo="Luz"
+                  valor={resumen.comparativasLuz.length}
+                  subtitulo="Comparativas de electricidad"
+                  tono="bg-orange-50/90 border-orange-200 text-orange-900"
+                />
+                <ServicioCard
+                  titulo="Gas"
+                  valor={resumen.comparativasGas.length}
+                  subtitulo="Comparativas de gas"
+                  tono="bg-amber-50/90 border-amber-200 text-amber-900"
+                />
+                <ServicioCard
+                  titulo="Telefonía"
+                  valor={resumen.comparativasTel.length}
+                  subtitulo="Móvil, fibra, etc."
+                  tono="bg-sky-50/90 border-sky-200 text-sky-900"
+                />
+                <ServicioCard
+                  titulo="Seguros"
+                  valor={resumen.comparativasSeguros.length}
+                  subtitulo="Seguros energéticos / hogar"
+                  tono="bg-violet-50/90 border-violet-200 text-violet-900"
+                />
+                <ServicioCard
+                  titulo="Otros"
+                  valor={resumen.comparativasOtras.length}
+                  subtitulo="Otros servicios"
+                  tono="bg-slate-50/90 border-slate-200 text-slate-900"
+                />
               </div>
             </section>
 
@@ -460,9 +498,21 @@ export default function DashboardPage() {
                 </p>
 
                 <div className="space-y-3">
-                  <ResumenFila titulo="Clientes registrados (en rango)" valor={resumen.leadsRango.length} descripcion="Total de registros en el periodo seleccionado." />
-                  <ResumenFila titulo="Clientes desde QR" valor={resumen.leadsDesdeQR.length} descripcion="Personas que han accedido desde un código QR." />
-                  <ResumenFila titulo="Comparativas realizadas" valor={resumen.comparativasRango.length} descripcion="Total de comparativas creadas por esos clientes." />
+                  <ResumenFila
+                    titulo="Clientes registrados (en rango)"
+                    valor={resumen.leadsRango.length}
+                    descripcion="Total de registros en el periodo seleccionado."
+                  />
+                  <ResumenFila
+                    titulo="Clientes desde QR"
+                    valor={resumen.leadsDesdeQR.length}
+                    descripcion="Personas que han accedido desde un código QR."
+                  />
+                  <ResumenFila
+                    titulo="Comparativas realizadas"
+                    valor={resumen.comparativasRango.length}
+                    descripcion="Total de comparativas creadas por esos clientes."
+                  />
                   <ResumenFila
                     titulo="Lugares con actividad"
                     valor={
@@ -509,14 +559,14 @@ function Chip({
   activo,
   onClick,
   label,
-  variante = "light",
+  variante = 'light',
 }: {
   activo: boolean
   onClick: () => void
   label: string
-  variante?: "light" | "dark"
+  variante?: 'light' | 'dark'
 }) {
-  const base = "px-3.5 py-1.5 rounded-full text-[13px] font-extrabold border transition"
+  const base = 'px-3.5 py-1.5 rounded-full text-[13px] font-extrabold border transition'
 
   if (activo) {
     return (
@@ -524,10 +574,10 @@ function Chip({
         onClick={onClick}
         className={[
           base,
-          variante === "dark"
-            ? "bg-slate-200 text-slate-950 border-slate-100 shadow"
-            : "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.35)]",
-        ].join(" ")}
+          variante === 'dark'
+            ? 'bg-slate-200 text-slate-950 border-slate-100 shadow'
+            : 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.35)]',
+        ].join(' ')}
       >
         {label}
       </button>
@@ -539,8 +589,8 @@ function Chip({
       onClick={onClick}
       className={[
         base,
-        "bg-slate-950/60 text-slate-200 border-slate-700 hover:border-emerald-400/60 hover:text-emerald-200",
-      ].join(" ")}
+        'bg-slate-950/60 text-slate-200 border-slate-700 hover:border-emerald-400/60 hover:text-emerald-200',
+      ].join(' ')}
     >
       {label}
     </button>
