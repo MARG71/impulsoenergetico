@@ -10,6 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+
+type AdminInfo = {
+  id: number;
+  nombre: string;
+  email: string;
+};
+
 const toPct = (v: string) => {
   const n = Number((v ?? "").replace(",", "."));
   if (Number.isNaN(n)) return undefined;
@@ -17,16 +25,13 @@ const toPct = (v: string) => {
 };
 
 export default function EditarAgentePage() {
-  const { id } = useParams() as { id: string };
   const router = useRouter();
+  const params = useParams() as { id: string };
   const searchParams = useSearchParams();
-  const adminId = searchParams.get("adminId");
-  const adminQuery = adminId ? `?adminId=${adminId}` : "";
-
   const { data: session, status } = useSession();
 
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { id } = params;
+  const adminIdFromQuery = searchParams.get("adminId");
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -34,10 +39,24 @@ export default function EditarAgentePage() {
   const [pctAgente, setPctAgente] = useState("");
   const [ocultoParaAdmin, setOcultoParaAdmin] = useState(false);
 
-  const [adminNombre, setAdminNombre] = useState<string | null>(null);
-  const [adminEmail, setAdminEmail] = useState<string | null>(null);
+  const [adminAsignado, setAdminAsignado] = useState<AdminInfo | null>(null);
 
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const role: Rol | null =
+    ((session?.user as any)?.rol as Rol | undefined) ??
+    ((session?.user as any)?.role as Rol | undefined) ??
+    null;
+
+  const isSuperadmin = role === "SUPERADMIN";
+  const isAdmin = role === "ADMIN";
+
+  // ────────────────────────────────────
+  // Cargar datos del agente
+  // ────────────────────────────────────
   useEffect(() => {
+    if (!id) return;
     if (status === "loading") return;
 
     if (!session) {
@@ -46,34 +65,42 @@ export default function EditarAgentePage() {
       return;
     }
 
-    (async () => {
+    if (!isSuperadmin && !isAdmin) {
+      setError("Solo SUPERADMIN o ADMIN pueden editar agentes.");
+      setCargando(false);
+      return;
+    }
+
+    const cargar = async () => {
       try {
-        const res = await fetch(`/api/agentes/${id}${adminQuery}`);
+        const qs = adminIdFromQuery ? `?adminId=${adminIdFromQuery}` : "";
+        const res = await fetch(`/api/agentes/${id}${qs}`);
         const json = await res.json().catch(() => ({}));
+
         if (!res.ok) {
           setError(json.error || "Error cargando agente");
-        } else {
-          setNombre(json.nombre || "");
-          setEmail(json.email || "");
-          setTelefono(json.telefono || "");
-          setPctAgente(
-            json.pctAgente != null ? String(Number(json.pctAgente) * 100) : ""
-          );
-          setOcultoParaAdmin(Boolean(json.ocultoParaAdmin));
-
-          if (json.admin) {
-            setAdminNombre(json.admin.nombre || null);
-            setAdminEmail(json.admin.email || null);
-          }
+          setCargando(false);
+          return;
         }
+
+        setNombre(json.nombre || "");
+        setEmail(json.email || "");
+        setTelefono(json.telefono || "");
+        setPctAgente(
+          json.pctAgente != null ? String(Number(json.pctAgente) * 100) : ""
+        );
+        setOcultoParaAdmin(!!json.ocultoParaAdmin);
+        setAdminAsignado(json.admin || null);
       } catch (e) {
         console.error(e);
         setError("Error de conexión al cargar agente");
       } finally {
         setCargando(false);
       }
-    })();
-  }, [session, status, id, adminQuery]);
+    };
+
+    cargar();
+  }, [id, status, session, isSuperadmin, isAdmin, adminIdFromQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +111,8 @@ export default function EditarAgentePage() {
     }
 
     try {
-      const res = await fetch(`/api/agentes/${id}${adminQuery}`, {
+      const qs = adminIdFromQuery ? `?adminId=${adminIdFromQuery}` : "";
+      const res = await fetch(`/api/agentes/${id}${qs}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,6 +121,8 @@ export default function EditarAgentePage() {
           telefono: telefono || null,
           pctAgente: toPct(pctAgente),
           ocultoParaAdmin,
+          // NOTA: de momento NO cambiamos adminId aquí,
+          // solo mostramos la info del admin asignado.
         }),
       });
 
@@ -104,21 +134,34 @@ export default function EditarAgentePage() {
       }
 
       toast.success("Agente actualizado correctamente");
-      // Volvemos al listado manteniendo el adminId si lo había
-      router.push(adminId ? `/agentes?adminId=${adminId}` : "/agentes");
+      // Nos quedamos en la misma página, por si quieres seguir editando
     } catch (e) {
       console.error(e);
       toast.error("Error de conexión al actualizar agente");
     }
   };
 
-  const volverAgentes = () => {
-    router.push(adminId ? `/agentes?adminId=${adminId}` : "/agentes");
+  const volverAAgentes = () => {
+    const base = "/agentes";
+    if (adminIdFromQuery) {
+      router.push(`${base}?adminId=${adminIdFromQuery}`);
+    } else {
+      router.push(base);
+    }
   };
 
-  const irDashboard = () => {
-    router.push(adminId ? `/dashboard?adminId=${adminId}` : "/dashboard");
+  const irADashboard = () => {
+    const base = "/dashboard";
+    if (adminIdFromQuery) {
+      router.push(`${base}?adminId=${adminIdFromQuery}`);
+    } else {
+      router.push(base);
+    }
   };
+
+  // ────────────────────────────────────
+  // Render
+  // ────────────────────────────────────
 
   if (error) {
     return (
@@ -126,15 +169,6 @@ export default function EditarAgentePage() {
         <div className="max-w-xl w-full rounded-2xl bg-red-900/70 border border-red-600 px-6 py-4">
           <h1 className="text-xl font-bold mb-2">Editar agente</h1>
           <p className="text-sm">{error}</p>
-          <div className="mt-4 flex gap-2">
-            <Button
-              variant="outline"
-              className="border-slate-600 text-slate-100"
-              onClick={volverAgentes}
-            >
-              Volver a agentes
-            </Button>
-          </div>
         </div>
       </div>
     );
@@ -149,139 +183,168 @@ export default function EditarAgentePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 md:px-10 py-8 text-slate-50">
-      <div className="w-full max-w-[1400px] mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-8 py-10 text-slate-50">
+      <div className="w-full max-w-[1700px] mx-auto space-y-8">
         {/* CABECERA */}
-        <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/25 via-sky-500/20 to-fuchsia-500/25 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
-          <div className="rounded-3xl bg-slate-950/95 px-6 md:px-8 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
+          <div className="rounded-3xl bg-slate-950/95 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
+              <h1 className="text-4xl font-extrabold text-white mb-1">
                 Editar agente
               </h1>
               <p className="text-sm md:text-base text-slate-300 max-w-2xl font-medium">
-                Actualiza los datos básicos del agente y su visibilidad en el CRM.
+                Actualiza los datos básicos del agente y su visibilidad en el
+                CRM.
               </p>
-              {adminNombre && (
-                <p className="text-xs md:text-sm text-emerald-300 mt-2 font-semibold">
-                  Administrador: {adminNombre}{" "}
-                  {adminEmail && (
-                    <span className="text-slate-300 font-normal">
-                      ({adminEmail})
-                    </span>
-                  )}
-                </p>
-              )}
+              <p className="text-xs text-slate-500 mt-2">
+                ID agente:{" "}
+                <span className="font-mono font-semibold text-slate-300">
+                  #{id}
+                </span>
+              </p>
             </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800 px-4"
-                  onClick={volverAgentes}
-                >
-                  ⬅ Volver a agentes
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 px-4"
-                  onClick={irDashboard}
-                >
-                  🏠 Dashboard
-                </Button>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                ID agente: <span className="font-mono">#{id}</span>
-              </p>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                variant="outline"
+                className="bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800 text-xs md:text-sm"
+                onClick={volverAAgentes}
+              >
+                ⬅ Volver a agentes
+              </Button>
+              <Button
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs md:text-sm"
+                onClick={irADashboard}
+              >
+                🏠 Dashboard
+              </Button>
             </div>
           </div>
         </header>
 
         {/* FORMULARIO */}
-        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6">
-          <h2 className="text-xl font-bold mb-4">Datos del agente</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <Label className="text-slate-100 font-semibold">Nombre</Label>
-              <Input
-                type="text"
-                className="bg-slate-900 border-slate-700 text-slate-100"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-              />
-            </div>
+        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-8">
+          <h2 className="text-2xl font-bold mb-6">Datos del agente</h2>
 
-            <div className="space-y-2">
-              <Label className="text-slate-100 font-semibold">Email</Label>
-              <Input
-                type="email"
-                className="bg-slate-900 border-slate-700 text-slate-100"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-slate-100 font-semibold">Teléfono</Label>
-              <Input
-                type="text"
-                className="bg-slate-900 border-slate-700 text-slate-100"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-slate-100 font-semibold">
-                % Agente (sobre comisión)
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                className="bg-slate-900 border-slate-700 text-slate-100"
-                placeholder="Ej. 15 (para 15%)"
-                value={pctAgente}
-                onChange={(e) => setPctAgente(e.target.value)}
-              />
-              <p className="text-[11px] text-slate-500">
-                Si pones 15, se guardará como 0.15 en base de datos.
-              </p>
-            </div>
-
-            <div className="col-span-1 md:col-span-2 flex items-center gap-3 mt-2">
+          {/* Admin asignado (solo info) */}
+          <div className="mb-6">
+            <Label className="text-xs uppercase tracking-wide text-slate-400">
+              Administrador asignado
+            </Label>
+            <div className="mt-1 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
               <input
-                id="ocultoParaAdmin"
-                type="checkbox"
-                checked={ocultoParaAdmin}
-                onChange={(e) => setOcultoParaAdmin(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500"
+                type="text"
+                disabled
+                value={
+                  adminAsignado
+                    ? `${adminAsignado.nombre} (${adminAsignado.email})`
+                    : "—"
+                }
+                className="w-full sm:max-w-lg bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
               />
-              <Label
-                htmlFor="ocultoParaAdmin"
-                className="text-slate-100 text-sm cursor-pointer"
-              >
-                Marcar agente como <span className="font-semibold">oculto para el administrador</span>{" "}
-                (no aparecerá en los listados normales).
-              </Label>
+              {isSuperadmin && (
+                <p className="text-[11px] text-slate-500 max-w-sm">
+                  (Solo lectura por ahora. Si quieres que un agente cambie de
+                  administrador/tenant, lo preparamos en un flujo específico
+                  para no romper datos de leads, lugares y comparativas.)
+                </p>
+              )}
+            </div>
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+          >
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-200">Nombre</Label>
+                <Input
+                  type="text"
+                  className="bg-slate-900 border-slate-700 text-slate-100 mt-1"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label className="text-slate-200">Teléfono</Label>
+                <Input
+                  type="text"
+                  className="bg-slate-900 border-slate-700 text-slate-100 mt-1"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  id="oculto"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  checked={ocultoParaAdmin}
+                  onChange={(e) => setOcultoParaAdmin(e.target.checked)}
+                />
+                <Label
+                  htmlFor="oculto"
+                  className="text-xs md:text-sm text-slate-300"
+                >
+                  Marcar agente como{" "}
+                  <span className="font-semibold">oculto para el administrador</span>{" "}
+                  <span className="text-slate-500">
+                    (no aparecerá en los listados normales).
+                  </span>
+                </Label>
+              </div>
             </div>
 
-            <div className="col-span-1 md:col-span-2 flex justify-end gap-3 mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="border-slate-600 text-slate-100"
-                onClick={volverAgentes}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-6"
-              >
-                Guardar cambios
-              </Button>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-200">Email</Label>
+                <Input
+                  type="email"
+                  className="bg-slate-900 border-slate-700 text-slate-100 mt-1"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label className="text-slate-200">
+                  % Agente (sobre comisión)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="ej. 15 o 0.15"
+                  className="bg-slate-900 border-slate-700 text-slate-100 mt-1"
+                  value={pctAgente}
+                  onChange={(e) => setPctAgente(e.target.value)}
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Si pones <strong>15</strong>, se guardará como{" "}
+                  <strong>0.15</strong> en base de datos.
+                </p>
+              </div>
+
+              <div className="flex justify-end items-center pt-4 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800"
+                  onClick={volverAAgentes}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
+                >
+                  Guardar cambios
+                </Button>
+              </div>
             </div>
           </form>
         </section>
