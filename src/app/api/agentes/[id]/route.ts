@@ -1,27 +1,85 @@
+// src/app/api/agentes/[id]/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-export async function GET(req: NextRequest, context: any) {
-  const { params } = context as { params: { id: string } };
+type RouteParams = {
+  params: { id: string };
+};
 
+function buildAgenteWhere(ctx: any, idNum: number) {
+  const where: any = { id: idNum };
+
+  if (ctx.isSuperadmin) {
+    // SUPERADMIN:
+    // - Si viene en modo tenant, filtra por ese adminId
+    // - Si no, puede ver/editar cualquier agente
+    if (ctx.tenantAdminId) {
+      where.adminId = ctx.tenantAdminId;
+    }
+  } else if (ctx.isAdmin) {
+    // ADMIN: solo sus agentes (su tenantAdminId)
+    if (!ctx.tenantAdminId) {
+      throw new Error("Config de tenant inválida para ADMIN (sin tenantAdminId)");
+    }
+    where.adminId = ctx.tenantAdminId;
+  } else {
+    // Otros roles no deberían llegar aquí
+    throw new Error("NO_PERMITIDO");
+  }
+
+  return where;
+}
+
+// ─────────────────────────────────────
+// GET /api/agentes/[id]
+// ─────────────────────────────────────
+export async function GET(req: NextRequest, { params }: RouteParams) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { isSuperadmin, tenantAdminId } = ctx;
-  const agenteId = Number(params.id);
-  if (!agenteId || Number.isNaN(agenteId)) {
+  const idNum = Number(params.id);
+  if (!Number.isFinite(idNum)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  const where: any = { id: agenteId };
-  if (!isSuperadmin || tenantAdminId) {
-    where.adminId = tenantAdminId;
+  let where;
+  try {
+    where = buildAgenteWhere(ctx, idNum);
+  } catch (e: any) {
+    if (e.message === "NO_PERMITIDO") {
+      return NextResponse.json(
+        { error: "Solo SUPERADMIN o ADMIN pueden ver agentes" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Config de tenant inválida" },
+      { status: 400 }
+    );
   }
 
-  const agente = await prisma.agente.findFirst({ where });
+  const agente = await prisma.agente.findFirst({
+    where,
+    include: {
+      _count: {
+        select: {
+          lugares: true,
+          leads: true,
+          comparativas: true,
+        },
+      },
+      admin: {
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+        },
+      },
+    },
+  });
 
   if (!agente) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
@@ -30,14 +88,16 @@ export async function GET(req: NextRequest, context: any) {
   return NextResponse.json(agente);
 }
 
-export async function PUT(req: NextRequest, context: any) {
-  const { params } = context as { params: { id: string } };
-
+// ─────────────────────────────────────
+// PUT /api/agentes/[id]
+// ─────────────────────────────────────
+export async function PUT(req: NextRequest, { params }: RouteParams) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  // Solo SUPERADMIN o ADMIN
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
     return NextResponse.json(
       { error: "Solo SUPERADMIN o ADMIN pueden editar agentes" },
@@ -45,54 +105,137 @@ export async function PUT(req: NextRequest, context: any) {
     );
   }
 
-  const agenteId = Number(params.id);
-  if (!agenteId || Number.isNaN(agenteId)) {
+  const idNum = Number(params.id);
+  if (!Number.isFinite(idNum)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
   const body = await req.json().catch(() => ({}));
-  const { nombre, email, telefono, pctAgente } = body || {};
-  const { isSuperadmin, tenantAdminId } = ctx;
+  const {
+    nombre,
+    email,
+    telefono,
+    pctAgente,
+    ocultoParaAdmin,
+  }: {
+    nombre?: string;
+    email?: string;
+    telefono?: string | null;
+    pctAgente?: number | null;
+    ocultoParaAdmin?: boolean;
+  } = body || {};
 
-  const whereCheck: any = { id: agenteId };
-  if (!isSuperadmin || tenantAdminId) {
-    whereCheck.adminId = tenantAdminId;
+  if (!nombre || !email) {
+    return NextResponse.json(
+      { error: "Nombre y email son obligatorios" },
+      { status: 400 }
+    );
   }
 
-  const existente = await prisma.agente.findFirst({ where: whereCheck });
-  if (!existente) {
+  let where;
+  try {
+    where = buildAgenteWhere(ctx, idNum);
+  } catch (e: any) {
+    if (e.message === "NO_PERMITIDO") {
+      return NextResponse.json(
+        { error: "Solo SUPERADMIN o ADMIN pueden editar agentes" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Config de tenant inválida" },
+      { status: 400 }
+    );
+  }
+
+  const agenteExistente = await prisma.agente.findFirst({
+    where,
+    include: {
+      usuarios: true,
+      admin: {
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!agenteExistente) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
   }
 
   try {
-    const agente = await prisma.agente.update({
-      where: { id: agenteId },
+    const agenteActualizado = await prisma.agente.update({
+      where: { id: agenteExistente.id },
       data: {
         nombre,
         email,
-        telefono: telefono || null,
+        telefono: telefono ?? null,
         pctAgente: pctAgente ?? null,
+        ocultoParaAdmin:
+          typeof ocultoParaAdmin === "boolean"
+            ? ocultoParaAdmin
+            : agenteExistente.ocultoParaAdmin,
+      },
+      include: {
+        _count: {
+          select: {
+            lugares: true,
+            leads: true,
+            comparativas: true,
+          },
+        },
+        admin: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json(agente);
+    // Sincronizar datos básicos en los usuarios vinculados al agente
+    if (agenteExistente.usuarios.length > 0) {
+      await prisma.usuario.updateMany({
+        where: {
+          agenteId: agenteExistente.id,
+        },
+        data: {
+          nombre,
+          email,
+        },
+      });
+    }
+
+    return NextResponse.json(agenteActualizado);
   } catch (e: any) {
-    console.error(e);
+    console.error("Error actualizando agente:", e);
+    if (e.code === "P2002") {
+      return NextResponse.json(
+        { error: "El email ya está en uso por otro usuario." },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "Error al actualizar agente" },
+      { error: "Error actualizando agente" },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(req: NextRequest, context: any) {
-  const { params } = context as { params: { id: string } };
-
+// ─────────────────────────────────────
+// DELETE /api/agentes/[id]
+// ─────────────────────────────────────
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  // Solo SUPERADMIN o ADMIN
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
     return NextResponse.json(
       { error: "Solo SUPERADMIN o ADMIN pueden eliminar agentes" },
@@ -100,34 +243,46 @@ export async function DELETE(req: NextRequest, context: any) {
     );
   }
 
-  const agenteId = Number(params.id);
-  if (!agenteId || Number.isNaN(agenteId)) {
+  const idNum = Number(params.id);
+  if (!Number.isFinite(idNum)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  const { isSuperadmin, tenantAdminId } = ctx;
-
-  const whereCheck: any = { id: agenteId };
-  if (!isSuperadmin || tenantAdminId) {
-    whereCheck.adminId = tenantAdminId;
+  let where;
+  try {
+    where = buildAgenteWhere(ctx, idNum);
+  } catch (e: any) {
+    if (e.message === "NO_PERMITIDO") {
+      return NextResponse.json(
+        { error: "Solo SUPERADMIN o ADMIN pueden eliminar agentes" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Config de tenant inválida" },
+      { status: 400 }
+    );
   }
 
-  const existente = await prisma.agente.findFirst({ where: whereCheck });
-  if (!existente) {
+  const agenteExistente = await prisma.agente.findFirst({ where });
+  if (!agenteExistente) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
   }
 
   try {
-    const agente = await prisma.agente.update({
-      where: { id: agenteId },
-      data: { ocultoParaAdmin: true },
+    // Soft delete: lo marcamos oculto para que no aparezca en listados normales
+    await prisma.agente.update({
+      where: { id: agenteExistente.id },
+      data: {
+        ocultoParaAdmin: true,
+      },
     });
 
-    return NextResponse.json({ ok: true, agente });
-  } catch (e: any) {
-    console.error(e);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("Error eliminando agente:", e);
     return NextResponse.json(
-      { error: "Error al eliminar agente" },
+      { error: "Error al eliminar (ocultar) el agente" },
       { status: 500 }
     );
   }
