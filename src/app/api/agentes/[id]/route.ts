@@ -1,11 +1,8 @@
 // src/app/api/agentes/[id]/route.ts
+// src/app/api/agentes/[id]/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
-
-type RouteParams = {
-  params: { id: string };
-};
 
 function buildAgenteWhere(ctx: any, idNum: number) {
   const where: any = { id: idNum };
@@ -34,7 +31,10 @@ function buildAgenteWhere(ctx: any, idNum: number) {
 // ─────────────────────────────────────
 // GET /api/agentes/[id]
 // ─────────────────────────────────────
-export async function GET(req: NextRequest, { params }: RouteParams) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -91,7 +91,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 // ─────────────────────────────────────
 // PUT /api/agentes/[id]
 // ─────────────────────────────────────
-export async function PUT(req: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -229,7 +232,10 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 // ─────────────────────────────────────
 // DELETE /api/agentes/[id]
 // ─────────────────────────────────────
-export async function DELETE(req: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
