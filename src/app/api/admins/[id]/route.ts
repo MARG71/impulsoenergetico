@@ -1,4 +1,5 @@
 // src/app/api/admins/[id]/route.ts
+// src/app/api/admins/[id]/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
@@ -11,10 +12,7 @@ function parseId(param: string): number | null {
 /**
  * OBTENER UN ADMIN (solo SUPERADMIN)
  */
-export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, context: any) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -26,7 +24,9 @@ export async function GET(
     );
   }
 
-  const id = parseId(context.params.id);
+  const { id: idParam } = (context?.params || {}) as { id?: string };
+  const id = idParam ? parseId(idParam) : null;
+
   if (!id) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
@@ -62,10 +62,7 @@ export async function GET(
 /**
  * EDITAR ADMIN (solo SUPERADMIN)
  */
-export async function PUT(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, context: any) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -77,7 +74,9 @@ export async function PUT(
     );
   }
 
-  const id = parseId(context.params.id);
+  const { id: idParam } = (context?.params || {}) as { id?: string };
+  const id = idParam ? parseId(idParam) : null;
+
   if (!id) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
@@ -124,12 +123,8 @@ export async function PUT(
 
 /**
  * BORRAR ADMIN (solo SUPERADMIN)
- * Ojo: fallará si tiene datos asociados (agentes, lugares, etc.)
  */
-export async function DELETE(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, context: any) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -141,7 +136,9 @@ export async function DELETE(
     );
   }
 
-  const id = parseId(context.params.id);
+  const { id: idParam } = (context?.params || {}) as { id?: string };
+  const id = idParam ? parseId(idParam) : null;
+
   if (!id) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
