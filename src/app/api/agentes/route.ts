@@ -44,6 +44,14 @@ export async function GET(req: NextRequest) {
           comparativas: true,
         },
       },
+      admin: {
+        // para SUPERADMIN poder ver de qué admin cuelga
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+        },
+      },
     },
     orderBy: { creadoEn: "desc" },
   });
@@ -66,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { nombre, email, telefono, pctAgente } = body || {};
+  const { nombre, email, telefono, pctAgente, ocultoParaAdmin } = body || {};
 
   if (!nombre || !email) {
     return NextResponse.json(
@@ -110,8 +118,17 @@ export async function POST(req: NextRequest) {
         email,
         telefono: telefono || null,
         pctAgente: pctAgente ?? null,
+        ocultoParaAdmin: Boolean(ocultoParaAdmin) || false,
         adminId,
         usuarios: { connect: { id: usuario.id } },
+      },
+      include: {
+        _count: {
+          select: { lugares: true, leads: true, comparativas: true },
+        },
+        admin: {
+          select: { id: true, nombre: true, email: true },
+        },
       },
     });
 
