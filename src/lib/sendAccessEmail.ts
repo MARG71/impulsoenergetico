@@ -24,8 +24,6 @@ export async function sendAccessEmail({
   email,
   password,
 }: SendAccessEmailParams) {
-
-  // URL base
   const baseUrl =
     process.env.NEXTAUTH_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -33,7 +31,6 @@ export async function sendAccessEmail({
 
   const loginUrl = `${baseUrl}/login`;
 
-  // 🔥 CORREGIDO: usar variables SMTP REALES del proyecto
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
@@ -72,7 +69,9 @@ export async function sendAccessEmail({
   `;
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || '"Impulso Energético" <no-reply@impulsoenergetico.es>',
+    from:
+      process.env.EMAIL_FROM ||
+      '"Impulso Energético" <no-reply@impulsoenergetico.es>',
     to,
     subject: `Acceso a tu zona (${rolTexto}) - Impulso Energético`,
     html,

@@ -1,19 +1,17 @@
 // src/app/(crm)/agentes/ID/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import Image from 'next/image';
-import Link from 'next/link';
+import { useEffect, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import Image from "next/image";
+import Link from "next/link";
 
-
-// helper
 const toPct = (v: string) => {
-  const n = Number((v ?? '').replace(',', '.'));
+  const n = Number((v ?? "").replace(",", "."));
   if (Number.isNaN(n)) return undefined;
   return n > 1 ? n / 100 : n;
 };
@@ -22,44 +20,56 @@ export default function EditarAgente() {
   const router = useRouter();
   const params = useParams() as { id: string };
   const { id } = params;
+  const searchParams = useSearchParams();
+  const adminId = searchParams.get("adminId");
+  const adminQuery = adminId ? `?adminId=${adminId}` : "";
 
-  const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [pctAgente, setPctAgente] = useState(''); // ← NUEVO
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [pctAgente, setPctAgente] = useState("");
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     const cargarAgente = async () => {
-      const res = await fetch(`/api/agentes/${id}`);
+      const res = await fetch(`/api/agentes/${id}${adminQuery}`);
       const data = await res.json();
       setNombre(data.nombre);
       setEmail(data.email);
-      setTelefono(data.telefono || '');
-      setPctAgente(data.pctAgente != null ? String(Number(data.pctAgente) * 100) : ''); // ← init %
+      setTelefono(data.telefono || "");
+      setPctAgente(
+        data.pctAgente != null ? String(Number(data.pctAgente) * 100) : ""
+      );
       setCargando(false);
     };
     if (id) cargarAgente();
-  }, [id]);
+  }, [id, adminQuery]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch(`/api/agentes/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, email, telefono, pctAgente: toPct(pctAgente) }), // ← añadido
+    const res = await fetch(`/api/agentes/${id}${adminQuery}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre,
+        email,
+        telefono,
+        pctAgente: toPct(pctAgente),
+      }),
     });
 
     if (res.ok) {
-      toast.success('Agente actualizado correctamente');
-      router.push('/agentes');
+      toast.success("Agente actualizado correctamente");
+      const base = "/agentes";
+      router.push(adminId ? `${base}?adminId=${adminId}` : base);
     } else {
       const err = await res.json().catch(() => ({}));
-      toast.error(err?.error || 'Error al actualizar agente');
+      toast.error(err?.error || "Error al actualizar agente");
     }
   };
 
-  if (cargando) return <p className="text-center text-gray-600">Cargando...</p>;
+  if (cargando)
+    return <p className="text-center text-gray-600">Cargando...</p>;
 
   return (
     <div className="p-6 min-h-screen bg-[#68B84B] flex justify-center items-start">
@@ -72,20 +82,32 @@ export default function EditarAgente() {
             height={48}
             priority
           />
-          <span className="hidden md:inline text-white/90">CRM · Editar agente</span>
+          <span className="hidden md:inline text-white/90">
+            CRM · Editar agente
+          </span>
         </div>
         <div className="flex gap-2">
-          <Link href="/agentes">
-            <Button className="bg-[#68B84B] text-white hover:bg-green-700">⬅ Volver a agentes</Button>
+          <Link href={adminId ? `/agentes?adminId=${adminId}` : "/agentes"}>
+            <Button className="bg-[#68B84B] text-white hover:bg-green-700">
+              ⬅ Volver a agentes
+            </Button>
           </Link>
-          <Link href="/dashboard">
-            <Button className="bg-[#F0C300] text-black hover:bg-yellow-400">🏠 Dashboard</Button>
+          <Link
+            href={
+              adminId ? `/dashboard?adminId=${adminId}` : "/dashboard"
+            }
+          >
+            <Button className="bg-[#F0C300] text-black hover:bg-yellow-400">
+              🏠 Dashboard
+            </Button>
           </Link>
         </div>
       </div>
 
       <div className="bg-[#F0F0F0] p-8 rounded-xl shadow-md w-full max-w-2xl">
-        <h2 className="text-2xl font-bold mb-6 text-[#1F1F1F]">Editar Agente</h2>
+        <h2 className="text-2xl font-bold mb-6 text-[#1F1F1F]">
+          Editar Agente
+        </h2>
         <form onSubmit={handleUpdate} className="space-y-4">
           <div>
             <Label className="text-black">Nombre</Label>
@@ -116,7 +138,7 @@ export default function EditarAgente() {
               onChange={(e) => setTelefono(e.target.value)}
             />
           </div>
-          <div>{/* NUEVO */}
+          <div>
             <Label className="text-black">% Agente</Label>
             <Input
               type="number"
@@ -128,7 +150,10 @@ export default function EditarAgente() {
             />
           </div>
 
-          <Button type="submit" className="bg-green-600 text-white hover:bg-green-800">
+          <Button
+            type="submit"
+            className="bg-green-600 text-white hover:bg-green-800"
+          >
             Guardar Cambios
           </Button>
         </form>
