@@ -1,15 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-export async function GET(req: Request, context: any) {
-  const { params } = context; // 👈 sacamos params de context (sin tipar)
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // Gestión: SUPERADMIN / ADMIN
+  // Gestión: SOLO SUPERADMIN / ADMIN
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
     return NextResponse.json(
       { error: "Solo SUPERADMIN o ADMIN pueden ver detalle de agente" },
@@ -25,6 +27,7 @@ export async function GET(req: Request, context: any) {
   const { isSuperadmin, tenantAdminId } = ctx;
   const where: any = { id: agenteId };
   if (!isSuperadmin || tenantAdminId) {
+    // ADMIN o SUPERADMIN en modo tenant
     where.adminId = tenantAdminId;
   }
 

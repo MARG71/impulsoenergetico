@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-export async function GET(req: Request, context: any) {
-  const { params } = context;
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -29,8 +31,10 @@ export async function GET(req: Request, context: any) {
   return NextResponse.json(agente);
 }
 
-export async function PUT(req: Request, context: any) {
-  const { params } = context;
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -83,8 +87,10 @@ export async function PUT(req: Request, context: any) {
   }
 }
 
-export async function DELETE(req: Request, context: any) {
-  const { params } = context;
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
