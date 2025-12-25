@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: Request, context: any) {
+  const { params } = context;
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -31,10 +29,8 @@ export async function GET(
   return NextResponse.json(agente);
 }
 
-export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: Request, context: any) {
+  const { params } = context;
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -56,7 +52,6 @@ export async function PUT(
   const { nombre, email, telefono, pctAgente } = body || {};
   const { isSuperadmin, tenantAdminId } = ctx;
 
-  // Comprobamos que el agente pertenece a este tenant
   const whereCheck: any = { id: agenteId };
   if (!isSuperadmin || tenantAdminId) {
     whereCheck.adminId = tenantAdminId;
@@ -88,10 +83,8 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: Request, context: any) {
+  const { params } = context;
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -122,7 +115,6 @@ export async function DELETE(
   }
 
   try {
-    // Soft delete: ocultoParaAdmin = true
     const agente = await prisma.agente.update({
       where: { id: agenteId },
       data: { ocultoParaAdmin: true },
