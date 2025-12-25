@@ -5,8 +5,6 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-
 
 type AdminRow = {
   id: number;
@@ -17,9 +15,9 @@ type AdminRow = {
 };
 
 export default function AdminsContenido() {
-  const router = useRouter();
   const { data: session, status } = useSession();
   const role = (session?.user as any)?.role as string | undefined;
+  const router = useRouter();
 
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,13 +53,16 @@ export default function AdminsContenido() {
     );
   }, [admins, q]);
 
-  if (status === "loading") return <div className="text-white/80">Cargando sesión…</div>;
+  if (status === "loading")
+    return <div className="text-white/80">Cargando sesión…</div>;
 
   if (role !== "SUPERADMIN") {
     return (
       <div className="rounded-2xl border border-white/10 bg-black/20 p-6 text-white">
         <div className="text-xl font-extrabold">Acceso restringido</div>
-        <div className="text-white/80 mt-2">Esta sección es solo para SUPERADMIN.</div>
+        <div className="text-white/80 mt-2">
+          Esta sección es solo para SUPERADMIN.
+        </div>
         <div className="mt-4">
           <Link
             href="/dashboard"
@@ -81,27 +82,16 @@ export default function AdminsContenido() {
           <div>
             <div className="text-3xl font-extrabold text-white">Admins</div>
             <div className="text-white/75 font-semibold mt-1">
-              Lista global de administradores (tenants). Desde aquí puedes ver el sistema como si fueras ese admin.
+              Lista global de administradores (tenants).
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/dashboard"
-              className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-[13px] font-extrabold text-white transition"
-            >
-              Volver
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard")}
-              className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
-              title="Ver dashboard global como SUPERADMIN"
-            >
-              Ver global
-            </button>
-          </div>
+          <Link
+            href="/dashboard"
+            className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-[13px] font-extrabold text-white transition"
+          >
+            Volver
+          </Link>
         </div>
 
         <div className="mt-4 flex flex-col md:flex-row gap-2 md:items-center">
@@ -114,11 +104,6 @@ export default function AdminsContenido() {
           <div className="text-white/70 font-bold text-sm">
             Total: <span className="text-white">{filtrados.length}</span>
           </div>
-        </div>
-
-        {/* Aviso breve */}
-        <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 font-semibold">
-          💡 <span className="font-extrabold">Modo tenant:</span> al pulsar “Ver como admin” el dashboard y los listados se filtran automáticamente por ese admin (sin mezclar datos).
         </div>
       </div>
 
@@ -140,36 +125,21 @@ export default function AdminsContenido() {
                   <div className="text-white font-extrabold truncate">
                     #{a.id} · {a.nombre}
                   </div>
-                  <div className="text-white/75 font-semibold truncate">{a.email}</div>
+                  <div className="text-white/75 font-semibold truncate">
+                    {a.email}
+                  </div>
                   <div className="text-white/60 text-sm font-bold mt-1">
                     TenantId: <span className="text-white">{a.id}</span>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/dashboard?adminId=${a.id}`)}
-                    className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
-                    >
-                    Entrar
-                   </button>
-
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(String(a.id))
-                        .then(() => toast.success("TenantId copiado"))
-                        .catch(() => toast.message("No se pudo copiar"));
-                    }}
-                    className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2.5 text-[13px] font-extrabold text-white transition"
-                    title="Copiar ID"
-                  >
-                    Copiar ID
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard?adminId=${a.id}`)}
+                  className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
+                >
+                  Ver / Entrar
+                </button>
               </div>
             ))}
           </div>
