@@ -31,10 +31,9 @@ function buildAgenteWhere(ctx: any, idNum: number) {
 // ─────────────────────────────────────
 // GET /api/agentes/[id]
 // ─────────────────────────────────────
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, context: any) {
+  const { params } = context as { params: { id: string } };
+
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -91,10 +90,9 @@ export async function GET(
 // ─────────────────────────────────────
 // PUT /api/agentes/[id]
 // ─────────────────────────────────────
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, context: any) {
+  const { params } = context as { params: { id: string } };
+
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -232,10 +230,9 @@ export async function PUT(
 // ─────────────────────────────────────
 // DELETE /api/agentes/[id]
 // ─────────────────────────────────────
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, context: any) {
+  const { params } = context as { params: { id: string } };
+
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
