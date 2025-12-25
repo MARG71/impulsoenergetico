@@ -141,24 +141,36 @@ export default function AgentesGestionContenido() {
     cargar();
   }, [session, status, isSuperadmin, isAdmin, adminQuery]);
 
-  // ─────────────────────
-  // Cargar lista de admins (solo SUPERADMIN)
-  // ─────────────────────
-  useEffect(() => {
-    if (!isSuperadmin) return;
+    // ─────────────────────
+    // Cargar lista de admins (solo SUPERADMIN)
+    // ─────────────────────
+    useEffect(() => {
+      if (!isSuperadmin) return;
 
-    (async () => {
-      try {
-        const res = await fetch("/api/admins");
-        const json = await res.json().catch(() => []);
-        if (res.ok && Array.isArray(json)) {
-          setAdminsDisponibles(json);
+      (async () => {
+        try {
+          const res = await fetch("/api/admins");
+          const json = await res.json().catch(() => ({}));
+
+          if (!res.ok) {
+            console.error("Error cargando admins:", json.error);
+            return;
+          }
+
+          const lista: AdminInfo[] = Array.isArray(json)
+            ? json
+            : Array.isArray((json as any).admins)
+            ? (json as any).admins
+            : Array.isArray((json as any).usuarios)
+            ? (json as any).usuarios
+            : [];
+
+          setAdminsDisponibles(lista);
+        } catch (e) {
+          console.error("Error cargando admins para selector", e);
         }
-      } catch (e) {
-        console.error("Error cargando admins para selector", e);
-      }
-    })();
-  }, [isSuperadmin]);
+      })();
+    }, [isSuperadmin]);
 
   // Si eres SUPERADMIN y vienes con ?adminId=XXX, preseleccionamos ese admin
   useEffect(() => {
