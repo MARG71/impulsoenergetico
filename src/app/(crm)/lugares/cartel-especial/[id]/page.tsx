@@ -1,32 +1,59 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import QRCode from 'react-qr-code';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from "react";
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+import QRCode from "react-qr-code";
+import { Button } from "@/components/ui/button";
+import { useSession } from "next-auth/react";
+
+type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 export default function CartelEspecial() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session } = useSession();
+
+  const role = ((session?.user as any)?.role ?? null) as Rol | null;
+  const isSuperadmin = role === "SUPERADMIN";
+
+  const adminIdParam = searchParams?.get("adminId");
+  const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
+  const tenantMode =
+    isSuperadmin &&
+    typeof adminIdContext === "number" &&
+    Number.isFinite(adminIdContext) &&
+    adminIdContext > 0;
+
+  const adminQuery =
+    tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+
   const [lugar, setLugar] = useState<any | null>(null);
   const [cargando, setCargando] = useState(true);
   const posterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
-      const r = await fetch(`/api/lugares/${id}`);
+      const r = await fetch(`/api/lugares/${id}${adminQuery}`);
       const d = await r.json();
       setLugar(d);
       setCargando(false);
     })();
-  }, [id]);
+  }, [id, adminQuery]);
 
   const downloadPNG = async () => {
     if (!posterRef.current) return;
-    const html2canvas = (await import('html2canvas')).default;
-    const canvas = await html2canvas(posterRef.current, { scale: 2, useCORS: true });
-    const data = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
+    const html2canvas = (await import("html2canvas")).default;
+    const canvas = await html2canvas(posterRef.current, {
+      scale: 2,
+      useCORS: true,
+    });
+    const data = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
     a.href = data;
     a.download = `cartel_especial_${lugar?.id}.png`;
     a.click();
@@ -47,25 +74,37 @@ export default function CartelEspecial() {
     );
   }
 
-  const qrUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
+  const qrUrl = `${
+    typeof window !== "undefined" ? window.location.origin : ""
+  }/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
 
   return (
     <div className="min-h-screen bg-white p-6 flex flex-col items-center gap-6">
       <div className="w-full max-w-4xl flex justify-between">
-        <Button onClick={() => router.back()} variant="secondary">⬅ Volver</Button>
+        <Button onClick={() => router.back()} variant="secondary">
+          ⬅ Volver
+        </Button>
         <div className="flex gap-2">
-          <Button onClick={downloadPNG} className="bg-blue-600 text-white">Descargar PNG</Button>
-          <Button onClick={imprimir} className="bg-green-600 text-white">Imprimir</Button>
+          <Button
+            onClick={downloadPNG}
+            className="bg-blue-600 text-white"
+          >
+            Descargar PNG
+          </Button>
+          <Button
+            onClick={imprimir}
+            className="bg-green-600 text-white"
+          >
+            Imprimir
+          </Button>
         </div>
       </div>
 
-      {/* Lienzo del cartel: formato 1080x1350 (ideal redes) escalado a /2 para pantalla */}
       <div
         ref={posterRef}
         className="relative border rounded-xl shadow-xl overflow-hidden"
         style={{ width: 540, height: 675 }}
       >
-        {/* Fondo del cartel especial */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={lugar.especialCartelUrl}
@@ -74,7 +113,6 @@ export default function CartelEspecial() {
           crossOrigin="anonymous"
         />
 
-        {/* Logo arriba derecha (si existe) */}
         {lugar.especialLogoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -85,7 +123,6 @@ export default function CartelEspecial() {
           />
         )}
 
-        {/* Caja QR abajo centrada */}
         <div
           className="absolute left-1/2 -translate-x-1/2 bottom-6 bg-white p-3 rounded-xl shadow"
           style={{ width: 160, height: 160 }}

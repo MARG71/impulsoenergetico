@@ -1,0 +1,175 @@
+// src/app/api/lugares/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getTenantContext } from "@/lib/tenant";
+
+function buildBaseWhere(ctx: any) {
+  const where: any = {};
+
+  if (ctx.isSuperadmin) {
+    // SUPERADMIN: si está en modo tenant, filtramos por ese admin
+    if (ctx.tenantAdminId) {
+      where.adminId = ctx.tenantAdminId;
+    }
+  } else if (ctx.isAdmin) {
+    // ADMIN: siempre por su tenantAdminId
+    if (!ctx.tenantAdminId) {
+      throw new Error("TENANT_INVALIDO");
+    }
+    where.adminId = ctx.tenantAdminId;
+  } else if (ctx.isAgente) {
+    // AGENTE: solo sus lugares
+    if (!ctx.agenteId) {
+      throw new Error("AGENTE_SIN_ID");
+    }
+    where.agenteId = ctx.agenteId;
+  } else {
+    throw new Error("NO_PERMITIDO");
+  }
+
+  // Por defecto no mostramos ocultos
+  where.ocultoParaAdmin = false;
+
+  return where;
+}
+
+// ───────────────────────────────
+// GET /api/lugares
+// ───────────────────────────────
+export async function GET(req: NextRequest) {
+  const ctx = await getTenantContext(req);
+  if (!ctx.ok) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  let where: any;
+  try {
+    where = buildBaseWhere(ctx);
+  } catch (e: any) {
+    if (e.message === "NO_PERMITIDO") {
+      return NextResponse.json(
+        { error: "Solo SUPERADMIN, ADMIN o AGENTE pueden ver lugares" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Configuración de tenant inválida" },
+      { status: 400 }
+    );
+  }
+
+  const lugares = await prisma.lugar.findMany({
+    where,
+    include: {
+      agente: {
+        select: { id: true, nombre: true, email: true },
+      },
+      _count: {
+        select: {
+          comparativas: true,
+          leads: true,
+          usuarios: true,
+        },
+      },
+    },
+    orderBy: { id: "desc" },
+  });
+
+  return NextResponse.json(lugares);
+}
+
+// ───────────────────────────────
+// POST /api/lugares
+// (crear lugar)
+// ───────────────────────────────
+export async function POST(req: NextRequest) {
+  const ctx = await getTenantContext(req);
+  if (!ctx.ok) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  // Por ahora solo SUPERADMIN y ADMIN crean lugares
+  if (!ctx.isSuperadmin && !ctx.isAdmin) {
+    return NextResponse.json(
+      { error: "Solo SUPERADMIN o ADMIN pueden crear lugares" },
+      { status: 403 }
+    );
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const {
+    nombre,
+    direccion,
+    qrCode,
+    agenteId,
+    pctCliente,
+    pctLugar,
+    especial,
+    especialLogoUrl,
+    especialColor,
+    especialMensaje,
+    aportacionAcumulada,
+    especialCartelUrl,
+  } = body || {};
+
+  if (!nombre || !direccion || !qrCode || !agenteId) {
+    return NextResponse.json(
+      { error: "Nombre, dirección, QR y agente son obligatorios" },
+      { status: 400 }
+    );
+  }
+
+  // adminId del lugar = tenant actual (ADMIN o SUPERADMIN en modo tenant)
+  const adminId =
+    ctx.tenantAdminId && Number.isFinite(ctx.tenantAdminId)
+      ? Number(ctx.tenantAdminId)
+      : ctx.isAdmin
+      ? ctx.userId
+      : null;
+
+  try {
+    const lugar = await prisma.lugar.create({
+      data: {
+        nombre,
+        direccion,
+        qrCode,
+        agenteId: Number(agenteId),
+        pctCliente: pctCliente != null ? Number(pctCliente) : null,
+        pctLugar: pctLugar != null ? Number(pctLugar) : null,
+        especial: !!especial,
+        especialLogoUrl: especialLogoUrl || null,
+        especialColor: especialColor || null,
+        especialMensaje: especialMensaje || null,
+        aportacionAcumulada: Number(aportacionAcumulada || 0),
+        especialCartelUrl: especialCartelUrl || null,
+        adminId,
+      },
+      include: {
+        agente: {
+          select: { id: true, nombre: true, email: true },
+        },
+        _count: {
+          select: {
+            comparativas: true,
+            leads: true,
+            usuarios: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(lugar);
+  } catch (e: any) {
+    console.error("Error creando lugar:", e);
+    if (e.code === "P2002") {
+      return NextResponse.json(
+        { error: "El código QR ya está en uso" },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Error al crear lugar" },
+      { status: 500 }
+    );
+  }
+}
