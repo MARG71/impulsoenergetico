@@ -64,6 +64,9 @@ export default function AgentesGestionContenido() {
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
+  // Vista: activos vs ocultos
+  const [mostrarOcultos, setMostrarOcultos] = useState(false);
+
   // Campos formulario nuevo agente
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoEmail, setNuevoEmail] = useState("");
@@ -104,7 +107,7 @@ export default function AgentesGestionContenido() {
   }, [isAdmin, isSuperadmin, adminIdFromQuery, session]);
 
   // ─────────────────────
-  // Cargar agentes
+  // Cargar agentes (activos + ocultos)
   // ─────────────────────
   useEffect(() => {
     if (status === "loading") return;
@@ -123,7 +126,12 @@ export default function AgentesGestionContenido() {
 
     const cargar = async () => {
       try {
-        const res = await fetch(`/api/agentes${adminQuery}`);
+        const params = new URLSearchParams();
+        if (adminIdFromQuery) params.set("adminId", adminIdFromQuery);
+        // 👇 Incluimos ocultos para poder gestionarlos
+        params.set("includeOcultos", "1");
+
+        const res = await fetch(`/api/agentes?${params.toString()}`);
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           setError(json.error || "Error cargando agentes");
@@ -139,38 +147,38 @@ export default function AgentesGestionContenido() {
     };
 
     cargar();
-  }, [session, status, isSuperadmin, isAdmin, adminQuery]);
+  }, [session, status, isSuperadmin, isAdmin, adminIdFromQuery]);
 
-    // ─────────────────────
-    // Cargar lista de admins (solo SUPERADMIN)
-    // ─────────────────────
-    useEffect(() => {
-      if (!isSuperadmin) return;
+  // ─────────────────────
+  // Cargar lista de admins (solo SUPERADMIN)
+  // ─────────────────────
+  useEffect(() => {
+    if (!isSuperadmin) return;
 
-      (async () => {
-        try {
-          const res = await fetch("/api/admins");
-          const json = await res.json().catch(() => ({}));
+    (async () => {
+      try {
+        const res = await fetch("/api/admins");
+        const json = await res.json().catch(() => ({}));
 
-          if (!res.ok) {
-            console.error("Error cargando admins:", json.error);
-            return;
-          }
-
-          const lista: AdminInfo[] = Array.isArray(json)
-            ? json
-            : Array.isArray((json as any).admins)
-            ? (json as any).admins
-            : Array.isArray((json as any).usuarios)
-            ? (json as any).usuarios
-            : [];
-
-          setAdminsDisponibles(lista);
-        } catch (e) {
-          console.error("Error cargando admins para selector", e);
+        if (!res.ok) {
+          console.error("Error cargando admins:", json.error);
+          return;
         }
-      })();
-    }, [isSuperadmin]);
+
+        const lista: AdminInfo[] = Array.isArray(json)
+          ? json
+          : Array.isArray((json as any).admins)
+          ? (json as any).admins
+          : Array.isArray((json as any).usuarios)
+          ? (json as any).usuarios
+          : [];
+
+        setAdminsDisponibles(lista);
+      } catch (e) {
+        console.error("Error cargando admins para selector", e);
+      }
+    })();
+  }, [isSuperadmin]);
 
   // Si eres SUPERADMIN y vienes con ?adminId=XXX, preseleccionamos ese admin
   useEffect(() => {
@@ -190,11 +198,27 @@ export default function AgentesGestionContenido() {
   }, [isSuperadmin, adminIdFromQuery, adminSeleccionado, adminsDisponibles]);
 
   // ─────────────────────
-  // Filtrado de la tabla
+  // Activos vs Ocultos
+  // ─────────────────────
+  const agentesActivos = useMemo(
+    () => agentes.filter((a) => !a.ocultoParaAdmin),
+    [agentes]
+  );
+
+  const agentesOcultos = useMemo(
+    () => agentes.filter((a) => a.ocultoParaAdmin),
+    [agentes]
+  );
+
+  // Lista base según la pestaña
+  const listaBase = mostrarOcultos ? agentesOcultos : agentesActivos;
+
+  // ─────────────────────
+  // Filtrado de la tabla (sobre la lista base)
   // ─────────────────────
   const agentesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda);
-    return agentes.filter((a) => {
+    return listaBase.filter((a) => {
       const camposBase = [
         a.id,
         a.nombre,
@@ -212,7 +236,7 @@ export default function AgentesGestionContenido() {
       const texto = normalizarTexto(camposBase.concat(camposAdmin).join(" "));
       return texto.includes(q);
     });
-  }, [agentes, busqueda, isSuperadmin]);
+  }, [listaBase, busqueda, isSuperadmin]);
 
   // ─────────────────────
   // Crear agente
@@ -267,6 +291,7 @@ export default function AgentesGestionContenido() {
       setNuevoPctAgente("");
       setNuevoOculto(false);
 
+      // Añadimos el nuevo agente a la lista (respeta si viene como oculto o no)
       setAgentes((prev) => [json, ...prev]);
     } catch (e) {
       console.error(e);
@@ -275,10 +300,10 @@ export default function AgentesGestionContenido() {
   };
 
   // ─────────────────────
-  // Eliminar agente
+  // Eliminar (ocultar) agente
   // ─────────────────────
   const handleEliminarAgente = async (id: number) => {
-    if (!confirm("¿Seguro que quieres eliminar este agente?")) return;
+    if (!confirm("¿Seguro que quieres dar de baja / ocultar este agente?")) return;
     try {
       const res = await fetch(`/api/agentes/${id}${adminQuery}`, {
         method: "DELETE",
@@ -290,11 +315,55 @@ export default function AgentesGestionContenido() {
         return;
       }
 
-      toast.success("Agente eliminado");
-      setAgentes((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Agente ocultado (baja registrada)");
+      // Lo marcamos como oculto, no lo quitamos de la lista global
+      setAgentes((prev) =>
+        prev.map((a) =>
+          a.id === id ? { ...a, ocultoParaAdmin: true } : a
+        )
+      );
     } catch (e) {
       console.error(e);
       toast.error("Error de conexión al eliminar agente");
+    }
+  };
+
+  // ─────────────────────
+  // Reactivar agente oculto
+  // ─────────────────────
+  const handleReactivarAgente = async (agente: Agente) => {
+    try {
+      const res = await fetch(`/api/agentes/${agente.id}${adminQuery}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: agente.nombre,
+          email: agente.email,
+          telefono: agente.telefono ?? null,
+          pctAgente:
+            agente.pctAgente != null ? Number(agente.pctAgente) : null,
+          ocultoParaAdmin: false,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        toast.error(json.error || "Error al reactivar agente");
+        return;
+      }
+
+      toast.success("Agente reactivado correctamente");
+      setAgentes((prev) =>
+        prev.map((a) =>
+          a.id === agente.id ? { ...a, ocultoParaAdmin: false } : a
+        )
+      );
+      // Opcional: al reactivar, volvemos a la pestaña de activos
+      setMostrarOcultos(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error de conexión al reactivar agente");
     }
   };
 
@@ -355,8 +424,32 @@ export default function AgentesGestionContenido() {
             </div>
 
             <div className="flex flex-col items-end gap-2 text-xs md:text-sm">
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button
+                  type="button"
+                  onClick={() => setMostrarOcultos(false)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    !mostrarOcultos
+                      ? "bg-emerald-500 text-slate-950 border-emerald-400"
+                      : "bg-slate-900 text-slate-200 border-slate-700 hover:border-emerald-400/70"
+                  }`}
+                >
+                  Activos ({agentesActivos.length})
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setMostrarOcultos(true)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    mostrarOcultos
+                      ? "bg-amber-500 text-slate-950 border-amber-400"
+                      : "bg-slate-900 text-slate-200 border-slate-700 hover:border-amber-300/70"
+                  }`}
+                >
+                  Ocultos / baja ({agentesOcultos.length})
+                </Button>
+              </div>
               <span className="text-slate-400 font-semibold">
-                Total agentes:{" "}
+                Total registrados:{" "}
                 <span className="font-bold text-emerald-300">
                   {agentes.length}
                 </span>
@@ -494,11 +587,15 @@ export default function AgentesGestionContenido() {
 
         {/* LISTADO DE AGENTES */}
         <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-6">
-          <h2 className="text-xl font-bold mb-4">Listado de agentes</h2>
+          <h2 className="text-xl font-bold mb-4">
+            {mostrarOcultos ? "Agentes ocultos / baja" : "Listado de agentes activos"}
+          </h2>
 
           {agentesFiltrados.length === 0 ? (
             <div className="rounded-2xl bg-slate-900/40 border border-slate-800 px-6 py-10 text-center text-slate-400 font-medium">
-              No hay agentes registrados aún.
+              {mostrarOcultos
+                ? "No hay agentes ocultos en este tenant."
+                : "No hay agentes activos registrados aún."}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
@@ -542,7 +639,9 @@ export default function AgentesGestionContenido() {
                   {agentesFiltrados.map((a) => (
                     <tr
                       key={a.id}
-                      className="border-t border-slate-800/70 hover:bg-slate-900/80"
+                      className={`border-t border-slate-800/70 hover:bg-slate-900/80 ${
+                        a.ocultoParaAdmin ? "opacity-90" : ""
+                      }`}
                     >
                       <td className="px-4 py-3 font-mono text-xs md:text-sm text-slate-400 font-semibold">
                         #{a.id}
@@ -564,8 +663,13 @@ export default function AgentesGestionContenido() {
                         </td>
                       )}
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-50">
+                        <div className="font-semibold text-slate-50 flex items-center gap-2">
                           {a.nombre}
+                          {a.ocultoParaAdmin && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/50 font-semibold uppercase">
+                              Oculto
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -607,13 +711,23 @@ export default function AgentesGestionContenido() {
                           >
                             Editar
                           </Button>
-                          <Button
-                            size="sm"
-                            className="bg-red-600 text-white hover:bg-red-700 font-semibold px-3 py-1"
-                            onClick={() => handleEliminarAgente(a.id)}
-                          >
-                            Eliminar
-                          </Button>
+                          {!a.ocultoParaAdmin ? (
+                            <Button
+                              size="sm"
+                              className="bg-red-600 text-white hover:bg-red-700 font-semibold px-3 py-1"
+                              onClick={() => handleEliminarAgente(a.id)}
+                            >
+                              Eliminar
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="bg-amber-500 text-slate-950 hover:bg-amber-400 font-semibold px-3 py-1"
+                              onClick={() => handleReactivarAgente(a)}
+                            >
+                              Reactivar
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

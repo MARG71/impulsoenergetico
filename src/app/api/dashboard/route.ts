@@ -79,8 +79,9 @@ export async function GET(req: NextRequest) {
           },
         }),
 
+        // 🔹 SOLO agentes visibles (no ocultos) para que el dashboard cuente "activos" reales
         prisma.agente.findMany({
-          where: byTenant({}),
+          where: byTenant({ ocultoParaAdmin: false }),
           orderBy: { id: "asc" },
           select: { id: true, nombre: true, email: true, telefono: true },
         }),
