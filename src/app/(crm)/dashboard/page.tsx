@@ -29,7 +29,9 @@ export default function DashboardPage() {
   const adminIdParam = searchParams?.get('adminId')
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null
   const isValidAdminContext =
-    typeof adminIdContext === 'number' && Number.isFinite(adminIdContext) && adminIdContext > 0
+    typeof adminIdContext === 'number' &&
+    Number.isFinite(adminIdContext) &&
+    adminIdContext > 0
 
   const [comparativas, setComparativas] = useState<Comparativa[]>([])
   const [agentes, setAgentes] = useState<Agente[]>([])
@@ -40,6 +42,17 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [rangoDias, setRangoDias] = useState<RangoDias>(1) // por defecto: HOY
+
+  // 🔁 Helper para navegar respetando el tenant cuando eres SUPERADMIN
+  const pushTenant = (href: string) => {
+    if (role === 'SUPERADMIN' && isValidAdminContext && adminIdContext) {
+      const hasQuery = href.includes('?')
+      const url = `${href}${hasQuery ? '&' : '?'}adminId=${adminIdContext}`
+      router.push(url)
+    } else {
+      router.push(href)
+    }
+  }
 
   useEffect(() => {
     // Esperamos a tener sesión cargada para no hacer peticiones con role = undefined
@@ -234,7 +247,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-4 py-8">
       <div className="w-full max-w-[1600px] mx-auto space-y-6">
-
         {/* ✅ BANDA SUPERADMIN (modo tenant) */}
         {role === 'SUPERADMIN' && isValidAdminContext && (
           <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/10 p-4 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
@@ -304,7 +316,8 @@ export default function DashboardPage() {
         </div>
 
         {cargando && (
-          <div className="p-6 text-center text-slate-300 text-sm rounded-2xl bg-slate-900/70 border border-slate-800">
+          <div className="p-6 text-center text-slate-300 text-sm rounded-2xl bg-slate-900/70 border border-slate-8
+00">
             Cargando datos...
           </div>
         )}
@@ -324,35 +337,35 @@ export default function DashboardPage() {
                 valor={resumen.leadsRango.length}
                 descripcion={`Registros en ${tituloRango.toLowerCase()}`}
                 color="from-emerald-500 to-emerald-400"
-                onClick={() => router.push('/pipeline-agentes')}
+                onClick={() => pushTenant('/pipeline-agentes')}
               />
               <KpiCard
                 titulo="Leads desde QR"
                 valor={resumen.leadsDesdeQR.length}
                 descripcion="Clientes que han entrado por QR"
                 color="from-sky-500 to-blue-500"
-                onClick={() => router.push('/pipeline-agentes')}
+                onClick={() => pushTenant('/pipeline-agentes')}
               />
               <KpiCard
                 titulo="Comparativas"
                 valor={resumen.comparativasRango.length}
                 descripcion="Luz · Gas · Telefonía · Seguros"
                 color="from-orange-500 to-amber-400"
-                onClick={() => router.push('/dashboard/historial')}
+                onClick={() => pushTenant('/dashboard/historial')}
               />
               <KpiCard
                 titulo="Lugares activos"
                 valor={lugares.length}
                 descripcion="Negocios con QR o clientes vinculados"
                 color="from-lime-500 to-emerald-400"
-                onClick={() => router.push('/lugares')}
+                onClick={() => pushTenant('/lugares')}
               />
               <KpiCard
                 titulo="Agentes activos"
                 valor={agentes.length}
                 descripcion="Comerciales gestionando clientes"
                 color="from-fuchsia-500 to-pink-500"
-                onClick={() => router.push('/agentes')}
+                onClick={() => pushTenant('/agentes')}
               />
             </section>
 
@@ -372,7 +385,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => router.push('/dashboard/historial')}
+                  onClick={() => pushTenant('/dashboard/historial')}
                   className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
                 >
                   Ir a gestión de comparativas
@@ -421,7 +434,7 @@ export default function DashboardPage() {
                     Actividad de clientes ({tituloRango})
                   </h2>
                   <button
-                    onClick={() => router.push('/pipeline-agentes')}
+                    onClick={() => pushTenant('/pipeline-agentes')}
                     className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 transition shadow-lg shadow-blue-600/30"
                   >
                     Ver pipeline completo
@@ -468,14 +481,18 @@ export default function DashboardPage() {
                         <div className="ml-2">
                           {ev.tipo === 'lead' ? (
                             <button
-                              onClick={() => router.push('/pipeline-agentes')}
+                              onClick={() => pushTenant('/pipeline-agentes')}
                               className="text-[13px] font-extrabold text-emerald-300 hover:text-emerald-100"
                             >
                               Ver lead
                             </button>
                           ) : (
                             <button
-                              onClick={() => router.push(`/comparador?id=${ev.id}`)}
+                              onClick={() =>
+                                pushTenant(
+                                  `/comparador?id=${encodeURIComponent(String(ev.id))}`
+                                )
+                              }
                               className="text-[13px] font-extrabold text-orange-300 hover:text-orange-100"
                             >
                               Ver comp.
@@ -526,19 +543,19 @@ export default function DashboardPage() {
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <button
-                    onClick={() => router.push('/pipeline-agentes')}
+                    onClick={() => pushTenant('/pipeline-agentes')}
                     className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30"
                   >
                     Gestionar leads
                   </button>
                   <button
-                    onClick={() => router.push('/lugares')}
+                    onClick={() => pushTenant('/lugares')}
                     className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-lime-400 text-slate-950 hover:bg-lime-300 transition shadow-lg shadow-lime-400/30"
                   >
                     Ver lugares
                   </button>
                   <button
-                    onClick={() => router.push('/agentes')}
+                    onClick={() => pushTenant('/agentes')}
                     className="px-4 py-2 rounded-full text-xs md:text-sm font-semibold bg-sky-500 text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
                   >
                     Ver agentes

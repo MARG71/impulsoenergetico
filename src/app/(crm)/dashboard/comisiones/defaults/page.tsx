@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,41 @@ type Defaults = {
 
 export default function DefaultsComisionesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+
+  const role = (session?.user as any)?.role as
+    | 'SUPERADMIN'
+    | 'ADMIN'
+    | 'AGENTE'
+    | 'LUGAR'
+    | 'CLIENTE'
+    | undefined;
+
+  // ✅ modo tenant solo para SUPERADMIN => ?adminId=...
+  const adminIdParam = searchParams?.get('adminId');
+  const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
+  const isValidAdminContext =
+    role === 'SUPERADMIN' &&
+    typeof adminIdContext === 'number' &&
+    Number.isFinite(adminIdContext) &&
+    adminIdContext > 0;
+
+  // query para las llamadas a la API
+  const adminQuery =
+    role === 'SUPERADMIN' && isValidAdminContext && adminIdContext
+      ? `?adminId=${adminIdContext}`
+      : '';
+
+  // helper para navegar respetando el tenant
+  const pushTenant = (href: string) => {
+    if (role === 'SUPERADMIN' && isValidAdminContext && adminIdContext) {
+      const hasQuery = href.includes('?');
+      router.push(`${href}${hasQuery ? '&' : '?'}adminId=${adminIdContext}`);
+    } else {
+      router.push(href);
+    }
+  };
 
   const [data, setData] = useState<Defaults | null>(null);
   const [cliente, setCliente] = useState('');
@@ -34,28 +68,37 @@ export default function DefaultsComisionesPage() {
   };
   const asPct = (f: number) => `${(f * 100).toFixed(1)}%`;
 
-  // Solo ADMIN
+  // ✅ Solo ADMIN o SUPERADMIN
   useEffect(() => {
     if (status === 'loading') return;
-    if (!session) return;
-    if ((session.user as any)?.role !== 'ADMIN') router.push('/unauthorized');
-  }, [session, status, router]);
+    if (!session || !role) return;
 
-  // Cargar defaults
+    if (role !== 'ADMIN' && role !== 'SUPERADMIN') {
+      router.push('/unauthorized');
+    }
+  }, [session, status, role, router]);
+
+  // Cargar defaults (teniendo en cuenta el tenant si lo hay)
   useEffect(() => {
     (async () => {
-      const res = await fetch('/api/comisiones/defaults', { cache: 'no-store' });
-      const json = await res.json();
-      if (res.ok) {
-        setData(json);
-        setCliente(json?.defaultPctCliente?.toString() ?? '0');
-        setLugar(json?.defaultPctLugar?.toString() ?? '0');
-        setAgente(json?.defaultPctAgente?.toString() ?? '0');
-      } else {
-        setMsg(json?.error ?? 'Error al cargar');
+      try {
+        const res = await fetch(`/api/comisiones/defaults${adminQuery}`, {
+          cache: 'no-store',
+        });
+        const json = await res.json();
+        if (res.ok) {
+          setData(json);
+          setCliente(json?.defaultPctCliente?.toString() ?? '0');
+          setLugar(json?.defaultPctLugar?.toString() ?? '0');
+          setAgente(json?.defaultPctAgente?.toString() ?? '0');
+        } else {
+          setMsg(json?.error ?? 'Error al cargar');
+        }
+      } catch {
+        setMsg('Error al cargar');
       }
     })();
-  }, []);
+  }, [adminQuery]);
 
   // Vista previa
   const preview = useMemo(() => {
@@ -84,7 +127,7 @@ export default function DefaultsComisionesPage() {
     setSaving(true);
     setMsg('');
     try {
-      const res = await fetch('/api/comisiones/defaults', {
+      const res = await fetch(`/api/comisiones/defaults${adminQuery}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,7 +151,7 @@ export default function DefaultsComisionesPage() {
 
   // Estilos base de input (texto oscuro, borde, foco accesible)
   const inputClass =
-    'bg-white text-[#111] placeholder:text-[#6b7280] border border-gray-300 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:ring-[#68B84B]';
+    'bg.white text-[#111] placeholder:text-[#6b7280] border border-gray-300 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:ring-[#68B84B]';
 
   return (
     <div className="min-h-screen bg-[#F4FAEE]">
@@ -116,11 +159,22 @@ export default function DefaultsComisionesPage() {
       <div className="sticky top-0 z-10 bg-gradient-to-r from-[#F4FAEE] via-[#F4FAEE]/95 to-[#F4FAEE] backdrop-blur">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png" alt="Impulso Energético" width={160} height={48} priority />
-            <span className="hidden md:inline text-[#1F1F1F] font-medium">CRM · Comisiones · Defaults</span>
+            <Image
+              src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+              alt="Impulso Energético"
+              width={160}
+              height={48}
+              priority
+            />
+            <span className="hidden md:inline text-[#1F1F1F] font-medium">
+              CRM · Comisiones · Defaults
+            </span>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => router.push('/dashboard')} className="bg-[#F0C300] text-black hover:bg-yellow-400">
+            <Button
+              onClick={() => pushTenant('/dashboard')}
+              className="bg-[#F0C300] text.black hover:bg-yellow-400"
+            >
               🏠 Dashboard
             </Button>
           </div>
@@ -128,20 +182,25 @@ export default function DefaultsComisionesPage() {
       </div>
 
       <main className="mx-auto max-w-6xl px-6 py-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-[#1F1F1F] mb-5">Defaults globales de comisión</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-[#1F1F1F] mb-5">
+          Defaults globales de comisión
+        </h1>
 
         <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.05)] p-6 md:p-7">
           <p className="text-[15px] text-[#374151] mb-6 leading-relaxed">
-            Estos porcentajes se aplican cuando un Lugar/Agente no tiene valores propios ni existe un override.
+            Estos porcentajes se aplican cuando un Lugar/Agente no tiene valores propios ni existe
+            un override.
             <br />
-            <strong>Cliente</strong> se aplica sobre el <strong>pool</strong>; <strong>Lugar</strong> y{' '}
-            <strong>Agente</strong> sobre el <strong>remanente</strong>.
+            <strong>Cliente</strong> se aplica sobre el <strong>pool</strong>; <strong>Lugar</strong>{' '}
+            y <strong>Agente</strong> sobre el <strong>remanente</strong>.
           </p>
 
           {/* Inputs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-[#111] mb-1">% Cliente (pool)</label>
+              <label className="block text-sm font-semibold text-[#111] mb-1">
+                % Cliente (pool)
+              </label>
               <Input
                 inputMode="decimal"
                 className={inputClass}
@@ -151,7 +210,9 @@ export default function DefaultsComisionesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#111] mb-1">% Lugar (remanente)</label>
+              <label className="block text-sm font-semibold text-[#111] mb-1">
+                % Lugar (remanente)
+              </label>
               <Input
                 inputMode="decimal"
                 className={inputClass}
@@ -161,7 +222,9 @@ export default function DefaultsComisionesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#111] mb-1">% Agente (remanente)</label>
+              <label className="block text-sm font-semibold text-[#111] mb-1">
+                % Agente (remanente)
+              </label>
               <Input
                 inputMode="decimal"
                 className={inputClass}
@@ -174,7 +237,11 @@ export default function DefaultsComisionesPage() {
 
           {/* Botón y mensajes */}
           <div className="mt-5 flex items-center gap-3">
-            <Button onClick={guardar} disabled={saving} className="bg-[#68B84B] text-white hover:bg-[#499a2f] px-6">
+            <Button
+              onClick={guardar}
+              disabled={saving}
+              className="bg-[#68B84B] text-white hover:bg-[#499a2f] px-6"
+            >
               {saving ? 'Guardando…' : 'Guardar'}
             </Button>
             {msg && (
@@ -194,18 +261,23 @@ export default function DefaultsComisionesPage() {
             {preview && !('error' in preview) ? (
               <ul className="text-[15px] leading-7 text-[#111]">
                 <li>
-                  Cliente: <strong>{asPct(asFrac(cliente))}</strong> → {preview.clienteEur.toFixed(2)} €
+                  Cliente: <strong>{asPct(asFrac(cliente))}</strong> →{' '}
+                  {preview.clienteEur.toFixed(2)} €
                 </li>
                 <li>
-                  Agente: <strong>{asPct(asFrac(agente))}</strong> del remanente → {preview.agenteEur.toFixed(2)} €
+                  Agente: <strong>{asPct(asFrac(agente))}</strong> del remanente →{' '}
+                  {preview.agenteEur.toFixed(2)} €
                 </li>
                 <li>
-                  Lugar: <strong>{asPct(asFrac(lugar))}</strong> del remanente → {preview.lugarEur.toFixed(2)} €
+                  Lugar: <strong>{asPct(asFrac(lugar))}</strong> del remanente →{' '}
+                  {preview.lugarEur.toFixed(2)} €
                 </li>
                 <li>Admin: (remanente - agente - lugar) → {preview.adminEur.toFixed(2)} €</li>
               </ul>
             ) : (
-              <div className="text-[#dc2626] text-sm">{(preview as any)?.error ?? 'Completa los valores'}</div>
+              <div className="text-[#dc2626] text-sm">
+                {(preview as any)?.error ?? 'Completa los valores'}
+              </div>
             )}
           </div>
         </div>
@@ -213,4 +285,3 @@ export default function DefaultsComisionesPage() {
     </div>
   );
 }
-
