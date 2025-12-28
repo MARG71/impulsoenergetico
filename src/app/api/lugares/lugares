@@ -88,14 +88,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // Por ahora solo SUPERADMIN y ADMIN crean lugares
-  if (!ctx.isSuperadmin && !ctx.isAdmin) {
-    return NextResponse.json(
-      { error: "Solo SUPERADMIN o ADMIN pueden crear lugares" },
-      { status: 403 }
-    );
-  }
-
   const body = await req.json().catch(() => ({}));
   const {
     nombre,
@@ -110,6 +102,7 @@ export async function POST(req: NextRequest) {
     especialMensaje,
     aportacionAcumulada,
     especialCartelUrl,
+    adminId: adminIdFromBody, // 👈 lo recibimos del formulario (solo SUPERADMIN)
   } = body || {};
 
   if (!nombre || !direccion || !qrCode || !agenteId) {
@@ -119,13 +112,55 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // adminId del lugar = tenant actual (ADMIN o SUPERADMIN en modo tenant)
-  const adminId =
-    ctx.tenantAdminId && Number.isFinite(ctx.tenantAdminId)
-      ? Number(ctx.tenantAdminId)
-      : ctx.isAdmin
-      ? ctx.userId
-      : null;
+  // 🔐 Determinar adminId (dueño del lugar)
+  let adminId: number | null = null;
+
+  if (ctx.isSuperadmin) {
+    // SUPERADMIN:
+    // 1) si viene en el body, usamos ese admin
+    // 2) si está en modo tenant (?adminId=...), usamos ese
+    if (adminIdFromBody) {
+      adminId = Number(adminIdFromBody);
+    } else if (ctx.tenantAdminId) {
+      adminId = Number(ctx.tenantAdminId);
+    }
+
+    if (!adminId || !Number.isFinite(adminId)) {
+      return NextResponse.json(
+        { error: "Debes seleccionar un ADMIN propietario para el lugar" },
+        { status: 400 }
+      );
+    }
+
+    // (Opcional pero recomendado) verificar que existe y es ADMIN
+    const adminUsuario = await prisma.usuario.findUnique({
+      where: { id: adminId },
+      select: { id: true, rol: true },
+    });
+    if (!adminUsuario || adminUsuario.rol !== "ADMIN") {
+      return NextResponse.json(
+        { error: "El ADMIN seleccionado no es válido" },
+        { status: 400 }
+      );
+    }
+  } else if (ctx.isAdmin) {
+    // ADMIN: el admin es el propio tenant
+    adminId =
+      (ctx.tenantAdminId && Number(ctx.tenantAdminId)) || ctx.userId || null;
+  } else if (ctx.isAgente) {
+    // (si en algún momento permites que el agente cree lugares)
+    // podrías decidir aquí cómo establecer adminId (por ejemplo, el admin del agente)
+    // De momento, lo bloqueamos:
+    return NextResponse.json(
+      { error: "Solo SUPERADMIN o ADMIN pueden crear lugares" },
+      { status: 403 }
+    );
+  } else {
+    return NextResponse.json(
+      { error: "Solo SUPERADMIN o ADMIN pueden crear lugares" },
+      { status: 403 }
+    );
+  }
 
   try {
     const lugar = await prisma.lugar.create({
@@ -142,7 +177,7 @@ export async function POST(req: NextRequest) {
         especialMensaje: especialMensaje || null,
         aportacionAcumulada: Number(aportacionAcumulada || 0),
         especialCartelUrl: especialCartelUrl || null,
-        adminId,
+        adminId, // 👈 muy importante para la trazabilidad
       },
       include: {
         agente: {

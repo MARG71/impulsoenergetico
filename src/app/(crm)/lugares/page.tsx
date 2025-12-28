@@ -25,6 +25,7 @@ const toNumberOr = (v: any, fallback = 0) => {
 
 type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 type Lugar = any;
+type Admin = { id: number; nombre: string; email: string };
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
@@ -59,6 +60,9 @@ export default function RegistrarLugar() {
     return `${href}${hasQuery ? "&" : "?"}adminId=${adminIdContext}`;
   };
 
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [adminSeleccionado, setAdminSeleccionado] = useState<string>("");
+
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
   const [fondos, setFondos] = useState<Fondo[]>([]);
@@ -73,6 +77,7 @@ export default function RegistrarLugar() {
     nombre: "",
     direccion: "",
     qrCode: "",
+    adminId: "", // 👈 para SUPERADMIN
     agenteId: "",
     pctCliente: "",
     pctLugar: "",
@@ -97,25 +102,72 @@ export default function RegistrarLugar() {
   const [cartelPreview, setCartelPreview] = useState<string | null>(null);
 
   // ───────────────────────────────
-  // Carga inicial (agentes + lugares + fondos)
+  // 1) Cargar admins (solo SUPERADMIN)
+  // ───────────────────────────────
+  useEffect(() => {
+    if (!session || !isSuperadmin) return;
+
+    (async () => {
+      try {
+        // 🔁 Usa el MISMO endpoint que utilices en la sección de agentes
+        // Si en agentes haces fetch('/api/admins'), hazlo igual aquí:
+        const res = await fetch("/api/admins", { cache: "no-store" });
+        const data = await res.json();
+        const lista = Array.isArray(data) ? data : [];
+        setAdmins(lista);
+
+        // Si estamos en modo tenant => preselecciona ese admin
+        if (tenantMode && adminIdContext) {
+          setAdminSeleccionado(String(adminIdContext));
+          setNuevo((s) => ({ ...s, adminId: String(adminIdContext) }));
+        } else if (lista.length > 0) {
+          // Superadmin global: preseleccionar el primero como comodidad
+          setAdminSeleccionado(String(lista[0].id));
+          setNuevo((s) => ({ ...s, adminId: String(lista[0].id) }));
+        }
+      } catch (err) {
+        console.error("Error cargando admins:", err);
+        setAdmins([]);
+      }
+    })();
+  }, [session, isSuperadmin, tenantMode, adminIdContext]);
+
+  // ───────────────────────────────
+  // 2) Cargar agentes en función del rol
   // ───────────────────────────────
   useEffect(() => {
     if (!session || !role) return;
 
     (async () => {
-      // AGENTES
       let agentesData: any[] = [];
-      if (isAdmin || isSuperadmin) {
+
+      if (isSuperadmin) {
+        // SUPERADMIN: si hay adminSeleccionado => agentes de ese admin
+        if (adminSeleccionado) {
+          try {
+            const res = await fetch(
+              `/api/agentes?adminId=${adminSeleccionado}`,
+              { cache: "no-store" }
+            );
+            const json = await res.json();
+            agentesData = Array.isArray(json) ? json : [];
+          } catch {
+            agentesData = [];
+          }
+        } else {
+          agentesData = [];
+        }
+      } else if (isAdmin) {
+        // ADMIN: sus agentes (tenant ya viene dado por el token)
         try {
-          const res = await fetch(`/api/agentes${adminQuery}`, {
-            cache: "no-store",
-          });
+          const res = await fetch(`/api/agentes`, { cache: "no-store" });
           const json = await res.json();
           agentesData = Array.isArray(json) ? json : [];
         } catch {
           agentesData = [];
         }
       } else if (isAgente) {
+        // AGENTE: solo él mismo
         const agenteId = (session?.user as any)?.agenteId;
         const nombreAgente =
           (session?.user as any)?.name ||
@@ -123,12 +175,22 @@ export default function RegistrarLugar() {
           "Agente";
         if (agenteId) {
           agentesData = [{ id: agenteId, nombre: nombreAgente }];
-          // preseleccionamos su propio id
           setNuevo((s) => ({ ...s, agenteId: String(agenteId) }));
         }
       }
 
-      // LUGARES (multi-tenant)
+      setAgentes(agentesData);
+    })();
+  }, [session, role, isSuperadmin, isAdmin, isAgente, adminSeleccionado]);
+
+  // ───────────────────────────────
+  // 3) Cargar lugares + fondos
+  // ───────────────────────────────
+  useEffect(() => {
+    if (!session || !role) return;
+
+    (async () => {
+      // Lugares: usan el contexto de tenant (adminQuery) como ya teníamos
       let lugaresData: any[] = [];
       try {
         const res = await fetch(`/api/lugares${adminQuery}`, {
@@ -140,7 +202,6 @@ export default function RegistrarLugar() {
         lugaresData = [];
       }
 
-      // FONDOS (global)
       let fondosData: any[] = [];
       try {
         const res = await fetch("/api/fondos");
@@ -150,14 +211,13 @@ export default function RegistrarLugar() {
         fondosData = [];
       }
 
-      setAgentes(agentesData);
       setLugares(lugaresData);
       setFondos(fondosData);
 
       const activo = fondosData.find((f: Fondo) => f.activo);
       if (activo) setFondoSeleccionado(activo.url);
     })();
-  }, [session, role, isAdmin, isSuperadmin, isAgente, adminQuery]);
+  }, [session, role, adminQuery]);
 
   // ---- Listado filtrado (por cualquier campo visible) ----
   const lugaresFiltrados = useMemo(() => {
@@ -215,6 +275,14 @@ export default function RegistrarLugar() {
   const registrarLugar = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validaciones extra para SUPERADMIN
+    if (isSuperadmin) {
+      if (!nuevo.adminId) {
+        alert("Selecciona un ADMIN propietario para el lugar.");
+        return;
+      }
+    }
+
     let especialLogoUrl = nuevo.especialLogoUrl;
     if (nuevo.especial && nuevo.logoFile) {
       const up = await subirFichero(nuevo.logoFile, "logos-lugares");
@@ -241,6 +309,11 @@ export default function RegistrarLugar() {
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
     };
 
+    // 👇 SUPERADMIN: mandamos adminId explícito
+    if (isSuperadmin && nuevo.adminId) {
+      body.adminId = nuevo.adminId;
+    }
+
     if (especialCartelUrl && especialCartelUrl.trim()) {
       body.especialCartelUrl = especialCartelUrl.trim();
     }
@@ -263,6 +336,7 @@ export default function RegistrarLugar() {
       nombre: "",
       direccion: "",
       qrCode: "",
+      adminId: isSuperadmin ? nuevo.adminId : "", // superadmin mantiene el admin seleccionado
       agenteId: "",
       pctCliente: "",
       pctLugar: "",
@@ -378,7 +452,6 @@ export default function RegistrarLugar() {
   // ───────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-8 py-10 text-slate-50">
-      {/* Contenedor ancho */}
       <div className="w-full max-w-[1700px] mx-auto space-y-8">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
@@ -435,6 +508,36 @@ export default function RegistrarLugar() {
           <h2 className="text-xl font-bold mb-4">Crear nuevo lugar</h2>
 
           <form onSubmit={registrarLugar} className="space-y-4">
+            {/* SUPERADMIN: selector de ADMIN propietario */}
+            {isSuperadmin && (
+              <div className="mb-4">
+                <label className="text-xs text-slate-300 font-semibold">
+                  Admin propietario del lugar
+                </label>
+                <select
+                  className="mt-1 w-full md:w-1/2 border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm"
+                  value={adminSeleccionado}
+                  onChange={(e) => {
+                    setAdminSeleccionado(e.target.value);
+                    setNuevo((s) => ({ ...s, adminId: e.target.value }));
+                  }}
+                  disabled={tenantMode} // en tenant ya viene fijado
+                >
+                  <option value="">Selecciona un admin…</option>
+                  {admins.map((ad) => (
+                    <option key={ad.id} value={ad.id}>
+                      {ad.nombre} ({ad.email})
+                    </option>
+                  ))}
+                </select>
+                {tenantMode && adminSeleccionado && (
+                  <p className="text-[11px] text-emerald-300 mt-1">
+                    Fijado por modo tenant (admin #{adminSeleccionado})
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="text-xs text-slate-300 font-semibold">
@@ -536,7 +639,7 @@ export default function RegistrarLugar() {
                     setNuevo((s) => ({ ...s, agenteId: e.target.value }))
                   }
                   required
-                  disabled={isAgente} // el agente siempre se usa a sí mismo
+                  disabled={isAgente}
                 >
                   <option value="">
                     {isAgente
