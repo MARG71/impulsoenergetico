@@ -299,8 +299,7 @@ export default function RegistrarLugar() {
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
     };
 
-    // ✅ SUPERADMIN global: enviamos adminSeleccionado para que el backend
-    // sepa en qué tenant crear el lugar.
+    // (opcional, no molesta aunque el backend no lo use)
     if (isSuperadmin && !tenantMode && adminSeleccionado) {
       body.adminSeleccionado = adminSeleccionado;
     }
@@ -309,11 +308,25 @@ export default function RegistrarLugar() {
       body.especialCartelUrl = especialCartelUrl.trim();
     }
 
-    const r = await fetch(`/api/lugares${adminQuery}`, {
+    // 👇 AQUÍ VIENE LA CLAVE: construimos la query ?adminId=...
+    let queryForPost = "";
+
+    if (isSuperadmin) {
+      if (tenantMode && adminIdContext) {
+        // SUPERADMIN en modo tenant -> usamos el admin del tenant
+        queryForPost = `?adminId=${adminIdContext}`;
+      } else if (!tenantMode && adminSeleccionado) {
+        // SUPERADMIN global creando desde el desplegable
+        queryForPost = `?adminId=${adminSeleccionado}`;
+      }
+    }
+
+    const r = await fetch(`/api/lugares${queryForPost}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+
     const d = await r.json();
     if (!r.ok) {
       alert(d?.error || "Error al crear lugar");
