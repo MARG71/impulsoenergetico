@@ -799,12 +799,12 @@ export default function RegistrarLugar() {
 
                             <Button
                               className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-9"
-                              onClick={() => window.open(landingUrlFor(l), "_blank")}
+                              onClick={() => router.push(withTenant(`/lugares/compartir/${l.id}`))}
                               size="sm"
-                              title="Abrir landing pública (registro)"
                             >
                               🔗 Landing
                             </Button>
+
 
                             {(isAdmin || isSuperadmin) ? (
                               <Button
