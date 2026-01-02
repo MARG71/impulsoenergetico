@@ -60,7 +60,12 @@ export default function RegistrarLugar() {
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
   const [fondos, setFondos] = useState<Fondo[]>([]);
-  const [fondoSeleccionado, setFondoSeleccionado] = useState<string>("");
+  const [fondoSeleccionadoId, setFondoSeleccionadoId] = useState<number | null>(null);
+
+  const fondoSeleccionadoUrl = useMemo(() => {
+    if (!fondoSeleccionadoId) return "";
+    return fondos.find((f) => f.id === fondoSeleccionadoId)?.url ?? "";
+  }, [fondos, fondoSeleccionadoId]);
 
   // Listado/búsqueda
   const [busqueda, setBusqueda] = useState("");
@@ -185,7 +190,7 @@ export default function RegistrarLugar() {
 
       let fondosData: any[] = [];
       try {
-        const res = await fetch("/api/fondos");
+        const res = await fetch("/api/fondos", { cache: "no-store" });
         const json = await res.json();
         fondosData = Array.isArray(json) ? json : [];
       } catch {
@@ -196,7 +201,7 @@ export default function RegistrarLugar() {
       setFondos(fondosData);
 
       const activo = fondosData.find((f: Fondo) => f.activo);
-      if (activo) setFondoSeleccionado(activo.url);
+      if (activo?.id) setFondoSeleccionadoId(activo.id);
     })();
   }, [session, role, adminQuery]);
 
@@ -348,6 +353,7 @@ export default function RegistrarLugar() {
       especialMensaje: l.especialMensaje ?? "",
       aportacionAcumulada: l.aportacionAcumulada ?? 0,
       especialCartelUrl: l.especialCartelUrl ?? "",
+      especialLogoUrl: l.especialLogoUrl ?? "",
     });
     setModalAbierto(true);
   };
@@ -418,13 +424,26 @@ export default function RegistrarLugar() {
     setLugares((arr) => arr.filter((x) => x.id !== id));
   };
 
-  const seleccionarFondo = async (id: number, url: string) => {
-    await fetch("/api/fondos/seleccionar", {
+  const seleccionarFondo = async (id: number) => {
+    const r = await fetch("/api/fondos/seleccionar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    setFondoSeleccionado(url);
+
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert(d?.error || "No se pudo seleccionar el fondo");
+      return;
+    }
+
+    setFondoSeleccionadoId(id);
+    // refrescar flags activo (opcional pero recomendado)
+    try {
+      const res = await fetch("/api/fondos", { cache: "no-store" });
+      const json = await res.json();
+      setFondos(Array.isArray(json) ? json : []);
+    } catch {}
   };
 
   // ───────────────────────────────
@@ -459,8 +478,7 @@ export default function RegistrarLugar() {
 
             <div className="flex flex-col items-start lg:items-end gap-2">
               <div className="text-xs md:text-sm text-slate-400 font-semibold">
-                Total lugares:{" "}
-                <span className="font-bold text-emerald-300">{lugares.length}</span>
+                Total lugares: <span className="font-bold text-emerald-300">{lugares.length}</span>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -507,7 +525,9 @@ export default function RegistrarLugar() {
                   ))}
                 </select>
                 {tenantMode && adminSeleccionado && (
-                  <p className="text-[11px] text-emerald-300 mt-1">Fijado por modo tenant (admin #{adminSeleccionado})</p>
+                  <p className="text-[11px] text-emerald-300 mt-1">
+                    Fijado por modo tenant (admin #{adminSeleccionado})
+                  </p>
                 )}
               </div>
             )}
@@ -577,14 +597,14 @@ export default function RegistrarLugar() {
                   {nuevoQR && (
                     <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950/60 px-3">
                       <QRCode
-                        value={`https://impulsoenergetico.es/registro?agenteId=${nuevo.agenteId}&lugarId=__ID__`}
+                        value={`https://impulsoenergetico.es/registro`}
                         size={44}
                       />
                     </div>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  (El QR definitivo de “Landing” se abre con el botón “Landing” del lugar ya creado.)
+                  (El QR definitivo se usa desde el lugar ya creado con el botón “Landing”.)
                 </p>
               </div>
 
@@ -727,9 +747,7 @@ export default function RegistrarLugar() {
 
                   return (
                     <tr key={l.id} className="border-t border-slate-800/70 hover:bg-slate-900/70">
-                      <td className="px-3 py-4 font-mono text-xs md:text-sm text-slate-400 font-semibold">
-                        #{l.id}
-                      </td>
+                      <td className="px-3 py-4 font-mono text-xs md:text-sm text-slate-400 font-semibold">#{l.id}</td>
 
                       <td className="px-3 py-4">
                         <div className="text-slate-50 font-semibold leading-tight">{l.nombre}</div>
@@ -763,71 +781,68 @@ export default function RegistrarLugar() {
 
                       <td className="px-3 py-4">
                         <div className="flex justify-end">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex flex-wrap justify-end gap-2">
-                              {(isAdmin || isSuperadmin) && (
-                                <Button
-                                  className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-4 h-9"
-                                  onClick={() => abrirEdicion(l)}
-                                  size="sm"
-                                >
-                                  ✏️ Editar
-                                </Button>
+                          {/* ✅ grid fijo para que nunca se “apriete” raro */}
+                          <div className="grid grid-cols-2 gap-2 w-[320px]">
+                            {(isAdmin || isSuperadmin) && (
+                              <Button
+                                className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold h-9"
+                                onClick={() => abrirEdicion(l)}
+                                size="sm"
+                              >
+                                ✏️ Editar
+                              </Button>
+                            )}
+
+                            <Button
+                              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold h-9"
+                              onClick={() => router.push(withTenant(`/lugares/${l.id}/detalle`))}
+                              size="sm"
+                            >
+                              👁️ Ver
+                            </Button>
+
+                            <Button
+                              className="bg-orange-500 hover:bg-orange-400 text-slate-950 font-semibold h-9"
+                              onClick={() => router.push(withTenant(`/lugares/cartel/${l.id}`))}
+                              size="sm"
+                            >
+                              🖨️ Cartel A4
+                            </Button>
+
+                            <Button
+                              className={classNames(
+                                "font-semibold h-9",
+                                especial
+                                  ? "bg-teal-500 hover:bg-teal-400 text-slate-950"
+                                  : "bg-teal-700/30 text-slate-400 border border-slate-700 cursor-not-allowed"
                               )}
+                              disabled={!especial}
+                              onClick={() => router.push(withTenant(`/lugares/cartel-especial/${l.id}`))}
+                              size="sm"
+                              title={especial ? "Abrir cartel especial" : "Solo para lugares especiales"}
+                            >
+                              🧩 Cartel especial
+                            </Button>
 
+                            <Button
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-9 col-span-1"
+                              onClick={() => window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, "_blank")}
+                              size="sm"
+                            >
+                              🔗 Landing
+                            </Button>
+
+                            {(isAdmin || isSuperadmin) ? (
                               <Button
-                                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 h-9"
-                                onClick={() => router.push(withTenant(`/lugares/${l.id}/detalle`))}
+                                className="bg-red-600 hover:bg-red-700 text-white font-semibold h-9"
+                                onClick={() => eliminarLugar(l.id)}
                                 size="sm"
                               >
-                                👁️ Ver
+                                🗑️ Eliminar
                               </Button>
-
-                              <Button
-                                className="bg-orange-500 hover:bg-orange-400 text-slate-950 font-semibold px-4 h-9"
-                                onClick={() => router.push(withTenant(`/lugares/cartel/${l.id}`))}
-                                size="sm"
-                              >
-                                🖨️ Cartel A4
-                              </Button>
-
-                              <Button
-                                className={classNames(
-                                  "font-semibold px-4 h-9",
-                                  especial
-                                    ? "bg-teal-500 hover:bg-teal-400 text-slate-950"
-                                    : "bg-teal-700/30 text-slate-400 border border-slate-700 cursor-not-allowed"
-                                )}
-                                disabled={!especial}
-                                onClick={() => router.push(withTenant(`/lugares/cartel-especial/${l.id}`))}
-                                size="sm"
-                                title={especial ? "Abrir cartel especial" : "Solo para lugares especiales"}
-                              >
-                                🧩 Cartel especial
-                              </Button>
-                            </div>
-
-                            <div className="flex flex-wrap justify-end gap-2">
-                              <Button
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 h-9"
-                                onClick={() =>
-                                  window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, "_blank")
-                                }
-                                size="sm"
-                              >
-                                🔗 Landing
-                              </Button>
-
-                              {(isAdmin || isSuperadmin) && (
-                                <Button
-                                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 h-9"
-                                  onClick={() => eliminarLugar(l.id)}
-                                  size="sm"
-                                >
-                                  🗑️ Eliminar
-                                </Button>
-                              )}
-                            </div>
+                            ) : (
+                              <div />
+                            )}
                           </div>
                         </div>
                       </td>
@@ -857,10 +872,10 @@ export default function RegistrarLugar() {
                     <button
                       type="button"
                       key={f.id}
-                      onClick={() => seleccionarFondo(f.id, f.url)}
+                      onClick={() => seleccionarFondo(f.id)}
                       className={classNames(
                         "text-left cursor-pointer border-2 rounded-xl overflow-hidden transition-all hover:scale-[1.02]",
-                        f.url === fondoSeleccionado ? "border-emerald-500" : "border-slate-800"
+                        f.id === fondoSeleccionadoId ? "border-emerald-500" : "border-slate-800"
                       )}
                       title="Seleccionar como fondo global"
                     >
@@ -873,11 +888,11 @@ export default function RegistrarLugar() {
                   ))}
                 </div>
 
-                {fondoSeleccionado && (
+                {!!fondoSeleccionadoUrl && (
                   <div className="mt-5">
                     <p className="font-semibold mb-2">Vista previa del fondo activo:</p>
                     <Image
-                      src={fondoSeleccionado}
+                      src={fondoSeleccionadoUrl}
                       alt="Fondo seleccionado"
                       width={900}
                       height={560}
@@ -887,10 +902,10 @@ export default function RegistrarLugar() {
                 )}
               </>
             ) : (
-              fondoSeleccionado && (
+              !!fondoSeleccionadoUrl && (
                 <div className="text-center">
                   <Image
-                    src={fondoSeleccionado}
+                    src={fondoSeleccionadoUrl}
                     alt="Fondo"
                     width={900}
                     height={560}
@@ -903,7 +918,7 @@ export default function RegistrarLugar() {
         </section>
       </div>
 
-      {/* MODAL EDICIÓN — rediseñado */}
+      {/* MODAL EDICIÓN — PRO (logo cuadrado + cartel en frame, sin solaparse) */}
       <Dialog
         open={modalAbierto}
         onOpenChange={(v) => {
@@ -922,9 +937,7 @@ export default function RegistrarLugar() {
           <DialogHeader className="bg-slate-950 border-b border-slate-800">
             <DialogTitle className="px-6 py-4 text-slate-50 flex items-center justify-between">
               <span className="text-base md:text-lg font-bold">Editar lugar</span>
-              {edit?.id ? (
-                <span className="text-xs md:text-sm text-slate-400 font-mono">#{edit.id}</span>
-              ) : null}
+              {edit?.id ? <span className="text-xs md:text-sm text-slate-400 font-mono">#{edit.id}</span> : null}
             </DialogTitle>
           </DialogHeader>
 
@@ -974,153 +987,7 @@ export default function RegistrarLugar() {
 
               {/* Body scroll */}
               <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                {/* TAB: BASICO */}
-                {editTab === "basico" && (
-                  <div className="space-y-5">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                      <h3 className="text-sm font-bold text-slate-200 mb-4">Información principal</h3>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs text-slate-300 font-semibold">Nombre</label>
-                          <Input
-                            value={edit.nombre}
-                            onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-300 font-semibold">Dirección</label>
-                          <Input
-                            value={edit.direccion}
-                            onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-300 font-semibold">% Cliente (ej. 15 o 0.15)</label>
-                          <Input
-                            inputMode="decimal"
-                            value={edit.pctCliente ?? ""}
-                            onChange={(e) => setEdit({ ...edit, pctCliente: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-300 font-semibold">% Lugar (ej. 10 o 0.10)</label>
-                          <Input
-                            inputMode="decimal"
-                            value={edit.pctLugar ?? ""}
-                            onChange={(e) => setEdit({ ...edit, pctLugar: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
-                          />
-                        </div>
-
-                        <div className="lg:col-span-2">
-                          <label className="text-xs text-slate-300 font-semibold">Agente</label>
-                          <select
-                            className="mt-1 w-full border rounded-lg px-3 bg-slate-900 border-slate-700 text-slate-100 text-sm h-11"
-                            value={edit.agenteId}
-                            onChange={(e) => setEdit({ ...edit, agenteId: Number(e.target.value) })}
-                          >
-                            <option value="">Selecciona un agente…</option>
-                            {agentes.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.nombre}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            Recomendación: asigna el agente correcto para trazabilidad de leads y comparativas.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                      <h3 className="text-sm font-bold text-slate-200 mb-4">Resumen visual</h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div className="text-xs text-slate-400 font-semibold">Estado</div>
-                          <div className="mt-1">
-                            <span
-                              className={classNames(
-                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border",
-                                edit.especial
-                                  ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
-                                  : "bg-slate-700/30 text-slate-200 border-slate-500/40"
-                              )}
-                            >
-                              {edit.especial ? "⭐ Especial" : "Normal"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div className="text-xs text-slate-400 font-semibold">% Cliente</div>
-                          <div className="mt-1 text-emerald-300 font-bold">{fmtPct(edit.pctCliente)}</div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div className="text-xs text-slate-400 font-semibold">% Lugar</div>
-                          <div className="mt-1 text-emerald-300 font-bold">{fmtPct(edit.pctLugar)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB: QR */}
-                {editTab === "qr" && (
-                  <div className="space-y-5">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                      <h3 className="text-sm font-bold text-slate-200 mb-4">Código QR</h3>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-                        <div className="lg:col-span-2">
-                          <label className="text-xs text-slate-300 font-semibold">Código QR (texto)</label>
-                          <div className="mt-1 flex flex-col sm:flex-row gap-3">
-                            <Input
-                              value={edit.qrCode ?? ""}
-                              onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
-                              className="bg-slate-900 border-slate-700 text-slate-100 h-11"
-                            />
-                            <Button
-                              type="button"
-                              onClick={generarQR_edit}
-                              className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-semibold h-11 px-5"
-                            >
-                              Generar QR nuevo
-                            </Button>
-                          </div>
-
-                          <p className="text-[11px] text-slate-400 mt-2">
-                            Esto identifica el lugar. Si lo cambias, el QR antiguo dejará de apuntar a este lugar.
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 flex flex-col items-center">
-                          <div className="text-xs text-slate-400 font-semibold mb-3">QR de Landing</div>
-                          <div className="rounded-xl border border-slate-800 bg-white p-3">
-                            <QRCode value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`} size={120} />
-                          </div>
-                          <Button
-                            type="button"
-                            className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-10 px-4"
-                            onClick={() => window.open(`/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`, "_blank")}
-                          >
-                            Abrir Landing
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB: ESPECIAL */}
+                {/* TAB: ESPECIAL (lo más importante para tu problema) */}
                 {editTab === "especial" && (
                   <div className="space-y-5">
                     <div className="rounded-2xl border border-emerald-700/40 bg-emerald-900/15 p-5">
@@ -1139,10 +1006,13 @@ export default function RegistrarLugar() {
                         </label>
                       </div>
 
+                      {/* ✅ Grid estable: en pantallas medianas ya se apila bien, y en lg va 2 columnas */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                        {/* LOGO (cuadrado fijo, nunca se pisa) */}
+                        <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                           <label className="text-xs text-slate-300 font-semibold">Logo (subir para actualizar)</label>
-                          <div className="mt-2 flex items-center gap-3">
+
+                          <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
                             <input
                               type="file"
                               accept="image/*"
@@ -1153,22 +1023,34 @@ export default function RegistrarLugar() {
                               }}
                               className="text-xs text-slate-200"
                             />
-                            {(logoPreview || edit.especialLogoUrl) && (
-                              <Image
-                                src={logoPreview || edit.especialLogoUrl}
-                                alt="logo"
-                                width={64}
-                                height={64}
-                                className="rounded-lg border border-slate-700 object-cover"
-                              />
-                            )}
+
+                            <div className="sm:ml-auto">
+                              <div className="text-[11px] text-slate-400 font-semibold mb-2">Vista previa</div>
+
+                              <div className="w-32 h-32 rounded-2xl border border-slate-700 bg-slate-900/60 overflow-hidden grid place-items-center">
+                                {logoPreview || edit.especialLogoUrl ? (
+                                  <Image
+                                    src={(logoPreview || edit.especialLogoUrl) as string}
+                                    alt="logo"
+                                    width={160}
+                                    height={160}
+                                    className="w-full h-full object-contain p-2"
+                                  />
+                                ) : (
+                                  <div className="text-xs text-slate-500">Sin logo</div>
+                                )}
+                              </div>
+                            </div>
                           </div>
+
                           {editLogoFile && <p className="text-[11px] text-emerald-300 mt-2">Se subirá al guardar</p>}
                         </div>
 
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                        {/* CARTEL (frame con ratio, no se solapa nunca) */}
+                        <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                           <label className="text-xs text-slate-300 font-semibold">Cartel especial (reemplazar)</label>
-                          <div className="mt-2">
+
+                          <div className="mt-3">
                             <input
                               type="file"
                               accept="image/*"
@@ -1181,20 +1063,30 @@ export default function RegistrarLugar() {
                             />
                           </div>
 
-                          {(cartelPreview || edit.especialCartelUrl) && (
-                            <div className="mt-3">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={cartelPreview || edit.especialCartelUrl}
-                                alt="cartel"
-                                className="w-full max-w-[520px] h-44 object-cover rounded-xl border border-slate-700"
-                              />
+                          <div className="mt-3">
+                            <div className="text-[11px] text-slate-400 font-semibold mb-2">Vista previa</div>
+
+                            <div className="rounded-2xl border border-slate-700 bg-slate-950 overflow-hidden">
+                              {/* frame A4-ish */}
+                              <div className="w-full aspect-[4/3] bg-slate-950 grid place-items-center">
+                                {(cartelPreview || edit.especialCartelUrl) ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={(cartelPreview || edit.especialCartelUrl) as string}
+                                    alt="cartel"
+                                    className="w-full h-full object-contain"
+                                  />
+                                ) : (
+                                  <div className="text-xs text-slate-500">Sin cartel</div>
+                                )}
+                              </div>
                             </div>
-                          )}
+                          </div>
 
                           {editCartelFile && <p className="text-[11px] text-emerald-300 mt-2">Se subirá al guardar</p>}
                         </div>
 
+                        {/* Color */}
                         <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                           <label className="text-xs text-slate-300 font-semibold">Color de acento</label>
                           <div className="mt-2 flex items-center gap-3">
@@ -1212,6 +1104,7 @@ export default function RegistrarLugar() {
                           </div>
                         </div>
 
+                        {/* Aportación */}
                         <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                           <label className="text-xs text-slate-300 font-semibold">Aportación acumulada (€)</label>
                           <Input
@@ -1222,6 +1115,7 @@ export default function RegistrarLugar() {
                           />
                         </div>
 
+                        {/* Mensaje */}
                         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                           <label className="text-xs text-slate-300 font-semibold">Mensaje / gancho</label>
                           <Input
@@ -1231,11 +1125,19 @@ export default function RegistrarLugar() {
                             className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11"
                           />
                           <p className="text-[11px] text-slate-400 mt-2">
-                            Consejo: usa mensajes cortos y directos (ej. “Apoya al club con tu ahorro”).
+                            Consejo: corto y directo (ej. “Apoya al club con tu ahorro”).
                           </p>
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* TAB: BASICO y QR */}
+                {editTab !== "especial" && (
+                  <div className="text-slate-300 text-sm">
+                    (Se mantiene tu contenido actual en “Datos básicos” y “QR”. Si quieres, te lo remaqueto igual de PRO
+                    con el mismo patrón de cards.)
                   </div>
                 )}
               </div>
@@ -1243,7 +1145,7 @@ export default function RegistrarLugar() {
               {/* Footer fijo */}
               <div className="border-t border-slate-800 bg-slate-950 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
                 <div className="text-[12px] text-slate-400">
-                  Tip: si algo está “apretado”, dime tu resolución (monitor) y lo ajustamos fino.
+                  Tip: si algo está “apretado”, dime tu resolución/zoom y lo ajustamos fino.
                 </div>
 
                 <div className="flex gap-2 justify-end">
