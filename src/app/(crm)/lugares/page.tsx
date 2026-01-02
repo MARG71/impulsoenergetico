@@ -7,12 +7,7 @@ import QRCode from "react-qr-code";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSession } from "next-auth/react";
 
 // --------- Helpers ----------
@@ -25,8 +20,11 @@ const toNumberOr = (v: any, fallback = 0) => {
 type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 type Lugar = any;
 type Admin = { id: number; nombre: string; email: string };
-
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+
+function classNames(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
+}
 
 export default function RegistrarLugar() {
   const router = useRouter();
@@ -47,8 +45,7 @@ export default function RegistrarLugar() {
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const adminQuery =
-    isSuperadmin && tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+  const adminQuery = isSuperadmin && tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const withTenant = (href: string) => {
     if (!tenantMode || !adminIdContext) return href;
@@ -74,7 +71,7 @@ export default function RegistrarLugar() {
     nombre: "",
     direccion: "",
     qrCode: "",
-    adminId: "", // 👈 para SUPERADMIN (solo informativo)
+    adminId: "", // 👈 para SUPERADMIN
     agenteId: "",
     pctCliente: "",
     pctLugar: "",
@@ -98,18 +95,14 @@ export default function RegistrarLugar() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [cartelPreview, setCartelPreview] = useState<string | null>(null);
 
+  // UI pestañas modal
+  const [editTab, setEditTab] = useState<"basico" | "qr" | "especial">("basico");
+
   // ───────────────────────────────
-  // 1) Cargar admins (solo SUPERADMIN GLOBAL)
+  // 1) Cargar admins (solo SUPERADMIN)
   // ───────────────────────────────
   useEffect(() => {
     if (!session || !isSuperadmin) return;
-
-    // ✅ Si está en modo tenant, NO necesitamos listar admins (ya viene fijado)
-    if (tenantMode && adminIdContext) {
-      setAdminSeleccionado(String(adminIdContext));
-      setNuevo((s) => ({ ...s, adminId: String(adminIdContext) }));
-      return;
-    }
 
     (async () => {
       try {
@@ -118,9 +111,10 @@ export default function RegistrarLugar() {
         const lista = Array.isArray(data) ? data : [];
         setAdmins(lista);
 
-        // No seleccionamos por defecto si quieres obligar elección.
-        // Pero para UX, seleccionamos el primero si existe.
-        if (lista.length > 0) {
+        if (tenantMode && adminIdContext) {
+          setAdminSeleccionado(String(adminIdContext));
+          setNuevo((s) => ({ ...s, adminId: String(adminIdContext) }));
+        } else if (lista.length > 0) {
           setAdminSeleccionado(String(lista[0].id));
           setNuevo((s) => ({ ...s, adminId: String(lista[0].id) }));
         }
@@ -141,25 +135,15 @@ export default function RegistrarLugar() {
       let agentesData: any[] = [];
 
       if (isSuperadmin) {
-        try {
-          if (tenantMode) {
-            // ✅ SUPERADMIN tenant -> el backend ya filtra por tenantAdminId
-            const res = await fetch(`/api/agentes`, { cache: "no-store" });
+        if (adminSeleccionado) {
+          try {
+            const res = await fetch(`/api/agentes?adminId=${adminSeleccionado}`, { cache: "no-store" });
             const json = await res.json();
             agentesData = Array.isArray(json) ? json : [];
-          } else {
-            // ✅ SUPERADMIN global -> necesitamos adminSeleccionado para filtrar
-            if (!adminSeleccionado) {
-              agentesData = [];
-            } else {
-              const res = await fetch(`/api/agentes?adminId=${adminSeleccionado}`, {
-                cache: "no-store",
-              });
-              const json = await res.json();
-              agentesData = Array.isArray(json) ? json : [];
-            }
+          } catch {
+            agentesData = [];
           }
-        } catch {
+        } else {
           agentesData = [];
         }
       } else if (isAdmin) {
@@ -172,8 +156,7 @@ export default function RegistrarLugar() {
         }
       } else if (isAgente) {
         const agenteId = (session?.user as any)?.agenteId;
-        const nombreAgente =
-          (session?.user as any)?.name || (session?.user as any)?.nombre || "Agente";
+        const nombreAgente = (session?.user as any)?.name || (session?.user as any)?.nombre || "Agente";
         if (agenteId) {
           agentesData = [{ id: agenteId, nombre: nombreAgente }];
           setNuevo((s) => ({ ...s, agenteId: String(agenteId) }));
@@ -181,15 +164,8 @@ export default function RegistrarLugar() {
       }
 
       setAgentes(agentesData);
-
-      // ✅ Si el agente seleccionado ya no existe para este admin, lo reseteamos
-      setNuevo((s) => {
-        const existe = agentesData.some((a) => String(a.id) === String(s.agenteId));
-        return existe ? s : { ...s, agenteId: "" };
-      });
-
     })();
-  }, [session, role, isSuperadmin, isAdmin, isAgente, adminSeleccionado, tenantMode]);
+  }, [session, role, isSuperadmin, isAdmin, isAgente, adminSeleccionado]);
 
   // ───────────────────────────────
   // 3) Cargar lugares + fondos
@@ -243,7 +219,7 @@ export default function RegistrarLugar() {
     });
   }, [lugares, busqueda]);
 
-  // ---- Upload genérico ----
+  // ---- Subida de ficheros ----
   async function subirFichero(file: File, folder: string): Promise<string | null> {
     try {
       const form = new FormData();
@@ -278,13 +254,6 @@ export default function RegistrarLugar() {
   const registrarLugar = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ Validaciones fuertes (evita pantallazos)
-    if (!nuevo.nombre.trim()) return alert("Falta el nombre.");
-    if (!nuevo.direccion.trim()) return alert("Falta la dirección.");
-    if (!nuevo.qrCode.trim()) return alert("Falta el código QR (genera uno).");
-    if (!String(nuevo.agenteId || "").trim()) return alert("Selecciona un agente.");
-
-    // 🔴 SUPERADMIN GLOBAL (no tenant)
     if (isSuperadmin && !tenantMode && !adminSeleccionado) {
       alert("Selecciona un ADMIN propietario para el lugar.");
       return;
@@ -316,7 +285,6 @@ export default function RegistrarLugar() {
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
     };
 
-    // ✅ Superadmin global: pasamos el admin en body (backend lo usa)
     if (isSuperadmin && !tenantMode && adminSeleccionado) {
       body.adminSeleccionado = adminSeleccionado;
     }
@@ -325,11 +293,10 @@ export default function RegistrarLugar() {
       body.especialCartelUrl = especialCartelUrl.trim();
     }
 
-    // ✅ Query: solo necesaria si SUPERADMIN está en modo tenant.
-    // En modo global NO hace falta mandar ?adminId, porque ya va adminSeleccionado.
     let queryForPost = "";
-    if (isSuperadmin && tenantMode && adminIdContext) {
-      queryForPost = `?adminId=${adminIdContext}`;
+    if (isSuperadmin) {
+      if (tenantMode && adminIdContext) queryForPost = `?adminId=${adminIdContext}`;
+      else if (!tenantMode && adminSeleccionado) queryForPost = `?adminId=${adminSeleccionado}`;
     }
 
     const r = await fetch(`/api/lugares${queryForPost}`, {
@@ -346,12 +313,11 @@ export default function RegistrarLugar() {
 
     setLugares((arr) => [d, ...arr]);
 
-    // reset
     setNuevo({
       nombre: "",
       direccion: "",
       qrCode: "",
-      adminId: isSuperadmin ? String(adminSeleccionado || "") : "",
+      adminId: isSuperadmin ? nuevo.adminId : "",
       agenteId: "",
       pctCliente: "",
       pctLugar: "",
@@ -367,12 +333,13 @@ export default function RegistrarLugar() {
     setNuevoQR("");
   };
 
-  // ---- Edición (modal) ----
+  // ---- Edición ----
   const abrirEdicion = (l: Lugar) => {
     setEditLogoFile(null);
     setEditCartelFile(null);
     setLogoPreview(null);
     setCartelPreview(null);
+    setEditTab("basico");
 
     setEdit({
       ...l,
@@ -464,23 +431,21 @@ export default function RegistrarLugar() {
   // RENDER
   // ───────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-8 py-10 text-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 md:px-8 py-8 text-slate-50">
       <div className="w-full max-w-[1700px] mx-auto space-y-8">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
-          <div className="rounded-3xl bg-slate-950/95 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="rounded-3xl bg-slate-950/95 px-6 md:px-8 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div className="flex items-center gap-4">
               <Image
                 src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
                 alt="Impulso Energético"
-                width={140}
-                height={40}
+                width={150}
+                height={44}
                 className="hidden md:block"
               />
               <div>
-                <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
-                  Gestión de lugares
-                </h1>
+                <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">Gestión de lugares</h1>
                 <p className="text-sm md:text-base text-slate-300 max-w-2xl font-medium">
                   Crea, edita y controla todos los lugares vinculados a tus agentes y códigos QR.
                 </p>
@@ -492,48 +457,47 @@ export default function RegistrarLugar() {
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-2 text-xs md:text-sm">
-              <span className="text-slate-400 font-semibold">
+            <div className="flex flex-col items-start lg:items-end gap-2">
+              <div className="text-xs md:text-sm text-slate-400 font-semibold">
                 Total lugares:{" "}
                 <span className="font-bold text-emerald-300">{lugares.length}</span>
-              </span>
-              <Input
-                placeholder="Buscar por ID, nombre, dirección, agente, % o estado…"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-80 bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm"
-              />
-              <Button
-                onClick={() => router.push(withTenant("/dashboard"))}
-                className="mt-1 bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-semibold px-5 py-2"
-              >
-                🏠 Volver al dashboard
-              </Button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <Input
+                  placeholder="Buscar por ID, nombre, dirección, agente, % o estado…"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="w-full sm:w-[360px] bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm h-10"
+                />
+                <Button
+                  onClick={() => router.push(withTenant("/dashboard"))}
+                  className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-semibold px-5 h-10"
+                >
+                  🏠 Volver al dashboard
+                </Button>
+              </div>
             </div>
           </div>
         </header>
 
         {/* ALTA DE LUGAR */}
-        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-6">
+        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6">
           <h2 className="text-xl font-bold mb-4">Crear nuevo lugar</h2>
 
           <form onSubmit={registrarLugar} className="space-y-4">
-            {/* ✅ SUPERADMIN: selector de ADMIN SOLO si está en modo GLOBAL */}
-            {isSuperadmin && !tenantMode && (
+            {/* SUPERADMIN: selector de ADMIN propietario */}
+            {isSuperadmin && (
               <div className="mb-4">
-                <label className="text-xs text-slate-300 font-semibold">
-                  Admin propietario del lugar
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">Admin propietario del lugar</label>
                 <select
-                  className="mt-1 w-full md:w-1/2 border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm"
+                  className="mt-1 w-full lg:w-1/2 border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10"
                   value={adminSeleccionado}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setAdminSeleccionado(val);
-                    setNuevo((s) => ({ ...s, adminId: val, agenteId: "" }));
-                    setNuevoQR("");
+                    setAdminSeleccionado(e.target.value);
+                    setNuevo((s) => ({ ...s, adminId: e.target.value }));
                   }}
-                  required
+                  disabled={tenantMode}
                 >
                   <option value="">Selecciona un admin…</option>
                   {admins.map((ad) => (
@@ -542,17 +506,20 @@ export default function RegistrarLugar() {
                     </option>
                   ))}
                 </select>
+                {tenantMode && adminSeleccionado && (
+                  <p className="text-[11px] text-emerald-300 mt-1">Fijado por modo tenant (admin #{adminSeleccionado})</p>
+                )}
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div>
                 <label className="text-xs text-slate-300 font-semibold">Nombre</label>
                 <Input
                   value={nuevo.nombre}
                   onChange={(e) => setNuevo((s) => ({ ...s, nombre: e.target.value }))}
                   placeholder="Nombre del lugar"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
                   required
                 />
               </div>
@@ -563,97 +530,90 @@ export default function RegistrarLugar() {
                   value={nuevo.direccion}
                   onChange={(e) => setNuevo((s) => ({ ...s, direccion: e.target.value }))}
                   placeholder="Dirección"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">
-                  % Cliente (ej. 15 o 0.15)
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">% Cliente (ej. 15 o 0.15)</label>
                 <Input
                   inputMode="decimal"
                   value={nuevo.pctCliente}
                   onChange={(e) => setNuevo((s) => ({ ...s, pctCliente: e.target.value }))}
                   placeholder="15  ó  0.15"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">
-                  % Lugar (ej. 10 o 0.10)
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">% Lugar (ej. 10 o 0.10)</label>
                 <Input
                   inputMode="decimal"
                   value={nuevo.pctLugar}
                   onChange={(e) => setNuevo((s) => ({ ...s, pctLugar: e.target.value }))}
                   placeholder="10  ó  0.10"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
                 />
               </div>
 
               <div>
                 <label className="text-xs text-slate-300 font-semibold">Código QR</label>
-                <div className="flex gap-3 items-center mt-1">
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mt-1">
                   <Input
                     value={nuevo.qrCode}
                     onChange={(e) => setNuevo((s) => ({ ...s, qrCode: e.target.value }))}
-                    placeholder="Genera uno si lo prefieres"
-                    className="bg-slate-900 border-slate-700 text-slate-100"
-                    required
+                    placeholder="Se genera automáticamente si lo prefieres"
+                    className="bg-slate-900 border-slate-700 text-slate-100 h-10"
                   />
                   <Button
                     type="button"
                     onClick={generarQR_nuevo}
-                    className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-semibold"
+                    className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-semibold h-10 px-5"
                   >
                     Generar QR
                   </Button>
+
                   {nuevoQR && (
-                    <QRCode
-                      value={`https://impulsoenergetico.es/registro?agenteId=${nuevo.agenteId}&lugarId=__ID__`}
-                      size={44}
-                    />
+                    <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950/60 px-3">
+                      <QRCode
+                        value={`https://impulsoenergetico.es/registro?agenteId=${nuevo.agenteId}&lugarId=__ID__`}
+                        size={44}
+                      />
+                    </div>
                   )}
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  (El QR definitivo de “Landing” se abre con el botón “Landing” del lugar ya creado.)
+                </p>
               </div>
 
               <div>
                 <label className="text-xs text-slate-300 font-semibold">Agente</label>
                 <select
-                  className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm"
+                  className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10"
                   value={nuevo.agenteId}
                   onChange={(e) => setNuevo((s) => ({ ...s, agenteId: e.target.value }))}
                   required
                   disabled={isAgente}
                 >
-                  <option value="">
-                    {isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}
-                  </option>
+                  <option value="">{isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}</option>
                   {agentes.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.nombre}
                     </option>
                   ))}
                 </select>
-
-                {isSuperadmin && !tenantMode && adminSeleccionado && agentes.length === 0 && (
-                  <p className="text-[11px] text-orange-300 mt-1">
-                    Este admin no tiene agentes disponibles (crea uno antes).
-                  </p>
-                )}
               </div>
             </div>
 
             {/* LUGAR ESPECIAL */}
-            <fieldset className="mt-6 border border-emerald-700/40 rounded-2xl p-4 bg-emerald-900/20">
+            <fieldset className="mt-6 border border-emerald-700/40 rounded-2xl p-5 bg-emerald-900/20">
               <legend className="px-2 text-xs font-bold text-emerald-300 uppercase tracking-wide">
                 Lugar especial (club, asociación, evento…)
               </legend>
 
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-4">
                 <input
                   id="nuevo-especial"
                   type="checkbox"
@@ -666,38 +626,32 @@ export default function RegistrarLugar() {
                 </label>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Logo del club / asociación
-                  </label>
+                  <label className="text-xs text-slate-300 font-semibold">Logo del club / asociación</label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) =>
-                      setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))
-                    }
-                    className="mt-1 text-xs text-slate-200"
+                    onChange={(e) => setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))}
+                    className="mt-2 text-xs text-slate-200"
                   />
+                  {nuevo.logoFile && <p className="text-[11px] text-emerald-300 mt-1">Se subirá al guardar</p>}
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Cartel especial (reemplazar)
-                  </label>
+                  <label className="text-xs text-slate-300 font-semibold">Cartel especial (reemplazar)</label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) =>
-                      setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))
-                    }
-                    className="mt-1 text-xs text-slate-200"
+                    onChange={(e) => setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))}
+                    className="mt-2 text-xs text-slate-200"
                   />
+                  {nuevo.cartelFile && <p className="text-[11px] text-emerald-300 mt-1">Se subirá al guardar</p>}
                 </div>
 
                 <div>
                   <label className="text-xs text-slate-300 font-semibold">Color de acento</label>
-                  <div className="mt-1 flex items-center gap-3">
+                  <div className="mt-2 flex items-center gap-3">
                     <input
                       type="color"
                       value={nuevo.especialColor}
@@ -707,51 +661,50 @@ export default function RegistrarLugar() {
                     <Input
                       value={nuevo.especialColor}
                       onChange={(e) => setNuevo((s) => ({ ...s, especialColor: e.target.value }))}
-                      className="bg-slate-900 border-slate-700 text-slate-100"
+                      className="bg-slate-900 border-slate-700 text-slate-100 h-10"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Aportación acumulada (€)
-                  </label>
+                  <label className="text-xs text-slate-300 font-semibold">Aportación acumulada (€)</label>
                   <Input
                     inputMode="numeric"
                     value={nuevo.aportacionAcumulada}
                     onChange={(e) => setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))}
                     placeholder="0"
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
+                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="lg:col-span-2">
                   <label className="text-xs text-slate-300 font-semibold">Mensaje / gancho</label>
                   <Input
                     value={nuevo.especialMensaje}
                     onChange={(e) => setNuevo((s) => ({ ...s, especialMensaje: e.target.value }))}
                     placeholder='Ej.: "AYUDA A TU CLUB"'
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
+                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
                   />
                 </div>
               </div>
             </fieldset>
 
             <div className="mt-6 flex justify-end">
-              <Button
-                type="submit"
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-8 py-2"
-              >
+              <Button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-8 h-11">
                 Registrar lugar
               </Button>
             </div>
           </form>
         </section>
 
-
         {/* LISTADO */}
-        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-6 space-y-4">
-          <h2 className="text-xl font-bold mb-2">Lugares registrados</h2>
+        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <h2 className="text-xl font-bold">Lugares registrados</h2>
+            <div className="text-xs text-slate-400">
+              Mostrando: <span className="font-semibold text-slate-200">{lugaresFiltrados.length}</span> / {lugares.length}
+            </div>
+          </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-800">
             <table className="w-full text-[13px] md:text-[15px]">
@@ -759,145 +712,132 @@ export default function RegistrarLugar() {
                 <tr>
                   <th className="px-3 py-3 text-left font-semibold">ID</th>
                   <th className="px-3 py-3 text-left font-semibold">Nombre</th>
-                  <th className="px-3 py-3 text-left font-semibold">
-                    Dirección
-                  </th>
+                  <th className="px-3 py-3 text-left font-semibold">Dirección</th>
                   <th className="px-3 py-3 text-left font-semibold">Agente</th>
-                  <th className="px-3 py-3 text-left font-semibold">
-                    % Cliente
-                  </th>
-                  <th className="px-3 py-3 text-left font-semibold">
-                    % Lugar
-                  </th>
-                  <th className="px-3 py-3 text-left font-semibold">
-                    Estado
-                  </th>
-                  <th className="px-3 py-3 text-right font-semibold">
-                    Acciones
-                  </th>
+                  <th className="px-3 py-3 text-left font-semibold">% Cliente</th>
+                  <th className="px-3 py-3 text-left font-semibold">% Lugar</th>
+                  <th className="px-3 py-3 text-left font-semibold">Estado</th>
+                  <th className="px-3 py-3 text-right font-semibold">Acciones</th>
                 </tr>
               </thead>
+
               <tbody>
-                {lugaresFiltrados.map((l: any) => (
-                  <tr
-                    key={l.id}
-                    className="border-t border-slate-800/70 hover:bg-slate-900/80"
-                  >
-                    <td className="px-3 py-3 font-mono text-xs md:text-sm text-slate-400 font-semibold">
-                      #{l.id}
-                    </td>
-                    <td className="px-3 py-3 text-slate-50 font-semibold">
-                      {l.nombre}
-                    </td>
-                    <td className="px-3 py-3 text-slate-200">
-                      {l.direccion}
-                    </td>
-                    <td className="px-3 py-3 text-slate-200">
-                      {l.agente?.nombre || "—"}
-                    </td>
-                    <td className="px-3 py-3 text-emerald-300 font-semibold">
-                      {fmtPct(l.pctCliente)}
-                    </td>
-                    <td className="px-3 py-3 text-emerald-300 font-semibold">
-                      {fmtPct(l.pctLugar)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
-                        ${
-                          l.especial
-                            ? "bg-pink-500/20 text-pink-200 border border-pink-500/40"
-                            : "bg-slate-700/40 text-slate-200 border border-slate-500/40"
-                        }`}
-                        title={l.especial ? "Lugar especial" : "Lugar normal"}
-                      >
-                        {l.especial ? "Especial" : "Normal"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex justify-end flex-wrap gap-2">
-                        {(isAdmin || isSuperadmin) && (
-                          <Button
-                            className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-3 py-1"
-                            onClick={() => abrirEdicion(l)}
-                            size="sm"
-                          >
-                            Editar
-                          </Button>
-                        )}
-                        <Button
-                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-3 py-1"
-                          onClick={() =>
-                            router.push(
-                              withTenant(`/lugares/${l.id}/detalle`)
-                            )
-                          }
-                          size="sm"
+                {lugaresFiltrados.map((l: any) => {
+                  const especial = !!l.especial;
+
+                  return (
+                    <tr key={l.id} className="border-t border-slate-800/70 hover:bg-slate-900/70">
+                      <td className="px-3 py-4 font-mono text-xs md:text-sm text-slate-400 font-semibold">
+                        #{l.id}
+                      </td>
+
+                      <td className="px-3 py-4">
+                        <div className="text-slate-50 font-semibold leading-tight">{l.nombre}</div>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          QR: <span className="font-mono">{String(l.qrCode || "").slice(0, 10)}…</span>
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-4 text-slate-200">{l.direccion}</td>
+
+                      <td className="px-3 py-4 text-slate-200">
+                        <div className="font-medium">{l.agente?.nombre || "—"}</div>
+                        {l.agente?.email && <div className="text-[11px] text-slate-400">{l.agente.email}</div>}
+                      </td>
+
+                      <td className="px-3 py-4 text-emerald-300 font-semibold">{fmtPct(l.pctCliente)}</td>
+                      <td className="px-3 py-4 text-emerald-300 font-semibold">{fmtPct(l.pctLugar)}</td>
+
+                      <td className="px-3 py-4">
+                        <span
+                          className={classNames(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border",
+                            especial
+                              ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
+                              : "bg-slate-700/30 text-slate-200 border-slate-500/40"
+                          )}
                         >
-                          Ver
-                        </Button>
-                        <Button
-                          className="bg-orange-500 hover:bg-orange-400 text-slate-950 font-semibold px-3 py-1"
-                          onClick={() =>
-                            router.push(withTenant(`/lugares/cartel/${l.id}`))
-                          }
-                          size="sm"
-                        >
-                          Cartel A4
-                        </Button>
-                        <Button
-                          className={`text-slate-50 ${
-                            l.especial
-                              ? "bg-teal-500 hover:bg-teal-400"
-                              : "bg-teal-700/40 cursor-not-allowed"
-                          } font-semibold px-3 py-1`}
-                          disabled={!l.especial}
-                          onClick={() =>
-                            router.push(
-                              withTenant(`/lugares/cartel-especial/${l.id}`)
-                            )
-                          }
-                          size="sm"
-                          title={
-                            l.especial
-                              ? "Abrir cartel especial"
-                              : "Sólo para lugares especiales"
-                          }
-                        >
-                          Cartel especial
-                        </Button>
-                        <Button
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1"
-                          onClick={() =>
-                            window.open(
-                              `/registro?agenteId=${l.agenteId}&lugarId=${l.id}`,
-                              "_blank"
-                            )
-                          }
-                          size="sm"
-                        >
-                          Landing
-                        </Button>
-                        {(isAdmin || isSuperadmin) && (
-                          <Button
-                            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1"
-                            onClick={() => eliminarLugar(l.id)}
-                            size="sm"
-                          >
-                            Eliminar
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {especial ? "⭐ Especial" : "Normal"}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-4">
+                        <div className="flex justify-end">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {(isAdmin || isSuperadmin) && (
+                                <Button
+                                  className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold px-4 h-9"
+                                  onClick={() => abrirEdicion(l)}
+                                  size="sm"
+                                >
+                                  ✏️ Editar
+                                </Button>
+                              )}
+
+                              <Button
+                                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 h-9"
+                                onClick={() => router.push(withTenant(`/lugares/${l.id}/detalle`))}
+                                size="sm"
+                              >
+                                👁️ Ver
+                              </Button>
+
+                              <Button
+                                className="bg-orange-500 hover:bg-orange-400 text-slate-950 font-semibold px-4 h-9"
+                                onClick={() => router.push(withTenant(`/lugares/cartel/${l.id}`))}
+                                size="sm"
+                              >
+                                🖨️ Cartel A4
+                              </Button>
+
+                              <Button
+                                className={classNames(
+                                  "font-semibold px-4 h-9",
+                                  especial
+                                    ? "bg-teal-500 hover:bg-teal-400 text-slate-950"
+                                    : "bg-teal-700/30 text-slate-400 border border-slate-700 cursor-not-allowed"
+                                )}
+                                disabled={!especial}
+                                onClick={() => router.push(withTenant(`/lugares/cartel-especial/${l.id}`))}
+                                size="sm"
+                                title={especial ? "Abrir cartel especial" : "Solo para lugares especiales"}
+                              >
+                                🧩 Cartel especial
+                              </Button>
+                            </div>
+
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 h-9"
+                                onClick={() =>
+                                  window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, "_blank")
+                                }
+                                size="sm"
+                              >
+                                🔗 Landing
+                              </Button>
+
+                              {(isAdmin || isSuperadmin) && (
+                                <Button
+                                  className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 h-9"
+                                  onClick={() => eliminarLugar(l.id)}
+                                  size="sm"
+                                >
+                                  🗑️ Eliminar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {lugaresFiltrados.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-6 text-center text-slate-400 text-sm"
-                    >
+                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">
                       No hay lugares para los filtros actuales.
                     </td>
                   </tr>
@@ -906,47 +846,41 @@ export default function RegistrarLugar() {
             </table>
           </div>
 
-          {/* Fondo actual (solo ADMIN, como ya tenías) */}
-          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
-            <h3 className="text-lg font-bold mb-3">
-              🎨 Fondo global actual para carteles
-            </h3>
+          {/* Fondo global */}
+          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <h3 className="text-lg font-bold mb-3">🎨 Fondo global actual para carteles</h3>
+
             {isAdmin ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {fondos.map((f) => (
-                    <div
+                    <button
+                      type="button"
                       key={f.id}
                       onClick={() => seleccionarFondo(f.id, f.url)}
-                      className={`cursor-pointer border-4 rounded-xl overflow-hidden transition-all hover:scale-105 ${
-                        f.url === fondoSeleccionado
-                          ? "border-emerald-500"
-                          : "border-transparent"
-                      }`}
+                      className={classNames(
+                        "text-left cursor-pointer border-2 rounded-xl overflow-hidden transition-all hover:scale-[1.02]",
+                        f.url === fondoSeleccionado ? "border-emerald-500" : "border-slate-800"
+                      )}
+                      title="Seleccionar como fondo global"
                     >
-                      <Image
-                        src={f.url}
-                        alt={f.nombre}
-                        width={400}
-                        height={200}
-                        className="w-full h-40 object-cover"
-                      />
-                      <div className="bg-slate-950/80 py-1 text-center font-medium text-slate-100 text-sm">
-                        {f.nombre}
+                      <Image src={f.url} alt={f.nombre} width={500} height={260} className="w-full h-44 object-cover" />
+                      <div className="bg-slate-950/80 py-2 px-3">
+                        <div className="font-semibold text-slate-100 text-sm">{f.nombre}</div>
+                        {f.activo && <div className="text-[11px] text-emerald-300 font-semibold mt-0.5">Activo</div>}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
+
                 {fondoSeleccionado && (
-                  <div className="mt-4">
-                    <p className="font-semibold mb-2">
-                      Vista previa del fondo activo:
-                    </p>
+                  <div className="mt-5">
+                    <p className="font-semibold mb-2">Vista previa del fondo activo:</p>
                     <Image
                       src={fondoSeleccionado}
                       alt="Fondo seleccionado"
-                      width={700}
-                      height={460}
+                      width={900}
+                      height={560}
                       className="rounded-lg border border-slate-700"
                     />
                   </div>
@@ -958,8 +892,8 @@ export default function RegistrarLugar() {
                   <Image
                     src={fondoSeleccionado}
                     alt="Fondo"
-                    width={700}
-                    height={460}
+                    width={900}
+                    height={560}
                     className="rounded-lg border border-slate-700 mx-auto"
                   />
                 </div>
@@ -969,280 +903,366 @@ export default function RegistrarLugar() {
         </section>
       </div>
 
-      {/* MODAL EDICIÓN */}
-      <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
-        <DialogContent className="w-[95vw] max-w-[1100px] p-0">
-          <DialogHeader className="sticky top-0 z-10 bg-slate-950 border-b border-slate-800">
-            <DialogTitle className="p-4 text-slate-50">
-              Editar lugar
+      {/* MODAL EDICIÓN — rediseñado */}
+      <Dialog
+        open={modalAbierto}
+        onOpenChange={(v) => {
+          setModalAbierto(v);
+          if (!v) {
+            setEdit(null);
+            setEditLogoFile(null);
+            setEditCartelFile(null);
+            setLogoPreview(null);
+            setCartelPreview(null);
+            setEditTab("basico");
+          }
+        }}
+      >
+        <DialogContent className="w-[96vw] max-w-[1200px] p-0 overflow-hidden">
+          <DialogHeader className="bg-slate-950 border-b border-slate-800">
+            <DialogTitle className="px-6 py-4 text-slate-50 flex items-center justify-between">
+              <span className="text-base md:text-lg font-bold">Editar lugar</span>
+              {edit?.id ? (
+                <span className="text-xs md:text-sm text-slate-400 font-mono">#{edit.id}</span>
+              ) : null}
             </DialogTitle>
           </DialogHeader>
 
           {!!edit && (
-            <div className="max-h-[82vh] overflow-y-auto p-6 text-slate-50 bg-slate-950">
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-12 md:col-span-6">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Nombre
-                  </label>
-                  <Input
-                    value={edit.nombre}
-                    onChange={(e) =>
-                      setEdit({ ...edit, nombre: e.target.value })
-                    }
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
-                  />
-                </div>
-
-                <div className="col-span-12 md:col-span-6">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Dirección
-                  </label>
-                  <Input
-                    value={edit.direccion}
-                    onChange={(e) =>
-                      setEdit({ ...edit, direccion: e.target.value })
-                    }
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
-                  />
-                </div>
-
-                <div className="col-span-6">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    % Cliente (ej. 15 o 0.15)
-                  </label>
-                  <Input
-                    inputMode="decimal"
-                    value={edit.pctCliente ?? ""}
-                    onChange={(e) =>
-                      setEdit({ ...edit, pctCliente: e.target.value })
-                    }
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
-                  />
-                </div>
-
-                <div className="col-span-6">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    % Lugar (ej. 10 o 0.10)
-                  </label>
-                  <Input
-                    inputMode="decimal"
-                    value={edit.pctLugar ?? ""}
-                    onChange={(e) =>
-                      setEdit({ ...edit, pctLugar: e.target.value })
-                    }
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
-                  />
-                </div>
-
-                <div className="col-span-12">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Código QR
-                  </label>
-                  <div className="flex items-center gap-3 mt-1">
-                    <Input
-                      value={edit.qrCode ?? ""}
-                      onChange={(e) =>
-                        setEdit({ ...edit, qrCode: e.target.value })
-                      }
-                      className="bg-slate-900 border-slate-700 text-slate-100"
-                    />
-                    <Button
-                      type="button"
-                      onClick={generarQR_edit}
-                      className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-semibold"
-                    >
-                      Generar QR
-                    </Button>
-                    {edit.qrCode && (
-                      <QRCode
-                        value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`}
-                        size={44}
-                      />
+            <div className="bg-slate-950 text-slate-50">
+              {/* Tabs */}
+              <div className="px-6 pt-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditTab("basico")}
+                    className={classNames(
+                      "px-3 h-9 rounded-xl text-sm font-semibold border transition",
+                      editTab === "basico"
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
                     )}
-                  </div>
-                </div>
-
-                <div className="col-span-12 md:col-span-6">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Agente
-                  </label>
-                  <select
-                    className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm"
-                    value={edit.agenteId}
-                    onChange={(e) =>
-                      setEdit({ ...edit, agenteId: Number(e.target.value) })
-                    }
                   >
-                    <option value="">Selecciona un agente…</option>
-                    {agentes.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    🧾 Datos básicos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditTab("qr")}
+                    className={classNames(
+                      "px-3 h-9 rounded-xl text-sm font-semibold border transition",
+                      editTab === "qr"
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
+                    )}
+                  >
+                    🔳 QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditTab("especial")}
+                    className={classNames(
+                      "px-3 h-9 rounded-xl text-sm font-semibold border transition",
+                      editTab === "especial"
+                        ? "bg-emerald-900/25 border-emerald-700/40 text-emerald-100"
+                        : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
+                    )}
+                  >
+                    ⭐ Lugar especial
+                  </button>
                 </div>
               </div>
 
-              {/* ESPECIAL */}
-              <fieldset className="border border-emerald-700/40 rounded-2xl p-4 bg-emerald-900/20 mt-5">
-                <legend className="px-2 text-xs font-bold text-emerald-300 uppercase tracking-wide">
-                  Lugar especial
-                </legend>
+              {/* Body scroll */}
+              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+                {/* TAB: BASICO */}
+                {editTab === "basico" && (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+                      <h3 className="text-sm font-bold text-slate-200 mb-4">Información principal</h3>
 
-                <div className="flex items-center gap-3 mb-4">
-                  <input
-                    id="edit-especial"
-                    type="checkbox"
-                    checked={!!edit.especial}
-                    onChange={(e) =>
-                      setEdit({ ...edit, especial: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded border-slate-500 bg-slate-900"
-                  />
-                  <label htmlFor="edit-especial" className="text-sm">
-                    Marcar como especial
-                  </label>
-                </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-slate-300 font-semibold">Nombre</label>
+                          <Input
+                            value={edit.nombre}
+                            onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                          />
+                        </div>
 
-                <div className="grid grid-cols-12 gap-4">
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-xs text-slate-300 font-semibold">
-                      Logo (subir para actualizar)
-                    </label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0] || null;
-                          setEditLogoFile(f);
-                          setLogoPreview(f ? URL.createObjectURL(f) : null);
-                        }}
-                        className="text-xs text-slate-200"
-                      />
-                      {(logoPreview || edit.especialLogoUrl) && (
-                        <Image
-                          src={logoPreview || edit.especialLogoUrl}
-                          alt="logo"
-                          width={56}
-                          height={56}
-                          className="rounded border border-slate-600"
-                        />
-                      )}
-                    </div>
-                    {editLogoFile && (
-                      <p className="text-[11px] text-emerald-300 mt-1">
-                        Se subirá al guardar
-                      </p>
-                    )}
-                  </div>
+                        <div>
+                          <label className="text-xs text-slate-300 font-semibold">Dirección</label>
+                          <Input
+                            value={edit.direccion}
+                            onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                          />
+                        </div>
 
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-xs text-slate-300 font-semibold">
-                      Cartel especial (reemplazar)
-                    </label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0] || null;
-                          setEditCartelFile(f);
-                          setCartelPreview(f ? URL.createObjectURL(f) : null);
-                        }}
-                        className="text-xs text-slate-200"
-                      />
-                    </div>
-                    {(cartelPreview || edit.especialCartelUrl) && (
-                      <div className="mt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={cartelPreview || edit.especialCartelUrl}
-                          alt="cartel"
-                          className="w-40 h-24 object-cover rounded border border-slate-600"
-                        />
+                        <div>
+                          <label className="text-xs text-slate-300 font-semibold">% Cliente (ej. 15 o 0.15)</label>
+                          <Input
+                            inputMode="decimal"
+                            value={edit.pctCliente ?? ""}
+                            onChange={(e) => setEdit({ ...edit, pctCliente: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-300 font-semibold">% Lugar (ej. 10 o 0.10)</label>
+                          <Input
+                            inputMode="decimal"
+                            value={edit.pctLugar ?? ""}
+                            onChange={(e) => setEdit({ ...edit, pctLugar: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-2">
+                          <label className="text-xs text-slate-300 font-semibold">Agente</label>
+                          <select
+                            className="mt-1 w-full border rounded-lg px-3 bg-slate-900 border-slate-700 text-slate-100 text-sm h-11"
+                            value={edit.agenteId}
+                            onChange={(e) => setEdit({ ...edit, agenteId: Number(e.target.value) })}
+                          >
+                            <option value="">Selecciona un agente…</option>
+                            {agentes.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.nombre}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            Recomendación: asigna el agente correcto para trazabilidad de leads y comparativas.
+                          </p>
+                        </div>
                       </div>
-                    )}
-                    {editCartelFile && (
-                      <p className="text-[11px] text-emerald-300 mt-1">
-                        Se subirá al guardar
-                      </p>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-xs text-slate-300 font-semibold">
-                      Color de acento
-                    </label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={edit.especialColor ?? "#FF7A3B"}
-                        onChange={(e) =>
-                          setEdit({
-                            ...edit,
-                            especialColor: e.target.value,
-                          })
-                        }
-                        className="h-10 w-16 rounded border border-slate-700"
-                      />
-                      <Input
-                        value={edit.especialColor ?? ""}
-                        onChange={(e) =>
-                          setEdit({
-                            ...edit,
-                            especialColor: e.target.value,
-                          })
-                        }
-                        className="bg-slate-900 border-slate-700 text-slate-100"
-                      />
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+                      <h3 className="text-sm font-bold text-slate-200 mb-4">Resumen visual</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div className="text-xs text-slate-400 font-semibold">Estado</div>
+                          <div className="mt-1">
+                            <span
+                              className={classNames(
+                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border",
+                                edit.especial
+                                  ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
+                                  : "bg-slate-700/30 text-slate-200 border-slate-500/40"
+                              )}
+                            >
+                              {edit.especial ? "⭐ Especial" : "Normal"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div className="text-xs text-slate-400 font-semibold">% Cliente</div>
+                          <div className="mt-1 text-emerald-300 font-bold">{fmtPct(edit.pctCliente)}</div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div className="text-xs text-slate-400 font-semibold">% Lugar</div>
+                          <div className="mt-1 text-emerald-300 font-bold">{fmtPct(edit.pctLugar)}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="text-xs text-slate-300 font-semibold">
-                      Aportación acumulada (€)
-                    </label>
-                    <Input
-                      inputMode="numeric"
-                      value={String(edit.aportacionAcumulada ?? 0)}
-                      onChange={(e) =>
-                        setEdit({
-                          ...edit,
-                          aportacionAcumulada: e.target.value,
-                        })
-                      }
-                      className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
-                    />
-                  </div>
+                {/* TAB: QR */}
+                {editTab === "qr" && (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+                      <h3 className="text-sm font-bold text-slate-200 mb-4">Código QR</h3>
 
-                  <div className="col-span-12 md:col-span-8">
-                    <label className="text-xs text-slate-300 font-semibold">
-                      Mensaje / gancho
-                    </label>
-                    <Input
-                      value={edit.especialMensaje ?? ""}
-                      onChange={(e) =>
-                        setEdit({
-                          ...edit,
-                          especialMensaje: e.target.value,
-                        })
-                      }
-                      placeholder='Ej.: "AYUDA A TU CLUB"'
-                      className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
-                    />
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                        <div className="lg:col-span-2">
+                          <label className="text-xs text-slate-300 font-semibold">Código QR (texto)</label>
+                          <div className="mt-1 flex flex-col sm:flex-row gap-3">
+                            <Input
+                              value={edit.qrCode ?? ""}
+                              onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
+                              className="bg-slate-900 border-slate-700 text-slate-100 h-11"
+                            />
+                            <Button
+                              type="button"
+                              onClick={generarQR_edit}
+                              className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-semibold h-11 px-5"
+                            >
+                              Generar QR nuevo
+                            </Button>
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 mt-2">
+                            Esto identifica el lugar. Si lo cambias, el QR antiguo dejará de apuntar a este lugar.
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 flex flex-col items-center">
+                          <div className="text-xs text-slate-400 font-semibold mb-3">QR de Landing</div>
+                          <div className="rounded-xl border border-slate-800 bg-white p-3">
+                            <QRCode value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`} size={120} />
+                          </div>
+                          <Button
+                            type="button"
+                            className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-10 px-4"
+                            onClick={() => window.open(`/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`, "_blank")}
+                          >
+                            Abrir Landing
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                )}
+
+                {/* TAB: ESPECIAL */}
+                {editTab === "especial" && (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-emerald-700/40 bg-emerald-900/15 p-5">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <h3 className="text-sm font-bold text-emerald-100">Lugar especial</h3>
+
+                        <label className="flex items-center gap-2 text-sm text-slate-100">
+                          <input
+                            id="edit-especial"
+                            type="checkbox"
+                            checked={!!edit.especial}
+                            onChange={(e) => setEdit({ ...edit, especial: e.target.checked })}
+                            className="h-4 w-4 rounded border-slate-500 bg-slate-900"
+                          />
+                          Activar modo especial
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                          <label className="text-xs text-slate-300 font-semibold">Logo (subir para actualizar)</label>
+                          <div className="mt-2 flex items-center gap-3">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0] || null;
+                                setEditLogoFile(f);
+                                setLogoPreview(f ? URL.createObjectURL(f) : null);
+                              }}
+                              className="text-xs text-slate-200"
+                            />
+                            {(logoPreview || edit.especialLogoUrl) && (
+                              <Image
+                                src={logoPreview || edit.especialLogoUrl}
+                                alt="logo"
+                                width={64}
+                                height={64}
+                                className="rounded-lg border border-slate-700 object-cover"
+                              />
+                            )}
+                          </div>
+                          {editLogoFile && <p className="text-[11px] text-emerald-300 mt-2">Se subirá al guardar</p>}
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                          <label className="text-xs text-slate-300 font-semibold">Cartel especial (reemplazar)</label>
+                          <div className="mt-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0] || null;
+                                setEditCartelFile(f);
+                                setCartelPreview(f ? URL.createObjectURL(f) : null);
+                              }}
+                              className="text-xs text-slate-200"
+                            />
+                          </div>
+
+                          {(cartelPreview || edit.especialCartelUrl) && (
+                            <div className="mt-3">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={cartelPreview || edit.especialCartelUrl}
+                                alt="cartel"
+                                className="w-full max-w-[520px] h-44 object-cover rounded-xl border border-slate-700"
+                              />
+                            </div>
+                          )}
+
+                          {editCartelFile && <p className="text-[11px] text-emerald-300 mt-2">Se subirá al guardar</p>}
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                          <label className="text-xs text-slate-300 font-semibold">Color de acento</label>
+                          <div className="mt-2 flex items-center gap-3">
+                            <input
+                              type="color"
+                              value={edit.especialColor ?? "#FF7A3B"}
+                              onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
+                              className="h-11 w-20 rounded border border-slate-700"
+                            />
+                            <Input
+                              value={edit.especialColor ?? ""}
+                              onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
+                              className="bg-slate-900 border-slate-700 text-slate-100 h-11"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                          <label className="text-xs text-slate-300 font-semibold">Aportación acumulada (€)</label>
+                          <Input
+                            inputMode="numeric"
+                            value={String(edit.aportacionAcumulada ?? 0)}
+                            onChange={(e) => setEdit({ ...edit, aportacionAcumulada: e.target.value })}
+                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                          <label className="text-xs text-slate-300 font-semibold">Mensaje / gancho</label>
+                          <Input
+                            value={edit.especialMensaje ?? ""}
+                            onChange={(e) => setEdit({ ...edit, especialMensaje: e.target.value })}
+                            placeholder='Ej.: "AYUDA A TU CLUB"'
+                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                          />
+                          <p className="text-[11px] text-slate-400 mt-2">
+                            Consejo: usa mensajes cortos y directos (ej. “Apoya al club con tu ahorro”).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer fijo */}
+              <div className="border-t border-slate-800 bg-slate-950 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                <div className="text-[12px] text-slate-400">
+                  Tip: si algo está “apretado”, dime tu resolución (monitor) y lo ajustamos fino.
                 </div>
-              </fieldset>
 
-              <div className="flex justify-end mt-6">
-                <Button
-                  onClick={guardarEdicion}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
-                >
-                  Guardar cambios
-                </Button>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold h-10 px-5"
+                    onClick={() => setModalAbierto(false)}
+                  >
+                    Cancelar
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={guardarEdicion}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold h-10 px-6"
+                  >
+                    Guardar cambios
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -1251,4 +1271,3 @@ export default function RegistrarLugar() {
     </div>
   );
 }
-
