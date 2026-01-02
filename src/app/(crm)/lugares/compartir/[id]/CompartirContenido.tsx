@@ -15,16 +15,17 @@ function classNames(...xs: Array<string | false | null | undefined>) {
 }
 
 // Convierte un SVG (del QR) a PNG descargable
-async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string, size = 1024) {
+async function downloadSvgAsPng(
+  svgEl: SVGSVGElement,
+  filename: string,
+  size = 1024
+) {
   const serializer = new XMLSerializer();
   let svgText = serializer.serializeToString(svgEl);
 
   // Asegurar namespace
   if (!svgText.includes("http://www.w3.org/2000/svg")) {
-    svgText = svgText.replace(
-      "<svg",
-      '<svg xmlns="http://www.w3.org/2000/svg"'
-    );
+    svgText = svgText.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
   }
 
   const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
@@ -161,7 +162,7 @@ export default function CompartirContenido({ id }: { id: string }) {
     const lugarId = lugar?.id ? Number(lugar.id) : Number(id);
     const agenteId = lugar?.agenteId ?? agente?.id;
 
-    // Si tienes qrCode y quieres reforzar trazabilidad, lo dejamos preparado:
+    // Reforzamos trazabilidad con qrCode si existe
     const qr = lugar?.qrCode ? String(lugar.qrCode) : "";
 
     const params = new URLSearchParams();
@@ -173,7 +174,6 @@ export default function CompartirContenido({ id }: { id: string }) {
   }, [lugar, agente, id]);
 
   const absolutePublicLink = useMemo(() => {
-    // Dominio producción
     return `https://impulsoenergetico.es${publicLink}`;
   }, [publicLink]);
 
@@ -214,7 +214,7 @@ export default function CompartirContenido({ id }: { id: string }) {
           url: absolutePublicLink,
         });
       } catch {
-        // Si cancela, no hacemos nada
+        // si cancela, no hacemos nada
       }
     } else {
       await copyToClipboard(absolutePublicLink);
@@ -241,7 +241,7 @@ export default function CompartirContenido({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-slate-50 px-6 md:px-8 py-8">
-      <div className="w-full max-w-[1200px] mx-auto space-y-8 text-[15px] md:text-[16px] font-semibold">
+      <div className="w-full max-w-[1700px] mx-auto space-y-8 text-[15px] md:text-[16px] font-semibold">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
           <div className="rounded-3xl bg-slate-950/95 px-6 md:px-8 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
@@ -258,7 +258,8 @@ export default function CompartirContenido({ id }: { id: string }) {
                   Kit de Compartir (Digital)
                 </h1>
                 <p className="text-sm md:text-base text-slate-300 font-semibold">
-                  Comparte el enlace por WhatsApp, redes o email manteniendo la trazabilidad del lugar.
+                  Comparte el enlace por WhatsApp, redes o email manteniendo la trazabilidad del
+                  lugar.
                 </p>
                 {tenantMode && (
                   <p className="text-xs md:text-sm text-emerald-300 mt-1 font-bold">
@@ -294,101 +295,139 @@ export default function CompartirContenido({ id }: { id: string }) {
               No se pudo cargar el lugar. Revisa permisos o ID.
             </div>
           ) : (
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-              <div className="min-w-0">
-                <div className="text-sm text-slate-400 font-extrabold">Lugar</div>
-                <div className="text-2xl font-extrabold text-white break-words">
-                  #{lugar.id} · {lugar.nombre}
-                </div>
-                <div className="text-sm text-slate-300 mt-1 font-semibold break-words">
-                  {lugar.direccion || "—"}
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
-                    <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                      Agente asignado
-                    </div>
-                    <div className="mt-2 text-base font-extrabold text-white">
-                      {lugar.agente?.nombre || agente?.nombre || "—"}
-                    </div>
-                    <div className="text-xs text-slate-400 font-semibold mt-1">
-                      {lugar.agente?.email || agente?.email || ""}
-                    </div>
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div className="min-w-0">
+                  <div className="text-sm text-slate-400 font-extrabold">Lugar</div>
+                  <div className="text-2xl font-extrabold text-white break-words">
+                    #{lugar.id} · {lugar.nombre}
+                  </div>
+                  <div className="text-sm text-slate-300 mt-1 font-semibold break-words">
+                    {lugar.direccion || "—"}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
-                    <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                      Estado
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        Agente asignado
+                      </div>
+                      <div className="mt-2 text-base font-extrabold text-white">
+                        {lugar.agente?.nombre || agente?.nombre || "—"}
+                      </div>
+                      <div className="text-xs text-slate-400 font-semibold mt-1">
+                        {lugar.agente?.email || agente?.email || ""}
+                      </div>
                     </div>
-                    <div className="mt-2">
-                      <span
-                        className={classNames(
-                          "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border",
-                          lugar.especial
-                            ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
-                            : "bg-slate-700/30 text-slate-200 border-slate-500/40"
-                        )}
-                      >
-                        {lugar.especial ? "⭐ Especial" : "Normal"}
-                      </span>
-                    </div>
-                    {lugar.especial && (
-                      <div className="text-xs text-slate-400 mt-2 font-semibold">
-                        Gancho:{" "}
-                        <span className="text-slate-200 font-extrabold">
-                          {lugar.especialMensaje || "—"}
+
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        Estado
+                      </div>
+                      <div className="mt-2">
+                        <span
+                          className={classNames(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border",
+                            lugar.especial
+                              ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
+                              : "bg-slate-700/30 text-slate-200 border-slate-500/40"
+                          )}
+                        >
+                          {lugar.especial ? "⭐ Especial" : "Normal"}
                         </span>
                       </div>
-                    )}
+                      {lugar.especial && (
+                        <div className="text-xs text-slate-400 mt-2 font-semibold">
+                          Gancho:{" "}
+                          <span className="text-slate-200 font-extrabold">
+                            {lugar.especialMensaje || "—"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Logos para marketing (Impulso + Lugar especial) */}
+                  <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="text-sm font-extrabold text-slate-200">
+                        Logos (para creatividades)
+                        <div className="text-[11px] text-slate-400 font-semibold mt-1">
+                          En Fase 2 estos logos se insertan automáticamente en post/story/email.
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2">
+                          <Image
+                            src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+                            alt="Impulso Energético"
+                            width={150}
+                            height={44}
+                            className="h-9 w-auto object-contain"
+                          />
+                        </div>
+
+                        {lugar.especial && !!lugar.especialLogoUrl && (
+                          <div className="rounded-xl border border-slate-800 bg-white px-3 py-2">
+                            <Image
+                              src={String(lugar.especialLogoUrl)}
+                              alt="Logo del lugar"
+                              width={90}
+                              height={90}
+                              className="h-10 w-10 object-contain"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* QR + acciones rápidas */}
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/30 p-5 w-full lg:w-[380px]">
-                <div className="text-sm font-extrabold text-slate-200 mb-3">
-                  QR Digital (para compartir)
-                </div>
+                {/* QR + acciones rápidas */}
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/30 p-5 w-full lg:w-[380px]">
+                  <div className="text-sm font-extrabold text-slate-200 mb-3">
+                    QR Digital (para compartir)
+                  </div>
 
-                <div
-                  ref={qrWrapRef}
-                  className="rounded-2xl border border-slate-800 bg-white p-4 flex items-center justify-center"
-                >
-                  <QRCode value={absolutePublicLink} size={220} />
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    onClick={downloadQrPng}
-                    className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold h-10"
+                  <div
+                    ref={qrWrapRef}
+                    className="rounded-2xl border border-slate-800 bg-white p-4 flex items-center justify-center"
                   >
-                    Descargar PNG
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => copyToClipboard(absolutePublicLink)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-10"
-                  >
-                    {copied ? "✅ Copiado" : "Copiar enlace"}
-                  </Button>
-                </div>
+                    <QRCode value={absolutePublicLink} size={220} />
+                  </div>
 
-                <div className="mt-2">
-                  <Button
-                    type="button"
-                    onClick={onShare}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold h-10"
-                  >
-                    {canNativeShare ? "📲 Compartir (móvil)" : "📲 Compartir / Copiar"}
-                  </Button>
-                </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      onClick={downloadQrPng}
+                      className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold h-10"
+                    >
+                      Descargar PNG
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => copyToClipboard(absolutePublicLink)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-10"
+                    >
+                      {copied ? "✅ Copiado" : "Copiar enlace"}
+                    </Button>
+                  </div>
 
-                <p className="text-[11px] text-slate-400 mt-3 font-semibold">
-                  Este QR apunta al enlace rastreable del lugar (toda la atribución queda guardada
-                  por agente y lugar).
-                </p>
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      onClick={onShare}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold h-10"
+                    >
+                      {canNativeShare ? "📲 Compartir (móvil)" : "📲 Compartir / Copiar"}
+                    </Button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 mt-3 font-semibold">
+                    Este QR apunta al enlace rastreable del lugar (toda la atribución queda guardada
+                    por agente y lugar).
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -449,6 +488,7 @@ export default function CompartirContenido({ id }: { id: string }) {
             </div>
           </div>
 
+          {/* TEXTO + PREVIEW MAQUETADO */}
           <div className="mt-2 rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <h3 className="text-sm font-extrabold text-slate-200">
@@ -471,9 +511,84 @@ export default function CompartirContenido({ id }: { id: string }) {
                 className="w-full rounded-2xl bg-slate-950/60 border border-slate-800 p-4 text-slate-100 font-semibold text-sm outline-none"
               />
               <p className="text-[11px] text-slate-400 mt-2 font-semibold">
-                Usa <span className="font-mono text-slate-200">{`{LINK}`}</span> para insertar el enlace automáticamente.
+                Usa <span className="font-mono text-slate-200">{`{LINK}`}</span> para insertar el
+                enlace automáticamente.
               </p>
             </div>
+
+            {/* PREVIEW MAQUETADO (base Fase 2) */}
+            {!loading && !!lugar && (
+              <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-sm font-extrabold text-slate-200">
+                      Previsualización (para WhatsApp / Email)
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-semibold mt-1">
+                      En Fase 2 podrás adjuntar imagen/vídeo y descargarlo como creatividad.
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      copyToClipboard(mensaje.replace("{LINK}", absolutePublicLink))
+                    }
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-9 px-4"
+                  >
+                    Copiar texto final
+                  </Button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 items-start">
+                  {/* Mensaje maquetado */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    {/* Cabecera con logos */}
+                    <div className="flex items-center justify-between gap-3">
+                      <Image
+                        src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+                        alt="Impulso Energético"
+                        width={140}
+                        height={40}
+                        className="h-8 w-auto object-contain opacity-95"
+                      />
+
+                      {lugar?.especial && lugar?.especialLogoUrl ? (
+                        <div className="rounded-xl bg-white border border-slate-800 px-2 py-1">
+                          <Image
+                            src={String(lugar.especialLogoUrl)}
+                            alt="Logo lugar"
+                            width={48}
+                            height={48}
+                            className="h-8 w-8 object-contain"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 whitespace-pre-wrap text-sm text-slate-100 font-semibold leading-relaxed">
+                      {mensaje.replace("{LINK}", absolutePublicLink)}
+                    </div>
+
+                    <div className="mt-3 text-[11px] text-slate-400 font-semibold">
+                      Consejo: listo para copiar/pegar en WhatsApp, email o redes.
+                    </div>
+                  </div>
+
+                  {/* QR + link pequeño */}
+                  <div className="rounded-2xl border border-slate-800 bg-white p-3">
+                    <div className="text-[11px] text-slate-700 font-extrabold mb-2">
+                      QR + Enlace
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <QRCode value={absolutePublicLink} size={170} />
+                    </div>
+                    <div className="mt-2 text-[10px] break-all text-slate-700 font-semibold">
+                      {absolutePublicLink}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
