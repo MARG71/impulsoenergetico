@@ -522,13 +522,15 @@ export default function EditarLugarContenido({ id }: { id: string }) {
                     <div className="text-[11px] text-slate-400 font-extrabold mb-2">Vista previa</div>
                     <div className="w-32 h-32 rounded-2xl border border-slate-700 bg-slate-900/60 overflow-hidden grid place-items-center">
                       {logoPreview || edit.especialLogoUrl ? (
-                        <Image
-                          src={(logoPreview || edit.especialLogoUrl) as string}
-                          alt="logo"
-                          width={160}
-                          height={160}
-                          className="w-full h-full object-contain p-2"
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                        src={(logoPreview || edit.especialLogoUrl) as string}
+                        alt="logo"
+                        className="w-full h-full object-contain p-2"
                         />
+
+                        
+
                       ) : (
                         <div className="text-xs text-slate-500 font-semibold">Sin logo</div>
                       )}
