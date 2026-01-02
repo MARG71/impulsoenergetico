@@ -1,7 +1,13 @@
 import { Suspense } from "react";
 import CompartirContenido from "./CompartirContenido";
 
-export default function Page({ params }: { params: { id: string } }) {
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function Page({ params }: PageProps) {
+  const { id } = await params;
+
   return (
     <Suspense
       fallback={
@@ -15,7 +21,7 @@ export default function Page({ params }: { params: { id: string } }) {
         </div>
       }
     >
-      <CompartirContenido id={params.id} />
+      <CompartirContenido id={id} />
     </Suspense>
   );
 }
