@@ -7,11 +7,17 @@ import QRCode from "react-qr-code";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useSession } from "next-auth/react";
 
 // --------- Helpers ----------
 const fmtPct = (v: any) => (v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`);
+
 const toNumberOr = (v: any, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -45,7 +51,8 @@ export default function RegistrarLugar() {
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const adminQuery = isSuperadmin && tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+  const adminQuery =
+    isSuperadmin && tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const withTenant = (href: string) => {
     if (!tenantMode || !adminIdContext) return href;
@@ -60,7 +67,9 @@ export default function RegistrarLugar() {
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
   const [fondos, setFondos] = useState<Fondo[]>([]);
-  const [fondoSeleccionadoId, setFondoSeleccionadoId] = useState<number | null>(null);
+  const [fondoSeleccionadoId, setFondoSeleccionadoId] = useState<number | null>(
+    null
+  );
 
   const fondoSeleccionadoUrl = useMemo(() => {
     if (!fondoSeleccionadoId) return "";
@@ -142,7 +151,9 @@ export default function RegistrarLugar() {
       if (isSuperadmin) {
         if (adminSeleccionado) {
           try {
-            const res = await fetch(`/api/agentes?adminId=${adminSeleccionado}`, { cache: "no-store" });
+            const res = await fetch(`/api/agentes?adminId=${adminSeleccionado}`, {
+              cache: "no-store",
+            });
             const json = await res.json();
             agentesData = Array.isArray(json) ? json : [];
           } catch {
@@ -161,7 +172,8 @@ export default function RegistrarLugar() {
         }
       } else if (isAgente) {
         const agenteId = (session?.user as any)?.agenteId;
-        const nombreAgente = (session?.user as any)?.name || (session?.user as any)?.nombre || "Agente";
+        const nombreAgente =
+          (session?.user as any)?.name || (session?.user as any)?.nombre || "Agente";
         if (agenteId) {
           agentesData = [{ id: agenteId, nombre: nombreAgente }];
           setNuevo((s) => ({ ...s, agenteId: String(agenteId) }));
@@ -230,12 +242,14 @@ export default function RegistrarLugar() {
       const form = new FormData();
       form.append("file", file);
       form.append("folder", folder);
+
       const r = await fetch("/api/uploads", { method: "POST", body: form });
       if (!r.ok) {
         const msg = await r.text().catch(() => "");
         alert(`Error al subir fichero (${r.status}): ${msg || "sin detalle"}`);
         return null;
       }
+
       const data = await r.json();
       const url = data?.url?.toString() ?? "";
       if (!/^https?:\/\//i.test(url)) {
@@ -355,6 +369,7 @@ export default function RegistrarLugar() {
       especialCartelUrl: l.especialCartelUrl ?? "",
       especialLogoUrl: l.especialLogoUrl ?? "",
     });
+
     setModalAbierto(true);
   };
 
@@ -438,7 +453,8 @@ export default function RegistrarLugar() {
     }
 
     setFondoSeleccionadoId(id);
-    // refrescar flags activo (opcional pero recomendado)
+
+    // refrescar flags activo
     try {
       const res = await fetch("/api/fondos", { cache: "no-store" });
       const json = await res.json();
@@ -451,7 +467,8 @@ export default function RegistrarLugar() {
   // ───────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 md:px-8 py-8 text-slate-50">
-      <div className="w-full max-w-[1700px] mx-auto space-y-8">
+      {/* ⬇️ Tipografía general más grande y más “pro” */}
+      <div className="w-full max-w-[1700px] mx-auto space-y-8 text-[15px] md:text-[16px] font-medium">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
           <div className="rounded-3xl bg-slate-950/95 px-6 md:px-8 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
@@ -464,12 +481,14 @@ export default function RegistrarLugar() {
                 className="hidden md:block"
               />
               <div>
-                <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">Gestión de lugares</h1>
-                <p className="text-sm md:text-base text-slate-300 max-w-2xl font-medium">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
+                  Gestión de lugares
+                </h1>
+                <p className="text-sm md:text-base text-slate-300 max-w-2xl font-semibold">
                   Crea, edita y controla todos los lugares vinculados a tus agentes y códigos QR.
                 </p>
                 {tenantMode && (
-                  <p className="text-xs md:text-sm text-emerald-300 mt-1 font-semibold">
+                  <p className="text-xs md:text-sm text-emerald-300 mt-1 font-bold">
                     Modo tenant · viendo lugares del admin #{adminIdContext}
                   </p>
                 )}
@@ -477,8 +496,9 @@ export default function RegistrarLugar() {
             </div>
 
             <div className="flex flex-col items-start lg:items-end gap-2">
-              <div className="text-xs md:text-sm text-slate-400 font-semibold">
-                Total lugares: <span className="font-bold text-emerald-300">{lugares.length}</span>
+              <div className="text-sm text-slate-300 font-semibold">
+                Total lugares:{" "}
+                <span className="font-extrabold text-emerald-300">{lugares.length}</span>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -486,11 +506,11 @@ export default function RegistrarLugar() {
                   placeholder="Buscar por ID, nombre, dirección, agente, % o estado…"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  className="w-full sm:w-[360px] bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm h-10"
+                  className="w-full sm:w-[360px] bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm h-10 font-semibold"
                 />
                 <Button
                   onClick={() => router.push(withTenant("/dashboard"))}
-                  className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-semibold px-5 h-10"
+                  className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-extrabold px-5 h-10"
                 >
                   🏠 Volver al dashboard
                 </Button>
@@ -501,15 +521,17 @@ export default function RegistrarLugar() {
 
         {/* ALTA DE LUGAR */}
         <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6">
-          <h2 className="text-xl font-bold mb-4">Crear nuevo lugar</h2>
+          <h2 className="text-xl font-extrabold mb-4">Crear nuevo lugar</h2>
 
           <form onSubmit={registrarLugar} className="space-y-4">
             {/* SUPERADMIN: selector de ADMIN propietario */}
             {isSuperadmin && (
               <div className="mb-4">
-                <label className="text-xs text-slate-300 font-semibold">Admin propietario del lugar</label>
+                <label className="text-xs text-slate-300 font-extrabold">
+                  Admin propietario del lugar
+                </label>
                 <select
-                  className="mt-1 w-full lg:w-1/2 border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10"
+                  className="mt-1 w-full lg:w-1/2 border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10 font-semibold"
                   value={adminSeleccionado}
                   onChange={(e) => {
                     setAdminSeleccionado(e.target.value);
@@ -525,7 +547,7 @@ export default function RegistrarLugar() {
                   ))}
                 </select>
                 {tenantMode && adminSeleccionado && (
-                  <p className="text-[11px] text-emerald-300 mt-1">
+                  <p className="text-[11px] text-emerald-300 mt-1 font-bold">
                     Fijado por modo tenant (admin #{adminSeleccionado})
                   </p>
                 )}
@@ -534,90 +556,93 @@ export default function RegistrarLugar() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div>
-                <label className="text-xs text-slate-300 font-semibold">Nombre</label>
+                <label className="text-xs text-slate-300 font-extrabold">Nombre</label>
                 <Input
                   value={nuevo.nombre}
                   onChange={(e) => setNuevo((s) => ({ ...s, nombre: e.target.value }))}
                   placeholder="Nombre del lugar"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">Dirección</label>
+                <label className="text-xs text-slate-300 font-extrabold">Dirección</label>
                 <Input
                   value={nuevo.direccion}
                   onChange={(e) => setNuevo((s) => ({ ...s, direccion: e.target.value }))}
                   placeholder="Dirección"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">% Cliente (ej. 15 o 0.15)</label>
+                <label className="text-xs text-slate-300 font-extrabold">
+                  % Cliente (ej. 15 o 0.15)
+                </label>
                 <Input
                   inputMode="decimal"
                   value={nuevo.pctCliente}
                   onChange={(e) => setNuevo((s) => ({ ...s, pctCliente: e.target.value }))}
                   placeholder="15  ó  0.15"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">% Lugar (ej. 10 o 0.10)</label>
+                <label className="text-xs text-slate-300 font-extrabold">
+                  % Lugar (ej. 10 o 0.10)
+                </label>
                 <Input
                   inputMode="decimal"
                   value={nuevo.pctLugar}
                   onChange={(e) => setNuevo((s) => ({ ...s, pctLugar: e.target.value }))}
                   placeholder="10  ó  0.10"
-                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
+                  className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">Código QR</label>
+                <label className="text-xs text-slate-300 font-extrabold">Código QR</label>
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mt-1">
                   <Input
                     value={nuevo.qrCode}
                     onChange={(e) => setNuevo((s) => ({ ...s, qrCode: e.target.value }))}
                     placeholder="Se genera automáticamente si lo prefieres"
-                    className="bg-slate-900 border-slate-700 text-slate-100 h-10"
+                    className="bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   />
                   <Button
                     type="button"
                     onClick={generarQR_nuevo}
-                    className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-semibold h-10 px-5"
+                    className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-extrabold h-10 px-5"
                   >
                     Generar QR
                   </Button>
 
                   {nuevoQR && (
                     <div className="flex items-center justify-center rounded-xl border border-slate-800 bg-slate-950/60 px-3">
-                      <QRCode
-                        value={`https://impulsoenergetico.es/registro`}
-                        size={44}
-                      />
+                      <QRCode value={`https://impulsoenergetico.es/registro`} size={44} />
                     </div>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1 font-semibold">
                   (El QR definitivo se usa desde el lugar ya creado con el botón “Landing”.)
                 </p>
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">Agente</label>
+                <label className="text-xs text-slate-300 font-extrabold">Agente</label>
                 <select
-                  className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10"
+                  className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10 font-semibold"
                   value={nuevo.agenteId}
                   onChange={(e) => setNuevo((s) => ({ ...s, agenteId: e.target.value }))}
                   required
                   disabled={isAgente}
                 >
-                  <option value="">{isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}</option>
+                  <option value="">
+                    {isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}
+                  </option>
                   {agentes.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.nombre}
@@ -629,7 +654,7 @@ export default function RegistrarLugar() {
 
             {/* LUGAR ESPECIAL */}
             <fieldset className="mt-6 border border-emerald-700/40 rounded-2xl p-5 bg-emerald-900/20">
-              <legend className="px-2 text-xs font-bold text-emerald-300 uppercase tracking-wide">
+              <legend className="px-2 text-xs font-extrabold text-emerald-300 uppercase tracking-wide">
                 Lugar especial (club, asociación, evento…)
               </legend>
 
@@ -641,36 +666,52 @@ export default function RegistrarLugar() {
                   onChange={(e) => setNuevo((s) => ({ ...s, especial: e.target.checked }))}
                   className="h-4 w-4 rounded border-slate-500 bg-slate-900"
                 />
-                <label htmlFor="nuevo-especial" className="text-sm text-slate-200">
+                <label htmlFor="nuevo-especial" className="text-sm text-slate-200 font-bold">
                   Marcar como lugar especial
                 </label>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">Logo del club / asociación</label>
+                  <label className="text-xs text-slate-300 font-extrabold">
+                    Logo del club / asociación
+                  </label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))}
-                    className="mt-2 text-xs text-slate-200"
+                    onChange={(e) =>
+                      setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))
+                    }
+                    className="mt-2 text-xs text-slate-200 font-semibold"
                   />
-                  {nuevo.logoFile && <p className="text-[11px] text-emerald-300 mt-1">Se subirá al guardar</p>}
+                  {nuevo.logoFile && (
+                    <p className="text-[11px] text-emerald-300 mt-1 font-bold">
+                      Se subirá al guardar
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">Cartel especial (reemplazar)</label>
+                  <label className="text-xs text-slate-300 font-extrabold">
+                    Cartel especial (reemplazar)
+                  </label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))}
-                    className="mt-2 text-xs text-slate-200"
+                    onChange={(e) =>
+                      setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))
+                    }
+                    className="mt-2 text-xs text-slate-200 font-semibold"
                   />
-                  {nuevo.cartelFile && <p className="text-[11px] text-emerald-300 mt-1">Se subirá al guardar</p>}
+                  {nuevo.cartelFile && (
+                    <p className="text-[11px] text-emerald-300 mt-1 font-bold">
+                      Se subirá al guardar
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">Color de acento</label>
+                  <label className="text-xs text-slate-300 font-extrabold">Color de acento</label>
                   <div className="mt-2 flex items-center gap-3">
                     <input
                       type="color"
@@ -681,36 +722,39 @@ export default function RegistrarLugar() {
                     <Input
                       value={nuevo.especialColor}
                       onChange={(e) => setNuevo((s) => ({ ...s, especialColor: e.target.value }))}
-                      className="bg-slate-900 border-slate-700 text-slate-100 h-10"
+                      className="bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">Aportación acumulada (€)</label>
+                  <label className="text-xs text-slate-300 font-extrabold">Aportación acumulada (€)</label>
                   <Input
                     inputMode="numeric"
                     value={nuevo.aportacionAcumulada}
                     onChange={(e) => setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))}
                     placeholder="0"
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
+                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   />
                 </div>
 
                 <div className="lg:col-span-2">
-                  <label className="text-xs text-slate-300 font-semibold">Mensaje / gancho</label>
+                  <label className="text-xs text-slate-300 font-extrabold">Mensaje / gancho</label>
                   <Input
                     value={nuevo.especialMensaje}
                     onChange={(e) => setNuevo((s) => ({ ...s, especialMensaje: e.target.value }))}
                     placeholder='Ej.: "AYUDA A TU CLUB"'
-                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10"
+                    className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   />
                 </div>
               </div>
             </fieldset>
 
             <div className="mt-6 flex justify-end">
-              <Button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-8 h-11">
+              <Button
+                type="submit"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-8 h-11"
+              >
                 Registrar lugar
               </Button>
             </div>
@@ -720,24 +764,26 @@ export default function RegistrarLugar() {
         {/* LISTADO */}
         <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6 space-y-4">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-            <h2 className="text-xl font-bold">Lugares registrados</h2>
-            <div className="text-xs text-slate-400">
-              Mostrando: <span className="font-semibold text-slate-200">{lugaresFiltrados.length}</span> / {lugares.length}
+            <h2 className="text-xl font-extrabold">Lugares registrados</h2>
+            <div className="text-sm text-slate-300 font-semibold">
+              Mostrando:{" "}
+              <span className="font-extrabold text-slate-100">{lugaresFiltrados.length}</span>{" "}
+              / {lugares.length}
             </div>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-800">
-            <table className="w-full text-[13px] md:text-[15px]">
-              <thead className="bg-slate-900/80 text-slate-300">
-                <tr>
-                  <th className="px-3 py-3 text-left font-semibold">ID</th>
-                  <th className="px-3 py-3 text-left font-semibold">Nombre</th>
-                  <th className="px-3 py-3 text-left font-semibold">Dirección</th>
-                  <th className="px-3 py-3 text-left font-semibold">Agente</th>
-                  <th className="px-3 py-3 text-left font-semibold">% Cliente</th>
-                  <th className="px-3 py-3 text-left font-semibold">% Lugar</th>
-                  <th className="px-3 py-3 text-left font-semibold">Estado</th>
-                  <th className="px-3 py-3 text-right font-semibold">Acciones</th>
+            <table className="w-full text-[14px] md:text-[15px]">
+              <thead className="bg-slate-900/80 text-slate-200">
+                <tr className="font-extrabold">
+                  <th className="px-3 py-3 text-left">ID</th>
+                  <th className="px-3 py-3 text-left">Nombre</th>
+                  <th className="px-3 py-3 text-left">Dirección</th>
+                  <th className="px-3 py-3 text-left">Agente</th>
+                  <th className="px-3 py-3 text-left">% Cliente</th>
+                  <th className="px-3 py-3 text-left">% Lugar</th>
+                  <th className="px-3 py-3 text-left">Estado</th>
+                  <th className="px-3 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
 
@@ -746,30 +792,48 @@ export default function RegistrarLugar() {
                   const especial = !!l.especial;
 
                   return (
-                    <tr key={l.id} className="border-t border-slate-800/70 hover:bg-slate-900/70">
-                      <td className="px-3 py-4 font-mono text-xs md:text-sm text-slate-400 font-semibold">#{l.id}</td>
+                    <tr
+                      key={l.id}
+                      className="border-t border-slate-800/70 hover:bg-slate-900/70"
+                    >
+                      <td className="px-3 py-4 font-mono text-xs md:text-sm text-slate-400 font-extrabold">
+                        #{l.id}
+                      </td>
 
                       <td className="px-3 py-4">
-                        <div className="text-slate-50 font-semibold leading-tight">{l.nombre}</div>
-                        <div className="text-[11px] text-slate-400 mt-1">
-                          QR: <span className="font-mono">{String(l.qrCode || "").slice(0, 10)}…</span>
+                        <div className="text-slate-50 font-extrabold leading-tight">
+                          {l.nombre}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1 font-semibold">
+                          QR:{" "}
+                          <span className="font-mono">
+                            {String(l.qrCode || "").slice(0, 10)}…
+                          </span>
                         </div>
                       </td>
 
-                      <td className="px-3 py-4 text-slate-200">{l.direccion}</td>
+                      <td className="px-3 py-4 text-slate-200 font-semibold">{l.direccion}</td>
 
                       <td className="px-3 py-4 text-slate-200">
-                        <div className="font-medium">{l.agente?.nombre || "—"}</div>
-                        {l.agente?.email && <div className="text-[11px] text-slate-400">{l.agente.email}</div>}
+                        <div className="font-extrabold">{l.agente?.nombre || "—"}</div>
+                        {l.agente?.email && (
+                          <div className="text-[11px] text-slate-400 font-semibold">
+                            {l.agente.email}
+                          </div>
+                        )}
                       </td>
 
-                      <td className="px-3 py-4 text-emerald-300 font-semibold">{fmtPct(l.pctCliente)}</td>
-                      <td className="px-3 py-4 text-emerald-300 font-semibold">{fmtPct(l.pctLugar)}</td>
+                      <td className="px-3 py-4 text-emerald-300 font-extrabold">
+                        {fmtPct(l.pctCliente)}
+                      </td>
+                      <td className="px-3 py-4 text-emerald-300 font-extrabold">
+                        {fmtPct(l.pctLugar)}
+                      </td>
 
                       <td className="px-3 py-4">
                         <span
                           className={classNames(
-                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border",
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border",
                             especial
                               ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
                               : "bg-slate-700/30 text-slate-200 border-slate-500/40"
@@ -785,7 +849,7 @@ export default function RegistrarLugar() {
                           <div className="grid grid-cols-2 gap-2 w-[320px]">
                             {(isAdmin || isSuperadmin) && (
                               <Button
-                                className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold h-9"
+                                className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold h-9"
                                 onClick={() => abrirEdicion(l)}
                                 size="sm"
                               >
@@ -794,7 +858,7 @@ export default function RegistrarLugar() {
                             )}
 
                             <Button
-                              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold h-9"
+                              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold h-9"
                               onClick={() => router.push(withTenant(`/lugares/${l.id}/detalle`))}
                               size="sm"
                             >
@@ -802,7 +866,7 @@ export default function RegistrarLugar() {
                             </Button>
 
                             <Button
-                              className="bg-orange-500 hover:bg-orange-400 text-slate-950 font-semibold h-9"
+                              className="bg-orange-500 hover:bg-orange-400 text-slate-950 font-extrabold h-9"
                               onClick={() => router.push(withTenant(`/lugares/cartel/${l.id}`))}
                               size="sm"
                             >
@@ -811,7 +875,7 @@ export default function RegistrarLugar() {
 
                             <Button
                               className={classNames(
-                                "font-semibold h-9",
+                                "font-extrabold h-9",
                                 especial
                                   ? "bg-teal-500 hover:bg-teal-400 text-slate-950"
                                   : "bg-teal-700/30 text-slate-400 border border-slate-700 cursor-not-allowed"
@@ -825,8 +889,10 @@ export default function RegistrarLugar() {
                             </Button>
 
                             <Button
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-9 col-span-1"
-                              onClick={() => window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, "_blank")}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-9"
+                              onClick={() =>
+                                window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, "_blank")
+                              }
                               size="sm"
                             >
                               🔗 Landing
@@ -834,7 +900,7 @@ export default function RegistrarLugar() {
 
                             {(isAdmin || isSuperadmin) ? (
                               <Button
-                                className="bg-red-600 hover:bg-red-700 text-white font-semibold h-9"
+                                className="bg-red-600 hover:bg-red-700 text-white font-extrabold h-9"
                                 onClick={() => eliminarLugar(l.id)}
                                 size="sm"
                               >
@@ -852,7 +918,7 @@ export default function RegistrarLugar() {
 
                 {lugaresFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">
+                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm font-semibold">
                       No hay lugares para los filtros actuales.
                     </td>
                   </tr>
@@ -863,7 +929,7 @@ export default function RegistrarLugar() {
 
           {/* Fondo global */}
           <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <h3 className="text-lg font-bold mb-3">🎨 Fondo global actual para carteles</h3>
+            <h3 className="text-lg font-extrabold mb-3">🎨 Fondo global actual para carteles</h3>
 
             {isAdmin ? (
               <>
@@ -879,10 +945,20 @@ export default function RegistrarLugar() {
                       )}
                       title="Seleccionar como fondo global"
                     >
-                      <Image src={f.url} alt={f.nombre} width={500} height={260} className="w-full h-44 object-cover" />
+                      <Image
+                        src={f.url}
+                        alt={f.nombre}
+                        width={500}
+                        height={260}
+                        className="w-full h-44 object-cover"
+                      />
                       <div className="bg-slate-950/80 py-2 px-3">
-                        <div className="font-semibold text-slate-100 text-sm">{f.nombre}</div>
-                        {f.activo && <div className="text-[11px] text-emerald-300 font-semibold mt-0.5">Activo</div>}
+                        <div className="font-extrabold text-slate-100 text-sm">{f.nombre}</div>
+                        {f.activo && (
+                          <div className="text-[11px] text-emerald-300 font-extrabold mt-0.5">
+                            Activo
+                          </div>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -890,7 +966,7 @@ export default function RegistrarLugar() {
 
                 {!!fondoSeleccionadoUrl && (
                   <div className="mt-5">
-                    <p className="font-semibold mb-2">Vista previa del fondo activo:</p>
+                    <p className="font-extrabold mb-2">Vista previa del fondo activo:</p>
                     <Image
                       src={fondoSeleccionadoUrl}
                       alt="Fondo seleccionado"
@@ -918,7 +994,7 @@ export default function RegistrarLugar() {
         </section>
       </div>
 
-      {/* MODAL EDICIÓN — PRO (logo cuadrado + cartel en frame, sin solaparse) */}
+      {/* MODAL EDICIÓN — con los 3 tabs completos */}
       <Dialog
         open={modalAbierto}
         onOpenChange={(v) => {
@@ -933,16 +1009,20 @@ export default function RegistrarLugar() {
           }
         }}
       >
-        <DialogContent className="w-[96vw] max-w-[1200px] p-0 overflow-hidden">
+        <DialogContent className="w-[96vw] max-w-[1200px] p-0 overflow-hidden max-h-[90vh]">
           <DialogHeader className="bg-slate-950 border-b border-slate-800">
             <DialogTitle className="px-6 py-4 text-slate-50 flex items-center justify-between">
-              <span className="text-base md:text-lg font-bold">Editar lugar</span>
-              {edit?.id ? <span className="text-xs md:text-sm text-slate-400 font-mono">#{edit.id}</span> : null}
+              <span className="text-base md:text-lg font-extrabold">Editar lugar</span>
+              {edit?.id ? (
+                <span className="text-xs md:text-sm text-slate-400 font-mono font-extrabold">
+                  #{edit.id}
+                </span>
+              ) : null}
             </DialogTitle>
           </DialogHeader>
 
           {!!edit && (
-            <div className="bg-slate-950 text-slate-50">
+            <div className="bg-slate-950 text-slate-50 text-[15px] md:text-[16px] font-medium">
               {/* Tabs */}
               <div className="px-6 pt-4">
                 <div className="flex flex-wrap gap-2">
@@ -950,7 +1030,7 @@ export default function RegistrarLugar() {
                     type="button"
                     onClick={() => setEditTab("basico")}
                     className={classNames(
-                      "px-3 h-9 rounded-xl text-sm font-semibold border transition",
+                      "px-3 h-9 rounded-xl text-sm font-extrabold border transition",
                       editTab === "basico"
                         ? "bg-slate-900 border-slate-700 text-white"
                         : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
@@ -962,7 +1042,7 @@ export default function RegistrarLugar() {
                     type="button"
                     onClick={() => setEditTab("qr")}
                     className={classNames(
-                      "px-3 h-9 rounded-xl text-sm font-semibold border transition",
+                      "px-3 h-9 rounded-xl text-sm font-extrabold border transition",
                       editTab === "qr"
                         ? "bg-slate-900 border-slate-700 text-white"
                         : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
@@ -974,7 +1054,7 @@ export default function RegistrarLugar() {
                     type="button"
                     onClick={() => setEditTab("especial")}
                     className={classNames(
-                      "px-3 h-9 rounded-xl text-sm font-semibold border transition",
+                      "px-3 h-9 rounded-xl text-sm font-extrabold border transition",
                       editTab === "especial"
                         ? "bg-emerald-900/25 border-emerald-700/40 text-emerald-100"
                         : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
@@ -986,15 +1066,179 @@ export default function RegistrarLugar() {
               </div>
 
               {/* Body scroll */}
-              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                {/* TAB: ESPECIAL (lo más importante para tu problema) */}
+              <div className="overflow-y-auto px-6 py-5 max-h-[70vh]">
+                {/* TAB: BASICO */}
+                {editTab === "basico" && (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+                      <h3 className="text-sm font-extrabold text-slate-200 mb-4">
+                        Información principal
+                      </h3>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-slate-300 font-extrabold">Nombre</label>
+                          <Input
+                            value={edit.nombre}
+                            onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-300 font-extrabold">Dirección</label>
+                          <Input
+                            value={edit.direccion}
+                            onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-300 font-extrabold">
+                            % Cliente (ej. 15 o 0.15)
+                          </label>
+                          <Input
+                            inputMode="decimal"
+                            value={edit.pctCliente ?? ""}
+                            onChange={(e) => setEdit({ ...edit, pctCliente: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-300 font-extrabold">
+                            % Lugar (ej. 10 o 0.10)
+                          </label>
+                          <Input
+                            inputMode="decimal"
+                            value={edit.pctLugar ?? ""}
+                            onChange={(e) => setEdit({ ...edit, pctLugar: e.target.value })}
+                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-2">
+                          <label className="text-xs text-slate-300 font-extrabold">Agente</label>
+                          <select
+                            className="mt-1 w-full border rounded-lg px-3 bg-slate-900 border-slate-700 text-slate-100 text-sm h-11 font-semibold"
+                            value={edit.agenteId}
+                            onChange={(e) => setEdit({ ...edit, agenteId: Number(e.target.value) })}
+                          >
+                            <option value="">Selecciona un agente…</option>
+                            {agentes.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.nombre}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[11px] text-slate-400 mt-1 font-semibold">
+                            Recomendación: asigna el agente correcto para trazabilidad de leads y comparativas.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+                      <h3 className="text-sm font-extrabold text-slate-200 mb-4">Resumen visual</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div className="text-xs text-slate-400 font-extrabold">Estado</div>
+                          <div className="mt-1">
+                            <span
+                              className={classNames(
+                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border",
+                                edit.especial
+                                  ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
+                                  : "bg-slate-700/30 text-slate-200 border-slate-500/40"
+                              )}
+                            >
+                              {edit.especial ? "⭐ Especial" : "Normal"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div className="text-xs text-slate-400 font-extrabold">% Cliente</div>
+                          <div className="mt-1 text-emerald-300 font-extrabold text-lg">
+                            {fmtPct(edit.pctCliente)}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                          <div className="text-xs text-slate-400 font-extrabold">% Lugar</div>
+                          <div className="mt-1 text-emerald-300 font-extrabold text-lg">
+                            {fmtPct(edit.pctLugar)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: QR */}
+                {editTab === "qr" && (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+                      <h3 className="text-sm font-extrabold text-slate-200 mb-4">Código QR</h3>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                        <div className="lg:col-span-2">
+                          <label className="text-xs text-slate-300 font-extrabold">Código QR (texto)</label>
+                          <div className="mt-1 flex flex-col sm:flex-row gap-3">
+                            <Input
+                              value={edit.qrCode ?? ""}
+                              onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
+                              className="bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
+                            />
+                            <Button
+                              type="button"
+                              onClick={generarQR_edit}
+                              className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-extrabold h-11 px-5"
+                            >
+                              Generar QR nuevo
+                            </Button>
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 mt-2 font-semibold">
+                            Esto identifica el lugar. Si lo cambias, el QR antiguo dejará de apuntar a este lugar.
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 flex flex-col items-center">
+                          <div className="text-xs text-slate-400 font-extrabold mb-3">QR de Landing</div>
+                          <div className="rounded-xl border border-slate-800 bg-white p-3">
+                            <QRCode
+                              value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`}
+                              size={120}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-10 px-4"
+                            onClick={() =>
+                              window.open(
+                                `/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`,
+                                "_blank"
+                              )
+                            }
+                          >
+                            Abrir Landing
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: ESPECIAL */}
                 {editTab === "especial" && (
                   <div className="space-y-5">
                     <div className="rounded-2xl border border-emerald-700/40 bg-emerald-900/15 p-5">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <h3 className="text-sm font-bold text-emerald-100">Lugar especial</h3>
+                        <h3 className="text-sm font-extrabold text-emerald-100">Lugar especial</h3>
 
-                        <label className="flex items-center gap-2 text-sm text-slate-100">
+                        <label className="flex items-center gap-2 text-sm text-slate-100 font-extrabold">
                           <input
                             id="edit-especial"
                             type="checkbox"
@@ -1006,11 +1250,13 @@ export default function RegistrarLugar() {
                         </label>
                       </div>
 
-                      {/* ✅ Grid estable: en pantallas medianas ya se apila bien, y en lg va 2 columnas */}
+                      {/* ✅ Grid estable */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
-                        {/* LOGO (cuadrado fijo, nunca se pisa) */}
+                        {/* LOGO (cuadrado fijo) */}
                         <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-semibold">Logo (subir para actualizar)</label>
+                          <label className="text-xs text-slate-300 font-extrabold">
+                            Logo (subir para actualizar)
+                          </label>
 
                           <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
                             <input
@@ -1021,11 +1267,13 @@ export default function RegistrarLugar() {
                                 setEditLogoFile(f);
                                 setLogoPreview(f ? URL.createObjectURL(f) : null);
                               }}
-                              className="text-xs text-slate-200"
+                              className="text-xs text-slate-200 font-semibold"
                             />
 
                             <div className="sm:ml-auto">
-                              <div className="text-[11px] text-slate-400 font-semibold mb-2">Vista previa</div>
+                              <div className="text-[11px] text-slate-400 font-extrabold mb-2">
+                                Vista previa
+                              </div>
 
                               <div className="w-32 h-32 rounded-2xl border border-slate-700 bg-slate-900/60 overflow-hidden grid place-items-center">
                                 {logoPreview || edit.especialLogoUrl ? (
@@ -1037,18 +1285,24 @@ export default function RegistrarLugar() {
                                     className="w-full h-full object-contain p-2"
                                   />
                                 ) : (
-                                  <div className="text-xs text-slate-500">Sin logo</div>
+                                  <div className="text-xs text-slate-500 font-semibold">Sin logo</div>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          {editLogoFile && <p className="text-[11px] text-emerald-300 mt-2">Se subirá al guardar</p>}
+                          {editLogoFile && (
+                            <p className="text-[11px] text-emerald-300 mt-2 font-extrabold">
+                              Se subirá al guardar
+                            </p>
+                          )}
                         </div>
 
-                        {/* CARTEL (frame con ratio, no se solapa nunca) */}
+                        {/* CARTEL (frame vertical tipo A4) */}
                         <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-semibold">Cartel especial (reemplazar)</label>
+                          <label className="text-xs text-slate-300 font-extrabold">
+                            Cartel especial (reemplazar)
+                          </label>
 
                           <div className="mt-3">
                             <input
@@ -1059,17 +1313,18 @@ export default function RegistrarLugar() {
                                 setEditCartelFile(f);
                                 setCartelPreview(f ? URL.createObjectURL(f) : null);
                               }}
-                              className="text-xs text-slate-200"
+                              className="text-xs text-slate-200 font-semibold"
                             />
                           </div>
 
                           <div className="mt-3">
-                            <div className="text-[11px] text-slate-400 font-semibold mb-2">Vista previa</div>
+                            <div className="text-[11px] text-slate-400 font-extrabold mb-2">
+                              Vista previa
+                            </div>
 
                             <div className="rounded-2xl border border-slate-700 bg-slate-950 overflow-hidden">
-                              {/* frame A4-ish */}
-                              <div className="w-full aspect-[4/3] bg-slate-950 grid place-items-center">
-                                {(cartelPreview || edit.especialCartelUrl) ? (
+                              <div className="w-full aspect-[3/4] bg-slate-950 grid place-items-center">
+                                {cartelPreview || edit.especialCartelUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={(cartelPreview || edit.especialCartelUrl) as string}
@@ -1077,18 +1332,24 @@ export default function RegistrarLugar() {
                                     className="w-full h-full object-contain"
                                   />
                                 ) : (
-                                  <div className="text-xs text-slate-500">Sin cartel</div>
+                                  <div className="text-xs text-slate-500 font-semibold">
+                                    Sin cartel
+                                  </div>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          {editCartelFile && <p className="text-[11px] text-emerald-300 mt-2">Se subirá al guardar</p>}
+                          {editCartelFile && (
+                            <p className="text-[11px] text-emerald-300 mt-2 font-extrabold">
+                              Se subirá al guardar
+                            </p>
+                          )}
                         </div>
 
                         {/* Color */}
                         <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-semibold">Color de acento</label>
+                          <label className="text-xs text-slate-300 font-extrabold">Color de acento</label>
                           <div className="mt-2 flex items-center gap-3">
                             <input
                               type="color"
@@ -1099,32 +1360,34 @@ export default function RegistrarLugar() {
                             <Input
                               value={edit.especialColor ?? ""}
                               onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
-                              className="bg-slate-900 border-slate-700 text-slate-100 h-11"
+                              className="bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
                             />
                           </div>
                         </div>
 
                         {/* Aportación */}
                         <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-semibold">Aportación acumulada (€)</label>
+                          <label className="text-xs text-slate-300 font-extrabold">
+                            Aportación acumulada (€)
+                          </label>
                           <Input
                             inputMode="numeric"
                             value={String(edit.aportacionAcumulada ?? 0)}
                             onChange={(e) => setEdit({ ...edit, aportacionAcumulada: e.target.value })}
-                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
                           />
                         </div>
 
                         {/* Mensaje */}
                         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-semibold">Mensaje / gancho</label>
+                          <label className="text-xs text-slate-300 font-extrabold">Mensaje / gancho</label>
                           <Input
                             value={edit.especialMensaje ?? ""}
                             onChange={(e) => setEdit({ ...edit, especialMensaje: e.target.value })}
                             placeholder='Ej.: "AYUDA A TU CLUB"'
-                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11"
+                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
                           />
-                          <p className="text-[11px] text-slate-400 mt-2">
+                          <p className="text-[11px] text-slate-400 mt-2 font-semibold">
                             Consejo: corto y directo (ej. “Apoya al club con tu ahorro”).
                           </p>
                         </div>
@@ -1132,26 +1395,18 @@ export default function RegistrarLugar() {
                     </div>
                   </div>
                 )}
-
-                {/* TAB: BASICO y QR */}
-                {editTab !== "especial" && (
-                  <div className="text-slate-300 text-sm">
-                    (Se mantiene tu contenido actual en “Datos básicos” y “QR”. Si quieres, te lo remaqueto igual de PRO
-                    con el mismo patrón de cards.)
-                  </div>
-                )}
               </div>
 
               {/* Footer fijo */}
               <div className="border-t border-slate-800 bg-slate-950 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                <div className="text-[12px] text-slate-400">
+                <div className="text-[12px] text-slate-400 font-semibold">
                   Tip: si algo está “apretado”, dime tu resolución/zoom y lo ajustamos fino.
                 </div>
 
                 <div className="flex gap-2 justify-end">
                   <Button
                     type="button"
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold h-10 px-5"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-extrabold h-10 px-5"
                     onClick={() => setModalAbierto(false)}
                   >
                     Cancelar
@@ -1160,7 +1415,7 @@ export default function RegistrarLugar() {
                   <Button
                     type="button"
                     onClick={guardarEdicion}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold h-10 px-6"
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold h-10 px-6"
                   >
                     Guardar cambios
                   </Button>
