@@ -23,13 +23,36 @@ const toNumberOr = (v: any, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const eur = (n: any) =>
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(
+    Number.isFinite(Number(n)) ? Number(n) : 0
+  );
+
 type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 type Lugar = any;
 type Admin = { id: number; nombre: string; email: string };
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
+type KpisLugar = {
+  leads7d: number;
+  comparativasMes: number;
+  ahorroTotal: number;
+  comisionTotal: number;
+};
+
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
+}
+
+// Normaliza respuesta de /api/lugares/[id]/detalle
+function normalizeKpis(raw: any): KpisLugar {
+  const src = raw?.kpisGlobal ?? raw?.kpis ?? raw?.kpi ?? raw ?? {};
+  return {
+    leads7d: Number(src?.leads7d ?? 0) || 0,
+    comparativasMes: Number(src?.comparativasMes ?? 0) || 0,
+    ahorroTotal: Number(src?.ahorroTotal ?? 0) || 0,
+    comisionTotal: Number(src?.comisionTotal ?? 0) || 0,
+  };
 }
 
 export default function RegistrarLugar() {
@@ -111,6 +134,38 @@ export default function RegistrarLugar() {
 
   // UI pestañas modal
   const [editTab, setEditTab] = useState<"basico" | "qr" | "especial">("basico");
+
+  // KPI modal (ficha directiva)
+  const [kpisModal, setKpisModal] = useState<KpisLugar>({
+    leads7d: 0,
+    comparativasMes: 0,
+    ahorroTotal: 0,
+    comisionTotal: 0,
+  });
+  const [kpisModalLoading, setKpisModalLoading] = useState(false);
+
+  const cargarKpisLugar = async (lugarId: number) => {
+    try {
+      setKpisModalLoading(true);
+      // ✅ Endpoint de detalle
+      const res = await fetch(`/api/lugares/${lugarId}/detalle${adminQuery}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`Detalle no disponible (${res.status})`);
+      const raw = await res.json();
+      setKpisModal(normalizeKpis(raw));
+    } catch (e) {
+      // Silencioso pero consistente
+      setKpisModal({
+        leads7d: 0,
+        comparativasMes: 0,
+        ahorroTotal: 0,
+        comisionTotal: 0,
+      });
+    } finally {
+      setKpisModalLoading(false);
+    }
+  };
 
   // ───────────────────────────────
   // 1) Cargar admins (solo SUPERADMIN)
@@ -371,6 +426,9 @@ export default function RegistrarLugar() {
     });
 
     setModalAbierto(true);
+
+    // ✅ Cargar KPIs del lugar al abrir modal
+    if (l?.id) cargarKpisLugar(Number(l.id));
   };
 
   const generarQR_edit = () => {
@@ -467,8 +525,8 @@ export default function RegistrarLugar() {
   // ───────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 md:px-8 py-8 text-slate-50">
-      {/* ⬇️ Tipografía general más grande y más “pro” */}
-      <div className="w-full max-w-[1700px] mx-auto space-y-8 text-[15px] md:text-[16px] font-medium">
+      {/* ⬇️ Tipografía general más grande y más “director” */}
+      <div className="w-full max-w-[1700px] mx-auto space-y-8 text-[15px] md:text-[16px] font-semibold">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
           <div className="rounded-3xl bg-slate-950/95 px-6 md:px-8 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
@@ -1022,7 +1080,84 @@ export default function RegistrarLugar() {
           </DialogHeader>
 
           {!!edit && (
-            <div className="bg-slate-950 text-slate-50 text-[15px] md:text-[16px] font-medium">
+            <div className="bg-slate-950 text-slate-50 text-[15px] md:text-[16px] font-semibold">
+              {/* ✅ FICHA DIRECTIVA (KPIs) — dentro del modal */}
+              <div className="px-6 pt-5">
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/30 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-extrabold text-white">
+                        Ficha directiva del lugar
+                      </h3>
+                      <p className="text-sm font-semibold text-slate-300">
+                        KPIs ejecutivos (7 días / mes / acumulado)
+                      </p>
+                    </div>
+
+                    {/* Logo del CRM (seguro, sin solape) */}
+                    <div className="relative z-20">
+                      <Image
+                        src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+                        alt="Impulso Energético"
+                        width={140}
+                        height={40}
+                        className="h-10 w-auto object-contain opacity-95"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        Leads (7 días)
+                      </div>
+                      <div className="mt-2 text-2xl font-extrabold text-white">
+                        {kpisModalLoading ? "…" : kpisModal.leads7d}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        Captación reciente
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        Comparativas (mes)
+                      </div>
+                      <div className="mt-2 text-2xl font-extrabold text-white">
+                        {kpisModalLoading ? "…" : kpisModal.comparativasMes}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        Actividad mensual
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        Ahorro total
+                      </div>
+                      <div className="mt-2 text-2xl font-extrabold text-white">
+                        {kpisModalLoading ? "…" : eur(kpisModal.ahorroTotal)}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        Acumulado (€)
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
+                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+                        Comisión total
+                      </div>
+                      <div className="mt-2 text-2xl font-extrabold text-white">
+                        {kpisModalLoading ? "…" : eur(kpisModal.comisionTotal)}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        Acumulado (€)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Tabs */}
               <div className="px-6 pt-4">
                 <div className="flex flex-wrap gap-2">
@@ -1298,7 +1433,7 @@ export default function RegistrarLugar() {
                           )}
                         </div>
 
-                        {/* CARTEL (frame vertical tipo A4) */}
+                        {/* CARTEL (frame vertical tipo A4) — FIX SOLAPE */}
                         <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                           <label className="text-xs text-slate-300 font-extrabold">
                             Cartel especial (reemplazar)
@@ -1322,8 +1457,12 @@ export default function RegistrarLugar() {
                               Vista previa
                             </div>
 
-                            <div className="rounded-2xl border border-slate-700 bg-slate-950 overflow-hidden">
-                              <div className="w-full aspect-[3/4] bg-slate-950 grid place-items-center">
+                            {/* ✅ Contenedor relativo + “zona segura” superior para evitar solapes */}
+                            <div className="relative rounded-2xl border border-slate-700 bg-slate-950 overflow-hidden">
+                              {/* Zona segura (evita que cualquier overlay quede por encima visualmente) */}
+                              <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-slate-950 to-transparent z-20" />
+
+                              <div className="w-full aspect-[3/4] bg-slate-950 grid place-items-center relative z-10">
                                 {cartelPreview || edit.especialCartelUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
