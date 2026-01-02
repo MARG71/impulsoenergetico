@@ -908,7 +908,7 @@ export default function RegistrarLugar() {
                             {(isAdmin || isSuperadmin) && (
                               <Button
                                 className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold h-9"
-                                onClick={() => abrirEdicion(l)}
+                                onClick={() => router.push(withTenant(`/lugares/editar/${l.id}`))}
                                 size="sm"
                               >
                                 ✏️ Editar
