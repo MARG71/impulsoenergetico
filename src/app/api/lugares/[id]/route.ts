@@ -3,6 +3,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
+// ✅ Normaliza porcentajes: "15" -> 0.15, "0.15" -> 0.15, "15,5" -> 0.155
+function toPct(value: any): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(String(value).replace(",", "."));
+  if (Number.isNaN(n)) return null;
+  return n > 1 ? n / 100 : n;
+}
+
+function toNumberOr0(v: any): number {
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function toIntOrNull(v: any): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function buildLugarWhere(ctx: any, idNum: number) {
   const where: any = { id: idNum };
 
@@ -33,6 +51,7 @@ function buildLugarWhere(ctx: any, idNum: number) {
 export async function GET(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
   const ctx = await getTenantContext(req);
+
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
@@ -80,6 +99,7 @@ export async function GET(req: NextRequest, context: any) {
 export async function PUT(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
   const ctx = await getTenantContext(req);
+
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
@@ -119,6 +139,11 @@ export async function PUT(req: NextRequest, context: any) {
     );
   }
 
+  const agenteIdNum = toIntOrNull(agenteId);
+  if (!agenteIdNum) {
+    return NextResponse.json({ error: "agenteId inválido" }, { status: 400 });
+  }
+
   let where: any;
   try {
     where = buildLugarWhere(ctx, idNum);
@@ -144,17 +169,24 @@ export async function PUT(req: NextRequest, context: any) {
     const lugar = await prisma.lugar.update({
       where: { id: existente.id },
       data: {
-        nombre,
-        direccion,
-        qrCode,
-        agenteId: Number(agenteId),
-        pctCliente: pctCliente != null ? Number(pctCliente) : null,
-        pctLugar: pctLugar != null ? Number(pctLugar) : null,
+        nombre: String(nombre).trim(),
+        direccion: String(direccion).trim(),
+        qrCode: String(qrCode).trim(),
+        agenteId: agenteIdNum,
+
+        // ✅ AQUÍ está la corrección importante:
+        pctCliente: toPct(pctCliente),
+        pctLugar: toPct(pctLugar),
+
         especial: !!especial,
         especialLogoUrl: especialLogoUrl ?? existente.especialLogoUrl,
         especialColor: especialColor ?? existente.especialColor,
         especialMensaje: especialMensaje ?? existente.especialMensaje,
-        aportacionAcumulada: Number(aportacionAcumulada ?? existente.aportacionAcumulada ?? 0),
+
+        aportacionAcumulada: toNumberOr0(
+          aportacionAcumulada ?? existente.aportacionAcumulada ?? 0
+        ),
+
         especialCartelUrl:
           typeof especialCartelUrl === "string" && especialCartelUrl.trim()
             ? especialCartelUrl.trim()
@@ -197,6 +229,7 @@ export async function PUT(req: NextRequest, context: any) {
 export async function DELETE(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
   const ctx = await getTenantContext(req);
+
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
@@ -237,9 +270,7 @@ export async function DELETE(req: NextRequest, context: any) {
   try {
     await prisma.lugar.update({
       where: { id: existente.id },
-      data: {
-        ocultoParaAdmin: true,
-      },
+      data: { ocultoParaAdmin: true },
     });
 
     return NextResponse.json({ ok: true });

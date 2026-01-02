@@ -16,8 +16,7 @@ import {
 import { useSession } from "next-auth/react";
 
 // --------- Helpers ----------
-const fmtPct = (v: any) =>
-  v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`;
+const fmtPct = (v: any) => (v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`);
 const toNumberOr = (v: any, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -49,9 +48,7 @@ export default function RegistrarLugar() {
     adminIdContext > 0;
 
   const adminQuery =
-    isSuperadmin && tenantMode && adminIdContext
-      ? `?adminId=${adminIdContext}`
-      : "";
+    isSuperadmin && tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const withTenant = (href: string) => {
     if (!tenantMode || !adminIdContext) return href;
@@ -77,7 +74,7 @@ export default function RegistrarLugar() {
     nombre: "",
     direccion: "",
     qrCode: "",
-    adminId: "", // 👈 para SUPERADMIN
+    adminId: "", // 👈 para SUPERADMIN (solo informativo)
     agenteId: "",
     pctCliente: "",
     pctLugar: "",
@@ -102,10 +99,17 @@ export default function RegistrarLugar() {
   const [cartelPreview, setCartelPreview] = useState<string | null>(null);
 
   // ───────────────────────────────
-  // 1) Cargar admins (solo SUPERADMIN)
+  // 1) Cargar admins (solo SUPERADMIN GLOBAL)
   // ───────────────────────────────
   useEffect(() => {
     if (!session || !isSuperadmin) return;
+
+    // ✅ Si está en modo tenant, NO necesitamos listar admins (ya viene fijado)
+    if (tenantMode && adminIdContext) {
+      setAdminSeleccionado(String(adminIdContext));
+      setNuevo((s) => ({ ...s, adminId: String(adminIdContext) }));
+      return;
+    }
 
     (async () => {
       try {
@@ -114,10 +118,9 @@ export default function RegistrarLugar() {
         const lista = Array.isArray(data) ? data : [];
         setAdmins(lista);
 
-        if (tenantMode && adminIdContext) {
-          setAdminSeleccionado(String(adminIdContext));
-          setNuevo((s) => ({ ...s, adminId: String(adminIdContext) }));
-        } else if (lista.length > 0) {
+        // No seleccionamos por defecto si quieres obligar elección.
+        // Pero para UX, seleccionamos el primero si existe.
+        if (lista.length > 0) {
           setAdminSeleccionado(String(lista[0].id));
           setNuevo((s) => ({ ...s, adminId: String(lista[0].id) }));
         }
@@ -138,18 +141,25 @@ export default function RegistrarLugar() {
       let agentesData: any[] = [];
 
       if (isSuperadmin) {
-        if (adminSeleccionado) {
-          try {
-            const res = await fetch(
-              `/api/agentes?adminId=${adminSeleccionado}`,
-              { cache: "no-store" }
-            );
+        try {
+          if (tenantMode) {
+            // ✅ SUPERADMIN tenant -> el backend ya filtra por tenantAdminId
+            const res = await fetch(`/api/agentes`, { cache: "no-store" });
             const json = await res.json();
             agentesData = Array.isArray(json) ? json : [];
-          } catch {
-            agentesData = [];
+          } else {
+            // ✅ SUPERADMIN global -> necesitamos adminSeleccionado para filtrar
+            if (!adminSeleccionado) {
+              agentesData = [];
+            } else {
+              const res = await fetch(`/api/agentes?adminId=${adminSeleccionado}`, {
+                cache: "no-store",
+              });
+              const json = await res.json();
+              agentesData = Array.isArray(json) ? json : [];
+            }
           }
-        } else {
+        } catch {
           agentesData = [];
         }
       } else if (isAdmin) {
@@ -163,9 +173,7 @@ export default function RegistrarLugar() {
       } else if (isAgente) {
         const agenteId = (session?.user as any)?.agenteId;
         const nombreAgente =
-          (session?.user as any)?.name ||
-          (session?.user as any)?.nombre ||
-          "Agente";
+          (session?.user as any)?.name || (session?.user as any)?.nombre || "Agente";
         if (agenteId) {
           agentesData = [{ id: agenteId, nombre: nombreAgente }];
           setNuevo((s) => ({ ...s, agenteId: String(agenteId) }));
@@ -173,8 +181,15 @@ export default function RegistrarLugar() {
       }
 
       setAgentes(agentesData);
+
+      // ✅ Si el agente seleccionado ya no existe para este admin, lo reseteamos
+      setNuevo((s) => {
+        const existe = agentesData.some((a) => String(a.id) === String(s.agenteId));
+        return existe ? s : { ...s, agenteId: "" };
+      });
+
     })();
-  }, [session, role, isSuperadmin, isAdmin, isAgente, adminSeleccionado]);
+  }, [session, role, isSuperadmin, isAdmin, isAgente, adminSeleccionado, tenantMode]);
 
   // ───────────────────────────────
   // 3) Cargar lugares + fondos
@@ -185,9 +200,7 @@ export default function RegistrarLugar() {
     (async () => {
       let lugaresData: any[] = [];
       try {
-        const res = await fetch(`/api/lugares${adminQuery}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`/api/lugares${adminQuery}`, { cache: "no-store" });
         const json = await res.json();
         lugaresData = Array.isArray(json) ? json : [];
       } catch {
@@ -211,7 +224,7 @@ export default function RegistrarLugar() {
     })();
   }, [session, role, adminQuery]);
 
-  // ---- Listado filtrado (por cualquier campo visible) ----
+  // ---- Listado filtrado ----
   const lugaresFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     if (!q) return lugares;
@@ -230,7 +243,7 @@ export default function RegistrarLugar() {
     });
   }, [lugares, busqueda]);
 
-  // ---- Subida de ficheros (upload genérico) ----
+  // ---- Upload genérico ----
   async function subirFichero(file: File, folder: string): Promise<string | null> {
     try {
       const form = new FormData();
@@ -239,9 +252,7 @@ export default function RegistrarLugar() {
       const r = await fetch("/api/uploads", { method: "POST", body: form });
       if (!r.ok) {
         const msg = await r.text().catch(() => "");
-        alert(
-          `Error al subir fichero (${r.status}): ${msg || "sin detalle"}`
-        );
+        alert(`Error al subir fichero (${r.status}): ${msg || "sin detalle"}`);
         return null;
       }
       const data = await r.json();
@@ -267,7 +278,13 @@ export default function RegistrarLugar() {
   const registrarLugar = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🔴 Validación SUPERADMIN GLOBAL (no tenant)
+    // ✅ Validaciones fuertes (evita pantallazos)
+    if (!nuevo.nombre.trim()) return alert("Falta el nombre.");
+    if (!nuevo.direccion.trim()) return alert("Falta la dirección.");
+    if (!nuevo.qrCode.trim()) return alert("Falta el código QR (genera uno).");
+    if (!String(nuevo.agenteId || "").trim()) return alert("Selecciona un agente.");
+
+    // 🔴 SUPERADMIN GLOBAL (no tenant)
     if (isSuperadmin && !tenantMode && !adminSeleccionado) {
       alert("Selecciona un ADMIN propietario para el lugar.");
       return;
@@ -299,7 +316,7 @@ export default function RegistrarLugar() {
       aportacionAcumulada: toNumberOr(nuevo.aportacionAcumulada, 0),
     };
 
-    // (opcional, no molesta aunque el backend no lo use)
+    // ✅ Superadmin global: pasamos el admin en body (backend lo usa)
     if (isSuperadmin && !tenantMode && adminSeleccionado) {
       body.adminSeleccionado = adminSeleccionado;
     }
@@ -308,17 +325,11 @@ export default function RegistrarLugar() {
       body.especialCartelUrl = especialCartelUrl.trim();
     }
 
-    // 👇 AQUÍ VIENE LA CLAVE: construimos la query ?adminId=...
+    // ✅ Query: solo necesaria si SUPERADMIN está en modo tenant.
+    // En modo global NO hace falta mandar ?adminId, porque ya va adminSeleccionado.
     let queryForPost = "";
-
-    if (isSuperadmin) {
-      if (tenantMode && adminIdContext) {
-        // SUPERADMIN en modo tenant -> usamos el admin del tenant
-        queryForPost = `?adminId=${adminIdContext}`;
-      } else if (!tenantMode && adminSeleccionado) {
-        // SUPERADMIN global creando desde el desplegable
-        queryForPost = `?adminId=${adminSeleccionado}`;
-      }
+    if (isSuperadmin && tenantMode && adminIdContext) {
+      queryForPost = `?adminId=${adminIdContext}`;
     }
 
     const r = await fetch(`/api/lugares${queryForPost}`, {
@@ -340,7 +351,7 @@ export default function RegistrarLugar() {
       nombre: "",
       direccion: "",
       qrCode: "",
-      adminId: isSuperadmin ? nuevo.adminId : "",
+      adminId: isSuperadmin ? String(adminSeleccionado || "") : "",
       agenteId: "",
       pctCliente: "",
       pctLugar: "",
@@ -431,9 +442,7 @@ export default function RegistrarLugar() {
 
   const eliminarLugar = async (id: number) => {
     if (!confirm("¿Eliminar lugar (se ocultará para el admin)?")) return;
-    const r = await fetch(`/api/lugares/${id}${adminQuery}`, {
-      method: "DELETE",
-    });
+    const r = await fetch(`/api/lugares/${id}${adminQuery}`, { method: "DELETE" });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       alert(d?.error || "Error al eliminar lugar");
@@ -473,8 +482,7 @@ export default function RegistrarLugar() {
                   Gestión de lugares
                 </h1>
                 <p className="text-sm md:text-base text-slate-300 max-w-2xl font-medium">
-                  Crea, edita y controla todos los lugares vinculados a tus
-                  agentes y códigos QR.
+                  Crea, edita y controla todos los lugares vinculados a tus agentes y códigos QR.
                 </p>
                 {tenantMode && (
                   <p className="text-xs md:text-sm text-emerald-300 mt-1 font-semibold">
@@ -487,9 +495,7 @@ export default function RegistrarLugar() {
             <div className="flex flex-col items-end gap-2 text-xs md:text-sm">
               <span className="text-slate-400 font-semibold">
                 Total lugares:{" "}
-                <span className="font-bold text-emerald-300">
-                  {lugares.length}
-                </span>
+                <span className="font-bold text-emerald-300">{lugares.length}</span>
               </span>
               <Input
                 placeholder="Buscar por ID, nombre, dirección, agente, % o estado…"
@@ -512,8 +518,8 @@ export default function RegistrarLugar() {
           <h2 className="text-xl font-bold mb-4">Crear nuevo lugar</h2>
 
           <form onSubmit={registrarLugar} className="space-y-4">
-            {/* SUPERADMIN: selector de ADMIN propietario */}
-            {isSuperadmin && (
+            {/* ✅ SUPERADMIN: selector de ADMIN SOLO si está en modo GLOBAL */}
+            {isSuperadmin && !tenantMode && (
               <div className="mb-4">
                 <label className="text-xs text-slate-300 font-semibold">
                   Admin propietario del lugar
@@ -522,10 +528,12 @@ export default function RegistrarLugar() {
                   className="mt-1 w-full md:w-1/2 border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm"
                   value={adminSeleccionado}
                   onChange={(e) => {
-                    setAdminSeleccionado(e.target.value);
-                    setNuevo((s) => ({ ...s, adminId: e.target.value }));
+                    const val = e.target.value;
+                    setAdminSeleccionado(val);
+                    setNuevo((s) => ({ ...s, adminId: val, agenteId: "" }));
+                    setNuevoQR("");
                   }}
-                  disabled={tenantMode}
+                  required
                 >
                   <option value="">Selecciona un admin…</option>
                   {admins.map((ad) => (
@@ -534,24 +542,15 @@ export default function RegistrarLugar() {
                     </option>
                   ))}
                 </select>
-                {tenantMode && adminSeleccionado && (
-                  <p className="text-[11px] text-emerald-300 mt-1">
-                    Fijado por modo tenant (admin #{adminSeleccionado})
-                  </p>
-                )}
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="text-xs text-slate-300 font-semibold">
-                  Nombre
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">Nombre</label>
                 <Input
                   value={nuevo.nombre}
-                  onChange={(e) =>
-                    setNuevo((s) => ({ ...s, nombre: e.target.value }))
-                  }
+                  onChange={(e) => setNuevo((s) => ({ ...s, nombre: e.target.value }))}
                   placeholder="Nombre del lugar"
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
                   required
@@ -559,14 +558,10 @@ export default function RegistrarLugar() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">
-                  Dirección
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">Dirección</label>
                 <Input
                   value={nuevo.direccion}
-                  onChange={(e) =>
-                    setNuevo((s) => ({ ...s, direccion: e.target.value }))
-                  }
+                  onChange={(e) => setNuevo((s) => ({ ...s, direccion: e.target.value }))}
                   placeholder="Dirección"
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
                   required
@@ -580,9 +575,7 @@ export default function RegistrarLugar() {
                 <Input
                   inputMode="decimal"
                   value={nuevo.pctCliente}
-                  onChange={(e) =>
-                    setNuevo((s) => ({ ...s, pctCliente: e.target.value }))
-                  }
+                  onChange={(e) => setNuevo((s) => ({ ...s, pctCliente: e.target.value }))}
                   placeholder="15  ó  0.15"
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
                 />
@@ -595,26 +588,21 @@ export default function RegistrarLugar() {
                 <Input
                   inputMode="decimal"
                   value={nuevo.pctLugar}
-                  onChange={(e) =>
-                    setNuevo((s) => ({ ...s, pctLugar: e.target.value }))
-                  }
+                  onChange={(e) => setNuevo((s) => ({ ...s, pctLugar: e.target.value }))}
                   placeholder="10  ó  0.10"
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">
-                  Código QR
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">Código QR</label>
                 <div className="flex gap-3 items-center mt-1">
                   <Input
                     value={nuevo.qrCode}
-                    onChange={(e) =>
-                      setNuevo((s) => ({ ...s, qrCode: e.target.value }))
-                    }
-                    placeholder="Se genera automáticamente si lo prefieres"
+                    onChange={(e) => setNuevo((s) => ({ ...s, qrCode: e.target.value }))}
+                    placeholder="Genera uno si lo prefieres"
                     className="bg-slate-900 border-slate-700 text-slate-100"
+                    required
                   />
                   <Button
                     type="button"
@@ -633,22 +621,16 @@ export default function RegistrarLugar() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-semibold">
-                  Agente
-                </label>
+                <label className="text-xs text-slate-300 font-semibold">Agente</label>
                 <select
                   className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm"
                   value={nuevo.agenteId}
-                  onChange={(e) =>
-                    setNuevo((s) => ({ ...s, agenteId: e.target.value }))
-                  }
+                  onChange={(e) => setNuevo((s) => ({ ...s, agenteId: e.target.value }))}
                   required
                   disabled={isAgente}
                 >
                   <option value="">
-                    {isAgente
-                      ? "Tu usuario de agente"
-                      : "Selecciona un agente…"}
+                    {isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}
                   </option>
                   {agentes.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -656,6 +638,12 @@ export default function RegistrarLugar() {
                     </option>
                   ))}
                 </select>
+
+                {isSuperadmin && !tenantMode && adminSeleccionado && agentes.length === 0 && (
+                  <p className="text-[11px] text-orange-300 mt-1">
+                    Este admin no tiene agentes disponibles (crea uno antes).
+                  </p>
+                )}
               </div>
             </div>
 
@@ -670,15 +658,10 @@ export default function RegistrarLugar() {
                   id="nuevo-especial"
                   type="checkbox"
                   checked={nuevo.especial}
-                  onChange={(e) =>
-                    setNuevo((s) => ({ ...s, especial: e.target.checked }))
-                  }
+                  onChange={(e) => setNuevo((s) => ({ ...s, especial: e.target.checked }))}
                   className="h-4 w-4 rounded border-slate-500 bg-slate-900"
                 />
-                <label
-                  htmlFor="nuevo-especial"
-                  className="text-sm text-slate-200"
-                >
+                <label htmlFor="nuevo-especial" className="text-sm text-slate-200">
                   Marcar como lugar especial
                 </label>
               </div>
@@ -692,18 +675,10 @@ export default function RegistrarLugar() {
                     type="file"
                     accept="image/*"
                     onChange={(e) =>
-                      setNuevo((s) => ({
-                        ...s,
-                        logoFile: e.target.files?.[0] || null,
-                      }))
+                      setNuevo((s) => ({ ...s, logoFile: e.target.files?.[0] || null }))
                     }
                     className="mt-1 text-xs text-slate-200"
                   />
-                  {nuevo.logoFile && (
-                    <p className="text-[11px] text-emerald-300 mt-1">
-                      Se subirá al guardar
-                    </p>
-                  )}
                 </div>
 
                 <div>
@@ -714,44 +689,24 @@ export default function RegistrarLugar() {
                     type="file"
                     accept="image/*"
                     onChange={(e) =>
-                      setNuevo((s) => ({
-                        ...s,
-                        cartelFile: e.target.files?.[0] || null,
-                      }))
+                      setNuevo((s) => ({ ...s, cartelFile: e.target.files?.[0] || null }))
                     }
                     className="mt-1 text-xs text-slate-200"
                   />
-                  {nuevo.cartelFile && (
-                    <p className="text-[11px] text-emerald-300 mt-1">
-                      Se subirá al guardar
-                    </p>
-                  )}
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Color de acento
-                  </label>
+                  <label className="text-xs text-slate-300 font-semibold">Color de acento</label>
                   <div className="mt-1 flex items-center gap-3">
                     <input
                       type="color"
                       value={nuevo.especialColor}
-                      onChange={(e) =>
-                        setNuevo((s) => ({
-                          ...s,
-                          especialColor: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNuevo((s) => ({ ...s, especialColor: e.target.value }))}
                       className="h-10 w-16 rounded border border-slate-700"
                     />
                     <Input
                       value={nuevo.especialColor}
-                      onChange={(e) =>
-                        setNuevo((s) => ({
-                          ...s,
-                          especialColor: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setNuevo((s) => ({ ...s, especialColor: e.target.value }))}
                       className="bg-slate-900 border-slate-700 text-slate-100"
                     />
                   </div>
@@ -764,29 +719,17 @@ export default function RegistrarLugar() {
                   <Input
                     inputMode="numeric"
                     value={nuevo.aportacionAcumulada}
-                    onChange={(e) =>
-                      setNuevo((s) => ({
-                        ...s,
-                        aportacionAcumulada: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))}
                     placeholder="0"
                     className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="text-xs text-slate-300 font-semibold">
-                    Mensaje / gancho
-                  </label>
+                  <label className="text-xs text-slate-300 font-semibold">Mensaje / gancho</label>
                   <Input
                     value={nuevo.especialMensaje}
-                    onChange={(e) =>
-                      setNuevo((s) => ({
-                        ...s,
-                        especialMensaje: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setNuevo((s) => ({ ...s, especialMensaje: e.target.value }))}
                     placeholder='Ej.: "AYUDA A TU CLUB"'
                     className="mt-1 bg-slate-900 border-slate-700 text-slate-100"
                   />

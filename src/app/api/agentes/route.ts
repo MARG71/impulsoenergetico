@@ -15,12 +15,17 @@ export async function GET(req: NextRequest) {
 
   const { isSuperadmin, tenantAdminId } = ctx;
   const url = new URL(req.url);
+
   const includeOcultos = url.searchParams.get("includeOcultos") === "1";
+
+  // ✅ NUEVO: adminId por query para SUPERADMIN global
+  const adminIdQuery = url.searchParams.get("adminId");
+  const adminIdFromQuery = adminIdQuery ? Number(adminIdQuery) : null;
 
   const where: any = {};
 
   if (!isSuperadmin) {
-    // ADMIN (y otros roles si entrasen): solo su propio tenant
+    // ADMIN: solo su tenant
     if (!tenantAdminId) {
       return NextResponse.json(
         { error: "Config de tenant inválida" },
@@ -28,9 +33,18 @@ export async function GET(req: NextRequest) {
       );
     }
     where.adminId = tenantAdminId;
-  } else if (tenantAdminId) {
-    // SUPERADMIN en modo tenant /dashboard?adminId=XXX
-    where.adminId = tenantAdminId;
+  } else {
+    // SUPERADMIN:
+    if (tenantAdminId) {
+      // modo tenant (?adminId=...) -> filtra por ese tenant
+      where.adminId = tenantAdminId;
+    } else {
+      // modo global -> si viene ?adminId=XX filtramos
+      if (adminIdFromQuery && Number.isFinite(adminIdFromQuery)) {
+        where.adminId = adminIdFromQuery;
+      }
+      // si no viene, devuelve todos (lo dejamos permitido)
+    }
   }
 
   if (!includeOcultos) {
@@ -40,27 +54,15 @@ export async function GET(req: NextRequest) {
   const agentes = await prisma.agente.findMany({
     where,
     include: {
-      _count: {
-        select: {
-          lugares: true,
-          leads: true,
-          comparativas: true,
-        },
-      },
-      admin: {
-        // para SUPERADMIN poder ver de qué admin cuelga
-        select: {
-          id: true,
-          nombre: true,
-          email: true,
-        },
-      },
+      _count: { select: { lugares: true, leads: true, comparativas: true } },
+      admin: { select: { id: true, nombre: true, email: true } },
     },
     orderBy: { creadoEn: "desc" },
   });
 
   return NextResponse.json(agentes);
 }
+
 
 // =======================
 // POST /api/agentes

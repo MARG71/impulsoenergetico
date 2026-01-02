@@ -1,11 +1,12 @@
 // ✅ src/app/api/lugares/route.ts
+// ✅ src/app/api/lugares/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-// Helpers porcentajes
+// Helpers
 function toPct(value: any): number | null {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(String(value).replace(",", "."));
@@ -19,13 +20,9 @@ function toIntOrNull(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// ─────────────────────────────────────
-// GET /api/lugares
-//  - SUPERADMIN global: ve todos (salvo ocultos), salvo que pase ?adminId
-//  - SUPERADMIN en tenant (?adminId): ve solo los del admin
-//  - ADMIN: ve solo sus lugares
-//  - AGENTE: ve solo sus lugares
-// ─────────────────────────────────────
+/**
+ * GET /api/lugares
+ */
 export async function GET(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
@@ -42,7 +39,6 @@ export async function GET(req: NextRequest) {
     lugarId,
   } = ctx;
 
-  // Opciones de filtro (por si en el futuro quieres ver ocultos, etc.)
   const url = req.nextUrl;
   const modo = url.searchParams.get("modo"); // "soloOcultos" | "todos"
   const incluirOcultos = url.searchParams.get("incluirOcultos") === "1";
@@ -58,9 +54,7 @@ export async function GET(req: NextRequest) {
 
   if (isSuperadmin) {
     // Global o por tenant
-    if (tenantAdminId) {
-      where.adminId = tenantAdminId;
-    }
+    if (tenantAdminId) where.adminId = tenantAdminId;
   } else if (isAdmin) {
     if (!tenantAdminId) {
       return NextResponse.json(
@@ -77,11 +71,8 @@ export async function GET(req: NextRequest) {
       );
     }
     where.agenteId = agenteId;
-    if (tenantAdminId) {
-      where.adminId = tenantAdminId;
-    }
+    if (tenantAdminId) where.adminId = tenantAdminId;
   } else if (isLugar) {
-    // Un usuario LUGAR no debería usar este endpoint, pero por si acaso:
     if (!lugarId) {
       return NextResponse.json(
         { error: "Este usuario LUGAR no tiene lugarId asociado" },
@@ -109,16 +100,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(lugares);
 }
 
-// ─────────────────────────────────────
-// POST /api/lugares
-//
-//  SUPERADMIN:
-//   - si está en modo tenant (?adminId=...), se usa ese adminId
-//   - si NO está en modo tenant, se usa body.adminSeleccionado
-//   - si no hay ninguno de los dos → error
-//
-//  ADMIN: crea siempre para su propio tenant
-// ─────────────────────────────────────
+/**
+ * POST /api/lugares
+ *
+ * SUPERADMIN:
+ *  - si está en modo tenant (?adminId=...), usa ctx.tenantAdminId
+ *  - si NO está en modo tenant, usa body.adminSeleccionado
+ *
+ * ADMIN: crea siempre para su tenant (ctx.tenantAdminId)
+ * AGENTE (si lo permites): crea siempre para su tenant (ctx.tenantAdminId)
+ */
 export async function POST(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
@@ -127,7 +118,6 @@ export async function POST(req: NextRequest) {
 
   const { isSuperadmin, isAdmin, isAgente, tenantAdminId, userId } = ctx;
 
-  // Solo SUPERADMIN, ADMIN o (si quieres en el futuro) AGENTE pueden crear
   if (!isSuperadmin && !isAdmin && !isAgente) {
     return NextResponse.json(
       { error: "Solo SUPERADMIN, ADMIN o AGENTE pueden crear lugares" },
@@ -150,8 +140,7 @@ export async function POST(req: NextRequest) {
     especialMensaje,
     aportacionAcumulada,
     especialCartelUrl,
-    // 👇 viene del formulario cuando estás en SUPERADMIN
-    adminSeleccionado,
+    adminSeleccionado, // 👈 SUPERADMIN global
   } = body || {};
 
   if (!nombre || !direccion || !qrCode || !agenteId) {
@@ -161,21 +150,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Determinar adminId (tenant dueño del lugar) ───────────────
+  // 1) Resolver adminId dueño del lugar (tenant)
   let adminId: number | null = null;
 
   if (isSuperadmin) {
-    // 1) si está en modo tenant, prima ese
     if (tenantAdminId) {
+      // SUPERADMIN en modo tenant
       adminId = tenantAdminId;
     } else {
-      // 2) si NO está en modo tenant, usamos el adminSeleccionado del body
+      // SUPERADMIN global: requiere adminSeleccionado
       const adminSelNum = toIntOrNull(adminSeleccionado);
       if (!adminSelNum) {
         return NextResponse.json(
           {
             error:
-              "SUPERADMIN debe indicar ?adminId=… o seleccionar un administrador en el desplegable para crear lugares dentro de un tenant",
+              "Como SUPERADMIN debes indicar ?adminId=... o seleccionar un ADMIN propietario (adminSeleccionado) para crear el lugar.",
           },
           { status: 400 }
         );
@@ -183,79 +172,88 @@ export async function POST(req: NextRequest) {
       adminId = adminSelNum;
     }
   } else if (isAdmin) {
-    // Para ADMIN, el tenant es él mismo (o el tenantAdminId)
+    // ADMIN: su tenant
     adminId = tenantAdminId ?? toIntOrNull(userId) ?? null;
   } else if (isAgente) {
-    // Para AGENTE, el adminId es el dueño del agente (tenantAdminId)
+    // AGENTE: su tenant (dueño del agente)
     adminId = tenantAdminId ?? null;
   }
 
-  // ── Validaciones básicas ──────────────────────────────────────
-  const agenteIdNum = Number(agenteId);
-  if (!Number.isFinite(agenteIdNum)) {
+  if (!adminId) {
     return NextResponse.json(
-      { error: "agenteId inválido" },
+      { error: "No se ha podido determinar el adminId (tenant) del lugar." },
       { status: 400 }
     );
   }
 
-  // Opcional: comprobar que el agente pertenece a ese admin (si adminId está definido)
-  if (adminId) {
-    const agente = await prisma.agente.findUnique({
-      where: { id: agenteIdNum },
-      select: { id: true, adminId: true },
-    });
-
-    if (!agente) {
-      return NextResponse.json(
-        { error: "Agente no encontrado" },
-        { status: 400 }
-      );
-    }
-
-    if (agente.adminId && agente.adminId !== adminId) {
-      return NextResponse.json(
-        {
-          error:
-            "El agente seleccionado no pertenece al administrador indicado",
-        },
-        { status: 400 }
-      );
-    }
+  // 2) Validar agenteId
+  const agenteIdNum = Number(agenteId);
+  if (!Number.isFinite(agenteIdNum) || agenteIdNum <= 0) {
+    return NextResponse.json({ error: "agenteId inválido" }, { status: 400 });
   }
 
-  // ── Crear lugar ───────────────────────────────────────────────
-  const nuevoLugar = await prisma.lugar.create({
-    data: {
-      nombre: String(nombre).trim(),
-      direccion: String(direccion).trim(),
-      qrCode: String(qrCode).trim(),
-      agenteId: agenteIdNum,
-
-      pctCliente: toPct(pctCliente),
-      pctLugar: toPct(pctLugar),
-
-      especial: !!especial,
-      especialLogoUrl: especial ? especialLogoUrl || null : null,
-      especialColor: especial ? especialColor || null : null,
-      especialMensaje: especial ? especialMensaje || null : null,
-
-      aportacionAcumulada: Number.isFinite(Number(aportacionAcumulada))
-        ? Number(aportacionAcumulada)
-        : 0,
-
-      especialCartelUrl: especial && especialCartelUrl
-        ? String(especialCartelUrl)
-        : null,
-
-      adminId: adminId ?? undefined,
-    },
-    include: {
-      agente: {
-        select: { id: true, nombre: true, email: true, telefono: true },
-      },
-    },
+  // 3) Comprobar que el agente existe y pertenece al adminId
+  const agente = await prisma.agente.findUnique({
+    where: { id: agenteIdNum },
+    select: { id: true, adminId: true },
   });
 
-  return NextResponse.json(nuevoLugar);
+  if (!agente) {
+    return NextResponse.json({ error: "Agente no encontrado" }, { status: 400 });
+  }
+
+  if (agente.adminId && agente.adminId !== adminId) {
+    return NextResponse.json(
+      { error: "El agente seleccionado no pertenece al ADMIN indicado." },
+      { status: 400 }
+    );
+  }
+
+  // 4) Crear lugar
+  try {
+    const nuevoLugar = await prisma.lugar.create({
+      data: {
+        nombre: String(nombre).trim(),
+        direccion: String(direccion).trim(),
+        qrCode: String(qrCode).trim(),
+        agenteId: agenteIdNum,
+
+        pctCliente: toPct(pctCliente),
+        pctLugar: toPct(pctLugar),
+
+        especial: !!especial,
+        especialLogoUrl: especial ? (especialLogoUrl || null) : null,
+        especialColor: especial ? (especialColor || null) : null,
+        especialMensaje: especial ? (especialMensaje || null) : null,
+
+        aportacionAcumulada: Number.isFinite(Number(aportacionAcumulada))
+          ? Number(aportacionAcumulada)
+          : 0,
+
+        especialCartelUrl:
+          especial && especialCartelUrl ? String(especialCartelUrl) : null,
+
+        adminId, // ✅ SIEMPRE guardamos adminId ya resuelto
+      },
+      include: {
+        agente: {
+          select: { id: true, nombre: true, email: true, telefono: true },
+        },
+      },
+    });
+
+    return NextResponse.json(nuevoLugar, { status: 201 });
+  } catch (e: any) {
+    console.error("Error creando lugar:", e);
+    if (e?.code === "P2002") {
+      return NextResponse.json(
+        { error: "El código QR ya está en uso por otro lugar." },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Error interno creando lugar" },
+      { status: 500 }
+    );
+  }
 }
