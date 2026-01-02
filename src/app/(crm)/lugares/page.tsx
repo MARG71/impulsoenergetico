@@ -7,12 +7,6 @@ import QRCode from "react-qr-code";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useSession } from "next-auth/react";
 
 // --------- Helpers ----------
@@ -23,36 +17,13 @@ const toNumberOr = (v: any, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-const eur = (n: any) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(
-    Number.isFinite(Number(n)) ? Number(n) : 0
-  );
-
 type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 type Lugar = any;
 type Admin = { id: number; nombre: string; email: string };
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
-type KpisLugar = {
-  leads7d: number;
-  comparativasMes: number;
-  ahorroTotal: number;
-  comisionTotal: number;
-};
-
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
-}
-
-// Normaliza respuesta de /api/lugares/[id]/detalle
-function normalizeKpis(raw: any): KpisLugar {
-  const src = raw?.kpisGlobal ?? raw?.kpis ?? raw?.kpi ?? raw ?? {};
-  return {
-    leads7d: Number(src?.leads7d ?? 0) || 0,
-    comparativasMes: Number(src?.comparativasMes ?? 0) || 0,
-    ahorroTotal: Number(src?.ahorroTotal ?? 0) || 0,
-    comisionTotal: Number(src?.comisionTotal ?? 0) || 0,
-  };
 }
 
 export default function RegistrarLugar() {
@@ -84,15 +55,17 @@ export default function RegistrarLugar() {
     return `${href}${hasQuery ? "&" : "?"}adminId=${adminIdContext}`;
   };
 
+  // ✅ helper de Landing (preparado para futuras mejoras: copiar, QR, etc.)
+  const landingUrlFor = (l: any) =>
+    `/registro?agenteId=${l.agenteId}&lugarId=${l.id}`;
+
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [adminSeleccionado, setAdminSeleccionado] = useState<string>("");
 
   const [agentes, setAgentes] = useState<any[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
   const [fondos, setFondos] = useState<Fondo[]>([]);
-  const [fondoSeleccionadoId, setFondoSeleccionadoId] = useState<number | null>(
-    null
-  );
+  const [fondoSeleccionadoId, setFondoSeleccionadoId] = useState<number | null>(null);
 
   const fondoSeleccionadoUrl = useMemo(() => {
     if (!fondoSeleccionadoId) return "";
@@ -121,51 +94,6 @@ export default function RegistrarLugar() {
     cartelFile: null as File | null,
     especialCartelUrl: "",
   });
-
-  // Edición (modal)
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [edit, setEdit] = useState<Lugar | null>(null);
-  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
-  const [editCartelFile, setEditCartelFile] = useState<File | null>(null);
-
-  // Previews en edición
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [cartelPreview, setCartelPreview] = useState<string | null>(null);
-
-  // UI pestañas modal
-  const [editTab, setEditTab] = useState<"basico" | "qr" | "especial">("basico");
-
-  // KPI modal (ficha directiva)
-  const [kpisModal, setKpisModal] = useState<KpisLugar>({
-    leads7d: 0,
-    comparativasMes: 0,
-    ahorroTotal: 0,
-    comisionTotal: 0,
-  });
-  const [kpisModalLoading, setKpisModalLoading] = useState(false);
-
-  const cargarKpisLugar = async (lugarId: number) => {
-    try {
-      setKpisModalLoading(true);
-      // ✅ Endpoint de detalle
-      const res = await fetch(`/api/lugares/${lugarId}/detalle${adminQuery}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`Detalle no disponible (${res.status})`);
-      const raw = await res.json();
-      setKpisModal(normalizeKpis(raw));
-    } catch (e) {
-      // Silencioso pero consistente
-      setKpisModal({
-        leads7d: 0,
-        comparativasMes: 0,
-        ahorroTotal: 0,
-        comisionTotal: 0,
-      });
-    } finally {
-      setKpisModalLoading(false);
-    }
-  };
 
   // ───────────────────────────────
   // 1) Cargar admins (solo SUPERADMIN)
@@ -291,7 +219,7 @@ export default function RegistrarLugar() {
     });
   }, [lugares, busqueda]);
 
-  // ---- Subida de ficheros ----
+  // ---- Subida de ficheros (se queda para alta) ----
   async function subirFichero(file: File, folder: string): Promise<string | null> {
     try {
       const form = new FormData();
@@ -407,85 +335,6 @@ export default function RegistrarLugar() {
     setNuevoQR("");
   };
 
-  // ---- Edición ----
-  const abrirEdicion = (l: Lugar) => {
-    setEditLogoFile(null);
-    setEditCartelFile(null);
-    setLogoPreview(null);
-    setCartelPreview(null);
-    setEditTab("basico");
-
-    setEdit({
-      ...l,
-      especial: !!l.especial,
-      especialColor: l.especialColor ?? "#FF7A3B",
-      especialMensaje: l.especialMensaje ?? "",
-      aportacionAcumulada: l.aportacionAcumulada ?? 0,
-      especialCartelUrl: l.especialCartelUrl ?? "",
-      especialLogoUrl: l.especialLogoUrl ?? "",
-    });
-
-    setModalAbierto(true);
-
-    // ✅ Cargar KPIs del lugar al abrir modal
-    if (l?.id) cargarKpisLugar(Number(l.id));
-  };
-
-  const generarQR_edit = () => {
-    if (!edit) return;
-    const id = uuidv4();
-    setEdit({ ...edit, qrCode: id });
-  };
-
-  const guardarEdicion = async () => {
-    if (!edit) return;
-
-    let especialLogoUrl = edit.especialLogoUrl ?? "";
-    if (edit.especial && editLogoFile) {
-      const up = await subirFichero(editLogoFile, "logos-lugares");
-      if (up) especialLogoUrl = up;
-    }
-
-    let especialCartelUrl = edit.especialCartelUrl ?? "";
-    if (edit.especial && editCartelFile) {
-      const up = await subirFichero(editCartelFile, "carteles-especiales");
-      if (up) especialCartelUrl = up;
-    }
-
-    const payload: any = {
-      nombre: edit.nombre,
-      direccion: edit.direccion,
-      qrCode: edit.qrCode,
-      agenteId: edit.agenteId,
-      pctCliente: edit.pctCliente,
-      pctLugar: edit.pctLugar,
-      especial: !!edit.especial,
-      especialLogoUrl,
-      especialColor: edit.especialColor,
-      especialMensaje: edit.especialMensaje,
-      aportacionAcumulada: toNumberOr(edit.aportacionAcumulada, 0),
-    };
-
-    if (especialCartelUrl && especialCartelUrl.trim()) {
-      payload.especialCartelUrl = especialCartelUrl.trim();
-    }
-
-    const r = await fetch(`/api/lugares/${edit.id}${adminQuery}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const d = await r.json();
-    if (!r.ok) {
-      alert(d?.error || "Error al guardar");
-      return;
-    }
-
-    setLugares((arr) => arr.map((x) => (x.id === d.id ? d : x)));
-    setModalAbierto(false);
-  };
-
   const eliminarLugar = async (id: number) => {
     if (!confirm("¿Eliminar lugar (se ocultará para el admin)?")) return;
     const r = await fetch(`/api/lugares/${id}${adminQuery}`, { method: "DELETE" });
@@ -525,7 +374,6 @@ export default function RegistrarLugar() {
   // ───────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 md:px-8 py-8 text-slate-50">
-      {/* ⬇️ Tipografía general más grande y más “director” */}
       <div className="w-full max-w-[1700px] mx-auto space-y-8 text-[15px] md:text-[16px] font-semibold">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
@@ -786,11 +634,15 @@ export default function RegistrarLugar() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 font-extrabold">Aportación acumulada (€)</label>
+                  <label className="text-xs text-slate-300 font-extrabold">
+                    Aportación acumulada (€)
+                  </label>
                   <Input
                     inputMode="numeric"
                     value={nuevo.aportacionAcumulada}
-                    onChange={(e) => setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))}
+                    onChange={(e) =>
+                      setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))
+                    }
                     placeholder="0"
                     className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   />
@@ -903,7 +755,6 @@ export default function RegistrarLugar() {
 
                       <td className="px-3 py-4">
                         <div className="flex justify-end">
-                          {/* ✅ grid fijo para que nunca se “apriete” raro */}
                           <div className="grid grid-cols-2 gap-2 w-[320px]">
                             {(isAdmin || isSuperadmin) && (
                               <Button
@@ -948,10 +799,9 @@ export default function RegistrarLugar() {
 
                             <Button
                               className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-9"
-                              onClick={() =>
-                                window.open(`/registro?agenteId=${l.agenteId}&lugarId=${l.id}`, "_blank")
-                              }
+                              onClick={() => window.open(landingUrlFor(l), "_blank")}
                               size="sm"
+                              title="Abrir landing pública (registro)"
                             >
                               🔗 Landing
                             </Button>
@@ -976,7 +826,10 @@ export default function RegistrarLugar() {
 
                 {lugaresFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm font-semibold">
+                    <td
+                      colSpan={8}
+                      className="px-4 py-10 text-center text-slate-400 text-sm font-semibold"
+                    >
                       No hay lugares para los filtros actuales.
                     </td>
                   </tr>
@@ -1051,519 +904,6 @@ export default function RegistrarLugar() {
           </div>
         </section>
       </div>
-
-      {/* MODAL EDICIÓN — con los 3 tabs completos */}
-      <Dialog
-        open={modalAbierto}
-        onOpenChange={(v) => {
-          setModalAbierto(v);
-          if (!v) {
-            setEdit(null);
-            setEditLogoFile(null);
-            setEditCartelFile(null);
-            setLogoPreview(null);
-            setCartelPreview(null);
-            setEditTab("basico");
-          }
-        }}
-      >
-        <DialogContent className="w-[96vw] max-w-[1200px] p-0 overflow-hidden max-h-[90vh]">
-          <DialogHeader className="bg-slate-950 border-b border-slate-800">
-            <DialogTitle className="px-6 py-4 text-slate-50 flex items-center justify-between">
-              <span className="text-base md:text-lg font-extrabold">Editar lugar</span>
-              {edit?.id ? (
-                <span className="text-xs md:text-sm text-slate-400 font-mono font-extrabold">
-                  #{edit.id}
-                </span>
-              ) : null}
-            </DialogTitle>
-          </DialogHeader>
-
-          {!!edit && (
-            <div className="bg-slate-950 text-slate-50 text-[15px] md:text-[16px] font-semibold">
-              {/* ✅ FICHA DIRECTIVA (KPIs) — dentro del modal */}
-              <div className="px-6 pt-5">
-                <div className="rounded-3xl border border-slate-800 bg-slate-900/30 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-extrabold text-white">
-                        Ficha directiva del lugar
-                      </h3>
-                      <p className="text-sm font-semibold text-slate-300">
-                        KPIs ejecutivos (7 días / mes / acumulado)
-                      </p>
-                    </div>
-
-                    {/* Logo del CRM (seguro, sin solape) */}
-                    <div className="relative z-20">
-                      <Image
-                        src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
-                        alt="Impulso Energético"
-                        width={140}
-                        height={40}
-                        className="h-10 w-auto object-contain opacity-95"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
-                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                        Leads (7 días)
-                      </div>
-                      <div className="mt-2 text-2xl font-extrabold text-white">
-                        {kpisModalLoading ? "…" : kpisModal.leads7d}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        Captación reciente
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
-                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                        Comparativas (mes)
-                      </div>
-                      <div className="mt-2 text-2xl font-extrabold text-white">
-                        {kpisModalLoading ? "…" : kpisModal.comparativasMes}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        Actividad mensual
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
-                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                        Ahorro total
-                      </div>
-                      <div className="mt-2 text-2xl font-extrabold text-white">
-                        {kpisModalLoading ? "…" : eur(kpisModal.ahorroTotal)}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        Acumulado (€)
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-4">
-                      <div className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
-                        Comisión total
-                      </div>
-                      <div className="mt-2 text-2xl font-extrabold text-white">
-                        {kpisModalLoading ? "…" : eur(kpisModal.comisionTotal)}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        Acumulado (€)
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="px-6 pt-4">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditTab("basico")}
-                    className={classNames(
-                      "px-3 h-9 rounded-xl text-sm font-extrabold border transition",
-                      editTab === "basico"
-                        ? "bg-slate-900 border-slate-700 text-white"
-                        : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
-                    )}
-                  >
-                    🧾 Datos básicos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditTab("qr")}
-                    className={classNames(
-                      "px-3 h-9 rounded-xl text-sm font-extrabold border transition",
-                      editTab === "qr"
-                        ? "bg-slate-900 border-slate-700 text-white"
-                        : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
-                    )}
-                  >
-                    🔳 QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditTab("especial")}
-                    className={classNames(
-                      "px-3 h-9 rounded-xl text-sm font-extrabold border transition",
-                      editTab === "especial"
-                        ? "bg-emerald-900/25 border-emerald-700/40 text-emerald-100"
-                        : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900/40"
-                    )}
-                  >
-                    ⭐ Lugar especial
-                  </button>
-                </div>
-              </div>
-
-              {/* Body scroll */}
-              <div className="overflow-y-auto px-6 py-5 max-h-[70vh]">
-                {/* TAB: BASICO */}
-                {editTab === "basico" && (
-                  <div className="space-y-5">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                      <h3 className="text-sm font-extrabold text-slate-200 mb-4">
-                        Información principal
-                      </h3>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs text-slate-300 font-extrabold">Nombre</label>
-                          <Input
-                            value={edit.nombre}
-                            onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-300 font-extrabold">Dirección</label>
-                          <Input
-                            value={edit.direccion}
-                            onChange={(e) => setEdit({ ...edit, direccion: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-300 font-extrabold">
-                            % Cliente (ej. 15 o 0.15)
-                          </label>
-                          <Input
-                            inputMode="decimal"
-                            value={edit.pctCliente ?? ""}
-                            onChange={(e) => setEdit({ ...edit, pctCliente: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-300 font-extrabold">
-                            % Lugar (ej. 10 o 0.10)
-                          </label>
-                          <Input
-                            inputMode="decimal"
-                            value={edit.pctLugar ?? ""}
-                            onChange={(e) => setEdit({ ...edit, pctLugar: e.target.value })}
-                            className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                          />
-                        </div>
-
-                        <div className="lg:col-span-2">
-                          <label className="text-xs text-slate-300 font-extrabold">Agente</label>
-                          <select
-                            className="mt-1 w-full border rounded-lg px-3 bg-slate-900 border-slate-700 text-slate-100 text-sm h-11 font-semibold"
-                            value={edit.agenteId}
-                            onChange={(e) => setEdit({ ...edit, agenteId: Number(e.target.value) })}
-                          >
-                            <option value="">Selecciona un agente…</option>
-                            {agentes.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.nombre}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-[11px] text-slate-400 mt-1 font-semibold">
-                            Recomendación: asigna el agente correcto para trazabilidad de leads y comparativas.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                      <h3 className="text-sm font-extrabold text-slate-200 mb-4">Resumen visual</h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div className="text-xs text-slate-400 font-extrabold">Estado</div>
-                          <div className="mt-1">
-                            <span
-                              className={classNames(
-                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border",
-                                edit.especial
-                                  ? "bg-pink-500/15 text-pink-200 border-pink-500/40"
-                                  : "bg-slate-700/30 text-slate-200 border-slate-500/40"
-                              )}
-                            >
-                              {edit.especial ? "⭐ Especial" : "Normal"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div className="text-xs text-slate-400 font-extrabold">% Cliente</div>
-                          <div className="mt-1 text-emerald-300 font-extrabold text-lg">
-                            {fmtPct(edit.pctCliente)}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                          <div className="text-xs text-slate-400 font-extrabold">% Lugar</div>
-                          <div className="mt-1 text-emerald-300 font-extrabold text-lg">
-                            {fmtPct(edit.pctLugar)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB: QR */}
-                {editTab === "qr" && (
-                  <div className="space-y-5">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                      <h3 className="text-sm font-extrabold text-slate-200 mb-4">Código QR</h3>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-                        <div className="lg:col-span-2">
-                          <label className="text-xs text-slate-300 font-extrabold">Código QR (texto)</label>
-                          <div className="mt-1 flex flex-col sm:flex-row gap-3">
-                            <Input
-                              value={edit.qrCode ?? ""}
-                              onChange={(e) => setEdit({ ...edit, qrCode: e.target.value })}
-                              className="bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                            />
-                            <Button
-                              type="button"
-                              onClick={generarQR_edit}
-                              className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-extrabold h-11 px-5"
-                            >
-                              Generar QR nuevo
-                            </Button>
-                          </div>
-
-                          <p className="text-[11px] text-slate-400 mt-2 font-semibold">
-                            Esto identifica el lugar. Si lo cambias, el QR antiguo dejará de apuntar a este lugar.
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 flex flex-col items-center">
-                          <div className="text-xs text-slate-400 font-extrabold mb-3">QR de Landing</div>
-                          <div className="rounded-xl border border-slate-800 bg-white p-3">
-                            <QRCode
-                              value={`https://impulsoenergetico.es/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`}
-                              size={120}
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-10 px-4"
-                            onClick={() =>
-                              window.open(
-                                `/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`,
-                                "_blank"
-                              )
-                            }
-                          >
-                            Abrir Landing
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB: ESPECIAL */}
-                {editTab === "especial" && (
-                  <div className="space-y-5">
-                    <div className="rounded-2xl border border-emerald-700/40 bg-emerald-900/15 p-5">
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <h3 className="text-sm font-extrabold text-emerald-100">Lugar especial</h3>
-
-                        <label className="flex items-center gap-2 text-sm text-slate-100 font-extrabold">
-                          <input
-                            id="edit-especial"
-                            type="checkbox"
-                            checked={!!edit.especial}
-                            onChange={(e) => setEdit({ ...edit, especial: e.target.checked })}
-                            className="h-4 w-4 rounded border-slate-500 bg-slate-900"
-                          />
-                          Activar modo especial
-                        </label>
-                      </div>
-
-                      {/* ✅ Grid estable */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
-                        {/* LOGO (cuadrado fijo) */}
-                        <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-extrabold">
-                            Logo (subir para actualizar)
-                          </label>
-
-                          <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0] || null;
-                                setEditLogoFile(f);
-                                setLogoPreview(f ? URL.createObjectURL(f) : null);
-                              }}
-                              className="text-xs text-slate-200 font-semibold"
-                            />
-
-                            <div className="sm:ml-auto">
-                              <div className="text-[11px] text-slate-400 font-extrabold mb-2">
-                                Vista previa
-                              </div>
-
-                              <div className="w-32 h-32 rounded-2xl border border-slate-700 bg-slate-900/60 overflow-hidden grid place-items-center">
-                                {logoPreview || edit.especialLogoUrl ? (
-                                  <Image
-                                    src={(logoPreview || edit.especialLogoUrl) as string}
-                                    alt="logo"
-                                    width={160}
-                                    height={160}
-                                    className="w-full h-full object-contain p-2"
-                                  />
-                                ) : (
-                                  <div className="text-xs text-slate-500 font-semibold">Sin logo</div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {editLogoFile && (
-                            <p className="text-[11px] text-emerald-300 mt-2 font-extrabold">
-                              Se subirá al guardar
-                            </p>
-                          )}
-                        </div>
-
-                        {/* CARTEL (frame vertical tipo A4) — FIX SOLAPE */}
-                        <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-extrabold">
-                            Cartel especial (reemplazar)
-                          </label>
-
-                          <div className="mt-3">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0] || null;
-                                setEditCartelFile(f);
-                                setCartelPreview(f ? URL.createObjectURL(f) : null);
-                              }}
-                              className="text-xs text-slate-200 font-semibold"
-                            />
-                          </div>
-
-                          <div className="mt-3">
-                            <div className="text-[11px] text-slate-400 font-extrabold mb-2">
-                              Vista previa
-                            </div>
-
-                            {/* ✅ Contenedor relativo + “zona segura” superior para evitar solapes */}
-                            <div className="relative rounded-2xl border border-slate-700 bg-slate-950 overflow-hidden">
-                              {/* Zona segura (evita que cualquier overlay quede por encima visualmente) */}
-                              <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-slate-950 to-transparent z-20" />
-
-                              <div className="w-full aspect-[3/4] bg-slate-950 grid place-items-center relative z-10">
-                                {cartelPreview || edit.especialCartelUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={(cartelPreview || edit.especialCartelUrl) as string}
-                                    alt="cartel"
-                                    className="w-full h-full object-contain"
-                                  />
-                                ) : (
-                                  <div className="text-xs text-slate-500 font-semibold">
-                                    Sin cartel
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {editCartelFile && (
-                            <p className="text-[11px] text-emerald-300 mt-2 font-extrabold">
-                              Se subirá al guardar
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Color */}
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-extrabold">Color de acento</label>
-                          <div className="mt-2 flex items-center gap-3">
-                            <input
-                              type="color"
-                              value={edit.especialColor ?? "#FF7A3B"}
-                              onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
-                              className="h-11 w-20 rounded border border-slate-700"
-                            />
-                            <Input
-                              value={edit.especialColor ?? ""}
-                              onChange={(e) => setEdit({ ...edit, especialColor: e.target.value })}
-                              className="bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Aportación */}
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-extrabold">
-                            Aportación acumulada (€)
-                          </label>
-                          <Input
-                            inputMode="numeric"
-                            value={String(edit.aportacionAcumulada ?? 0)}
-                            onChange={(e) => setEdit({ ...edit, aportacionAcumulada: e.target.value })}
-                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                          />
-                        </div>
-
-                        {/* Mensaje */}
-                        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                          <label className="text-xs text-slate-300 font-extrabold">Mensaje / gancho</label>
-                          <Input
-                            value={edit.especialMensaje ?? ""}
-                            onChange={(e) => setEdit({ ...edit, especialMensaje: e.target.value })}
-                            placeholder='Ej.: "AYUDA A TU CLUB"'
-                            className="mt-2 bg-slate-900 border-slate-700 text-slate-100 h-11 font-semibold"
-                          />
-                          <p className="text-[11px] text-slate-400 mt-2 font-semibold">
-                            Consejo: corto y directo (ej. “Apoya al club con tu ahorro”).
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer fijo */}
-              <div className="border-t border-slate-800 bg-slate-950 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                <div className="text-[12px] text-slate-400 font-semibold">
-                  Tip: si algo está “apretado”, dime tu resolución/zoom y lo ajustamos fino.
-                </div>
-
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    type="button"
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-extrabold h-10 px-5"
-                    onClick={() => setModalAbierto(false)}
-                  >
-                    Cancelar
-                  </Button>
-
-                  <Button
-                    type="button"
-                    onClick={guardarEdicion}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold h-10 px-6"
-                  >
-                    Guardar cambios
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
