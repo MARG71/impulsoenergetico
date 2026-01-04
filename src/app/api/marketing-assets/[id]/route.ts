@@ -9,9 +9,10 @@ function getRole(session: any): Rol | null {
   return ((session?.user as any)?.role ?? null) as Rol | null;
 }
 
+// ✅ Next 15: ctx.params suele ser Promise en builds strict (Vercel)
 export async function DELETE(
   req: Request,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions as any);
@@ -23,11 +24,13 @@ export async function DELETE(
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
-    const assetId = Number(ctx.params.id);
+    const { id } = await ctx.params; // 👈 clave para Next 15
+    const assetId = Number(id);
     if (!assetId || Number.isNaN(assetId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
+    // tenant opcional
     const { searchParams } = new URL(req.url);
     const adminIdParam = searchParams.get("adminId");
     const adminId = adminIdParam ? Number(adminIdParam) : null;
@@ -38,6 +41,7 @@ export async function DELETE(
     }
 
     await prisma.marketingAsset.delete({ where });
+
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
