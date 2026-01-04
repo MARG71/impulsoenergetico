@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import Image from 'next/image';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 type Fondo = {
   id: number;
@@ -19,7 +19,7 @@ export default function GestionFondosCartel() {
   const [fondos, setFondos] = useState<Fondo[]>([]);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
-  const [filtro, setFiltro] = useState<'todos' | 'ultimos7'>('todos');
+  const [filtro, setFiltro] = useState<"todos" | "ultimos7">("todos");
 
   const fetchFondos = async () => {
     const res = await fetch(`/api/fondos?filtro=${filtro}`);
@@ -32,92 +32,100 @@ export default function GestionFondosCartel() {
   }, [filtro]);
 
   const handleSubirFondo = async () => {
-    if (!archivo) return toast.error('Selecciona un archivo');
+    if (!archivo) return toast.error("Selecciona un archivo");
     setSubiendo(true);
 
-    const formData = new FormData();
-    formData.append('file', archivo);
-    formData.append('upload_preset', 'impulso_carteles');
-
     try {
-      const cloudinaryRes = await fetch('https://api.cloudinary.com/v1_1/dhkzxihjg/image/upload', {
-        method: 'POST',
-        body: formData,
+      // 1) Subir a Cloudinary a través del backend
+      const fd = new FormData();
+      fd.append("file", archivo);
+
+      // Carpeta Cloudinary según tu estructura acordada:
+      fd.append("folder", "impulso/fondos/historico");
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
       });
 
-      const cloudinaryData = await cloudinaryRes.json();
+      const uploadData = await uploadRes.json();
 
-      if (!cloudinaryData.secure_url) {
-        throw new Error('Error en la subida a Cloudinary');
+      if (!uploadRes.ok || !uploadData?.url) {
+        throw new Error(uploadData?.error || "Error en /api/upload");
       }
 
-      const apiRes = await fetch('/api/fondos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      // 2) Guardar en BD (Prisma) como ya hacías
+      const apiRes = await fetch("/api/fondos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: archivo.name,
-          url: cloudinaryData.secure_url,
+          url: uploadData.url,
         }),
       });
 
-      if (!apiRes.ok) throw new Error('Error al guardar en base de datos');
+      if (!apiRes.ok) throw new Error("Error al guardar en base de datos");
 
-      toast.success('Fondo subido correctamente');
+      toast.success("Fondo subido correctamente");
       setArchivo(null);
       fetchFondos();
     } catch (error) {
       console.error(error);
-      toast.error('Error al subir el fondo');
+      toast.error("Error al subir el fondo");
     } finally {
       setSubiendo(false);
     }
   };
 
   const handleEliminar = async (id: number) => {
-    const confirmar = confirm('¿Estás seguro de eliminar este fondo?');
+    const confirmar = confirm("¿Estás seguro de eliminar este fondo?");
     if (!confirmar) return;
 
     try {
-      const res = await fetch('/api/fondos', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/fondos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
 
-      if (!res.ok) throw new Error('Error al eliminar');
+      if (!res.ok) throw new Error("Error al eliminar");
 
-      toast.success('Fondo eliminado');
+      toast.success("Fondo eliminado");
       fetchFondos();
     } catch (error) {
       console.error(error);
-      toast.error('No se pudo eliminar el fondo');
+      toast.error("No se pudo eliminar el fondo");
     }
   };
 
   const handleSeleccionarFondoActivo = async (id: number) => {
     try {
-      const res = await fetch('/api/fondos/seleccionar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/fondos/seleccionar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
 
-      if (!res.ok) throw new Error('No se pudo activar el fondo');
+      if (!res.ok) throw new Error("No se pudo activar el fondo");
 
-      toast.success('Fondo seleccionado como activo');
+      toast.success("Fondo seleccionado como activo");
       fetchFondos();
     } catch (error) {
       console.error(error);
-      toast.error('Error al activar el fondo');
+      toast.error("Error al activar el fondo");
     }
   };
 
   return (
     <div className="p-8 bg-[#F6FFEC] min-h-screen">
-      <h1 className="text-3xl font-bold text-[#004AAD] mb-10">🎨 Gestión de Fondos para Carteles</h1>
+      <h1 className="text-3xl font-bold text-[#004AAD] mb-10">
+        🎨 Gestión de Fondos para Carteles
+      </h1>
 
       <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 mb-10 max-w-xl mx-auto">
-        <h2 className="text-xl font-semibold text-[#1F1F1F] mb-4">Subir nuevo fondo</h2>
+        <h2 className="text-xl font-semibold text-[#1F1F1F] mb-4">
+          Subir nuevo fondo
+        </h2>
 
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Selecciona un fondo (.jpg, .png):
@@ -131,15 +139,19 @@ export default function GestionFondosCartel() {
         />
 
         <Button onClick={handleSubirFondo} disabled={subiendo} className="w-full">
-          {subiendo ? 'Subiendo...' : 'Subir Fondo'}
+          {subiendo ? "Subiendo..." : "Subir Fondo"}
         </Button>
+
+        <p className="text-xs text-gray-500 mt-3">
+          Subida segura vía backend (sin exponer secretos).
+        </p>
       </div>
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-[#004AAD]">🖼️ Fondos disponibles</h2>
         <select
           value={filtro}
-          onChange={(e) => setFiltro(e.target.value as 'todos' | 'ultimos7')}
+          onChange={(e) => setFiltro(e.target.value as "todos" | "ultimos7")}
           className="border border-gray-300 rounded-lg px-3 py-1 text-sm text-[#004AAD] font-semibold"
         >
           <option value="todos">Todos</option>
@@ -152,7 +164,7 @@ export default function GestionFondosCartel() {
           <div
             key={fondo.id}
             className={`border-4 rounded-xl overflow-hidden transition transform hover:scale-105 ${
-              fondo.activo ? 'border-blue-600' : 'border-transparent'
+              fondo.activo ? "border-blue-600" : "border-transparent"
             }`}
           >
             <Image
@@ -163,18 +175,25 @@ export default function GestionFondosCartel() {
               className="w-full h-48 object-cover"
             />
             <div className="bg-[#F9FAFB] p-3 text-center">
-              <p className="text-sm font-semibold text-gray-800 truncate">{fondo.nombre}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Subido el {format(new Date(fondo.creadoEn), 'dd MMMM yyyy', { locale: es })}
+              <p className="text-sm font-semibold text-gray-800 truncate">
+                {fondo.nombre}
               </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Subido el{" "}
+                {format(new Date(fondo.creadoEn), "dd MMMM yyyy", { locale: es })}
+              </p>
+
               <Button
                 onClick={() => handleSeleccionarFondoActivo(fondo.id)}
                 className={`mt-2 w-full text-sm ${
-                  fondo.activo ? 'bg-green-600 text-white' : 'bg-[#004AAD] text-white hover:bg-[#00368A]'
+                  fondo.activo
+                    ? "bg-green-600 text-white"
+                    : "bg-[#004AAD] text-white hover:bg-[#00368A]"
                 }`}
               >
-                {fondo.activo ? '✅ Fondo activo' : 'Usar como fondo actual'}
+                {fondo.activo ? "✅ Fondo activo" : "Usar como fondo actual"}
               </Button>
+
               <Button
                 variant="destructive"
                 onClick={() => handleEliminar(fondo.id)}
