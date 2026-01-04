@@ -145,6 +145,9 @@ model Lugar {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
+  // ✅ AÑADIDO: relación inversa para MarketingAsset (ARREGLA P1012)
+  marketingAssets MarketingAsset[]
+
   creadoEn DateTime @default(now())
 
   especial        Boolean @default(false)
@@ -198,14 +201,11 @@ model Usuario {
   lugar  Lugar?  @relation(fields: [lugarId], references: [id])
 
   // ✅ MULTI-ADMIN (TENANT)
-  // Para AGENTE/LUGAR/CLIENTE: adminId apunta al ADMIN dueño.
-  // Para ADMIN: puede ir null (y en código el tenantId = user.id).
-  // Para SUPERADMIN: null.
   adminId  Int?
   admin    Usuario?  @relation("AdminUsuarios", fields: [adminId], references: [id])
   usuarios Usuario[] @relation("AdminUsuarios")
 
-  // ✅ relaciones “dueño” (para consultar todo por admin fácilmente)
+  // ✅ relaciones “dueño”
   agentesGestionados      Agente[]            @relation("AdminAgentes")
   lugaresGestionados      Lugar[]             @relation("AdminLugares")
   clientesGestionados     Cliente[]           @relation("AdminClientes")
@@ -332,12 +332,6 @@ model ProductoGanadero {
 
   @@index([adminId])
 }
-
-/**
- * =========
- * COMISIONES
- * =========
- */
 
 model GlobalComisionDefaults {
   id                Int      @id @default(1)
@@ -566,4 +560,30 @@ model OfertaTarifaSolarConfig {
   @@unique([ofertaTarifaBaseId])
   @@index([modo, activa])
   @@index([excedenteTarifaId])
+}
+
+enum MarketingTipo {
+  IMAGE
+  VIDEO
+}
+
+model MarketingAsset {
+  id       Int           @id @default(autoincrement())
+  tipo     MarketingTipo
+  url      String
+  nombre   String?
+  publicId String? // (opcional) si algún día usas Cloudinary
+  creadaEn DateTime      @default(now())
+
+  lugarId Int
+  lugar   Lugar @relation(fields: [lugarId], references: [id], onDelete: Cascade)
+
+  // Para trazabilidad multi-tenant:
+  adminId  Int?
+  agenteId Int?
+
+  @@index([lugarId])
+  @@index([adminId])
+  @@index([agenteId])
+  @@map("marketing_assets")
 }
