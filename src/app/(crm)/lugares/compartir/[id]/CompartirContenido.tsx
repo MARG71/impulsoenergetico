@@ -512,18 +512,9 @@ export default function CompartirContenido({ id }: { id: string }) {
 
         {/* ✅ FASE 2 (AHORA EN COMPONENTE SEPARADO) */}
         {!loading && !!lugar?.id && (
-          <MarketingAssetsPanel
-            lugarId={Number(lugar.id)}
-            // si quieres que el panel conozca tenantMode/adminId
-            tenantMode={tenantMode}
-            adminId={adminIdContext ?? undefined}
-            canManage={canMarketingManage}
-            absolutePublicLink={absolutePublicLink}
-            lugar={lugar}
-            impulsoLogoSrc={impulsoLogoSrc}
-            especialLogoUrl={especialLogoUrl}
-          />
+            <MarketingAssetsPanel lugarId={Number(lugar.id)} />
         )}
+
       </div>
     </div>
   );
