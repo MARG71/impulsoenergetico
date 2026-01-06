@@ -8,8 +8,7 @@ import { MarketingTipo, Prisma } from "@prisma/client";
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 function getRole(session: Session | null): Rol | null {
-  const role = (session?.user as { role?: Rol } | undefined)?.role;
-  return role ?? null;
+  return ((session?.user as any)?.role ?? null) as Rol | null;
 }
 
 function isValidUrlOrPath(url: string): boolean {
@@ -38,7 +37,7 @@ export async function GET(req: Request) {
 
     const where: Prisma.MarketingAssetWhereInput = { lugarId };
 
-    // SUPERADMIN puede consultar "en modo tenant" por adminId
+    // SUPERADMIN: modo tenant opcional
     if (role === "SUPERADMIN" && adminId && Number.isFinite(adminId)) {
       where.adminId = adminId;
     }
@@ -68,17 +67,16 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as {
       lugarId?: number | string;
-      tipo?: MarketingTipo | string;
+      tipo?: MarketingTipo | string; // IMAGE | VIDEO | PDF
       url?: string;
       nombre?: string | null;
 
-      // cloudinary opcional
       publicId?: string | null;
-      resourceType?: string | null;
+      resourceType?: string | null; // image | video | raw
       mime?: string | null;
       size?: number | null;
 
-      // tenant opcional
+      // tenant opcional (solo SUPERADMIN)
       adminId?: number | string | null;
       agenteId?: number | string | null;
     };
@@ -88,7 +86,10 @@ export async function POST(req: Request) {
     const tipoStr = String(body?.tipo ?? "");
 
     if (!Number.isFinite(lugarId) || lugarId <= 0 || !url || !tipoStr) {
-      return NextResponse.json({ error: "Faltan campos (lugarId, tipo, url)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Faltan campos (lugarId, tipo, url)" },
+        { status: 400 }
+      );
     }
 
     if (!isValidUrlOrPath(url)) {
@@ -98,7 +99,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validar tipo
     const tipo = Object.values(MarketingTipo).includes(tipoStr as MarketingTipo)
       ? (tipoStr as MarketingTipo)
       : null;
@@ -110,30 +110,25 @@ export async function POST(req: Request) {
       );
     }
 
+    // ✅ Usamos Unchecked para poder setear adminId/agenteId sin pelear con types
     const data: Prisma.MarketingAssetUncheckedCreateInput = {
-    lugarId,
-    tipo,
-    url,
-    nombre: body?.nombre ? String(body.nombre) : null,
+      lugarId,
+      tipo,
+      url,
+      nombre: body?.nombre ? String(body.nombre) : null,
 
-    publicId: body?.publicId ? String(body.publicId) : null,
-    resourceType: body?.resourceType ? String(body.resourceType) : null,
-    mime: body?.mime ? String(body.mime) : null,
-    size: typeof body?.size === "number" ? body.size : null,
+      publicId: body?.publicId ? String(body.publicId) : null,
+      resourceType: body?.resourceType ? String(body.resourceType) : null,
+      mime: body?.mime ? String(body.mime) : null,
+      size: typeof body?.size === "number" ? body.size : null,
     };
 
-
-    // SUPERADMIN puede asignar adminId/agenteId explícitos
     if (role === "SUPERADMIN") {
       const adminId = body?.adminId != null ? Number(body.adminId) : null;
-      if (adminId && Number.isFinite(adminId)) {
-        (data as any).adminId = adminId; // prisma createInput no tiene adminId directo por ser scalar con map; lo permite igual
-      }
-
       const agenteId = body?.agenteId != null ? Number(body.agenteId) : null;
-      if (agenteId && Number.isFinite(agenteId)) {
-        (data as any).agenteId = agenteId;
-      }
+
+      if (adminId && Number.isFinite(adminId)) data.adminId = adminId;
+      if (agenteId && Number.isFinite(agenteId)) data.agenteId = agenteId;
     }
 
     const created = await prisma.marketingAsset.create({ data });

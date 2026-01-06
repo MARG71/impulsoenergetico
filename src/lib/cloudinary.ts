@@ -64,3 +64,17 @@ export async function uploadBufferToCloudinary(params: {
     stream.end(buffer);
   });
 }
+
+export async function deleteFromCloudinary(params: {
+  publicId: string;
+  resourceType?: UploadResourceType; // image | video | raw
+}): Promise<{ result: string }> {
+  const { publicId, resourceType = "image" } = params;
+
+  const res = await cloudinary.uploader.destroy(publicId, {
+    resource_type: resourceType,
+    invalidate: true,
+  });
+
+  return { result: (res as any)?.result ?? "unknown" };
+}

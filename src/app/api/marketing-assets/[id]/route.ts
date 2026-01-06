@@ -3,16 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { Prisma } from "@prisma/client";
+import { deleteFromCloudinary, UploadResourceType } from "@/lib/cloudinary";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 function getRole(session: Session | null): Rol | null {
-  const role = (session?.user as { role?: Rol } | undefined)?.role;
-  return role ?? null;
+  return ((session?.user as any)?.role ?? null) as Rol | null;
 }
 
-// ✅ Next 15: ctx.params puede venir como Promise en builds strict
+function toResourceType(v?: string | null): UploadResourceType | null {
+  if (!v) return null;
+  if (v === "image" || v === "video" || v === "raw") return v;
+  return null;
+}
+
+// ✅ Next 15: params puede venir como Promise
 export async function DELETE(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -29,7 +34,6 @@ export async function DELETE(
 
     const { id } = await ctx.params;
     const assetId = Number(id);
-
     if (!Number.isFinite(assetId) || assetId <= 0) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
@@ -39,22 +43,38 @@ export async function DELETE(
     const adminIdParam = searchParams.get("adminId");
     const adminId = adminIdParam ? Number(adminIdParam) : null;
 
-    const where: Prisma.MarketingAssetWhereUniqueInput = { id: assetId };
+    // 1) Buscar asset
+    const asset = await prisma.marketingAsset.findFirst({
+      where:
+        role === "SUPERADMIN" && adminId && Number.isFinite(adminId)
+          ? { id: assetId, adminId }
+          : { id: assetId },
+      select: { id: true, publicId: true, resourceType: true },
+    });
 
-    // Si quieres “tenant strict” en delete, hazlo con findFirst + delete
-    // porque delete({ where }) solo acepta unique.
-    // Así evitamos “líneas rojas” y controlamos tenant:
-    if (role === "SUPERADMIN" && adminId && Number.isFinite(adminId)) {
-      const existing = await prisma.marketingAsset.findFirst({
-        where: { id: assetId, adminId },
-        select: { id: true },
+    if (!asset) {
+      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    }
+
+    // 2) Borrar en Cloudinary si aplica
+    if (asset.publicId) {
+      const rt = toResourceType(asset.resourceType) ?? "image";
+      const res = await deleteFromCloudinary({
+        publicId: asset.publicId,
+        resourceType: rt,
       });
-      if (!existing) {
-        return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+      // Cloudinary suele devolver "ok" o "not found"
+      if (res.result !== "ok" && res.result !== "not found") {
+        return NextResponse.json(
+          { error: `Cloudinary delete falló: ${res.result}` },
+          { status: 500 }
+        );
       }
     }
 
-    await prisma.marketingAsset.delete({ where });
+    // 3) Borrar en BD
+    await prisma.marketingAsset.delete({ where: { id: assetId } });
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
