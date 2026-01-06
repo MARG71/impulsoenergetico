@@ -512,7 +512,11 @@ export default function CompartirContenido({ id }: { id: string }) {
 
         {/* ✅ FASE 2 (AHORA EN COMPONENTE SEPARADO) */}
         {!loading && !!lugar?.id && (
-            <MarketingAssetsPanel lugarId={Number(lugar.id)} />
+            <MarketingAssetsPanel
+                lugarId={Number(lugar.id)}
+                adminId={tenantMode ? adminIdContext : null}
+            />
+
         )}
 
       </div>
