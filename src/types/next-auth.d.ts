@@ -1,34 +1,29 @@
-// types/next-auth.d.ts
-import NextAuth from "next-auth";
+import "next-auth";
+import "next-auth/jwt";
+
+export type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 declare module "next-auth" {
   interface User {
-    id: string;
+    id: number;
     name: string;
     email: string;
-    role: string;
+    role: Rol;
     agenteId?: number | null;
     lugarId?: number | null;
   }
 
   interface Session {
-    user: {
-      id: string;
-      name: string;
-      email: string;
-      role: string;
-      agenteId?: number | null;
-      lugarId?: number | null;
-    };
+    user: User;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id?: string | number;
+    id?: number;
     name?: string;
     email?: string;
-    role?: string;
+    role?: Rol;
     agenteId?: number | null;
     lugarId?: number | null;
   }

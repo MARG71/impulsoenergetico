@@ -565,6 +565,7 @@ model OfertaTarifaSolarConfig {
 enum MarketingTipo {
   IMAGE
   VIDEO
+  PDF
 }
 
 model MarketingAsset {
@@ -572,7 +573,11 @@ model MarketingAsset {
   tipo     MarketingTipo
   url      String
   nombre   String?
-  publicId String? // (opcional) si algún día usas Cloudinary
+  publicId String?       // Cloudinary public_id
+  resourceType String?   // image | video | raw
+  mime     String?
+  size     Int?
+
   creadaEn DateTime      @default(now())
 
   lugarId Int
