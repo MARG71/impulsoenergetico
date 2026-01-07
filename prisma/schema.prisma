@@ -284,7 +284,19 @@ model Fondo {
   url      String   @unique
   creadoEn DateTime @default(now())
   activo   Boolean  @default(false)
+
+  // ✅ Cloudinary metadata (para borrar de Cloudinary y depurar)
+  publicId      String? // ej: impulso/fondos/historico/xxxx
+  resourceType  String? // image | video | raw
+  bytes         Int?
+  width         Int?
+  height        Int?
+  format        String?
+
+  // opcional (si quieres conservarlo)
+  mime          String?
 }
+
 
 model ConfiguracionGlobal {
   id             Int    @id @default(1)

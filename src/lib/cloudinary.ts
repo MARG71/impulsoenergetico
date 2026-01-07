@@ -65,14 +65,17 @@ export async function uploadBufferToCloudinary(params: {
   });
 }
 
+/**
+ * Borra un asset en Cloudinary por publicId.
+ */
 export async function deleteFromCloudinary(params: {
   publicId: string;
-  resourceType?: UploadResourceType; // image | video | raw
+  resourceType?: UploadResourceType | string | null; // por si viene null/undefined
 }): Promise<{ result: string }> {
-  const { publicId, resourceType = "image" } = params;
+  const rt = (params.resourceType || "image") as UploadResourceType;
 
-  const res = await cloudinary.uploader.destroy(publicId, {
-    resource_type: resourceType,
+  const res = await cloudinary.uploader.destroy(params.publicId, {
+    resource_type: rt,
     invalidate: true,
   });
 

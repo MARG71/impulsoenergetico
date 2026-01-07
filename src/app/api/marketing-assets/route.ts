@@ -1,140 +1,124 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import type { Session } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { getTenantContext } from "@/lib/tenant";
 import { MarketingTipo, Prisma } from "@prisma/client";
 
-type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
-
-function getRole(session: Session | null): Rol | null {
-  return ((session?.user as any)?.role ?? null) as Rol | null;
+function isValidUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
 }
 
-function isValidUrlOrPath(url: string): boolean {
-  return (
-    url.startsWith("http://") ||
-    url.startsWith("https://") ||
-    url.startsWith("/")
-  );
+function normalizeTipo(v: any): MarketingTipo | null {
+  const s = String(v ?? "").toUpperCase();
+  if (s === "IMAGE") return MarketingTipo.IMAGE;
+  if (s === "VIDEO") return MarketingTipo.VIDEO;
+  if (s === "PDF") return MarketingTipo.PDF;
+  return null;
 }
 
-export async function GET(req: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "No auth" }, { status: 401 });
+export async function GET(req: NextRequest) {
+  const ctx = await getTenantContext(req);
+  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const role = getRole(session);
-
-    const { searchParams } = new URL(req.url);
-    const lugarId = Number(searchParams.get("lugarId"));
-    const adminIdParam = searchParams.get("adminId");
-    const adminId = adminIdParam ? Number(adminIdParam) : null;
-
-    if (!Number.isFinite(lugarId) || lugarId <= 0) {
-      return NextResponse.json({ error: "lugarId requerido" }, { status: 400 });
-    }
-
-    const where: Prisma.MarketingAssetWhereInput = { lugarId };
-
-    // SUPERADMIN: modo tenant opcional
-    if (role === "SUPERADMIN" && adminId && Number.isFinite(adminId)) {
-      where.adminId = adminId;
-    }
-
-    const assets = await prisma.marketingAsset.findMany({
-      where,
-      orderBy: { creadaEn: "desc" },
-    });
-
-    return NextResponse.json({ assets });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  const { searchParams } = new URL(req.url);
+  const lugarId = Number(searchParams.get("lugarId"));
+  if (!Number.isFinite(lugarId) || lugarId <= 0) {
+    return NextResponse.json({ error: "lugarId requerido" }, { status: 400 });
   }
+
+  // SUPERADMIN modo tenant opcional
+  const adminIdParam = searchParams.get("adminId");
+  const adminId = adminIdParam ? Number(adminIdParam) : null;
+
+  // Resolver el adminId efectivo
+  const effectiveAdminId =
+    ctx.isSuperadmin && adminId && Number.isFinite(adminId) && adminId > 0
+      ? adminId
+      : ctx.tenantAdminId ?? null;
+
+  // 1) Validar que el lugar pertenece al tenant (si aplica)
+  const lugar = await prisma.lugar.findFirst({
+    where: effectiveAdminId ? { id: lugarId, adminId: effectiveAdminId } : { id: lugarId },
+    select: { id: true, adminId: true, agenteId: true },
+  });
+
+  if (!lugar) {
+    return NextResponse.json({ error: "Lugar no encontrado o sin permisos" }, { status: 404 });
+  }
+
+  const where: Prisma.MarketingAssetWhereInput = {
+    lugarId,
+  };
+
+  // Si estamos en tenant, filtramos
+  if (effectiveAdminId) where.adminId = effectiveAdminId;
+
+  const assets = await prisma.marketingAsset.findMany({
+    where,
+    orderBy: { creadaEn: "desc" },
+  });
+
+  return NextResponse.json({ assets });
 }
 
-export async function POST(req: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "No auth" }, { status: 401 });
+export async function POST(req: NextRequest) {
+  const ctx = await getTenantContext(req);
+  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const role = getRole(session);
-    const canManage = role === "ADMIN" || role === "SUPERADMIN";
-    if (!canManage) {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
-    }
-
-    const body = (await req.json()) as {
-      lugarId?: number | string;
-      tipo?: MarketingTipo | string; // IMAGE | VIDEO | PDF
-      url?: string;
-      nombre?: string | null;
-
-      publicId?: string | null;
-      resourceType?: string | null; // image | video | raw
-      mime?: string | null;
-      size?: number | null;
-
-      // tenant opcional (solo SUPERADMIN)
-      adminId?: number | string | null;
-      agenteId?: number | string | null;
-    };
-
-    const lugarId = Number(body?.lugarId);
-    const url = String(body?.url ?? "");
-    const tipoStr = String(body?.tipo ?? "");
-
-    if (!Number.isFinite(lugarId) || lugarId <= 0 || !url || !tipoStr) {
-      return NextResponse.json(
-        { error: "Faltan campos (lugarId, tipo, url)" },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidUrlOrPath(url)) {
-      return NextResponse.json(
-        { error: "URL inválida (http/https o /...)" },
-        { status: 400 }
-      );
-    }
-
-    const tipo = Object.values(MarketingTipo).includes(tipoStr as MarketingTipo)
-      ? (tipoStr as MarketingTipo)
-      : null;
-
-    if (!tipo) {
-      return NextResponse.json(
-        { error: `tipo inválido. Usa: ${Object.values(MarketingTipo).join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Usamos Unchecked para poder setear adminId/agenteId sin pelear con types
-    const data: Prisma.MarketingAssetUncheckedCreateInput = {
-      lugarId,
-      tipo,
-      url,
-      nombre: body?.nombre ? String(body.nombre) : null,
-
-      publicId: body?.publicId ? String(body.publicId) : null,
-      resourceType: body?.resourceType ? String(body.resourceType) : null,
-      mime: body?.mime ? String(body.mime) : null,
-      size: typeof body?.size === "number" ? body.size : null,
-    };
-
-    if (role === "SUPERADMIN") {
-      const adminId = body?.adminId != null ? Number(body.adminId) : null;
-      const agenteId = body?.agenteId != null ? Number(body.agenteId) : null;
-
-      if (adminId && Number.isFinite(adminId)) data.adminId = adminId;
-      if (agenteId && Number.isFinite(agenteId)) data.agenteId = agenteId;
-    }
-
-    const created = await prisma.marketingAsset.create({ data });
-    return NextResponse.json({ ok: true, created });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (!ctx.isAdmin && !ctx.isSuperadmin) {
+    return NextResponse.json({ error: "Solo ADMIN o SUPERADMIN" }, { status: 403 });
   }
+
+  const body = (await req.json().catch(() => ({}))) as any;
+
+  const lugarId = Number(body?.lugarId);
+  const url = String(body?.url ?? "").trim();
+  const tipo = normalizeTipo(body?.tipo);
+
+  if (!Number.isFinite(lugarId) || lugarId <= 0 || !url || !tipo) {
+    return NextResponse.json(
+      { error: "Faltan campos (lugarId, tipo, url)" },
+      { status: 400 }
+    );
+  }
+
+  if (!isValidUrl(url)) {
+    return NextResponse.json({ error: "URL inválida (debe ser http/https)" }, { status: 400 });
+  }
+
+  // SUPERADMIN modo tenant opcional
+  const adminIdFromBody = body?.adminId != null ? Number(body.adminId) : null;
+  const effectiveAdminId =
+    ctx.isSuperadmin && adminIdFromBody && Number.isFinite(adminIdFromBody) && adminIdFromBody > 0
+      ? adminIdFromBody
+      : ctx.tenantAdminId ?? null;
+
+  // 1) Validar lugar pertenece al tenant
+  const lugar = await prisma.lugar.findFirst({
+    where: effectiveAdminId ? { id: lugarId, adminId: effectiveAdminId } : { id: lugarId },
+    select: { id: true, adminId: true, agenteId: true },
+  });
+
+  if (!lugar) {
+    return NextResponse.json({ error: "Lugar no encontrado o sin permisos" }, { status: 404 });
+  }
+
+  const data: Prisma.MarketingAssetUncheckedCreateInput = {
+    lugarId,
+    tipo,
+    url,
+    nombre: body?.nombre ? String(body.nombre) : null,
+
+    publicId: body?.publicId ? String(body.publicId) : null,
+    resourceType: body?.resourceType ? String(body.resourceType) : null,
+    mime: body?.mime ? String(body.mime) : null,
+    size: Number.isFinite(Number(body?.size)) ? Number(body.size) : null,
+
+    adminId: effectiveAdminId,
+    agenteId: lugar.agenteId ?? null, // ✅ trazabilidad automática por lugar
+  };
+
+  const created = await prisma.marketingAsset.create({ data });
+  return NextResponse.json({ ok: true, created }, { status: 201 });
 }

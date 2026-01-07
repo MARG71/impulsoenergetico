@@ -20,7 +20,9 @@ function guessTipoFromMime(mime: string | null | undefined): Asset["tipo"] {
   if (!mime) return "IMAGE";
   if (mime.startsWith("image/")) return "IMAGE";
   if (mime.startsWith("video/")) return "VIDEO";
+  if (mime === "application/pdf") return "PDF";
   return "PDF";
+
 }
 
 export default function MarketingAssetsPanel({
@@ -41,6 +43,7 @@ export default function MarketingAssetsPanel({
   const adminQuery = useMemo(() => {
     return adminId && Number.isFinite(adminId) ? `&adminId=${adminId}` : "";
   }, [adminId]);
+
 
   const loadAssets = async () => {
     setLoading(true);
@@ -169,7 +172,9 @@ export default function MarketingAssetsPanel({
     if (!confirm("¿Eliminar este asset?")) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/marketing-assets/${id}`, { method: "DELETE" });
+      const url = `/api/marketing-assets/${id}${adminId ? `?adminId=${adminId}` : ""}`;
+
+      const res = await fetch(url, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "No se pudo borrar");
       await loadAssets();

@@ -19,8 +19,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  // ✅ Si quieres multi-tenant por adminId, aquí habría que filtrar por tenant.
-  // De momento lo dejamos global:
+  const exists = await prisma.fondo.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) {
+    return NextResponse.json({ error: "Fondo no encontrado" }, { status: 404 });
+  }
+
   await prisma.fondo.updateMany({ data: { activo: false } });
   const updated = await prisma.fondo.update({ where: { id }, data: { activo: true } });
 

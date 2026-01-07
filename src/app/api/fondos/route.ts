@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
+import { deleteFromCloudinary } from "@/lib/cloudinary";
 
 export async function GET(req: NextRequest) {
   const ctx = await getTenantContext(req);
@@ -12,15 +13,11 @@ export async function GET(req: NextRequest) {
 
   const where: any = {};
 
-  // 🔎 filtro últimos 7 días
   if (filtro === "ultimos7") {
     const d = new Date();
     d.setDate(d.getDate() - 7);
     where.creadoEn = { gte: d };
   }
-
-  // ✅ Si tu modelo Fondo tiene adminId y quieres multi-tenant, descomenta:
-  // if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
 
   const fondos = await prisma.fondo.findMany({
     where,
@@ -39,6 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
+
   const nombre = String(body?.nombre ?? "").trim();
   const url = String(body?.url ?? "").trim();
 
@@ -46,16 +44,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan campos (nombre, url)" }, { status: 400 });
   }
 
-  const created = await prisma.fondo.create({
-    data: {
-      nombre,
-      url,
-      // ✅ Si tu modelo Fondo tiene adminId:
-      // adminId: ctx.tenantAdminId ?? null,
-    },
-  });
+  // metadata cloudinary (opcionales)
+  const publicId = body?.publicId ? String(body.publicId) : null;
+  const resourceType = body?.resourceType ? String(body.resourceType) : null;
 
-  return NextResponse.json({ ok: true, fondo: created }, { status: 201 });
+  const bytes = Number.isFinite(Number(body?.bytes)) ? Number(body.bytes) : null;
+  const width = Number.isFinite(Number(body?.width)) ? Number(body.width) : null;
+  const height = Number.isFinite(Number(body?.height)) ? Number(body.height) : null;
+  const format = body?.format ? String(body.format) : null;
+  const mime = body?.mime ? String(body.mime) : null;
+
+  try {
+    const created = await prisma.fondo.create({
+      data: {
+        nombre,
+        url,
+        publicId,
+        resourceType,
+        bytes,
+        width,
+        height,
+        format,
+        mime,
+      },
+    });
+
+    return NextResponse.json({ ok: true, fondo: created }, { status: 201 });
+  } catch (e: any) {
+    // URL unique
+    if (e?.code === "P2002") {
+      return NextResponse.json(
+        { error: "Ya existe un fondo con esa URL (duplicado)." },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ error: "Error creando fondo" }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -73,9 +97,37 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  // Si el fondo estaba activo, lo desactivamos antes de borrar
-  await prisma.fondo.updateMany({ where: { id }, data: { activo: false } });
+  const fondo = await prisma.fondo.findUnique({
+    where: { id },
+    select: { id: true, activo: true, publicId: true, resourceType: true },
+  });
 
+  if (!fondo) {
+    return NextResponse.json({ error: "Fondo no encontrado" }, { status: 404 });
+  }
+
+  // 1) Si estaba activo, lo desactivamos
+  if (fondo.activo) {
+    await prisma.fondo.update({
+      where: { id },
+      data: { activo: false },
+    });
+  }
+
+  // 2) Borrar de Cloudinary (si tenemos publicId)
+  if (fondo.publicId) {
+    try {
+      await deleteFromCloudinary({
+        publicId: fondo.publicId,
+        resourceType: fondo.resourceType,
+      });
+    } catch (e) {
+      // si falla cloudinary, NO bloqueamos borrado BD
+      console.error("Error borrando Cloudinary:", e);
+    }
+  }
+
+  // 3) Borrar de BD
   await prisma.fondo.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });

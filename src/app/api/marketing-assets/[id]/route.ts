@@ -1,84 +1,68 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import type { Session } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { getTenantContext } from "@/lib/tenant";
 import { deleteFromCloudinary, UploadResourceType } from "@/lib/cloudinary";
 
-type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
-
-function getRole(session: Session | null): Rol | null {
-  return ((session?.user as any)?.role ?? null) as Rol | null;
-}
-
-function toResourceType(v?: string | null): UploadResourceType | null {
-  if (!v) return null;
+function toResourceType(v?: string | null): UploadResourceType {
   if (v === "image" || v === "video" || v === "raw") return v;
-  return null;
+  return "image";
 }
 
-// ✅ Next 15: params puede venir como Promise
-export async function DELETE(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "No auth" }, { status: 401 });
+export async function DELETE(req: NextRequest, ctx2: { params: Promise<{ id: string }> }) {
+  const ctx = await getTenantContext(req);
+  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const role = getRole(session);
-    const canManage = role === "ADMIN" || role === "SUPERADMIN";
-    if (!canManage) {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
-    }
+  if (!ctx.isAdmin && !ctx.isSuperadmin) {
+    return NextResponse.json({ error: "Solo ADMIN o SUPERADMIN" }, { status: 403 });
+  }
 
-    const { id } = await ctx.params;
-    const assetId = Number(id);
-    if (!Number.isFinite(assetId) || assetId <= 0) {
-      return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-    }
+  const { id } = await ctx2.params;
+  const assetId = Number(id);
+  if (!Number.isFinite(assetId) || assetId <= 0) {
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  }
 
-    // tenant opcional
-    const { searchParams } = new URL(req.url);
-    const adminIdParam = searchParams.get("adminId");
-    const adminId = adminIdParam ? Number(adminIdParam) : null;
+  // SUPERADMIN modo tenant opcional (?adminId=...)
+  const adminIdParam = req.nextUrl.searchParams.get("adminId");
+  const adminId = adminIdParam ? Number(adminIdParam) : null;
 
-    // 1) Buscar asset
-    const asset = await prisma.marketingAsset.findFirst({
-      where:
-        role === "SUPERADMIN" && adminId && Number.isFinite(adminId)
-          ? { id: assetId, adminId }
-          : { id: assetId },
-      select: { id: true, publicId: true, resourceType: true },
-    });
+  const effectiveAdminId =
+    ctx.isSuperadmin && adminId && Number.isFinite(adminId) && adminId > 0
+      ? adminId
+      : ctx.tenantAdminId ?? null;
 
-    if (!asset) {
-      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    }
+  // 1) Buscar asset con filtro tenant si aplica
+  const asset = await prisma.marketingAsset.findFirst({
+    where: effectiveAdminId ? { id: assetId, adminId: effectiveAdminId } : { id: assetId },
+    select: { id: true, publicId: true, resourceType: true },
+  });
 
-    // 2) Borrar en Cloudinary si aplica
-    if (asset.publicId) {
-      const rt = toResourceType(asset.resourceType) ?? "image";
-      const res = await deleteFromCloudinary({
-        publicId: asset.publicId,
-        resourceType: rt,
-      });
+  if (!asset) {
+    return NextResponse.json({ error: "No encontrado o sin permisos" }, { status: 404 });
+  }
 
-      // Cloudinary suele devolver "ok" o "not found"
-      if (res.result !== "ok" && res.result !== "not found") {
+  // 2) Borrar en Cloudinary si hay publicId
+  if (asset.publicId) {
+    try {
+      const rt = toResourceType(asset.resourceType);
+      const res = await deleteFromCloudinary({ publicId: asset.publicId, resourceType: rt });
+      // aceptamos ok o not found
+      if (res?.result !== "ok" && res?.result !== "not found") {
         return NextResponse.json(
-          { error: `Cloudinary delete falló: ${res.result}` },
+          { error: `Cloudinary delete falló: ${String(res?.result ?? "unknown")}` },
           { status: 500 }
         );
       }
+    } catch (e) {
+      console.error("Cloudinary delete error:", e);
+      // si falla cloudinary, no bloqueamos borrado BD (como fondos)
     }
-
-    // 3) Borrar en BD
-    await prisma.marketingAsset.delete({ where: { id: assetId } });
-
-    return NextResponse.json({ ok: true });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Error";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
+
+  // 3) Borrar en BD
+  await prisma.marketingAsset.delete({ where: { id: assetId } });
+
+  return NextResponse.json({ ok: true });
 }

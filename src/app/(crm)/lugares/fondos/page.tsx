@@ -61,7 +61,17 @@ export default function GestionFondosCartel() {
         body: JSON.stringify({
           nombre: archivo.name,
           url: uploadData.url,
+
+          // ✅ guarda metadata para poder borrar Cloudinary
+          publicId: uploadData.publicId || null,
+          resourceType: uploadData.resourceType || null,
+          bytes: uploadData.bytes ?? null,
+          width: uploadData.width ?? null,
+          height: uploadData.height ?? null,
+          format: uploadData.format ?? null,
+          mime: archivo.type || null,
         }),
+
       });
 
       if (!apiRes.ok) throw new Error("Error al guardar en base de datos");

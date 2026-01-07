@@ -8,6 +8,8 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MarketingAssetsPanel from "./MarketingAssetsPanel";
+import FondosGlobalesPanel from "./FondosGlobalesPanel";
+
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
@@ -511,13 +513,18 @@ export default function CompartirContenido({ id }: { id: string }) {
         </section>
 
         {/* ✅ FASE 2 (AHORA EN COMPONENTE SEPARADO) */}
+        {/* ✅ FASE 2 */}
         {!loading && !!lugar?.id && (
+          <>
             <MarketingAssetsPanel
-                lugarId={Number(lugar.id)}
-                adminId={tenantMode ? adminIdContext : null}
+              lugarId={Number(lugar.id)}
+              adminId={tenantMode ? adminIdContext : null}
             />
 
+            <FondosGlobalesPanel />
+          </>
         )}
+
 
       </div>
     </div>
