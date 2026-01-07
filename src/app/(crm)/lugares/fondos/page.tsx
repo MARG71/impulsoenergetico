@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useSession } from "next-auth/react";
 
 type Fondo = {
   id: number;
@@ -16,31 +17,37 @@ type Fondo = {
 };
 
 export default function GestionFondosCartel() {
+  const { data: session } = useSession();
+
+  const role = (session?.user as any)?.role as string | undefined;
+  const isSuperadmin = role === "SUPERADMIN";
+
   const [fondos, setFondos] = useState<Fondo[]>([]);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [filtro, setFiltro] = useState<"todos" | "ultimos7">("todos");
 
   const fetchFondos = async () => {
-    const res = await fetch(`/api/fondos?filtro=${filtro}`);
+    const res = await fetch(`/api/fondos?filtro=${filtro}`, { cache: "no-store" });
     const data = await res.json();
-    setFondos(data);
+    setFondos(Array.isArray(data) ? data : []);
   };
 
   useEffect(() => {
     fetchFondos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtro]);
 
   const handleSubirFondo = async () => {
+    if (!isSuperadmin) return toast.error("Solo SUPERADMIN puede subir fondos.");
     if (!archivo) return toast.error("Selecciona un archivo");
+
     setSubiendo(true);
 
     try {
       // 1) Subir a Cloudinary a través del backend
       const fd = new FormData();
       fd.append("file", archivo);
-
-      // Carpeta Cloudinary según tu estructura acordada:
       fd.append("folder", "impulso/fondos/historico");
 
       const uploadRes = await fetch("/api/upload", {
@@ -54,7 +61,7 @@ export default function GestionFondosCartel() {
         throw new Error(uploadData?.error || "Error en /api/upload");
       }
 
-      // 2) Guardar en BD (Prisma) como ya hacías
+      // 2) Guardar en BD (Prisma)
       const apiRes = await fetch("/api/fondos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +69,7 @@ export default function GestionFondosCartel() {
           nombre: archivo.name,
           url: uploadData.url,
 
-          // ✅ guarda metadata para poder borrar Cloudinary
+          // metadata para borrado Cloudinary
           publicId: uploadData.publicId || null,
           resourceType: uploadData.resourceType || null,
           bytes: uploadData.bytes ?? null,
@@ -71,10 +78,10 @@ export default function GestionFondosCartel() {
           format: uploadData.format ?? null,
           mime: archivo.type || null,
         }),
-
       });
 
-      if (!apiRes.ok) throw new Error("Error al guardar en base de datos");
+      const apiData = await apiRes.json();
+      if (!apiRes.ok) throw new Error(apiData?.error || "Error al guardar en base de datos");
 
       toast.success("Fondo subido correctamente");
       setArchivo(null);
@@ -88,7 +95,9 @@ export default function GestionFondosCartel() {
   };
 
   const handleEliminar = async (id: number) => {
-    const confirmar = confirm("¿Estás seguro de eliminar este fondo?");
+    if (!isSuperadmin) return toast.error("Solo SUPERADMIN puede eliminar fondos.");
+
+    const confirmar = confirm("¿Estás seguro de eliminar este fondo? (Cloudinary + BD)");
     if (!confirmar) return;
 
     try {
@@ -98,7 +107,8 @@ export default function GestionFondosCartel() {
         body: JSON.stringify({ id }),
       });
 
-      if (!res.ok) throw new Error("Error al eliminar");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Error al eliminar");
 
       toast.success("Fondo eliminado");
       fetchFondos();
@@ -109,6 +119,8 @@ export default function GestionFondosCartel() {
   };
 
   const handleSeleccionarFondoActivo = async (id: number) => {
+    if (!isSuperadmin) return toast.error("Solo SUPERADMIN puede activar fondos.");
+
     try {
       const res = await fetch("/api/fondos/seleccionar", {
         method: "POST",
@@ -116,7 +128,8 @@ export default function GestionFondosCartel() {
         body: JSON.stringify({ id }),
       });
 
-      if (!res.ok) throw new Error("No se pudo activar el fondo");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "No se pudo activar el fondo");
 
       toast.success("Fondo seleccionado como activo");
       fetchFondos();
@@ -128,34 +141,48 @@ export default function GestionFondosCartel() {
 
   return (
     <div className="p-8 bg-[#F6FFEC] min-h-screen">
-      <h1 className="text-3xl font-bold text-[#004AAD] mb-10">
+      <h1 className="text-3xl font-bold text-[#004AAD] mb-3">
         🎨 Gestión de Fondos para Carteles
       </h1>
 
-      <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 mb-10 max-w-xl mx-auto">
-        <h2 className="text-xl font-semibold text-[#1F1F1F] mb-4">
-          Subir nuevo fondo
-        </h2>
+      <p className="text-sm text-gray-700 font-semibold mb-8">
+        ⚠️ Estos fondos son <b>globales</b>: el fondo activo se aplica a <b>todos los lugares</b> de{" "}
+        <b>todos los admins</b>.
+        {!isSuperadmin && (
+          <>
+            {" "}
+            <span className="text-gray-600">
+              (Solo SUPERADMIN puede subir/activar/eliminar.)
+            </span>
+          </>
+        )}
+      </p>
 
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Selecciona un fondo (.jpg, .png):
-        </label>
+      {/* SUBIR (SOLO SUPERADMIN) */}
+      {isSuperadmin && (
+        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 mb-10 max-w-xl mx-auto">
+          <h2 className="text-xl font-semibold text-[#1F1F1F] mb-4">Subir nuevo fondo</h2>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setArchivo(e.target.files?.[0] || null)}
-          className="block w-full text-sm text-black file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#004AAD] file:text-white hover:file:bg-[#00368A] mb-4"
-        />
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Selecciona un fondo (.jpg, .png):
+          </label>
 
-        <Button onClick={handleSubirFondo} disabled={subiendo} className="w-full">
-          {subiendo ? "Subiendo..." : "Subir Fondo"}
-        </Button>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setArchivo(e.target.files?.[0] || null)}
+            className="block w-full text-sm text-black file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#004AAD] file:text-white hover:file:bg-[#00368A] mb-4"
+          />
 
-        <p className="text-xs text-gray-500 mt-3">
-          Subida segura vía backend (sin exponer secretos).
-        </p>
-      </div>
+          <Button onClick={handleSubirFondo} disabled={subiendo} className="w-full">
+            {subiendo ? "Subiendo..." : "Subir Fondo"}
+          </Button>
+
+          <p className="text-xs text-gray-500 mt-3">
+            Subida segura vía backend (sin exponer secretos).
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-[#004AAD]">🖼️ Fondos disponibles</h2>
@@ -184,33 +211,40 @@ export default function GestionFondosCartel() {
               height={200}
               className="w-full h-48 object-cover"
             />
+
             <div className="bg-[#F9FAFB] p-3 text-center">
-              <p className="text-sm font-semibold text-gray-800 truncate">
-                {fondo.nombre}
-              </p>
+              <p className="text-sm font-semibold text-gray-800 truncate">{fondo.nombre}</p>
               <p className="text-xs text-gray-500 mt-1">
                 Subido el{" "}
                 {format(new Date(fondo.creadoEn), "dd MMMM yyyy", { locale: es })}
               </p>
 
-              <Button
-                onClick={() => handleSeleccionarFondoActivo(fondo.id)}
-                className={`mt-2 w-full text-sm ${
-                  fondo.activo
-                    ? "bg-green-600 text-white"
-                    : "bg-[#004AAD] text-white hover:bg-[#00368A]"
-                }`}
-              >
-                {fondo.activo ? "✅ Fondo activo" : "Usar como fondo actual"}
-              </Button>
+              {isSuperadmin ? (
+                <>
+                  <Button
+                    onClick={() => handleSeleccionarFondoActivo(fondo.id)}
+                    className={`mt-2 w-full text-sm ${
+                      fondo.activo
+                        ? "bg-green-600 text-white"
+                        : "bg-[#004AAD] text-white hover:bg-[#00368A]"
+                    }`}
+                  >
+                    {fondo.activo ? "✅ Fondo activo" : "Usar como fondo actual"}
+                  </Button>
 
-              <Button
-                variant="destructive"
-                onClick={() => handleEliminar(fondo.id)}
-                className="mt-2 w-full text-sm"
-              >
-                Eliminar
-              </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleEliminar(fondo.id)}
+                    className="mt-2 w-full text-sm"
+                  >
+                    Eliminar
+                  </Button>
+                </>
+              ) : (
+                <p className="mt-3 text-xs text-gray-500 font-semibold">
+                  Solo SUPERADMIN puede activar o eliminar fondos.
+                </p>
+              )}
             </div>
           </div>
         ))}

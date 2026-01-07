@@ -8,8 +8,9 @@ export async function POST(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  if (!ctx.isAdmin && !ctx.isSuperadmin) {
-    return NextResponse.json({ error: "Solo ADMIN o SUPERADMIN" }, { status: 403 });
+  // ✅ SOLO SUPERADMIN
+  if (!ctx.isSuperadmin) {
+    return NextResponse.json({ error: "Solo SUPERADMIN" }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));

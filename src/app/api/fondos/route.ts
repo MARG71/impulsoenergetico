@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  // ✅ En opción 1, cualquiera autenticado puede VER fondos (si quieres, lo limitamos)
   const filtro = req.nextUrl.searchParams.get("filtro") || "todos";
 
   const where: any = {};
@@ -31,8 +32,9 @@ export async function POST(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  if (!ctx.isAdmin && !ctx.isSuperadmin) {
-    return NextResponse.json({ error: "Solo ADMIN o SUPERADMIN" }, { status: 403 });
+  // ✅ SOLO SUPERADMIN
+  if (!ctx.isSuperadmin) {
+    return NextResponse.json({ error: "Solo SUPERADMIN" }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -44,7 +46,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan campos (nombre, url)" }, { status: 400 });
   }
 
-  // metadata cloudinary (opcionales)
   const publicId = body?.publicId ? String(body.publicId) : null;
   const resourceType = body?.resourceType ? String(body.resourceType) : null;
 
@@ -71,7 +72,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, fondo: created }, { status: 201 });
   } catch (e: any) {
-    // URL unique
     if (e?.code === "P2002") {
       return NextResponse.json(
         { error: "Ya existe un fondo con esa URL (duplicado)." },
@@ -86,8 +86,9 @@ export async function DELETE(req: NextRequest) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  if (!ctx.isAdmin && !ctx.isSuperadmin) {
-    return NextResponse.json({ error: "Solo ADMIN o SUPERADMIN" }, { status: 403 });
+  // ✅ SOLO SUPERADMIN
+  if (!ctx.isSuperadmin) {
+    return NextResponse.json({ error: "Solo SUPERADMIN" }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -106,15 +107,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Fondo no encontrado" }, { status: 404 });
   }
 
-  // 1) Si estaba activo, lo desactivamos
   if (fondo.activo) {
-    await prisma.fondo.update({
-      where: { id },
-      data: { activo: false },
-    });
+    await prisma.fondo.update({ where: { id }, data: { activo: false } });
   }
 
-  // 2) Borrar de Cloudinary (si tenemos publicId)
   if (fondo.publicId) {
     try {
       await deleteFromCloudinary({
@@ -122,12 +118,10 @@ export async function DELETE(req: NextRequest) {
         resourceType: fondo.resourceType,
       });
     } catch (e) {
-      // si falla cloudinary, NO bloqueamos borrado BD
       console.error("Error borrando Cloudinary:", e);
     }
   }
 
-  // 3) Borrar de BD
   await prisma.fondo.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });
