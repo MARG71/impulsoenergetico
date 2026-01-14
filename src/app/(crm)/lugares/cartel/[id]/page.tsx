@@ -25,39 +25,41 @@ export default function CartelLugar() {
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
-  // ✅ Tenant solo para buscar el lugar (NO para fondos en opción A)
+  // ✅ tenant solo para obtener lugar (NO para fondos globales)
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
+
   const tenantMode =
     isSuperadmin &&
     typeof adminIdContext === "number" &&
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const adminQuery =
-    tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+  const adminQuery = tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
-  const [exportando, setExportando] = useState(false);
-
-  
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
+
   const [fondoActivo, setFondoActivo] = useState<Fondo | null>(null);
   const fondoUrl = fondoActivo?.url ?? null;
 
+  const [exportando, setExportando] = useState(false);
 
   const cartelRef = useRef<HTMLDivElement>(null);
 
-  // ✅ Link QR (cuando ya tenemos lugar)
+  // ✅ Link QR real del lugar
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
   }, [lugar]);
 
+  // ───────────────────────────────
+  // FETCH: lugar + fondo activo
+  // ───────────────────────────────
   useEffect(() => {
     if (!id) return;
 
@@ -68,7 +70,6 @@ export default function CartelLugar() {
     };
 
     const fetchFondoActivo = async () => {
-      // ✅ Opción A: fondo global => NO usamos adminId aquí
       const res = await fetch(`/api/fondos?filtro=todos`, { cache: "no-store" });
       const data = (await res.json()) as Fondo[];
 
@@ -81,15 +82,13 @@ export default function CartelLugar() {
       const activo = data.find((f) => !!f.activo);
       if (activo?.url) {
         setFondoActivo(activo);
-
         setWarning(null);
         return;
       }
 
-      // ✅ fallback si nadie está marcado como activo: usa el más reciente (primer elemento)
+      // fallback: más reciente
       if (data[0]?.url) {
         setFondoActivo(data[0]);
-
         setWarning(
           "No hay ningún fondo marcado como activo. Mostrando el más reciente. (Activa uno en /lugares/fondos)"
         );
@@ -109,26 +108,22 @@ export default function CartelLugar() {
     })();
   }, [id, adminQuery]);
 
-  const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PDF") => {
+  // ───────────────────────────────
+  // Helpers
+  // ───────────────────────────────
+  const cleanupHtml2PdfOverlays = () => {
     try {
-      await fetch("/api/carteles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo: "A4_QR",
-          accion,
-          lugarId: lugar?.id,
-          fondoId: fondoActivo?.id ?? null,
-          fondoUrlSnap: fondoActivo?.url ?? null,
-          qrUrlSnap: qrUrl,
-          // si estás en tenantMode, lo mandamos (superadmin auditando otro admin)
-          adminId: tenantMode ? adminIdContext : null,
-        }),
+      document
+        .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+        .forEach((el) => el.remove());
+
+      document.querySelectorAll("iframe").forEach((el) => {
+        if (!el.getAttribute("src") || el.getAttribute("src") === "about:blank") el.remove();
       });
-    } catch (e) {
-      // ✅ No hacemos nada: nunca debe romper imprimir/descargar
-      console.warn("No se pudo registrar historial del cartel:", e);
-    }
+
+      document.body.style.pointerEvents = "";
+      document.body.style.overflow = "";
+    } catch {}
   };
 
   const downloadBlob = (blob: Blob, filename: string) => {
@@ -139,15 +134,45 @@ export default function CartelLugar() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 500);
+    setTimeout(() => URL.revokeObjectURL(url), 800);
   };
 
+  const registrarHistorial = async (
+    accion: "IMPRIMIR" | "DESCARGAR_PDF",
+    extra?: { archivoUrl?: string; archivoPublicId?: string; archivoResourceType?: string; archivoMime?: string; archivoBytes?: number; archivoFormat?: string }
+  ) => {
+    try {
+      const r = await fetch("/api/carteles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "A4_QR",
+          accion,
+          lugarId: lugar?.id,
+          fondoId: fondoActivo?.id ?? null,
+          fondoUrlSnap: fondoActivo?.url ?? null,
+          qrUrlSnap: qrUrl,
+          adminId: tenantMode ? adminIdContext : null,
+          ...extra,
+        }),
+      });
 
-  const imprimirCartel = () => {
+      const d = await r.json().catch(() => ({}));
+      return d?.cartel?.id ?? null;
+    } catch (e) {
+      console.warn("No se pudo registrar historial:", e);
+      return null;
+    }
+  };
+
+  // ───────────────────────────────
+  // Imprimir
+  // ───────────────────────────────
+  const imprimirCartel = async () => {
+    if (!cartelRef.current || !lugar) return;
+
+    // ✅ registrar solo IMPRIMIR
     registrarHistorial("IMPRIMIR");
-    registrarHistorial("DESCARGAR_PDF");
-
-    if (!cartelRef.current) return;
 
     const contenido = cartelRef.current.innerHTML;
     const ventana = window.open("", "", "width=800,height=1000");
@@ -167,6 +192,7 @@ export default function CartelLugar() {
               overflow: hidden;
               margin: 0;
               padding: 0;
+              background: #ffffff;
             }
             .cartel img {
               position: absolute;
@@ -204,117 +230,85 @@ export default function CartelLugar() {
     ventana.close();
   };
 
-  const cleanupHtml2PdfOverlays = () => {
-    try {
-      // html2pdf suele crear estos nodos
-      document.querySelectorAll(".html2pdf__overlay, .html2pdf__container").forEach((el) => el.remove());
-
-      // algunos casos dejan iframes “fantasma”
-      document.querySelectorAll("iframe").forEach((el) => {
-        // solo elimina los iframes “vacíos” o sospechosos
-        if (!el.src || el.src === "about:blank") el.remove();
-      });
-
-      // por si dejó estilos bloqueando interacción
-      document.body.style.pointerEvents = "";
-      document.body.style.overflow = "";
-    } catch {}
-  };
-
-
+  // ───────────────────────────────
+  // Descargar PDF (ULTRA PRO + historial + Cloudinary)
+  // ───────────────────────────────
   const descargarPDF = async () => {
-    if (!cartelRef.current) return;
-    if (!lugar) return;
+    if (!cartelRef.current || !lugar) return;
 
     try {
       setExportando(true);
+      cleanupHtml2PdfOverlays();
 
-      // 1) Crear registro de historial
-      const rHist = await fetch("/api/carteles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo: "A4_QR",
-          accion: "DESCARGAR_PDF",
-          lugarId: lugar.id,
-          fondoId: fondoActivo?.id ?? null,            // si ya lo tienes como objeto
-          fondoUrlSnap: fondoActivo?.url ?? fondoUrl,  // fallback
-          qrUrlSnap: qrUrl,
-          adminId: tenantMode ? adminIdContext : null,
-        }),
-      });
+      // 1) Crear historial y obtener cartelId
+      const cartelId = await registrarHistorial("DESCARGAR_PDF");
+      if (!cartelId) throw new Error("No se pudo crear el registro de historial (sin ID).");
 
-      const dHist = await rHist.json().catch(() => ({}));
-      if (!rHist.ok) throw new Error(dHist?.error || "No se pudo crear historial");
-
-      const cartelId = dHist?.cartel?.id;
-      if (!cartelId) throw new Error("Historial sin ID");
-
-      // 2) Generar PDF como blob
+      // 2) Generar PDF blob
       const html2pdf = (await import("html2pdf.js")).default;
 
       const worker = html2pdf()
         .from(cartelRef.current)
         .set({
           margin: 0,
-          html2canvas: { scale: 3, useCORS: true, allowTaint: true, logging: false, backgroundColor: null },
+          html2canvas: {
+            scale: 3,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+          },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         });
 
-      // outputPdf('blob') funciona con html2pdf.js recientes
       const pdfBlob: Blob = await worker.outputPdf("blob");
 
-      // 3) Subir PDF a Cloudinary vía /api/uploads
-      const file = new File([pdfBlob], `cartel_lugar_${lugar.id}.pdf`, { type: "application/pdf" });
+      // 3) Subir PDF a Cloudinary vía /api/uploads (resourceType raw)
+      const file = new File([pdfBlob], `cartel_lugar_${lugar.id}.pdf`, {
+        type: "application/pdf",
+      });
 
       const form = new FormData();
       form.append("file", file);
       form.append("folder", "impulso/carteles-generados");
-
+      form.append("resourceType", "raw");
 
       const rUp = await fetch("/api/uploads", { method: "POST", body: form });
       const dUp = await rUp.json().catch(() => ({}));
+      if (!rUp.ok) throw new Error(dUp?.error || "Error subiendo PDF a Cloudinary");
 
-      if (!rUp.ok) throw new Error(dUp?.error || "Error subiendo PDF");
-
-      // 4) Asociar archivo al historial
+      // 4) Asociar PDF al historial
       const rPatch = await fetch(`/api/carteles/${cartelId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           archivoUrl: dUp.url,
           archivoPublicId: dUp.publicId ?? null,
-          archivoResourceType: dUp.resourceType ?? null,
-          archivoMime: dUp.mime ?? "application/pdf",
+          archivoResourceType: dUp.resourceType ?? "raw",
+          archivoMime: "application/pdf",
           archivoBytes: dUp.bytes ?? null,
-          archivoFormat: dUp.format ?? null,
+          archivoFormat: dUp.format ?? "pdf",
         }),
       });
 
       const dPatch = await rPatch.json().catch(() => ({}));
-      if (!rPatch.ok) throw new Error(dPatch?.error || "No se pudo asociar el PDF");
+      if (!rPatch.ok) throw new Error(dPatch?.error || "No se pudo asociar el PDF al historial");
 
-      // 5) Descargar localmente al usuario (sin overlays)
+      // 5) Descargar local
       downloadBlob(pdfBlob, `cartel_lugar_${lugar.id}.pdf`);
     } catch (e: any) {
       console.error(e);
       alert(e?.message || "Error generando/subiendo PDF");
     } finally {
-      // Limpieza overlays por si acaso
-      try {
-        document.querySelectorAll(".html2pdf__overlay, .html2pdf__container").forEach((el) => el.remove());
-        document.body.style.pointerEvents = "";
-        document.body.style.overflow = "";
-      } catch {}
+      cleanupHtml2PdfOverlays();
       setExportando(false);
     }
   };
 
-
-
-  if (loading) {
-    return <div className="p-10 text-center">Cargando cartel...</div>;
-  }
+  // ───────────────────────────────
+  // UI states
+  // ───────────────────────────────
+  if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
 
   if (!lugar) {
     return (
@@ -341,15 +335,37 @@ export default function CartelLugar() {
     );
   }
 
+  const historialHref = tenantMode
+    ? `/lugares/${lugar.id}/historial-carteles?adminId=${adminIdContext}`
+    : `/lugares/${lugar.id}/historial-carteles`;
+
+  const volverLugaresHref = tenantMode ? `/lugares?adminId=${adminIdContext}` : "/lugares";
+
   return (
     <div className="min-h-screen flex flex-col items-center bg-white p-6">
-      <div className="w-full max-w-4xl mb-4 flex items-center justify-between gap-3">
-        <Button
-          onClick={() => router.back()}
-          className="bg-gray-200 text-black hover:bg-gray-300"
-        >
-          ⬅ Volver
-        </Button>
+      <div className="w-full max-w-4xl mb-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-2">
+          <Button
+            onClick={() => router.push(volverLugaresHref)}
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            📍 Volver a Lugares
+          </Button>
+
+          <Button
+            onClick={() => router.back()}
+            className="bg-gray-200 text-black hover:bg-gray-300"
+          >
+            ⬅ Volver
+          </Button>
+
+          <Button
+            onClick={() => router.push(historialHref)}
+            className="bg-slate-900 text-white hover:bg-slate-800"
+          >
+            🧾 Ver Historial
+          </Button>
+        </div>
 
         {warning ? (
           <div className="text-xs md:text-sm font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-2 rounded-lg">
@@ -358,21 +374,35 @@ export default function CartelLugar() {
         ) : null}
       </div>
 
+      {/* ✅ CARTEL CAPTURABLE SIN OKLCH */}
       <div
         ref={cartelRef}
-        className="relative border border-gray-300 shadow-xl overflow-hidden bg-white"
-        style={{ width: "210mm", height: "297mm", position: "relative" }}
+        style={{
+          width: "210mm",
+          height: "297mm",
+          position: "relative",
+          overflow: "hidden",
+          background: "#ffffff",
+          border: "1px solid #d1d5db",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+        }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fondoUrl}
           alt="Fondo del cartel"
-          className="absolute top-0 left-0 w-full h-full object-cover z-0"
           crossOrigin="anonymous"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            zIndex: 0,
+          }}
         />
 
         <div
-          className="qr-centro"
           style={{
             position: "absolute",
             width: "5cm",
@@ -380,7 +410,7 @@ export default function CartelLugar() {
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            background: "white",
+            background: "#ffffff",
             padding: "12px",
             borderRadius: "12px",
             display: "flex",
@@ -409,7 +439,6 @@ export default function CartelLugar() {
         >
           Imprimir cartel
         </Button>
-
       </div>
     </div>
   );

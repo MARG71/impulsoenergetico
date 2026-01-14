@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
-import Image from "next/image";
+import QRCode from "react-qr-code";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
@@ -13,49 +14,55 @@ type Item = {
   creadoEn: string;
   tipo: "A4_QR" | "ESPECIAL";
   accion: "IMPRIMIR" | "DESCARGAR_PDF" | "DESCARGAR_PNG";
+
   fondoUrlSnap?: string | null;
   qrUrlSnap?: string | null;
-  archivoUrl?: string | null;
+
+  archivoUrl?: string | null; // ✅ para “Descargar PDF desde historial”
+  archivoMime?: string | null;
 
   fondo?: { id: number; nombre: string; url: string } | null;
   creadoPor?: { id: number; nombre: string; email: string; rol: Rol } | null;
   lugar?: { id: number; nombre: string; direccion: string } | null;
 };
 
-function pillClass(tipo: Item["tipo"]) {
-  return tipo === "A4_QR"
-    ? "bg-sky-500/15 text-sky-200 border-sky-500/40"
-    : "bg-pink-500/15 text-pink-200 border-pink-500/40";
+function classNames(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
-function accionTxt(a: Item["accion"]) {
-  return a === "IMPRIMIR" ? "Imprimir" : a === "DESCARGAR_PDF" ? "Descargar PDF" : "Descargar PNG";
-}
-
-function tipoTxt(t: Item["tipo"]) {
-  return t === "A4_QR" ? "A4 con QR" : "Cartel especial";
-}
-
-function toEsDateTime(iso: string) {
+function formatFechaEs(v: string) {
   try {
-    return new Date(iso).toLocaleString("es-ES");
+    return new Date(v).toLocaleString("es-ES");
   } catch {
-    return iso;
+    return v;
   }
 }
 
-function includesQ(haystack: string, q: string) {
-  return haystack.toLowerCase().includes(q.toLowerCase());
+function accionLabel(a: Item["accion"]) {
+  if (a === "IMPRIMIR") return "Imprimir";
+  if (a === "DESCARGAR_PDF") return "Descargar PDF";
+  return "Descargar PNG";
 }
 
-function csvEscape(v: any) {
-  const s = String(v ?? "");
-  // CSV RFC-ish: wrap with quotes if needed and escape quotes
-  if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
+function tipoLabel(t: Item["tipo"]) {
+  return t === "A4_QR" ? "A4 con QR" : "Cartel Especial";
 }
 
-function downloadTextFile(filename: string, content: string, mime = "text/csv;charset=utf-8") {
+function badgeTipo(t: Item["tipo"]) {
+  return t === "A4_QR"
+    ? "bg-sky-500/15 text-sky-200 border-sky-400/30"
+    : "bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-400/30";
+}
+
+function badgeAccion(a: Item["accion"]) {
+  return a === "IMPRIMIR"
+    ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/30"
+    : a === "DESCARGAR_PDF"
+    ? "bg-blue-500/15 text-blue-200 border-blue-400/30"
+    : "bg-orange-500/15 text-orange-200 border-orange-400/30";
+}
+
+function downloadText(filename: string, content: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -64,7 +71,15 @@ function downloadTextFile(filename: string, content: string, mime = "text/csv;ch
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 500);
+  setTimeout(() => URL.revokeObjectURL(url), 800);
+}
+
+function escapeCsv(value: any) {
+  const s = String(value ?? "");
+  if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
 }
 
 export default function HistorialCartelesLugar() {
@@ -84,23 +99,13 @@ export default function HistorialCartelesLugar() {
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const withTenant = (href: string) => {
-    if (!tenantMode || !adminIdContext) return href;
-    if (!href.startsWith("/")) return href;
-    const hasQuery = href.includes("?");
-    return `${href}${hasQuery ? "&" : "?"}adminId=${adminIdContext}`;
-  };
-
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // filtros “server” (API)
   const [filtroTipo, setFiltroTipo] = useState<"" | "A4_QR" | "ESPECIAL">("");
   const [filtroAccion, setFiltroAccion] = useState<
     "" | "IMPRIMIR" | "DESCARGAR_PDF" | "DESCARGAR_PNG"
   >("");
-
-  // filtro “client” (texto)
   const [q, setQ] = useState("");
 
   const query = useMemo(() => {
@@ -109,6 +114,7 @@ export default function HistorialCartelesLugar() {
     sp.set("limit", "200");
     if (filtroTipo) sp.set("tipo", filtroTipo);
     if (filtroAccion) sp.set("accion", filtroAccion);
+    // ✅ si tu API en GET también lo usa para tenant, lo añadimos
     if (tenantMode && adminIdContext) sp.set("adminId", String(adminIdContext));
     return `/api/carteles?${sp.toString()}`;
   }, [id, filtroTipo, filtroAccion, tenantMode, adminIdContext]);
@@ -126,67 +132,69 @@ export default function HistorialCartelesLugar() {
     })();
   }, [query]);
 
+  // ✅ filtro por texto en cliente (ultra cómodo)
   const itemsFiltrados = useMemo(() => {
-    const txt = q.trim().toLowerCase();
-    if (!txt) return items;
+    const t = q.trim().toLowerCase();
+    if (!t) return items;
 
     return items.filter((it) => {
-      const fecha = toEsDateTime(it.creadoEn);
       const fondoNombre = it.fondo?.nombre ?? "";
-      const tipo = tipoTxt(it.tipo);
-      const accion = accionTxt(it.accion);
-
-      // buscamos por: tipo, acción, fecha, nombre del fondo, id, y (si eres superadmin) actor
-      const actor = isSuperadmin ? (it.creadoPor?.nombre ?? it.creadoPor?.email ?? "") : "";
-
-      const hay = [
-        `#${it.id}`,
+      const fecha = formatFechaEs(it.creadoEn);
+      const txt = [
+        it.id,
+        it.tipo,
+        tipoLabel(it.tipo),
+        it.accion,
+        accionLabel(it.accion),
         fecha,
-        tipo,
-        accion,
         fondoNombre,
         it.fondoUrlSnap ?? "",
         it.qrUrlSnap ?? "",
-        actor,
-      ].join(" ");
+        it.archivoUrl ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
 
-      return includesQ(hay, txt);
+      return txt.includes(t);
     });
-  }, [items, q, isSuperadmin]);
+  }, [items, q]);
 
-  const exportarCSV = () => {
-    const rows = itemsFiltrados.map((it) => {
-      const fecha = toEsDateTime(it.creadoEn);
-      const fondoNombre = it.fondo?.nombre ?? "";
-      const actor = isSuperadmin ? (it.creadoPor?.nombre ?? it.creadoPor?.email ?? "") : ""; // oculto para no superadmin
+  const volverLugaresHref = tenantMode && adminIdContext ? `/lugares?adminId=${adminIdContext}` : "/lugares";
 
-      return {
-        id: it.id,
-        fecha,
-        tipo: tipoTxt(it.tipo),
-        accion: accionTxt(it.accion),
-        fondo: fondoNombre,
-        fondoUrl: it.fondoUrlSnap ?? "",
-        qrUrl: it.qrUrlSnap ?? "",
-        usuario: actor, // quedará vacío si no es superadmin
-      };
-    });
+  const exportarCsv = () => {
+    const rows = itemsFiltrados.map((it) => ({
+      id: it.id,
+      creadoEn: formatFechaEs(it.creadoEn),
+      tipo: tipoLabel(it.tipo),
+      accion: accionLabel(it.accion),
+      fondo: it.fondo?.nombre ?? "",
+      fondoUrlSnap: it.fondoUrlSnap ?? "",
+      qrUrlSnap: it.qrUrlSnap ?? "",
+      archivoUrl: it.archivoUrl ?? "",
+    }));
 
-    const headers = ["id", "fecha", "tipo", "accion", "fondo", "fondoUrl", "qrUrl", "usuario"];
+    const header = Object.keys(rows[0] ?? { id: "", creadoEn: "", tipo: "", accion: "", fondo: "", fondoUrlSnap: "", qrUrlSnap: "", archivoUrl: "" });
     const csv =
-      headers.join(";") +
+      header.join(",") +
       "\n" +
       rows
-        .map((r) => headers.map((h) => csvEscape((r as any)[h])).join(";"))
+        .map((r) => header.map((k) => escapeCsv((r as any)[k])).join(","))
         .join("\n");
 
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    downloadTextFile(`historial_carteles_lugar_${id}_${stamp}.csv`, csv);
+    downloadText(`historial_carteles_lugar_${id}.csv`, csv, "text/csv;charset=utf-8");
+  };
+
+  const mostrarUsuario = (it: Item) => {
+    // ✅ Solo el SUPERADMIN puede ver quién creó el registro
+    if (!isSuperadmin) return null;
+
+    const actor = it.creadoPor?.nombre ?? it.creadoPor?.email ?? "—";
+    return <span><span className="font-extrabold text-slate-200">Usuario:</span> {actor}</span>;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-6 md:px-8 py-8 text-slate-50">
-      <div className="w-full max-w-[1200px] mx-auto space-y-6 text-[15px] md:text-[16px] font-semibold">
+      <div className="w-full max-w-[1300px] mx-auto space-y-6">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
           <div className="rounded-3xl bg-slate-950/95 px-6 md:px-8 py-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
@@ -202,7 +210,7 @@ export default function HistorialCartelesLugar() {
                 <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1">
                   Historial de carteles
                 </h1>
-                <p className="text-sm md:text-base text-slate-300 max-w-2xl font-semibold">
+                <p className="text-sm md:text-base text-slate-300 font-semibold">
                   Registro de impresiones y descargas para este lugar.
                 </p>
                 {tenantMode && (
@@ -213,9 +221,9 @@ export default function HistorialCartelesLugar() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap justify-start lg:justify-end">
+            <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => router.push(withTenant("/lugares"))}
+                onClick={() => router.push(volverLugaresHref)}
                 className="bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-extrabold h-10 px-5"
               >
                 📍 Volver a Lugares
@@ -229,10 +237,10 @@ export default function HistorialCartelesLugar() {
               </Button>
 
               <Button
-                onClick={exportarCSV}
+                onClick={exportarCsv}
                 className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-extrabold h-10 px-5"
                 disabled={loading || itemsFiltrados.length === 0}
-                title={itemsFiltrados.length === 0 ? "No hay registros para exportar" : "Exportar a CSV"}
+                title={itemsFiltrados.length === 0 ? "No hay datos para exportar" : "Exportar CSV"}
               >
                 ⬇️ Exportar CSV
               </Button>
@@ -240,15 +248,14 @@ export default function HistorialCartelesLugar() {
           </div>
         </header>
 
-        {/* CONTENIDO */}
-        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6 space-y-4">
-          {/* FILTROS */}
+        {/* FILTROS */}
+        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-5">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-2">
               <select
                 value={filtroTipo}
                 onChange={(e) => setFiltroTipo(e.target.value as any)}
-                className="border rounded-xl px-3 py-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10 font-semibold"
+                className="h-10 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 px-3 font-bold"
               >
                 <option value="">Todos los tipos</option>
                 <option value="A4_QR">A4 con QR</option>
@@ -258,7 +265,7 @@ export default function HistorialCartelesLugar() {
               <select
                 value={filtroAccion}
                 onChange={(e) => setFiltroAccion(e.target.value as any)}
-                className="border rounded-xl px-3 py-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10 font-semibold"
+                className="h-10 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 px-3 font-bold"
               >
                 <option value="">Todas las acciones</option>
                 <option value="IMPRIMIR">Imprimir</option>
@@ -270,182 +277,169 @@ export default function HistorialCartelesLugar() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar por acción, tipo, fecha, fondo, id…"
-                className="border rounded-xl px-3 py-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10 font-semibold w-full sm:w-[340px] placeholder:text-slate-500"
+                className="h-10 w-full sm:w-[360px] rounded-xl bg-slate-900 border border-slate-700 text-slate-100 px-3 font-semibold placeholder:text-slate-500"
               />
-
-              {q.trim() ? (
-                <Button
-                  onClick={() => setQ("")}
-                  className="bg-slate-200 text-slate-950 hover:bg-slate-300 font-extrabold h-10 px-4"
-                >
-                  ✖ Limpiar
-                </Button>
-              ) : null}
             </div>
 
             <div className="text-sm text-slate-300 font-semibold">
-              {loading ? "Cargando..." : "Registros:"}{" "}
-              <span className="font-extrabold text-emerald-300">
-                {loading ? "…" : itemsFiltrados.length}
-              </span>
-              {!loading && itemsFiltrados.length !== items.length ? (
-                <span className="text-slate-400 font-semibold">
-                  {" "}
-                  (filtrado de {items.length})
-                </span>
-              ) : null}
+              {loading ? (
+                "Cargando..."
+              ) : (
+                <>
+                  Registros:{" "}
+                  <span className="font-extrabold text-emerald-300">{itemsFiltrados.length}</span>
+                </>
+              )}
             </div>
           </div>
+        </section>
 
+        {/* LISTA */}
+        <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-8 py-6">
           {itemsFiltrados.length === 0 && !loading ? (
             <div className="text-slate-300 py-10 text-center font-semibold">
-              No hay registros con estos filtros.
+              Aún no hay registros. Se crearán cuando imprimas o descargues un cartel.
             </div>
           ) : null}
 
-          {/* LISTA */}
           <div className="space-y-3">
             {itemsFiltrados.map((it) => {
-              const fecha = toEsDateTime(it.creadoEn);
-              const fondoNombre =
-                it.fondo?.nombre ?? (it.fondoUrlSnap ? "Fondo (snapshot)" : "—");
+              const fecha = formatFechaEs(it.creadoEn);
 
-              const t = tipoTxt(it.tipo);
-              const a = accionTxt(it.accion);
+              const fondoNombre =
+                it.fondo?.nombre ??
+                (it.fondoUrlSnap ? "Fondo usado (snapshot)" : "—");
+
+              const showFondoThumb = !!it.fondoUrlSnap;
+              const showQrThumb = !!it.qrUrlSnap;
 
               return (
                 <div
                   key={it.id}
-                  className="border border-slate-800 rounded-2xl p-4 bg-slate-950/60 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                  className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
                 >
-                  {/* IZQUIERDA */}
+                  {/* IZQUIERDA: texto */}
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border ${pillClass(
-                          it.tipo
-                        )}`}
+                        className={classNames(
+                          "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold border",
+                          badgeTipo(it.tipo)
+                        )}
                       >
-                        {t}
+                        {tipoLabel(it.tipo)}
                       </span>
-                      <span className="text-slate-100 font-extrabold">— {a}</span>
-                      <span className="text-xs font-extrabold text-slate-500">
+
+                      <span
+                        className={classNames(
+                          "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold border",
+                          badgeAccion(it.accion)
+                        )}
+                      >
+                        {accionLabel(it.accion)}
+                      </span>
+
+                      <span className="text-xs text-slate-400 font-extrabold">
                         #{it.id}
                       </span>
                     </div>
 
-                    <div className="text-sm text-slate-300">
-                      <span className="font-extrabold text-slate-200">Fecha:</span> {fecha}
+                    <div className="text-sm text-slate-200 font-semibold">
+                      <span className="font-extrabold text-slate-100">Fecha:</span> {fecha}
                       {" · "}
-                      <span className="font-extrabold text-slate-200">Fondo:</span>{" "}
-                      {fondoNombre}
-                      {/* ✅ Usuario: solo SUPERADMIN lo ve; para otros, oculto del todo */}
-                      {isSuperadmin && it.creadoPor ? (
+                      <span className="font-extrabold text-slate-100">Fondo:</span> {fondoNombre}
+                      {isSuperadmin ? (
                         <>
                           {" · "}
-                          <span className="font-extrabold text-slate-200">Usuario:</span>{" "}
-                          {it.creadoPor.nombre || it.creadoPor.email}
+                          {mostrarUsuario(it)}
                         </>
                       ) : null}
                     </div>
 
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-2 flex-wrap pt-1">
                       {it.fondoUrlSnap ? (
                         <a
                           href={it.fondoUrlSnap}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-sm font-extrabold px-3 py-2 rounded-xl border border-slate-700 hover:bg-slate-900"
+                          className="text-xs font-extrabold px-3 py-2 rounded-xl border border-slate-700 hover:bg-slate-900"
                         >
                           Ver fondo usado
                         </a>
                       ) : null}
-
-                      {it.archivoUrl ? (
-                        <a
-                            href={it.archivoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm font-extrabold px-3 py-2 rounded-xl border border-slate-700 hover:bg-slate-900"
-                        >
-                            📄 Ver / Descargar PDF
-                        </a>
-                      ) : null}
-
 
                       {it.qrUrlSnap ? (
                         <a
                           href={it.qrUrlSnap}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-sm font-extrabold px-3 py-2 rounded-xl border border-slate-700 hover:bg-slate-900"
+                          className="text-xs font-extrabold px-3 py-2 rounded-xl border border-slate-700 hover:bg-slate-900"
                         >
                           Abrir link QR
                         </a>
                       ) : null}
+
+                      {/* ✅ Botón descargar PDF desde historial (si existe) */}
+                      {it.archivoUrl ? (
+                        <a
+                          href={it.archivoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-extrabold px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                          title="PDF generado guardado"
+                        >
+                          📄 Descargar PDF
+                        </a>
+                      ) : null}
+                    </div>
+
+                    <div className="text-[12px] text-slate-400 font-semibold pt-1">
+                      Tip: el historial se genera automáticamente cuando imprimes o descargas un cartel.
                     </div>
                   </div>
 
-                  {/* DERECHA: miniaturas (Fondo + QR) */}
-                  <div className="flex gap-3 flex-wrap justify-start lg:justify-end">
-                    {/* Fondo */}
-                    {it.fondoUrlSnap ? (
+                  {/* DERECHA: miniaturas */}
+                  <div className="flex items-center justify-end gap-3 flex-wrap">
+                    {/* Mini fondo */}
+                    {showFondoThumb ? (
                       <a
-                        href={it.fondoUrlSnap}
+                        href={it.fondoUrlSnap!}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0"
+                        className="rounded-2xl border border-slate-800 bg-slate-950/70 overflow-hidden w-[160px] h-[90px] hover:scale-[1.02] transition"
                         title="Ver fondo usado"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={it.fondoUrlSnap}
-                          alt="Miniatura fondo"
-                          className="w-40 h-24 object-cover rounded-xl border border-slate-800 shadow"
+                          src={it.fondoUrlSnap!}
+                          alt="Fondo usado"
+                          className="w-full h-full object-cover"
                           crossOrigin="anonymous"
                         />
                       </a>
                     ) : (
-                      <div className="shrink-0 w-40 h-24 rounded-xl border border-slate-800 bg-slate-900/40 flex items-center justify-center text-xs text-slate-500 font-extrabold">
-                        Sin fondo
+                      <div className="w-[160px] h-[90px] rounded-2xl border border-slate-800 bg-slate-900/40 flex items-center justify-center text-[11px] text-slate-500 font-bold">
+                        Sin miniatura
                       </div>
                     )}
 
-                    {/* QR preview */}
-                    {it.qrUrlSnap ? (
-                      <a
-                        href={it.qrUrlSnap}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0"
-                        title="Abrir link QR"
+                    {/* QR mini (solo visual) */}
+                    {showQrThumb ? (
+                      <div
+                        className="rounded-2xl border border-slate-800 bg-white p-2 w-[90px] h-[90px] flex items-center justify-center"
+                        title="QR (preview visual)"
                       >
-                        <div className="w-24 h-24 rounded-xl border border-slate-800 bg-white flex items-center justify-center shadow">
-                          {/* usamos un servicio de QR por URL para preview rápido */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
-                              it.qrUrlSnap
-                            )}`}
-                            alt="QR preview"
-                            className="w-[84px] h-[84px] object-contain"
-                          />
-                        </div>
-                      </a>
+                        <QRCode value={it.qrUrlSnap!} size={74} />
+                      </div>
                     ) : (
-                      <div className="shrink-0 w-24 h-24 rounded-xl border border-slate-800 bg-slate-900/40 flex items-center justify-center text-xs text-slate-500 font-extrabold">
-                        Sin QR
+                      <div className="w-[90px] h-[90px] rounded-2xl border border-slate-800 bg-slate-900/40 flex items-center justify-center text-[11px] text-slate-500 font-bold">
+                        —
                       </div>
                     )}
                   </div>
                 </div>
               );
             })}
-          </div>
-
-          {/* Nota */}
-          <div className="text-[12px] text-slate-400 font-semibold pt-2">
-            Tip: El historial se genera automáticamente cuando imprimes o descargas un cartel.
           </div>
         </section>
       </div>
