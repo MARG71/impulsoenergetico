@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  useParams,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
@@ -29,8 +25,7 @@ export default function CartelEspecial() {
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const adminQuery =
-    tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+  const adminQuery = tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const [lugar, setLugar] = useState<any | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -38,24 +33,30 @@ export default function CartelEspecial() {
 
   useEffect(() => {
     (async () => {
-      const r = await fetch(`/api/lugares/${id}${adminQuery}`);
-      const d = await r.json();
-      setLugar(d);
-      setCargando(false);
+      try {
+        const r = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
+        const d = await r.json();
+        setLugar(d);
+      } finally {
+        setCargando(false);
+      }
     })();
   }, [id, adminQuery]);
 
   const downloadPNG = async () => {
     if (!posterRef.current) return;
     const html2canvas = (await import("html2canvas")).default;
+
     const canvas = await html2canvas(posterRef.current, {
       scale: 2,
       useCORS: true,
+      backgroundColor: null,
     });
+
     const data = canvas.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = data;
-    a.download = `cartel_especial_${lugar?.id}.png`;
+    a.download = `cartel_especial_${lugar?.id ?? id}.png`;
     a.click();
   };
 
@@ -63,6 +64,7 @@ export default function CartelEspecial() {
 
   if (cargando) return <div className="p-10 text-center">Cargando...</div>;
   if (!lugar) return <div className="p-10 text-center">Lugar no encontrado</div>;
+
   if (!lugar.especial || !lugar.especialCartelUrl) {
     return (
       <div className="p-10 text-center">
@@ -85,16 +87,10 @@ export default function CartelEspecial() {
           ⬅ Volver
         </Button>
         <div className="flex gap-2">
-          <Button
-            onClick={downloadPNG}
-            className="bg-blue-600 text-white"
-          >
+          <Button onClick={downloadPNG} className="bg-blue-600 text-white">
             Descargar PNG
           </Button>
-          <Button
-            onClick={imprimir}
-            className="bg-green-600 text-white"
-          >
+          <Button onClick={imprimir} className="bg-green-600 text-white">
             Imprimir
           </Button>
         </div>

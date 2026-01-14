@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  useParams,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+
+type Fondo = {
+  id: number;
+  nombre: string;
+  url: string;
+  activo?: boolean;
+  creadoEn?: string;
+};
 
 export default function CartelLugar() {
   const router = useRouter();
@@ -21,6 +25,7 @@ export default function CartelLugar() {
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
+  // ✅ Tenant solo para buscar el lugar (NO para fondos en opción A)
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
   const tenantMode =
@@ -32,29 +37,69 @@ export default function CartelLugar() {
   const adminQuery =
     tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
-  const id = params?.id;
+  const id = params?.id as string | undefined;
+
   const [lugar, setLugar] = useState<any | null>(null);
   const [fondoUrl, setFondoUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [warning, setWarning] = useState<string | null>(null);
+
   const cartelRef = useRef<HTMLDivElement>(null);
+
+  // ✅ Link QR (cuando ya tenemos lugar)
+  const qrUrl = useMemo(() => {
+    if (!lugar) return "";
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
+  }, [lugar]);
 
   useEffect(() => {
     if (!id) return;
 
     const fetchLugar = async () => {
-      const res = await fetch(`/api/lugares/${id}${adminQuery}`);
+      const res = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
       const data = await res.json();
       setLugar(data);
     };
 
     const fetchFondoActivo = async () => {
-      const res = await fetch("/api/fondos");
-      const data = await res.json();
-      const fondoActivo = data.find((f: any) => f.activo);
-      if (fondoActivo) setFondoUrl(fondoActivo.url);
+      // ✅ Opción A: fondo global => NO usamos adminId aquí
+      const res = await fetch(`/api/fondos?filtro=todos`, { cache: "no-store" });
+      const data = (await res.json()) as Fondo[];
+
+      if (!Array.isArray(data) || data.length === 0) {
+        setFondoUrl(null);
+        setWarning("No hay fondos subidos aún. Sube uno en /lugares/fondos.");
+        return;
+      }
+
+      const activo = data.find((f) => !!f.activo);
+      if (activo?.url) {
+        setFondoUrl(activo.url);
+        setWarning(null);
+        return;
+      }
+
+      // ✅ fallback si nadie está marcado como activo: usa el más reciente (primer elemento)
+      if (data[0]?.url) {
+        setFondoUrl(data[0].url);
+        setWarning(
+          "No hay ningún fondo marcado como activo. Mostrando el más reciente. (Activa uno en /lugares/fondos)"
+        );
+      } else {
+        setFondoUrl(null);
+        setWarning("No se pudo obtener URL de fondo.");
+      }
     };
 
-    fetchLugar();
-    fetchFondoActivo();
+    (async () => {
+      try {
+        setLoading(true);
+        await Promise.all([fetchLugar(), fetchFondoActivo()]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [id, adminQuery]);
 
   const imprimirCartel = () => {
@@ -62,7 +107,6 @@ export default function CartelLugar() {
 
     const contenido = cartelRef.current.innerHTML;
     const ventana = window.open("", "", "width=800,height=1000");
-
     if (!ventana) return;
 
     ventana.document.write(`
@@ -70,19 +114,15 @@ export default function CartelLugar() {
         <head>
           <title>Imprimir Cartel</title>
           <style>
-            @page {
-              size: A4;
-              margin: 0;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-            }
+            @page { size: A4; margin: 0; }
+            body { margin: 0; padding: 0; }
             .cartel {
               width: 210mm;
               height: 297mm;
               position: relative;
               overflow: hidden;
+              margin: 0;
+              padding: 0;
             }
             .cartel img {
               position: absolute;
@@ -123,19 +163,21 @@ export default function CartelLugar() {
   const descargarPDF = async () => {
     if (!cartelRef.current) return;
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Espera breve por si la imagen tarda en pintar
+    await new Promise((r) => setTimeout(r, 250));
+
     const html2pdf = (await import("html2pdf.js")).default;
 
     html2pdf()
       .from(cartelRef.current)
       .set({
         margin: 0,
-        filename: "cartel_impulso.pdf",
+        filename: `cartel_lugar_${lugar?.id ?? id}.pdf`,
         html2canvas: {
           scale: 3,
           useCORS: true,
           allowTaint: true,
-          logging: true,
+          logging: false,
         },
         jsPDF: {
           unit: "mm",
@@ -146,38 +188,63 @@ export default function CartelLugar() {
       .save();
   };
 
-  if (!lugar || !fondoUrl) {
+  if (loading) {
     return <div className="p-10 text-center">Cargando cartel...</div>;
   }
 
-  const qrUrl = `${
-    typeof window !== "undefined" ? window.location.origin : ""
-  }/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
+  if (!lugar) {
+    return (
+      <div className="p-10 text-center">
+        No se pudo cargar el lugar.
+        <div className="mt-4">
+          <Button onClick={() => router.back()}>Volver</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!fondoUrl) {
+    return (
+      <div className="p-10 text-center">
+        No hay fondo disponible (o no se pudo cargar).
+        <div className="mt-3 text-sm text-gray-600">
+          Sube y activa un fondo en <b>/lugares/fondos</b>.
+        </div>
+        <div className="mt-4">
+          <Button onClick={() => router.back()}>Volver</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-white p-6">
-      <div className="w-full max-w-4xl mb-4">
+      <div className="w-full max-w-4xl mb-4 flex items-center justify-between gap-3">
         <Button
           onClick={() => router.back()}
           className="bg-gray-200 text-black hover:bg-gray-300"
         >
           ⬅ Volver
         </Button>
+
+        {warning ? (
+          <div className="text-xs md:text-sm font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-2 rounded-lg">
+            {warning}
+          </div>
+        ) : null}
       </div>
 
       <div
         ref={cartelRef}
         className="relative border border-gray-300 shadow-xl overflow-hidden bg-white"
-        style={{
-          width: "210mm",
-          height: "297mm",
-          position: "relative",
-        }}
+        style={{ width: "210mm", height: "297mm", position: "relative" }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fondoUrl}
           alt="Fondo del cartel"
           className="absolute top-0 left-0 w-full h-full object-cover z-0"
+          crossOrigin="anonymous"
         />
 
         <div
@@ -202,17 +269,11 @@ export default function CartelLugar() {
         </div>
       </div>
 
-      <div className="mt-6 flex gap-4 justify-center">
-        <Button
-          onClick={descargarPDF}
-          className="bg-blue-600 text-white hover:bg-blue-700"
-        >
+      <div className="mt-6 flex gap-4 justify-center flex-wrap">
+        <Button onClick={descargarPDF} className="bg-blue-600 text-white hover:bg-blue-700">
           Descargar cartel en PDF
         </Button>
-        <Button
-          onClick={imprimirCartel}
-          className="bg-green-600 text-white hover:bg-green-700"
-        >
+        <Button onClick={imprimirCartel} className="bg-green-600 text-white hover:bg-green-700">
           Imprimir cartel
         </Button>
       </div>
