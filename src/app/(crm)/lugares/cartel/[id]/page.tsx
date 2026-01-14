@@ -40,6 +40,8 @@ export default function CartelLugar() {
   const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
+  const [exportando, setExportando] = useState(false);
+
   
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
@@ -191,33 +193,68 @@ export default function CartelLugar() {
     ventana.close();
   };
 
+  const cleanupHtml2PdfOverlays = () => {
+    try {
+      // html2pdf suele crear estos nodos
+      document.querySelectorAll(".html2pdf__overlay, .html2pdf__container").forEach((el) => el.remove());
+
+      // algunos casos dejan iframes “fantasma”
+      document.querySelectorAll("iframe").forEach((el) => {
+        // solo elimina los iframes “vacíos” o sospechosos
+        if (!el.src || el.src === "about:blank") el.remove();
+      });
+
+      // por si dejó estilos bloqueando interacción
+      document.body.style.pointerEvents = "";
+      document.body.style.overflow = "";
+    } catch {}
+  };
+
+
   const descargarPDF = async () => {
     if (!cartelRef.current) return;
+    if (exportando) return;
 
-    // Espera breve por si la imagen tarda en pintar
-    await new Promise((r) => setTimeout(r, 250));
+    setExportando(true);
 
-    const html2pdf = (await import("html2pdf.js")).default;
+    try {
+      // 1) registra historial ANTES
+      await registrarHistorial("DESCARGAR_PDF");
 
-    html2pdf()
-      .from(cartelRef.current)
-      .set({
-        margin: 0,
-        filename: `cartel_lugar_${lugar?.id ?? id}.pdf`,
-        html2canvas: {
-          scale: 3,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-        },
-        jsPDF: {
-          unit: "mm",
-          format: "a4",
-          orientation: "portrait",
-        },
-      })
-      .save();
+      // 2) espera a que pinte la imagen
+      await new Promise((r) => setTimeout(r, 250));
+
+      const html2pdf = (await import("html2pdf.js")).default;
+
+      // 3) genera y ESPERA (await) para que termine bien
+      await html2pdf()
+        .from(cartelRef.current)
+        .set({
+          margin: 0,
+          filename: `cartel_lugar_${lugar?.id ?? id}.pdf`,
+          html2canvas: {
+            scale: 3,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: null,
+          },
+          jsPDF: {
+            unit: "mm",
+            format: "a4",
+            orientation: "portrait",
+          },
+        })
+        .save();
+    } catch (e) {
+      console.error("Error generando PDF:", e);
+    } finally {
+      // 4) LIMPIA SIEMPRE para que no quede pantalla bloqueada
+      cleanupHtml2PdfOverlays();
+      setExportando(false);
+    }
   };
+
 
   if (loading) {
     return <div className="p-10 text-center">Cargando cartel...</div>;
@@ -301,12 +338,22 @@ export default function CartelLugar() {
       </div>
 
       <div className="mt-6 flex gap-4 justify-center flex-wrap">
-        <Button onClick={descargarPDF} className="bg-blue-600 text-white hover:bg-blue-700">
-          Descargar cartel en PDF
+        <Button
+          onClick={descargarPDF}
+          disabled={exportando}
+          className="bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          {exportando ? "Generando PDF..." : "Descargar cartel en PDF"}
         </Button>
-        <Button onClick={imprimirCartel} className="bg-green-600 text-white hover:bg-green-700">
+
+        <Button
+          onClick={imprimirCartel}
+          disabled={exportando}
+          className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+        >
           Imprimir cartel
         </Button>
+
       </div>
     </div>
   );
