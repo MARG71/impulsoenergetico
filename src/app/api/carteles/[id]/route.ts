@@ -9,43 +9,66 @@ function safeNumber(v: any) {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function PATCH(req: NextRequest, ctxRoute: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const ctx = await getTenantContext(req);
-  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!ctx.ok) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
 
-  const id = safeNumber(ctxRoute.params.id);
-  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  const id = safeNumber(params.id);
+  if (!id) {
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  }
 
   const body = await req.json().catch(() => ({}));
 
   const archivoUrl = body?.archivoUrl ? String(body.archivoUrl) : null;
   const archivoPublicId = body?.archivoPublicId ? String(body.archivoPublicId) : null;
-  const archivoResourceType = body?.archivoResourceType ? String(body.archivoResourceType) : null;
+  const archivoResourceType = body?.archivoResourceType
+    ? String(body.archivoResourceType)
+    : null;
   const archivoMime = body?.archivoMime ? String(body.archivoMime) : null;
 
-  const archivoBytes = Number.isFinite(Number(body?.archivoBytes)) ? Number(body.archivoBytes) : null;
+  const archivoBytes = Number.isFinite(Number(body?.archivoBytes))
+    ? Number(body.archivoBytes)
+    : null;
+
   const archivoFormat = body?.archivoFormat ? String(body.archivoFormat) : null;
 
   if (!archivoUrl) {
-    return NextResponse.json({ error: "archivoUrl requerido" }, { status: 400 });
+    return NextResponse.json(
+      { error: "archivoUrl requerido" },
+      { status: 400 }
+    );
   }
 
-  // ✅ Seguridad: solo SUPERADMIN o el propio usuario que lo creó
-  const userId = (ctx as any).userId ? Number((ctx as any).userId) : null;
+  const userId = (ctx as any).userId
+    ? Number((ctx as any).userId)
+    : null;
 
   const existing = await prisma.cartelGenerado.findUnique({
     where: { id },
     select: { id: true, creadoPorId: true, adminId: true },
   });
 
-  if (!existing) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  if (!existing) {
+    return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  }
 
+  // 🔐 Seguridad
   if (!ctx.isSuperadmin) {
     if (!userId || existing.creadoPorId !== userId) {
       return NextResponse.json({ error: "No permitido" }, { status: 403 });
     }
-    // extra tenant guard: si tu ctx trae adminId, debe coincidir
-    if ((ctx as any).adminId && existing.adminId && existing.adminId !== (ctx as any).adminId) {
+
+    if (
+      (ctx as any).adminId &&
+      existing.adminId &&
+      existing.adminId !== (ctx as any).adminId
+    ) {
       return NextResponse.json({ error: "No permitido" }, { status: 403 });
     }
   }
