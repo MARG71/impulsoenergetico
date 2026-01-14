@@ -9,16 +9,14 @@ function safeNumber(v: any) {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, context: any) {
   const ctx = await getTenantContext(req);
   if (!ctx.ok) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const id = safeNumber(params.id);
+  const rawId = context?.params?.id;
+  const id = safeNumber(rawId);
   if (!id) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
@@ -39,15 +37,11 @@ export async function PATCH(
   const archivoFormat = body?.archivoFormat ? String(body.archivoFormat) : null;
 
   if (!archivoUrl) {
-    return NextResponse.json(
-      { error: "archivoUrl requerido" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "archivoUrl requerido" }, { status: 400 });
   }
 
-  const userId = (ctx as any).userId
-    ? Number((ctx as any).userId)
-    : null;
+  // ✅ Seguridad: solo SUPERADMIN o el propio usuario que lo creó
+  const userId = (ctx as any).userId ? Number((ctx as any).userId) : null;
 
   const existing = await prisma.cartelGenerado.findUnique({
     where: { id },
@@ -58,12 +52,12 @@ export async function PATCH(
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   }
 
-  // 🔐 Seguridad
   if (!ctx.isSuperadmin) {
     if (!userId || existing.creadoPorId !== userId) {
       return NextResponse.json({ error: "No permitido" }, { status: 403 });
     }
 
+    // extra tenant guard
     if (
       (ctx as any).adminId &&
       existing.adminId &&
