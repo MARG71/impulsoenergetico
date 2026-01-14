@@ -755,7 +755,8 @@ export default function RegistrarLugar() {
 
                       <td className="px-3 py-4">
                         <div className="flex justify-end">
-                          <div className="grid grid-cols-2 gap-2 w-[320px]">
+                          <div className="grid grid-cols-2 gap-2 w-[360px]">
+
                             {(isAdmin || isSuperadmin) && (
                               <Button
                                 className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold h-9"
@@ -783,6 +784,14 @@ export default function RegistrarLugar() {
                             </Button>
 
                             <Button
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-950 font-extrabold h-9"
+                              onClick={() => router.push(withTenant(`/lugares/${l.id}/historial-carteles`))}
+                              size="sm"
+                            >
+                              📜 Historial
+                            </Button>
+
+                            <Button
                               className={classNames(
                                 "font-extrabold h-9",
                                 especial
@@ -802,7 +811,7 @@ export default function RegistrarLugar() {
                               onClick={() => router.push(withTenant(`/lugares/compartir/${l.id}`))}
                               size="sm"
                             >
-                              🔗 Landing
+                              🔗 Marketing
                             </Button>
 
 

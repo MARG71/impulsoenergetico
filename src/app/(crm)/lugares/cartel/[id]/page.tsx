@@ -40,9 +40,12 @@ export default function CartelLugar() {
   const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
-  const [fondoUrl, setFondoUrl] = useState<string | null>(null);
+  
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
+  const [fondoActivo, setFondoActivo] = useState<Fondo | null>(null);
+  const fondoUrl = fondoActivo?.url ?? null;
+
 
   const cartelRef = useRef<HTMLDivElement>(null);
 
@@ -68,26 +71,28 @@ export default function CartelLugar() {
       const data = (await res.json()) as Fondo[];
 
       if (!Array.isArray(data) || data.length === 0) {
-        setFondoUrl(null);
+        setFondoActivo(null);
         setWarning("No hay fondos subidos aún. Sube uno en /lugares/fondos.");
         return;
       }
 
       const activo = data.find((f) => !!f.activo);
       if (activo?.url) {
-        setFondoUrl(activo.url);
+        setFondoActivo(activo);
+
         setWarning(null);
         return;
       }
 
       // ✅ fallback si nadie está marcado como activo: usa el más reciente (primer elemento)
       if (data[0]?.url) {
-        setFondoUrl(data[0].url);
+        setFondoActivo(data[0]);
+
         setWarning(
           "No hay ningún fondo marcado como activo. Mostrando el más reciente. (Activa uno en /lugares/fondos)"
         );
       } else {
-        setFondoUrl(null);
+        setFondoActivo(null);
         setWarning("No se pudo obtener URL de fondo.");
       }
     };
@@ -102,7 +107,33 @@ export default function CartelLugar() {
     })();
   }, [id, adminQuery]);
 
+  const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PDF") => {
+    try {
+      await fetch("/api/carteles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "A4_QR",
+          accion,
+          lugarId: lugar?.id,
+          fondoId: fondoActivo?.id ?? null,
+          fondoUrlSnap: fondoActivo?.url ?? null,
+          qrUrlSnap: qrUrl,
+          // si estás en tenantMode, lo mandamos (superadmin auditando otro admin)
+          adminId: tenantMode ? adminIdContext : null,
+        }),
+      });
+    } catch (e) {
+      // ✅ No hacemos nada: nunca debe romper imprimir/descargar
+      console.warn("No se pudo registrar historial del cartel:", e);
+    }
+  };
+
+
   const imprimirCartel = () => {
+    registrarHistorial("IMPRIMIR");
+    registrarHistorial("DESCARGAR_PDF");
+
     if (!cartelRef.current) return;
 
     const contenido = cartelRef.current.innerHTML;

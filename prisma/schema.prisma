@@ -164,8 +164,9 @@ model Lugar {
   ocultoParaAdmin Boolean  @default(false)
 
   // ✅ MULTI-ADMIN (TENANT)
-  adminId Int?
-  admin   Usuario? @relation("AdminLugares", fields: [adminId], references: [id])
+  adminId           Int?
+  admin             Usuario?         @relation("AdminLugares", fields: [adminId], references: [id])
+  cartelesGenerados CartelGenerado[] @relation("LugarCartelesGenerados")
 
   @@index([adminId])
 }
@@ -216,6 +217,9 @@ model Usuario {
   ofertasGestionadas      Oferta[]            @relation("AdminOfertas")
   productosGestionados    ProductoGanadero[]  @relation("AdminProductos")
   solicitudesGestionadas  SolicitudContrato[] @relation("AdminSolicitudes")
+
+  cartelesCreados     CartelGenerado[] @relation("UsuarioCartelesCreados")
+  cartelesGestionados CartelGenerado[] @relation("AdminCartelesGenerados")
 
   @@index([adminId])
 }
@@ -286,17 +290,17 @@ model Fondo {
   activo   Boolean  @default(false)
 
   // ✅ Cloudinary metadata (para borrar de Cloudinary y depurar)
-  publicId      String? // ej: impulso/fondos/historico/xxxx
-  resourceType  String? // image | video | raw
-  bytes         Int?
-  width         Int?
-  height        Int?
-  format        String?
+  publicId     String? // ej: impulso/fondos/historico/xxxx
+  resourceType String? // image | video | raw
+  bytes        Int?
+  width        Int?
+  height       Int?
+  format       String?
 
   // opcional (si quieres conservarlo)
-  mime          String?
+  mime              String?
+  cartelesGenerados CartelGenerado[] @relation("FondoCartelesGenerados")
 }
-
 
 model ConfiguracionGlobal {
   id             Int    @id @default(1)
@@ -581,16 +585,16 @@ enum MarketingTipo {
 }
 
 model MarketingAsset {
-  id       Int           @id @default(autoincrement())
-  tipo     MarketingTipo
-  url      String
-  nombre   String?
-  publicId String?       // Cloudinary public_id
-  resourceType String?   // image | video | raw
-  mime     String?
-  size     Int?
+  id           Int           @id @default(autoincrement())
+  tipo         MarketingTipo
+  url          String
+  nombre       String?
+  publicId     String? // Cloudinary public_id
+  resourceType String? // image | video | raw
+  mime         String?
+  size         Int?
 
-  creadaEn DateTime      @default(now())
+  creadaEn DateTime @default(now())
 
   lugarId Int
   lugar   Lugar @relation(fields: [lugarId], references: [id], onDelete: Cascade)
@@ -603,4 +607,43 @@ model MarketingAsset {
   @@index([adminId])
   @@index([agenteId])
   @@map("marketing_assets")
+}
+
+enum TipoCartelGenerado {
+  A4_QR
+  ESPECIAL
+}
+
+enum AccionCartelGenerado {
+  IMPRIMIR
+  DESCARGAR_PDF
+  DESCARGAR_PNG
+}
+
+model CartelGenerado {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+
+  tipo   TipoCartelGenerado
+  accion AccionCartelGenerado
+
+  lugarId Int
+  lugar   Lugar @relation("LugarCartelesGenerados", fields: [lugarId], references: [id], onDelete: Cascade)
+
+  fondoId Int?
+  fondo   Fondo? @relation("FondoCartelesGenerados", fields: [fondoId], references: [id], onDelete: SetNull)
+
+  fondoUrlSnap String?
+  qrUrlSnap    String?
+
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("UsuarioCartelesCreados", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  adminId Int?
+  admin   Usuario? @relation("AdminCartelesGenerados", fields: [adminId], references: [id])
+
+  @@index([lugarId, creadoEn])
+  @@index([tipo, accion, creadoEn])
+  @@index([adminId])
+  @@map("carteles_generados")
 }

@@ -45,6 +45,8 @@ export default function CartelEspecial() {
 
   const downloadPNG = async () => {
     if (!posterRef.current) return;
+    await registrarHistorial("DESCARGAR_PNG");
+
     const html2canvas = (await import("html2canvas")).default;
 
     const canvas = await html2canvas(posterRef.current, {
@@ -60,7 +62,32 @@ export default function CartelEspecial() {
     a.click();
   };
 
+  const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PNG") => {
+    try {
+      await fetch("/api/carteles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "ESPECIAL",
+          accion,
+          lugarId: lugar?.id,
+          fondoId: null,
+          fondoUrlSnap: lugar?.especialCartelUrl ?? null,
+          qrUrlSnap: qrUrl,
+          adminId: tenantMode ? adminIdContext : null,
+        }),
+      });
+    } catch (e) {
+      console.warn("No se pudo registrar historial del cartel especial:", e);
+    }
+  };
+
+
   const imprimir = () => window.print();
+
+  registrarHistorial("IMPRIMIR");
+  window.print();
+
 
   if (cargando) return <div className="p-10 text-center">Cargando...</div>;
   if (!lugar) return <div className="p-10 text-center">Lugar no encontrado</div>;
