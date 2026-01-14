@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       height: result.height,
       format: result.format,
       resourceType: result.resource_type,
+      mime: file.type,
       folder,
     });
   } catch (err: any) {

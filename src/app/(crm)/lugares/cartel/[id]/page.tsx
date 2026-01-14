@@ -131,6 +131,17 @@ export default function CartelLugar() {
     }
   };
 
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  };
+
 
   const imprimirCartel = () => {
     registrarHistorial("IMPRIMIR");
@@ -213,47 +224,92 @@ export default function CartelLugar() {
 
   const descargarPDF = async () => {
     if (!cartelRef.current) return;
-    if (exportando) return;
-
-    setExportando(true);
+    if (!lugar) return;
 
     try {
-      // 1) registra historial ANTES
-      await registrarHistorial("DESCARGAR_PDF");
+      setExportando(true);
 
-      // 2) espera a que pinte la imagen
-      await new Promise((r) => setTimeout(r, 250));
+      // 1) Crear registro de historial
+      const rHist = await fetch("/api/carteles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "A4_QR",
+          accion: "DESCARGAR_PDF",
+          lugarId: lugar.id,
+          fondoId: fondoActivo?.id ?? null,            // si ya lo tienes como objeto
+          fondoUrlSnap: fondoActivo?.url ?? fondoUrl,  // fallback
+          qrUrlSnap: qrUrl,
+          adminId: tenantMode ? adminIdContext : null,
+        }),
+      });
 
+      const dHist = await rHist.json().catch(() => ({}));
+      if (!rHist.ok) throw new Error(dHist?.error || "No se pudo crear historial");
+
+      const cartelId = dHist?.cartel?.id;
+      if (!cartelId) throw new Error("Historial sin ID");
+
+      // 2) Generar PDF como blob
       const html2pdf = (await import("html2pdf.js")).default;
 
-      // 3) genera y ESPERA (await) para que termine bien
-      await html2pdf()
+      const worker = html2pdf()
         .from(cartelRef.current)
         .set({
           margin: 0,
-          filename: `cartel_lugar_${lugar?.id ?? id}.pdf`,
-          html2canvas: {
-            scale: 3,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            backgroundColor: null,
-          },
-          jsPDF: {
-            unit: "mm",
-            format: "a4",
-            orientation: "portrait",
-          },
-        })
-        .save();
-    } catch (e) {
-      console.error("Error generando PDF:", e);
+          html2canvas: { scale: 3, useCORS: true, allowTaint: true, logging: false, backgroundColor: null },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        });
+
+      // outputPdf('blob') funciona con html2pdf.js recientes
+      const pdfBlob: Blob = await worker.outputPdf("blob");
+
+      // 3) Subir PDF a Cloudinary vía /api/uploads
+      const file = new File([pdfBlob], `cartel_lugar_${lugar.id}.pdf`, { type: "application/pdf" });
+
+      const form = new FormData();
+      form.append("file", file);
+      form.append("folder", "impulso/carteles-generados");
+
+
+      const rUp = await fetch("/api/uploads", { method: "POST", body: form });
+      const dUp = await rUp.json().catch(() => ({}));
+
+      if (!rUp.ok) throw new Error(dUp?.error || "Error subiendo PDF");
+
+      // 4) Asociar archivo al historial
+      const rPatch = await fetch(`/api/carteles/${cartelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          archivoUrl: dUp.url,
+          archivoPublicId: dUp.publicId ?? null,
+          archivoResourceType: dUp.resourceType ?? null,
+          archivoMime: dUp.mime ?? "application/pdf",
+          archivoBytes: dUp.bytes ?? null,
+          archivoFormat: dUp.format ?? null,
+        }),
+      });
+
+      const dPatch = await rPatch.json().catch(() => ({}));
+      if (!rPatch.ok) throw new Error(dPatch?.error || "No se pudo asociar el PDF");
+
+      // 5) Descargar localmente al usuario (sin overlays)
+      downloadBlob(pdfBlob, `cartel_lugar_${lugar.id}.pdf`);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Error generando/subiendo PDF");
     } finally {
-      // 4) LIMPIA SIEMPRE para que no quede pantalla bloqueada
-      cleanupHtml2PdfOverlays();
+      // Limpieza overlays por si acaso
+      try {
+        document.querySelectorAll(".html2pdf__overlay, .html2pdf__container").forEach((el) => el.remove());
+        document.body.style.pointerEvents = "";
+        document.body.style.overflow = "";
+      } catch {}
       setExportando(false);
     }
   };
+
 
 
   if (loading) {

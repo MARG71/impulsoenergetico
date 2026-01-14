@@ -642,6 +642,14 @@ model CartelGenerado {
   adminId Int?
   admin   Usuario? @relation("AdminCartelesGenerados", fields: [adminId], references: [id])
 
+  // ✅ Archivo generado (PDF / PNG)
+  archivoUrl          String?
+  archivoPublicId     String?
+  archivoResourceType String? // raw | image
+  archivoMime         String?
+  archivoBytes        Int?
+  archivoFormat       String?
+
   @@index([lugarId, creadoEn])
   @@index([tipo, accion, creadoEn])
   @@index([adminId])
