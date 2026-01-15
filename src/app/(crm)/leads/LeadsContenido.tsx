@@ -23,17 +23,46 @@ type Tareas = {
   todos: Lead[];
 };
 
-const ESTADOS = ["pendiente", "contactado", "comparativa", "contrato", "cerrado", "perdido"] as const;
+type LeadStats = {
+  total: number;
+  estados: {
+    pendiente: number;
+    contactado: number;
+    comparativa: number;
+    contrato: number;
+    cerrado: number;
+    perdido: number;
+  };
+  ratios: Record<string, number>;
+  topAgentes: { agenteId: number | null; nombre: string; total: number }[];
+  topLugares: { lugarId: number | null; nombre: string; total: number }[];
+};
+
+const ESTADOS = [
+  "pendiente",
+  "contactado",
+  "comparativa",
+  "contrato",
+  "cerrado",
+  "perdido",
+] as const;
 
 function badgeEstado(estado?: string | null) {
   const s = (estado || "pendiente").toLowerCase();
-  const base = "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border";
-  if (s === "pendiente") return `${base} bg-slate-900/70 text-slate-200 border-slate-700`;
-  if (s === "contactado") return `${base} bg-blue-900/40 text-blue-100 border-blue-500/40`;
-  if (s === "comparativa") return `${base} bg-amber-900/40 text-amber-100 border-amber-500/40`;
-  if (s === "contrato") return `${base} bg-emerald-900/40 text-emerald-100 border-emerald-500/40`;
-  if (s === "cerrado") return `${base} bg-green-900/50 text-green-100 border-green-500/50`;
-  if (s === "perdido") return `${base} bg-red-900/40 text-red-100 border-red-500/40`;
+  const base =
+    "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border";
+  if (s === "pendiente")
+    return `${base} bg-slate-900/70 text-slate-200 border-slate-700`;
+  if (s === "contactado")
+    return `${base} bg-blue-900/40 text-blue-100 border-blue-500/40`;
+  if (s === "comparativa")
+    return `${base} bg-amber-900/40 text-amber-100 border-amber-500/40`;
+  if (s === "contrato")
+    return `${base} bg-emerald-900/40 text-emerald-100 border-emerald-500/40`;
+  if (s === "cerrado")
+    return `${base} bg-green-900/50 text-green-100 border-green-500/50`;
+  if (s === "perdido")
+    return `${base} bg-red-900/40 text-red-100 border-red-500/40`;
   return `${base} bg-slate-900/70 text-slate-200 border-slate-700`;
 }
 
@@ -42,10 +71,6 @@ function prioridad(lead: Lead) {
   const creado = new Date(lead.creadoEn).getTime();
   const ageHours = (now - creado) / (1000 * 60 * 60);
 
-  // 🔥 Heurística sencilla (muy efectiva):
-  // - Nuevos <24h = alta
-  // - Vencido = alta
-  // - Hoy = media
   const pa = lead.proximaAccionEn ? new Date(lead.proximaAccionEn).getTime() : null;
   const inicioHoy = new Date();
   inicioHoy.setHours(0, 0, 0, 0);
@@ -62,14 +87,20 @@ function prioridad(lead: Lead) {
 }
 
 function badgePrioridad(p: string) {
-  const base = "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-extrabold border";
+  const base =
+    "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-extrabold border";
   if (p === "ALTA") return `${base} bg-red-900/40 text-red-100 border-red-500/40`;
-  if (p === "MEDIA") return `${base} bg-amber-900/40 text-amber-100 border-amber-500/40`;
+  if (p === "MEDIA")
+    return `${base} bg-amber-900/40 text-amber-100 border-amber-500/40`;
   return `${base} bg-slate-900/60 text-slate-200 border-slate-700`;
 }
 
 export default function LeadsContenido() {
   const [tareas, setTareas] = useState<Tareas | null>(null);
+  const [stats, setStats] = useState<LeadStats | null>(null);
+
+  const [rango, setRango] = useState<"hoy" | "7d" | "30d">("7d");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,6 +111,7 @@ export default function LeadsContenido() {
   const cargar = async () => {
     setLoading(true);
     try {
+      // ✅ TAREAS
       const res = await fetch("/api/leads/tareas", { cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -87,6 +119,18 @@ export default function LeadsContenido() {
       }
       const data = (await res.json()) as Tareas;
       setTareas(data);
+
+      // ✅ STATS
+      const resStats = await fetch(`/api/leads/stats?rango=${rango}`, {
+        cache: "no-store",
+      });
+      if (resStats.ok) {
+        const st = (await resStats.json()) as LeadStats;
+        setStats(st);
+      } else {
+        setStats(null);
+      }
+
       setError(null);
     } catch (e: any) {
       setError(e?.message || "Error al cargar leads");
@@ -97,7 +141,14 @@ export default function LeadsContenido() {
 
   useEffect(() => {
     cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // cuando cambias rango recargamos stats+tareas
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rango]);
 
   const lista = useMemo(() => {
     if (!tareas) return [];
@@ -123,7 +174,6 @@ export default function LeadsContenido() {
         );
       })
       .sort((a, b) => {
-        // orden por prioridad primero, luego por proximaAccionEn, luego por fecha
         const pa = prioridad(a);
         const pb = prioridad(b);
         const score = (x: string) => (x === "ALTA" ? 2 : x === "MEDIA" ? 1 : 0);
@@ -137,7 +187,9 @@ export default function LeadsContenido() {
       });
   }, [lista, q, estado]);
 
-  if (loading) return <div className="p-6 text-slate-200 text-sm">Cargando Lead Center…</div>;
+  if (loading) {
+    return <div className="p-6 text-slate-200 text-sm">Cargando Lead Center…</div>;
+  }
 
   if (error) {
     return (
@@ -169,6 +221,42 @@ export default function LeadsContenido() {
           <p className="text-sm text-slate-300">
             Tu bandeja comercial diaria. Prioriza, contacta y convierte.
           </p>
+
+          {/* Selector rango */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button
+              onClick={() => setRango("hoy")}
+              className={`px-3 py-1.5 rounded-full text-xs font-extrabold border ${
+                rango === "hoy"
+                  ? "bg-emerald-600/20 border-emerald-400 text-emerald-100"
+                  : "bg-slate-950 border-slate-700 text-slate-200 hover:border-emerald-400"
+              }`}
+            >
+              Hoy
+            </button>
+
+            <button
+              onClick={() => setRango("7d")}
+              className={`px-3 py-1.5 rounded-full text-xs font-extrabold border ${
+                rango === "7d"
+                  ? "bg-emerald-600/20 border-emerald-400 text-emerald-100"
+                  : "bg-slate-950 border-slate-700 text-slate-200 hover:border-emerald-400"
+              }`}
+            >
+              7 días
+            </button>
+
+            <button
+              onClick={() => setRango("30d")}
+              className={`px-3 py-1.5 rounded-full text-xs font-extrabold border ${
+                rango === "30d"
+                  ? "bg-emerald-600/20 border-emerald-400 text-emerald-100"
+                  : "bg-slate-950 border-slate-700 text-slate-200 hover:border-emerald-400"
+              }`}
+            >
+              30 días
+            </button>
+          </div>
         </div>
 
         <button
@@ -178,6 +266,47 @@ export default function LeadsContenido() {
           Actualizar
         </button>
       </div>
+
+      {/* Métricas */}
+      {stats && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="rounded-3xl bg-slate-950/70 border border-slate-700 p-5">
+            <p className="text-xs text-slate-400 font-bold">TOTAL EN RANGO</p>
+            <p className="text-3xl text-white font-extrabold mt-1">{stats.total}</p>
+            <p className="text-xs text-slate-400 mt-1">Leads filtrados</p>
+          </div>
+
+          <div className="rounded-3xl bg-slate-950/70 border border-slate-700 p-5">
+            <p className="text-xs text-slate-400 font-bold">TOP AGENTES</p>
+            <div className="mt-2 space-y-1">
+              {stats.topAgentes.slice(0, 3).map((a, i) => (
+                <div key={i} className="flex justify-between text-sm text-slate-200">
+                  <span className="truncate">{a.nombre}</span>
+                  <span className="font-bold">{a.total}</span>
+                </div>
+              ))}
+              {stats.topAgentes.length === 0 && (
+                <p className="text-sm text-slate-400 mt-2">Sin datos</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-slate-950/70 border border-slate-700 p-5">
+            <p className="text-xs text-slate-400 font-bold">TOP LUGARES</p>
+            <div className="mt-2 space-y-1">
+              {stats.topLugares.slice(0, 3).map((l, i) => (
+                <div key={i} className="flex justify-between text-sm text-slate-200">
+                  <span className="truncate">{l.nombre}</span>
+                  <span className="font-bold">{l.total}</span>
+                </div>
+              ))}
+              {stats.topLugares.length === 0 && (
+                <p className="text-sm text-slate-400 mt-2">Sin datos</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2">
@@ -310,8 +439,14 @@ export default function LeadsContenido() {
                       </td>
 
                       <td className="px-5 py-4 text-slate-200 text-xs">
-                        <div><span className="text-slate-400">Agente:</span> {l.agente?.nombre || "—"}</div>
-                        <div><span className="text-slate-400">Lugar:</span> {l.lugar?.nombre || "—"}</div>
+                        <div>
+                          <span className="text-slate-400">Agente:</span>{" "}
+                          {l.agente?.nombre || "—"}
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Lugar:</span>{" "}
+                          {l.lugar?.nombre || "—"}
+                        </div>
                       </td>
 
                       <td className="px-5 py-4 text-right">
