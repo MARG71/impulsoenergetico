@@ -227,39 +227,22 @@ export default function HistorialCartelesLugar() {
   };
 
   // ✅ DESCARGA “A PRUEBA DE POPUPS”: fetch -> blob -> download
-  const descargarArchivo = async (it: Item) => {
-    const url = it.archivoUrl;
-    if (!url) {
+  const descargarArchivo = (it: Item) => {
+    if (!it.archivoUrl) {
       alert("Este registro aún no tiene archivo guardado.");
       return;
     }
 
-    try {
-      setDownloadingId(it.id);
+    // ✅ Descarga server-side (sin CORS, sin popups, 100% fiable)
+    const url =
+      tenantMode && adminIdContext
+        ? `/api/carteles/${it.id}/download?adminId=${adminIdContext}`
+        : `/api/carteles/${it.id}/download`;
 
-      // 1) Intento descarga directa blob
-      const r = await fetch(url, { method: "GET" });
-      if (!r.ok) throw new Error("No se pudo descargar el archivo.");
-
-      const blob = await r.blob();
-      const filename = guessFilename(it);
-
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 800);
-    } catch (e) {
-      // 2) Fallback: abrir en pestaña (por si CORS impide blob)
-      const w = window.open(url, "_blank", "noopener,noreferrer");
-      if (!w) alert("Tu navegador bloqueó la descarga. Prueba permitiendo popups o usa otro navegador.");
-    } finally {
-      setDownloadingId(null);
-    }
+    // navegación directa = el navegador SIEMPRE descarga
+    window.location.href = url;
   };
+
 
   const eliminarCartel = async (it: Item) => {
     if (!puedeBorrar) return;
