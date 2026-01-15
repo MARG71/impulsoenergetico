@@ -222,11 +222,15 @@ export async function POST(req: Request) {
           email: emailNormalizado,
           password: hash,
           rol: "LUGAR",
-          adminId: tenantAdminId, // ✅ clave para trazabilidad
-          ...(agenteIdNum ? { agente: { connect: { id: agenteIdNum } } } : {}),
-          ...(lugarIdNum ? { lugar: { connect: { id: lugarIdNum } } } : {}),
+          adminId: tenantAdminId,
+
+          // ✅ Usar FK directos (evita el error de tipos con relaciones)
+          agenteId: agenteIdNum ?? null,
+          lugarId: lugarIdNum ?? null,
+          
         },
       });
+
 
       nuevoUsuario = true;
 
