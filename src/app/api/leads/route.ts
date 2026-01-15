@@ -126,10 +126,11 @@ export async function POST(req: Request) {
 
     const emailNormalizado = email.toLowerCase();
 
-    const agenteIdNum =
+    let agenteIdNum =
       typeof agenteId === "string" ? Number(agenteId) : agenteId ?? undefined;
     const lugarIdNum =
       typeof lugarId === "string" ? Number(lugarId) : lugarId ?? undefined;
+
 
     // ✅ Resolver adminId (tenant) desde Lugar o Agente (prioridad Lugar)
     let tenantAdminId: number | null = null;
