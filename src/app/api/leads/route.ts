@@ -1,21 +1,91 @@
 // src/app/api/leads/route.ts
-// src/app/api/leads/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { enviarEmailBienvenida } from "@/lib/email";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 
-// 🔹 GET: devolver todos los leads (para el dashboard)
+// Helper: genera una contraseña provisional sencilla (8 caracteres)
+function generarPasswordProvisional() {
+  return Math.random().toString(36).slice(-8);
+}
+
+// ✅ Helper: resuelve el tenant (admin dueño) según rol
+async function resolverTenantDesdeSession() {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user) {
+    return { ok: false as const, status: 401, error: "No autenticado" };
+  }
+
+  const rol = ((session.user as any).rol ?? (session.user as any).role ?? null) as
+    | "SUPERADMIN"
+    | "ADMIN"
+    | "AGENTE"
+    | "LUGAR"
+    | "CLIENTE"
+    | null;
+
+  const userId = (session.user as any).id ? Number((session.user as any).id) : null;
+  const adminId = (session.user as any).adminId ? Number((session.user as any).adminId) : null;
+  const agenteId = (session.user as any).agenteId ? Number((session.user as any).agenteId) : null;
+  const lugarId = (session.user as any).lugarId ? Number((session.user as any).lugarId) : null;
+
+  // tenantAdminId = admin dueño de los datos
+  const tenantAdminId =
+    rol === "SUPERADMIN" ? null : rol === "ADMIN" ? userId : adminId;
+
+  return {
+    ok: true as const,
+    session,
+    rol,
+    userId,
+    adminId,
+    agenteId,
+    lugarId,
+    tenantAdminId,
+  };
+}
+
+// 🔹 GET: devolver leads según rol y trazabilidad multi-tenant
 export async function GET() {
   try {
+    const auth = await resolverTenantDesdeSession();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { rol, tenantAdminId, agenteId, lugarId } = auth;
+
+    const where: any = {};
+
+    // ✅ SUPERADMIN ve todo
+    if (rol !== "SUPERADMIN") {
+      if (!tenantAdminId) {
+        return NextResponse.json(
+          { error: "No se pudo resolver el tenant (adminId)" },
+          { status: 400 }
+        );
+      }
+      where.adminId = tenantAdminId;
+    }
+
+    // ✅ AGENTE: solo sus leads
+    if (rol === "AGENTE") where.agenteId = agenteId ?? -1;
+
+    // ✅ LUGAR: solo sus leads
+    if (rol === "LUGAR") where.lugarId = lugarId ?? -1;
+
+    // (Opcional) si CLIENTE no debe ver nada aquí:
+    if (rol === "CLIENTE") {
+      return NextResponse.json({ leads: [] });
+    }
+
     const leads = await prisma.lead.findMany({
-      orderBy: {
-        creadoEn: "desc",
-      },
-      include: {
-        agente: true,
-        lugar: true,
-      },
+      where,
+      orderBy: { creadoEn: "desc" },
+      include: { agente: true, lugar: true },
     });
 
     return NextResponse.json({ leads });
@@ -28,12 +98,9 @@ export async function GET() {
   }
 }
 
-// Helper: genera una contraseña provisional sencilla (8 caracteres)
-function generarPasswordProvisional() {
-  return Math.random().toString(36).slice(-8);
-}
-
 // 🔹 POST: crear/actualizar lead + crear usuario (si no existe) + enviar email bienvenida SOLO la 1ª vez
+// ✅ Este POST se usa desde el registro público (QR), así que NO dependemos de session.
+// ✅ Debemos resolver adminId desde lugar/agente (trazabilidad).
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -57,7 +124,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Normalizamos email para evitar duplicados por mayúsculas
     const emailNormalizado = email.toLowerCase();
 
     const agenteIdNum =
@@ -65,16 +131,48 @@ export async function POST(req: Request) {
     const lugarIdNum =
       typeof lugarId === "string" ? Number(lugarId) : lugarId ?? undefined;
 
-    // 1️⃣ Buscamos si ya existe un lead con ese email
+    // ✅ Resolver adminId (tenant) desde Lugar o Agente (prioridad Lugar)
+    let tenantAdminId: number | null = null;
+
+    if (lugarIdNum) {
+      const lugar = await prisma.lugar.findUnique({
+        where: { id: lugarIdNum },
+        select: { adminId: true, agenteId: true },
+      });
+      tenantAdminId = (lugar?.adminId ?? null) as any;
+
+      // si no viene agenteId pero el lugar lo tiene, lo completamos
+      if (!agenteIdNum && lugar?.agenteId) {
+        agenteIdNum = lugar.agenteId;
+      }
+    }
+
+    if (!tenantAdminId && agenteIdNum) {
+      const agente = await prisma.agente.findUnique({
+        where: { id: agenteIdNum },
+        select: { adminId: true },
+      });
+      tenantAdminId = (agente?.adminId ?? null) as any;
+    }
+
+    // Si no podemos resolver el adminId, NO creamos lead huérfano
+    if (!tenantAdminId) {
+      return NextResponse.json(
+        { error: "No se pudo resolver el admin (tenant) para este registro." },
+        { status: 400 }
+      );
+    }
+
+    // 1️⃣ Buscamos si ya existe un lead con ese email *dentro del tenant*
     const existingLead = await prisma.lead.findFirst({
-      where: { email: emailNormalizado },
+      where: { email: emailNormalizado, adminId: tenantAdminId },
     });
 
     let nuevoLead = false;
     let lead;
 
     if (existingLead) {
-      // 🔁 Ya existía: actualizamos datos (para que en el CRM veas los últimos)
+      // 🔁 Ya existía: actualizamos datos
       lead = await prisma.lead.update({
         where: { id: existingLead.id },
         data: {
@@ -83,6 +181,7 @@ export async function POST(req: Request) {
           email: emailNormalizado,
           agenteId: agenteIdNum ?? existingLead.agenteId,
           lugarId: lugarIdNum ?? existingLead.lugarId,
+          adminId: tenantAdminId,
         },
       });
     } else {
@@ -95,12 +194,15 @@ export async function POST(req: Request) {
           estado: "pendiente",
           agenteId: agenteIdNum,
           lugarId: lugarIdNum,
+          adminId: tenantAdminId,
         },
       });
       nuevoLead = true;
     }
 
-    // 2️⃣ Buscamos si ya existe un usuario con ese email
+    // 2️⃣ Buscamos si ya existe un usuario con ese email (en tu tabla global)
+    // ⚠️ Recomendación: si quieres multi-tenant "puro", habría que permitir email duplicado por tenant.
+    // Por ahora respetamos tu sistema actual.
     let usuario = await prisma.usuario.findUnique({
       where: { email: emailNormalizado },
     });
@@ -110,7 +212,6 @@ export async function POST(req: Request) {
     let emailEnviado = false;
 
     if (!usuario) {
-      // 🆕 Creamos usuario y contraseña provisional SOLO la primera vez
       passwordProvisional = generarPasswordProvisional();
       const hash = await bcrypt.hash(passwordProvisional, 10);
 
@@ -120,26 +221,15 @@ export async function POST(req: Request) {
           email: emailNormalizado,
           password: hash,
           rol: "LUGAR",
-          ...(agenteIdNum
-            ? {
-                agente: {
-                  connect: { id: agenteIdNum },
-                },
-              }
-            : {}),
-          ...(lugarIdNum
-            ? {
-                lugar: {
-                  connect: { id: lugarIdNum },
-                },
-              }
-            : {}),
+          adminId: tenantAdminId, // ✅ clave para trazabilidad
+          ...(agenteIdNum ? { agente: { connect: { id: agenteIdNum } } } : {}),
+          ...(lugarIdNum ? { lugar: { connect: { id: lugarIdNum } } } : {}),
         },
       });
 
       nuevoUsuario = true;
 
-      // 3️⃣ Enviamos email de bienvenida con los datos de acceso
+      // 3️⃣ Email bienvenida solo 1ª vez
       try {
         const baseUrl =
           process.env.NEXTAUTH_URL ||
@@ -158,11 +248,7 @@ export async function POST(req: Request) {
         emailEnviado = true;
       } catch (err) {
         console.error("[LEADS][POST] Error enviando email de bienvenida:", err);
-        // No rompemos la respuesta al cliente si el email falla
       }
-    } else {
-      // Si el usuario ya existe NO enviamos email (ya lo recibió en su día)
-      emailEnviado = false;
     }
 
     return NextResponse.json({
