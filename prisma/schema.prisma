@@ -242,8 +242,20 @@ model Lead {
   adminId Int?
   admin   Usuario? @relation("AdminLeads", fields: [adminId], references: [id])
 
+  // ✅ GESTIÓN COMERCIAL (AÑADIR)
+  notas           String?
+  proximaAccion   String?
+  proximaAccionEn DateTime?
+
+  // ✅ CONVERSIÓN (para fase 2, pero lo dejamos ya preparado)
+  comparativaId Int?
+  contratoId    Int?
+
   @@index([adminId])
+  @@index([estado, creadoEn])
+  @@index([proximaAccionEn])
 }
+
 
 model DatosFactura {
   id                   Int         @id @default(autoincrement())

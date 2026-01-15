@@ -142,5 +142,68 @@ export default function LeadDetalleContenido() {
         </div>
       </div>
     </div>
+    {/* --- Gestión comercial --- */}
+    <div className="rounded-3xl bg-slate-950/85 border border-slate-700 p-6">
+      <h2 className="text-white font-extrabold text-lg mb-4">Gestión comercial</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-bold text-slate-300 mb-1">Estado</label>
+          <select
+            value={estadoEdit}
+            onChange={(e) => setEstadoEdit(e.target.value)}
+            className="w-full px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+          >
+            <option value="pendiente">PENDIENTE</option>
+            <option value="contactado">CONTACTADO</option>
+            <option value="comparativa">COMPARATIVA</option>
+            <option value="contrato">CONTRATO</option>
+            <option value="cerrado">CERRADO</option>
+            <option value="perdido">PERDIDO</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 mb-1">Próxima acción</label>
+          <input
+            value={accionEdit}
+            onChange={(e) => setAccionEdit(e.target.value)}
+            placeholder="Ej: Llamar, WhatsApp, Enviar oferta…"
+            className="w-full px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+          />
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <label className="block text-xs font-bold text-slate-300 mb-1">Fecha próxima acción</label>
+        <input
+          type="datetime-local"
+          value={accionEnEdit}
+          onChange={(e) => setAccionEnEdit(e.target.value)}
+          className="w-full px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+        />
+      </div>
+
+      <div className="mt-3">
+        <label className="block text-xs font-bold text-slate-300 mb-1">Notas</label>
+        <textarea
+          value={notasEdit}
+          onChange={(e) => setNotasEdit(e.target.value)}
+          rows={6}
+          placeholder="Objeciones, precio, cuándo volver a llamar, etc."
+          className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+        />
+      </div>
+
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          onClick={guardarCambios}
+          className="inline-flex px-4 py-2 rounded-2xl bg-emerald-500 text-slate-950 text-sm font-extrabold hover:bg-emerald-400"
+        >
+          Guardar
+        </button>
+      </div>
+    </div>
+
   );
 }
