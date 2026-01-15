@@ -70,6 +70,7 @@ export default function CartelLugar() {
     };
 
     const fetchFondoActivo = async () => {
+      // ✅ fondo global => NO dependemos de adminId aquí
       const res = await fetch(`/api/fondos?filtro=todos`, { cache: "no-store" });
       const data = (await res.json()) as Fondo[];
 
@@ -117,10 +118,13 @@ export default function CartelLugar() {
         .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
         .forEach((el) => el.remove());
 
+      // algunos casos dejan iframes “fantasma”
       document.querySelectorAll("iframe").forEach((el) => {
-        if (!el.getAttribute("src") || el.getAttribute("src") === "about:blank") el.remove();
+        const src = el.getAttribute("src");
+        if (!src || src === "about:blank") el.remove();
       });
 
+      // por si dejó estilos bloqueando interacción
       document.body.style.pointerEvents = "";
       document.body.style.overflow = "";
     } catch {}
@@ -137,10 +141,7 @@ export default function CartelLugar() {
     setTimeout(() => URL.revokeObjectURL(url), 800);
   };
 
-  const registrarHistorial = async (
-    accion: "IMPRIMIR" | "DESCARGAR_PDF",
-    extra?: { archivoUrl?: string; archivoPublicId?: string; archivoResourceType?: string; archivoMime?: string; archivoBytes?: number; archivoFormat?: string }
-  ) => {
+  const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PDF") => {
     try {
       const r = await fetch("/api/carteles", {
         method: "POST",
@@ -153,7 +154,6 @@ export default function CartelLugar() {
           fondoUrlSnap: fondoActivo?.url ?? null,
           qrUrlSnap: qrUrl,
           adminId: tenantMode ? adminIdContext : null,
-          ...extra,
         }),
       });
 
@@ -231,13 +231,15 @@ export default function CartelLugar() {
   };
 
   // ───────────────────────────────
-  // Descargar PDF (ULTRA PRO + historial + Cloudinary)
+  // Descargar PDF (PRO + historial + Cloudinary)
   // ───────────────────────────────
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
 
     try {
       setExportando(true);
+
+      // ✅ muy importante: limpiar antes y después
       cleanupHtml2PdfOverlays();
 
       // 1) Crear historial y obtener cartelId
@@ -247,21 +249,54 @@ export default function CartelLugar() {
       // 2) Generar PDF blob
       const html2pdf = (await import("html2pdf.js")).default;
 
-      const worker = html2pdf()
-        .from(cartelRef.current)
-        .set({
-          margin: 0,
-          html2canvas: {
-            scale: 3,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            backgroundColor: "#ffffff",
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        });
+      // ⚠️ OJO: algunos builds de html2pdf fallan con outputPdf('blob').
+      // Por eso hacemos fallback.
+      let pdfBlob: Blob | null = null;
 
-      const pdfBlob: Blob = await worker.outputPdf("blob");
+      try {
+        const worker = html2pdf()
+          .from(cartelRef.current)
+          .set({
+            margin: 0,
+            html2canvas: {
+              scale: 3,
+              useCORS: true,
+              allowTaint: true,
+              logging: false,
+              backgroundColor: "#ffffff",
+            },
+            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          });
+
+        // intento 1
+        pdfBlob = await worker.outputPdf("blob");
+      } catch (err) {
+        console.warn("outputPdf(blob) falló, probando fallback save->fetch", err);
+      }
+
+      // fallback: save() genera descarga; pero nosotros queremos blob.
+      // Solución: usar jsPDF output directamente si la lib lo permite:
+      if (!pdfBlob) {
+        // intento 2: output('blob') (según versiones)
+        try {
+          const worker2 = html2pdf()
+            .from(cartelRef.current)
+            .set({
+              margin: 0,
+              html2canvas: { scale: 3, useCORS: true, backgroundColor: "#ffffff" },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+            });
+
+          // @ts-ignore
+          pdfBlob = await worker2.output("blob");
+        } catch (err) {
+          console.error("Fallback output(blob) también falló", err);
+        }
+      }
+
+      if (!pdfBlob) {
+        throw new Error("No se pudo generar el PDF (html2pdf falló).");
+      }
 
       // 3) Subir PDF a Cloudinary vía /api/uploads (resourceType raw)
       const file = new File([pdfBlob], `cartel_lugar_${lugar.id}.pdf`, {
@@ -285,14 +320,17 @@ export default function CartelLugar() {
           archivoUrl: dUp.url,
           archivoPublicId: dUp.publicId ?? null,
           archivoResourceType: dUp.resourceType ?? "raw",
-          archivoMime: "application/pdf",
+          archivoMime: dUp.mime ?? "application/pdf",
           archivoBytes: dUp.bytes ?? null,
           archivoFormat: dUp.format ?? "pdf",
         }),
       });
 
       const dPatch = await rPatch.json().catch(() => ({}));
-      if (!rPatch.ok) throw new Error(dPatch?.error || "No se pudo asociar el PDF al historial");
+      if (!rPatch.ok) {
+        // ✅ Esto te ayuda a saber si está guardado o no
+        throw new Error(dPatch?.error || "No se pudo asociar el PDF al historial");
+      }
 
       // 5) Descargar local
       downloadBlob(pdfBlob, `cartel_lugar_${lugar.id}.pdf`);

@@ -18,7 +18,10 @@ type Item = {
   fondoUrlSnap?: string | null;
   qrUrlSnap?: string | null;
 
-  archivoUrl?: string | null; // ✅ para “Descargar PDF desde historial”
+  // ✅ archivos generados (PDF / PNG) si los guardas
+  archivoUrl?: string | null;
+  archivoPublicId?: string | null;
+  archivoResourceType?: string | null;
   archivoMime?: string | null;
 
   fondo?: { id: number; nombre: string; url: string } | null;
@@ -82,6 +85,14 @@ function escapeCsv(value: any) {
   return s;
 }
 
+function guessFilename(it: Item) {
+  const ext =
+    it.archivoMime?.includes("pdf") ? "pdf" :
+    it.archivoMime?.includes("png") ? "png" :
+    "pdf";
+  return `cartel_${it.id}.${ext}`;
+}
+
 export default function HistorialCartelesLugar() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -90,6 +101,9 @@ export default function HistorialCartelesLugar() {
 
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
+  const isAdmin = role === "ADMIN";
+
+  const puedeBorrar = isSuperadmin || isAdmin;
 
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
@@ -108,13 +122,15 @@ export default function HistorialCartelesLugar() {
   >("");
   const [q, setQ] = useState("");
 
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
   const query = useMemo(() => {
     const sp = new URLSearchParams();
     sp.set("lugarId", String(id));
     sp.set("limit", "200");
     if (filtroTipo) sp.set("tipo", filtroTipo);
     if (filtroAccion) sp.set("accion", filtroAccion);
-    // ✅ si tu API en GET también lo usa para tenant, lo añadimos
     if (tenantMode && adminIdContext) sp.set("adminId", String(adminIdContext));
     return `/api/carteles?${sp.toString()}`;
   }, [id, filtroTipo, filtroAccion, tenantMode, adminIdContext]);
@@ -132,7 +148,6 @@ export default function HistorialCartelesLugar() {
     })();
   }, [query]);
 
-  // ✅ filtro por texto en cliente (ultra cómodo)
   const itemsFiltrados = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return items;
@@ -151,6 +166,7 @@ export default function HistorialCartelesLugar() {
         it.fondoUrlSnap ?? "",
         it.qrUrlSnap ?? "",
         it.archivoUrl ?? "",
+        it.archivoPublicId ?? "",
       ]
         .join(" ")
         .toLowerCase();
@@ -159,7 +175,8 @@ export default function HistorialCartelesLugar() {
     });
   }, [items, q]);
 
-  const volverLugaresHref = tenantMode && adminIdContext ? `/lugares?adminId=${adminIdContext}` : "/lugares";
+  const volverLugaresHref =
+    tenantMode && adminIdContext ? `/lugares?adminId=${adminIdContext}` : "/lugares";
 
   const exportarCsv = () => {
     const rows = itemsFiltrados.map((it) => ({
@@ -171,9 +188,23 @@ export default function HistorialCartelesLugar() {
       fondoUrlSnap: it.fondoUrlSnap ?? "",
       qrUrlSnap: it.qrUrlSnap ?? "",
       archivoUrl: it.archivoUrl ?? "",
+      archivoPublicId: it.archivoPublicId ?? "",
     }));
 
-    const header = Object.keys(rows[0] ?? { id: "", creadoEn: "", tipo: "", accion: "", fondo: "", fondoUrlSnap: "", qrUrlSnap: "", archivoUrl: "" });
+    const header = Object.keys(
+      rows[0] ?? {
+        id: "",
+        creadoEn: "",
+        tipo: "",
+        accion: "",
+        fondo: "",
+        fondoUrlSnap: "",
+        qrUrlSnap: "",
+        archivoUrl: "",
+        archivoPublicId: "",
+      }
+    );
+
     const csv =
       header.join(",") +
       "\n" +
@@ -185,11 +216,82 @@ export default function HistorialCartelesLugar() {
   };
 
   const mostrarUsuario = (it: Item) => {
-    // ✅ Solo el SUPERADMIN puede ver quién creó el registro
+    // ✅ Solo el SUPERADMIN ve el usuario que lo generó
     if (!isSuperadmin) return null;
-
     const actor = it.creadoPor?.nombre ?? it.creadoPor?.email ?? "—";
-    return <span><span className="font-extrabold text-slate-200">Usuario:</span> {actor}</span>;
+    return (
+      <span>
+        <span className="font-extrabold text-slate-200">Usuario:</span> {actor}
+      </span>
+    );
+  };
+
+  // ✅ DESCARGA “A PRUEBA DE POPUPS”: fetch -> blob -> download
+  const descargarArchivo = async (it: Item) => {
+    const url = it.archivoUrl;
+    if (!url) {
+      alert("Este registro aún no tiene archivo guardado.");
+      return;
+    }
+
+    try {
+      setDownloadingId(it.id);
+
+      // 1) Intento descarga directa blob
+      const r = await fetch(url, { method: "GET" });
+      if (!r.ok) throw new Error("No se pudo descargar el archivo.");
+
+      const blob = await r.blob();
+      const filename = guessFilename(it);
+
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 800);
+    } catch (e) {
+      // 2) Fallback: abrir en pestaña (por si CORS impide blob)
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      if (!w) alert("Tu navegador bloqueó la descarga. Prueba permitiendo popups o usa otro navegador.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const eliminarCartel = async (it: Item) => {
+    if (!puedeBorrar) return;
+
+    const ok = confirm(
+      `¿Eliminar este registro #${it.id}?\n\n` +
+        `Si tiene archivo (Cloudinary), también se borrará.\n` +
+        `Esta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+
+    try {
+      setDeletingId(it.id);
+
+      const url =
+        tenantMode && adminIdContext
+          ? `/api/carteles/${it.id}?adminId=${adminIdContext}`
+          : `/api/carteles/${it.id}`;
+
+      const r = await fetch(url, { method: "DELETE" });
+      const d = await r.json().catch(() => ({}));
+
+      if (!r.ok) throw new Error(d?.error || "No se pudo eliminar");
+
+      // ✅ optimista: quita de UI
+      setItems((prev) => prev.filter((x) => x.id !== it.id));
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Error eliminando el cartel");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -240,7 +342,6 @@ export default function HistorialCartelesLugar() {
                 onClick={exportarCsv}
                 className="bg-sky-500 text-slate-950 hover:bg-sky-400 font-extrabold h-10 px-5"
                 disabled={loading || itemsFiltrados.length === 0}
-                title={itemsFiltrados.length === 0 ? "No hay datos para exportar" : "Exportar CSV"}
               >
                 ⬇️ Exportar CSV
               </Button>
@@ -305,10 +406,8 @@ export default function HistorialCartelesLugar() {
           <div className="space-y-3">
             {itemsFiltrados.map((it) => {
               const fecha = formatFechaEs(it.creadoEn);
-
               const fondoNombre =
-                it.fondo?.nombre ??
-                (it.fondoUrlSnap ? "Fondo usado (snapshot)" : "—");
+                it.fondo?.nombre ?? (it.fondoUrlSnap ? "Fondo usado (snapshot)" : "—");
 
               const showFondoThumb = !!it.fondoUrlSnap;
               const showQrThumb = !!it.qrUrlSnap;
@@ -318,7 +417,7 @@ export default function HistorialCartelesLugar() {
                   key={it.id}
                   className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
                 >
-                  {/* IZQUIERDA: texto */}
+                  {/* IZQUIERDA */}
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
@@ -339,9 +438,7 @@ export default function HistorialCartelesLugar() {
                         {accionLabel(it.accion)}
                       </span>
 
-                      <span className="text-xs text-slate-400 font-extrabold">
-                        #{it.id}
-                      </span>
+                      <span className="text-xs text-slate-400 font-extrabold">#{it.id}</span>
                     </div>
 
                     <div className="text-sm text-slate-200 font-semibold">
@@ -379,17 +476,32 @@ export default function HistorialCartelesLugar() {
                         </a>
                       ) : null}
 
-                      {/* ✅ Botón descargar PDF desde historial (si existe) */}
+                      {/* ✅ DESCARGAR (FIABLE) */}
                       {it.archivoUrl ? (
-                        <a
-                          href={it.archivoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-extrabold px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                          title="PDF generado guardado"
+                        <Button
+                          onClick={() => descargarArchivo(it)}
+                          disabled={downloadingId === it.id}
+                          className="h-9 px-4 text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+                          title="Descargar archivo guardado"
                         >
-                          📄 Descargar PDF
-                        </a>
+                          {downloadingId === it.id ? "Descargando..." : "📄 Descargar PDF"}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-semibold px-1">
+                          (Aún sin archivo guardado)
+                        </span>
+                      )}
+
+                      {/* ✅ ELIMINAR */}
+                      {puedeBorrar ? (
+                        <Button
+                          onClick={() => eliminarCartel(it)}
+                          disabled={deletingId === it.id}
+                          className="h-9 px-4 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white disabled:opacity-60"
+                          title="Eliminar historial (y archivo si existe)"
+                        >
+                          {deletingId === it.id ? "Eliminando..." : "🗑️ Eliminar"}
+                        </Button>
                       ) : null}
                     </div>
 
