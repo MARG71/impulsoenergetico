@@ -5,10 +5,16 @@ import { authOptions } from "@/lib/authOptions";
 
 function resolveUser(session: any) {
   const rol = (session?.user as any)?.rol ?? (session?.user as any)?.role ?? null;
-  const userId = (session?.user as any)?.id ? Number((session.user as any).id) : null;
-  const adminId = (session?.user as any)?.adminId ? Number((session.user as any).adminId) : null;
-  const agenteId = (session?.user as any)?.agenteId ? Number((session.user as any).agenteId) : null;
-  const lugarId = (session?.user as any)?.lugarId ? Number((session.user as any).lugarId) : null;
+
+  const userIdRaw = (session?.user as any)?.id;
+  const adminIdRaw = (session?.user as any)?.adminId;
+  const agenteIdRaw = (session?.user as any)?.agenteId;
+  const lugarIdRaw = (session?.user as any)?.lugarId;
+
+  const userId = userIdRaw != null ? Number(userIdRaw) : null;
+  const adminId = adminIdRaw != null ? Number(adminIdRaw) : null;
+  const agenteId = agenteIdRaw != null ? Number(agenteIdRaw) : null;
+  const lugarId = lugarIdRaw != null ? Number(lugarIdRaw) : null;
 
   const tenantAdminId =
     rol === "SUPERADMIN" ? null : rol === "ADMIN" ? userId : adminId;
@@ -21,7 +27,7 @@ function rangoToDays(rango?: string | null) {
   if (r === "hoy") return 1;
   if (r === "7d" || r === "7dias" || r === "7") return 7;
   if (r === "30d" || r === "30dias" || r === "30") return 30;
-  return 30; // default
+  return 30;
 }
 
 export async function GET(req: Request) {
@@ -33,7 +39,6 @@ export async function GET(req: Request) {
 
     const { rol, tenantAdminId, agenteId, lugarId } = resolveUser(session);
 
-    // Permitir ver stats a SUPERADMIN, ADMIN, AGENTE (y si quieres, LUGAR)
     if (!["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"].includes(String(rol))) {
       return NextResponse.json({ error: "No permitido" }, { status: 403 });
     }
@@ -43,17 +48,17 @@ export async function GET(req: Request) {
     const days = rangoToDays(rango);
 
     const desde = new Date();
-    desde.setDate(desde.getDate() - (days === 1 ? 0 : days));
     if (days === 1) {
-      // hoy
       desde.setHours(0, 0, 0, 0);
+    } else {
+      desde.setDate(desde.getDate() - days);
     }
 
     const whereBase: any = {
       creadoEn: { gte: desde },
     };
 
-    // ✅ Multi-tenant
+    // ✅ Multi-tenant (SUPERADMIN ve todo)
     if (rol !== "SUPERADMIN") {
       if (!tenantAdminId) {
         return NextResponse.json({ error: "Tenant no resuelto" }, { status: 400 });
@@ -61,28 +66,38 @@ export async function GET(req: Request) {
       whereBase.adminId = tenantAdminId;
     }
 
-    // ✅ Restricciones por rol
+    // ✅ Restricción por rol
     if (rol === "AGENTE") whereBase.agenteId = agenteId ?? -1;
     if (rol === "LUGAR") whereBase.lugarId = lugarId ?? -1;
 
     // Totales por estado
-    const [total, pendiente, contactado, comparativa, contrato, cerrado, perdido] =
-      await Promise.all([
-        prisma.lead.count({ where: whereBase }),
-        prisma.lead.count({ where: { ...whereBase, estado: "pendiente" } }),
-        prisma.lead.count({ where: { ...whereBase, estado: "contactado" } }),
-        prisma.lead.count({ where: { ...whereBase, estado: "comparativa" } }),
-        prisma.lead.count({ where: { ...whereBase, estado: "contrato" } }),
-        prisma.lead.count({ where: { ...whereBase, estado: "cerrado" } }),
-        prisma.lead.count({ where: { ...whereBase, estado: "perdido" } }),
-      ]);
+    const [
+      total,
+      pendiente,
+      contactado,
+      comparativa,
+      contrato,
+      cerrado,
+      perdido,
+    ] = await Promise.all([
+      prisma.lead.count({ where: whereBase }),
+      prisma.lead.count({ where: { ...whereBase, estado: "pendiente" } }),
+      prisma.lead.count({ where: { ...whereBase, estado: "contactado" } }),
+      prisma.lead.count({ where: { ...whereBase, estado: "comparativa" } }),
+      prisma.lead.count({ where: { ...whereBase, estado: "contrato" } }),
+      prisma.lead.count({ where: { ...whereBase, estado: "cerrado" } }),
+      prisma.lead.count({ where: { ...whereBase, estado: "perdido" } }),
+    ]);
 
-    // Top Agentes
+    // Helper ratio
+    const ratio = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+
+    // ✅ TOP AGENTES (Prisma v6 compatible)
     const topAgentesRaw = await prisma.lead.groupBy({
       by: ["agenteId"],
       where: whereBase,
-      _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
       take: 5,
     });
 
@@ -98,17 +113,17 @@ export async function GET(req: Request) {
       : [];
 
     const topAgentes = topAgentesRaw.map((x) => ({
-      agenteId: x.agenteId,
+      agenteId: x.agenteId ?? null,
       nombre: agentes.find((a) => a.id === x.agenteId)?.nombre || "Sin agente",
-      total: x._count._all,
+      total: x._count.id,
     }));
 
-    // Top Lugares
+    // ✅ TOP LUGARES (Prisma v6 compatible)
     const topLugaresRaw = await prisma.lead.groupBy({
       by: ["lugarId"],
       where: whereBase,
-      _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
       take: 5,
     });
 
@@ -124,13 +139,10 @@ export async function GET(req: Request) {
       : [];
 
     const topLugares = topLugaresRaw.map((x) => ({
-      lugarId: x.lugarId,
+      lugarId: x.lugarId ?? null,
       nombre: lugares.find((l) => l.id === x.lugarId)?.nombre || "Sin lugar",
-      total: x._count._all,
+      total: x._count.id,
     }));
-
-    // Embudo (ratios)
-    const ratio = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
     return NextResponse.json({
       rango: rango || (days === 1 ? "hoy" : `${days}d`),
@@ -157,6 +169,9 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error("[LEADS][STATS] Error:", error);
-    return NextResponse.json({ error: "Error cargando estadísticas" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error cargando estadísticas" },
+      { status: 500 }
+    );
   }
 }
