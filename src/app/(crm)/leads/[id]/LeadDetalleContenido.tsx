@@ -31,7 +31,25 @@ export default function LeadDetalleContenido() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [comparativaIdInput, setComparativaIdInput] = useState("");
 
+  const vincularComparativa = async () => {
+    if (!lead) return;
+      const idComp = Number(comparativaIdInput);
+      if (!idComp || Number.isNaN(idComp)) return;
+
+      const res = await fetch("/api/leads/vincular", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: lead.id, comparativaId: idComp }),
+      });
+
+      if (res.ok) {
+        await cargar(); // recarga lead
+        setComparativaIdInput("");
+      }
+    };
+    
   // ✅ Campos edición
   const [estadoEdit, setEstadoEdit] = useState("pendiente");
   const [accionEdit, setAccionEdit] = useState("");
@@ -292,6 +310,10 @@ export default function LeadDetalleContenido() {
           </div>
         </div>
       </div>
+
+
+
+
     </div>
   );
 }
