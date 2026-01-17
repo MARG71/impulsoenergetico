@@ -30,6 +30,9 @@ export default function ComparadorContenido() {
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [lugarId, setLugarId] = useState<string | null>(null);
 
+  const [emailCliente, setEmailCliente] = useState("");
+  const [telefonoCliente, setTelefonoCliente] = useState("");
+
   const comparativaId = searchParams.get("id");
   const idAgenteQR = searchParams.get("idAgente");
   const idLugarQR = searchParams.get("idLugar");
@@ -277,6 +280,9 @@ export default function ComparadorContenido() {
       setNombreCliente("");
       setDireccionCliente("");
       setResultados([]);
+      setEmailCliente("");
+      setTelefonoCliente("");
+
     }
   }, [comparativaId]);
 
@@ -297,11 +303,23 @@ export default function ComparadorContenido() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // ✅ Validación de datos del cliente (para trazabilidad y seguimiento)
+    if (!nombreCliente.trim()) {
+      alert("Introduce el nombre del cliente.");
+      return;
+    }
+
+    if (!emailCliente.trim() && !telefonoCliente.trim()) {
+      alert("Introduce email o teléfono para poder guardar y hacer seguimiento.");
+      return;
+    }
+
     // 1) Datos básicos de la factura introducida
     const consumoTotal = periodosConsumo.reduce(
       (sum, key) => sum + (parseFloat(consumoPeriodos[key]) || 0),
       0
     );
+
     const facturaNum = parseFloat(importeFactura) || 0;
 
     if (consumoTotal <= 0 || facturaNum <= 0) {
@@ -542,7 +560,10 @@ export default function ComparadorContenido() {
             cliente: {
               nombre: nombreCliente,
               direccion: direccionCliente,
+              email: emailCliente,
+              telefono: telefonoCliente,
             },
+
             agenteId: parseInt(idAgenteQR || agenteId || "1", 10),
             lugarId: parseInt(idLugarQR || lugarId || "1", 10),
             datosFactura: {
@@ -833,7 +854,9 @@ export default function ComparadorContenido() {
             <form
               onSubmit={handleSubmit}
               className="space-y-3 text-sm md:text-base"
+              
             >
+              
               <div className="space-y-2">
                 <div>
                   <label className="block font-semibold mb-1">
@@ -861,6 +884,30 @@ export default function ComparadorContenido() {
                       setDireccionCliente(e.target.value)
                     }
                   />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-semibold mb-1">Email</label>
+                    <input
+                      type="email"
+                      placeholder="correo@ejemplo.com"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
+                      value={emailCliente}
+                      onChange={(e) => setEmailCliente(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold mb-1">Teléfono</label>
+                    <input
+                      type="tel"
+                      placeholder="600123123"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/80"
+                      value={telefonoCliente}
+                      onChange={(e) => setTelefonoCliente(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div>
