@@ -19,7 +19,14 @@ type LeadDetalle = {
   lugar?: { id: number; nombre: string | null } | null;
 };
 
-const ESTADOS = ["pendiente", "contactado", "comparativa", "contrato", "cerrado", "perdido"];
+const ESTADOS = [
+  "pendiente",
+  "contactado",
+  "comparativa",
+  "contrato",
+  "cerrado",
+  "perdido",
+];
 
 export default function LeadDetalleContenido() {
   const params = useParams();
@@ -31,29 +38,10 @@ export default function LeadDetalleContenido() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
-  const [comparativaIdInput, setComparativaIdInput] = useState("");
 
-  const vincularComparativa = async () => {
-    if (!lead) return;
-      const idComp = Number(comparativaIdInput);
-      if (!idComp || Number.isNaN(idComp)) return;
-
-      const res = await fetch("/api/leads/vincular", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId: lead.id, comparativaId: idComp }),
-      });
-
-      if (res.ok) {
-        await cargar(); // recarga lead
-        setComparativaIdInput("");
-      }
-    };
-    
-  // ✅ Campos edición
   const [estadoEdit, setEstadoEdit] = useState("pendiente");
   const [accionEdit, setAccionEdit] = useState("");
-  const [accionEnEdit, setAccionEnEdit] = useState(""); // datetime-local
+  const [accionEnEdit, setAccionEnEdit] = useState("");
   const [notasEdit, setNotasEdit] = useState("");
 
   const whatsappLink = useMemo(() => {
@@ -67,32 +55,23 @@ export default function LeadDetalleContenido() {
 
   const cargar = async () => {
     setLoading(true);
-    setError(null);
-    setOkMsg(null);
-
     try {
-      if (!id || Number.isNaN(id)) {
-        throw new Error("ID de lead no válido.");
-      }
-
-      const res = await fetch(`/api/leads/${id}`, { cache: "no-store" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Error al cargar el lead");
-      }
+      const res = await fetch(`/api/crm/leads/${id}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Error al cargar el lead");
 
       const data = (await res.json()) as LeadDetalle;
       setLead(data);
 
-      // hidratar formulario
       setEstadoEdit((data.estado || "pendiente").toLowerCase());
       setAccionEdit(data.proximaAccion || "");
       setAccionEnEdit(
-        data.proximaAccionEn ? new Date(data.proximaAccionEn).toISOString().slice(0, 16) : ""
+        data.proximaAccionEn
+          ? new Date(data.proximaAccionEn).toISOString().slice(0, 16)
+          : ""
       );
       setNotasEdit(data.notas || "");
     } catch (e: any) {
-      setError(e?.message || "Error al cargar el lead");
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -100,220 +79,142 @@ export default function LeadDetalleContenido() {
 
   useEffect(() => {
     cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const guardarCambios = async () => {
     if (!lead) return;
     setSaving(true);
-    setError(null);
-    setOkMsg(null);
 
     try {
-      const payload = {
-        estado: estadoEdit,
-        proximaAccion: accionEdit ? accionEdit.trim() : null,
-        proximaAccionEn: accionEnEdit ? new Date(accionEnEdit).toISOString() : null,
-        notas: notasEdit ? notasEdit.trim() : null,
-      };
-
-      const res = await fetch(`/api/leads/${lead.id}`, {
+      const res = await fetch(`/api/crm/leads/${lead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          estado: estadoEdit,
+          proximaAccion: accionEdit || null,
+          proximaAccionEn: accionEnEdit
+            ? new Date(accionEnEdit).toISOString()
+            : null,
+          notas: notasEdit || null,
+        }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "No se pudo guardar");
-      }
+      if (!res.ok) throw new Error("No se pudo guardar");
 
-      const updated = (await res.json()) as LeadDetalle;
-      setLead(updated);
-      setOkMsg("Guardado ✅");
+      setOkMsg("Cambios guardados correctamente ✅");
+      cargar();
     } catch (e: any) {
-      setError(e?.message || "Error al guardar");
+      setError(e.message);
     } finally {
       setSaving(false);
-      // limpiar msg a los segundos
-      setTimeout(() => setOkMsg(null), 2500);
+      setTimeout(() => setOkMsg(null), 3000);
     }
   };
 
   if (loading) {
-    return <div className="p-6 text-slate-200 text-sm">Cargando información del lead…</div>;
+    return (
+      <div className="p-6 text-slate-200 text-base">
+        Cargando información del lead…
+      </div>
+    );
   }
 
-  if (error || !lead) {
+  if (!lead || error) {
     return (
-      <div className="p-6">
-        <div className="max-w-xl bg-red-900/70 border border-red-500/70 text-red-50 rounded-2xl px-5 py-4 text-sm">
-          <p className="font-semibold mb-1">Error al cargar el lead</p>
-          <p>{error || "No se han encontrado datos."}</p>
-          <button
-            onClick={() => router.back()}
-            className="mt-3 inline-flex px-3 py-1.5 rounded-full bg-slate-950 border border-slate-600 text-slate-100 text-xs hover:border-emerald-400"
-          >
-            Volver
-          </button>
-        </div>
+      <div className="p-6 text-red-200 text-base">
+        Error al cargar el lead
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4">
+    <div className="p-6 max-w-6xl mx-auto space-y-6 text-base">
       <button
         onClick={() => router.back()}
-        className="inline-flex mb-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-600 text-slate-100 text-xs hover:border-emerald-400"
+        className="mb-2 px-4 py-2 rounded-full bg-slate-900 border border-slate-600 text-slate-100 text-sm hover:border-emerald-400"
       >
-        ← Volver a Lead Center
+        ← Volver a Leads
       </button>
 
-      {/* Cabecera lead */}
-      <div className="rounded-3xl bg-slate-950/90 border border-emerald-500/60 p-6 shadow-[0_0_35px_rgba(16,185,129,0.28)]">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-white mb-1">
-              {lead.nombre || "Lead sin nombre"}
-            </h1>
+      {/* Cabecera */}
+      <div className="rounded-3xl bg-slate-950 border border-emerald-500/60 p-7 shadow-lg">
+        <h1 className="text-3xl font-extrabold text-white mb-2">
+          {lead.nombre}
+        </h1>
 
-            <p className="text-sm text-slate-300">
-              Email: <span className="font-semibold">{lead.email || "No indicado"}</span>
-            </p>
-            <p className="text-sm text-slate-300">
-              Teléfono: <span className="font-semibold">{lead.telefono || "No indicado"}</span>
-            </p>
+        <p className="text-base text-slate-300">
+          📧 <strong>{lead.email}</strong>
+        </p>
+        <p className="text-base text-slate-300">
+          📞 <strong>{lead.telefono}</strong>
+        </p>
 
-            <p className="text-xs text-slate-400 mt-1">
-              Estado actual:{" "}
-              <span className="font-bold text-slate-200">
-                {(lead.estado || "pendiente").toUpperCase()}
-              </span>
-            </p>
-
-            {lead.creadoEn && (
-              <p className="text-xs text-slate-500 mt-1">
-                Registrado el {new Date(lead.creadoEn).toLocaleString("es-ES")}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <a
-              href={`tel:${lead.telefono}`}
-              className="inline-flex px-3 py-1.5 rounded-full bg-slate-950 border border-slate-700 text-slate-100 text-xs font-bold hover:border-emerald-400"
-            >
-              📞 Llamar
-            </a>
-
-            {whatsappLink && (
-              <a
-                href={whatsappLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex px-3 py-1.5 rounded-full bg-emerald-600/20 border border-emerald-400 text-emerald-100 text-xs font-bold hover:bg-emerald-600/30"
-              >
-                💬 WhatsApp
-              </a>
-            )}
-
-            <button
-              onClick={guardarCambios}
-              disabled={saving}
-              className="inline-flex px-4 py-1.5 rounded-full bg-emerald-500 text-slate-950 text-xs font-extrabold hover:bg-emerald-400 disabled:opacity-60"
-            >
-              {saving ? "Guardando…" : "Guardar cambios"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-4">
-            <h2 className="text-sm font-semibold text-slate-100 mb-2">Agente</h2>
-            <p className="text-slate-300">{lead.agente?.nombre || "Sin agente asignado"}</p>
-          </div>
-
-          <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-4">
-            <h2 className="text-sm font-semibold text-slate-100 mb-2">Lugar</h2>
-            <p className="text-slate-300">{lead.lugar?.nombre || "Sin lugar asignado"}</p>
-          </div>
-        </div>
-
-        {(okMsg || error) && (
-          <div className="mt-4">
-            {okMsg && (
-              <div className="rounded-2xl bg-emerald-900/25 border border-emerald-500/30 text-emerald-100 px-4 py-3 text-sm">
-                {okMsg}
-              </div>
-            )}
-          </div>
-        )}
+        <p className="mt-2 text-base">
+          Estado actual:{" "}
+          <span className="font-bold text-emerald-400 uppercase">
+            {lead.estado}
+          </span>
+        </p>
       </div>
 
-      {/* Gestión comercial */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-3xl bg-slate-950/85 border border-slate-700 p-6">
-          <h2 className="text-white font-extrabold text-lg mb-4">Gestión comercial</h2>
+      {/* Gestión */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-3xl bg-slate-950 border border-slate-700 p-6">
+          <h2 className="text-xl font-extrabold mb-4 text-white">
+            Gestión comercial
+          </h2>
 
-          <label className="block text-xs font-bold text-slate-300 mb-1">Estado</label>
+          <label className="block mb-1 font-semibold">Estado</label>
           <select
             value={estadoEdit}
             onChange={(e) => setEstadoEdit(e.target.value)}
-            className="w-full mb-4 px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+            className="w-full mb-4 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-base"
           >
             {ESTADOS.map((s) => (
-              <option key={s} value={s}>
-                {s.toUpperCase()}
-              </option>
+              <option key={s}>{s}</option>
             ))}
           </select>
 
-          <label className="block text-xs font-bold text-slate-300 mb-1">Próxima acción</label>
+          <label className="block mb-1 font-semibold">Próxima acción</label>
           <input
             value={accionEdit}
             onChange={(e) => setAccionEdit(e.target.value)}
-            placeholder="Ej: Llamar, WhatsApp, Enviar oferta…"
-            className="w-full mb-3 px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+            className="w-full mb-4 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-base"
           />
 
-          <label className="block text-xs font-bold text-slate-300 mb-1">Fecha próxima acción</label>
+          <label className="block mb-1 font-semibold">Fecha</label>
           <input
             type="datetime-local"
             value={accionEnEdit}
             onChange={(e) => setAccionEnEdit(e.target.value)}
-            className="w-full px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+            className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-base"
           />
-
-          <p className="text-xs text-slate-400 mt-2">
-            Tip: Si un lead tiene “próxima acción”, nunca se pierde.
-          </p>
         </div>
 
-        <div className="rounded-3xl bg-slate-950/85 border border-slate-700 p-6">
-          <h2 className="text-white font-extrabold text-lg mb-4">Notas</h2>
+        <div className="rounded-3xl bg-slate-950 border border-slate-700 p-6">
+          <h2 className="text-xl font-extrabold mb-4 text-white">Notas</h2>
           <textarea
+            rows={10}
             value={notasEdit}
             onChange={(e) => setNotasEdit(e.target.value)}
-            rows={10}
-            placeholder="Objeciones, precio, cuándo volver a llamar, resumen de la conversación…"
-            className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm outline-none focus:border-emerald-400"
+            className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-base"
           />
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={guardarCambios}
-              disabled={saving}
-              className="inline-flex px-4 py-2 rounded-2xl bg-emerald-500 text-slate-950 text-sm font-extrabold hover:bg-emerald-400 disabled:opacity-60"
-            >
-              {saving ? "Guardando…" : "Guardar"}
-            </button>
-          </div>
+
+          <button
+            onClick={guardarCambios}
+            disabled={saving}
+            className="mt-4 w-full py-3 rounded-xl bg-emerald-500 text-slate-950 text-lg font-extrabold hover:bg-emerald-400"
+          >
+            {saving ? "Guardando…" : "Guardar cambios"}
+          </button>
         </div>
       </div>
 
-
-
-
+      {okMsg && (
+        <div className="rounded-xl bg-emerald-900/30 border border-emerald-500 text-emerald-100 px-5 py-4 text-base">
+          {okMsg}
+        </div>
+      )}
     </div>
   );
 }
