@@ -2,13 +2,9 @@
 // src/app/api/crm/leads/stats/route.ts
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  getSessionOrThrow,
-  sessionAdminId,
-  sessionRole,
-} from "@/lib/auth-server";
+import { getSessionOrThrow, sessionRole } from "@/lib/auth-server";
 
 type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
@@ -48,16 +44,26 @@ function rangoToDate(rango: string | null) {
   return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 }
 
-const ESTADOS = [
-  "pendiente",
-  "contactado",
-  "comparativa",
-  "contrato",
-  "cerrado",
-  "perdido",
-] as const;
+type EstadoKey =
+  | "pendiente"
+  | "contactado"
+  | "comparativa"
+  | "contrato"
+  | "cerrado"
+  | "perdido";
 
-export async function GET(req: NextRequest) {
+function isEstadoKey(x: string): x is EstadoKey {
+  return (
+    x === "pendiente" ||
+    x === "contactado" ||
+    x === "comparativa" ||
+    x === "contrato" ||
+    x === "cerrado" ||
+    x === "perdido"
+  );
+}
+
+export async function GET(req: Request) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -84,43 +90,33 @@ export async function GET(req: NextRequest) {
       _count: { _all: true },
     });
 
-    type EstadoKey = "pendiente" | "contactado" | "comparativa" | "contrato" | "cerrado" | "perdido";
-
-    function isEstadoKey(x: string): x is EstadoKey {
-    return (
-        x === "pendiente" ||
-        x === "contactado" ||
-        x === "comparativa" ||
-        x === "contrato" ||
-        x === "cerrado" ||
-        x === "perdido"
-    );
-    }
-
     const estados: Record<EstadoKey, number> = {
-    pendiente: 0,
-    contactado: 0,
-    comparativa: 0,
-    contrato: 0,
-    cerrado: 0,
-    perdido: 0,
+      pendiente: 0,
+      contactado: 0,
+      comparativa: 0,
+      contrato: 0,
+      cerrado: 0,
+      perdido: 0,
     };
 
     for (const row of groupEstados) {
-    const keyRaw = String((row as any)?.estado ?? "pendiente").toLowerCase();
-    if (isEstadoKey(keyRaw)) {
+      const keyRaw = String((row as any)?.estado ?? "pendiente").toLowerCase();
+      if (isEstadoKey(keyRaw)) {
         estados[keyRaw] = Number((row as any)?._count?._all ?? 0);
-    }
+      }
     }
 
-    // top agentes
-    const groupAgentes = await prisma.lead.groupBy({
+    // top agentes (groupBy sin orderBy, ordenamos en JS)
+    const groupAgentesRaw = await prisma.lead.groupBy({
       by: ["agenteId"],
       where: whereRango,
       _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
-      take: 10,
     });
+
+    const groupAgentes = groupAgentesRaw
+      .slice()
+      .sort((a, b) => (b._count?._all ?? 0) - (a._count?._all ?? 0))
+      .slice(0, 10);
 
     const agenteIds = groupAgentes
       .map((g) => g.agenteId)
@@ -133,23 +129,30 @@ export async function GET(req: NextRequest) {
         })
       : [];
 
-    const agenteName = new Map(agentes.map((a) => [a.id, a.nombre ?? `Agente ${a.id}`]));
+    const agenteName = new Map(
+      agentes.map((a) => [a.id, a.nombre ?? `Agente ${a.id}`])
+    );
 
     const topAgentes = groupAgentes.map((g) => ({
       agenteId: g.agenteId ?? null,
       nombre:
-        g.agenteId == null ? "Sin agente" : (agenteName.get(g.agenteId) ?? `Agente ${g.agenteId}`),
-      total: g._count._all,
+        g.agenteId == null
+          ? "Sin agente"
+          : agenteName.get(g.agenteId) ?? `Agente ${g.agenteId}`,
+      total: Number(g._count?._all ?? 0),
     }));
 
-    // top lugares
-    const groupLugares = await prisma.lead.groupBy({
+    // top lugares (groupBy sin orderBy, ordenamos en JS)
+    const groupLugaresRaw = await prisma.lead.groupBy({
       by: ["lugarId"],
       where: whereRango,
       _count: { _all: true },
-      orderBy: { _count: { _all: "desc" } },
-      take: 10,
     });
+
+    const groupLugares = groupLugaresRaw
+      .slice()
+      .sort((a, b) => (b._count?._all ?? 0) - (a._count?._all ?? 0))
+      .slice(0, 10);
 
     const lugarIds = groupLugares
       .map((g) => g.lugarId)
@@ -162,16 +165,20 @@ export async function GET(req: NextRequest) {
         })
       : [];
 
-    const lugarName = new Map(lugares.map((l) => [l.id, l.nombre ?? `Lugar ${l.id}`]));
+    const lugarName = new Map(
+      lugares.map((l) => [l.id, l.nombre ?? `Lugar ${l.id}`])
+    );
 
     const topLugares = groupLugares.map((g) => ({
       lugarId: g.lugarId ?? null,
       nombre:
-        g.lugarId == null ? "Sin lugar" : (lugarName.get(g.lugarId) ?? `Lugar ${g.lugarId}`),
-      total: g._count._all,
+        g.lugarId == null
+          ? "Sin lugar"
+          : lugarName.get(g.lugarId) ?? `Lugar ${g.lugarId}`,
+      total: Number(g._count?._all ?? 0),
     }));
 
-    // ratios simples (si quieres)
+    // ratios simples
     const ratios: Record<string, number> = {};
     if (total > 0) {
       ratios.contactado = Math.round((estados.contactado / total) * 100);
@@ -189,7 +196,9 @@ export async function GET(req: NextRequest) {
       meta: { rango: rango ?? "7d", desde: from.toISOString(), role },
     });
   } catch (e: any) {
-    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    if (e?.message === "NO_AUTH") {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
     console.error("stats leads error:", e);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
