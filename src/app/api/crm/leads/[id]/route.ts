@@ -1,4 +1,7 @@
 // src/app/api/crm/leads/[id]/route.ts
+// src/app/api/crm/leads/[id]/route.ts
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -8,39 +11,50 @@ import {
   sessionRole,
 } from "@/lib/auth-server";
 
-function leadIdFromPath(req: NextRequest) {
-  const idStr = req.nextUrl.pathname.split("/").pop();
-  const leadId = Number(idStr);
-  return leadId;
+type Params = { params: { id: string } };
+
+function parseId(id: string) {
+  const n = Number(id);
+  return !n || Number.isNaN(n) ? null : n;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
     const tenantAdminId = sessionAdminId(session);
     const agenteId = sessionAgenteId(session);
+    const lugarId = Number((session.user as any)?.lugarId ?? null);
 
-    const leadId = leadIdFromPath(req);
-    if (!leadId || Number.isNaN(leadId)) {
-      return NextResponse.json({ error: "ID no válido" }, { status: 400 });
-    }
+    const leadId = parseId(params.id);
+    if (!leadId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
       include: {
         agente: { select: { id: true, nombre: true } },
         lugar: { select: { id: true, nombre: true } },
+        actividades: {
+          orderBy: { creadoEn: "desc" },
+          take: 200,
+          include: {
+            usuario: { select: { id: true, nombre: true, rol: true } },
+          },
+        },
       },
     });
 
     if (!lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
+    // ✅ permisos multi-tenant
     if (role !== "SUPERADMIN") {
       if ((lead.adminId ?? null) !== tenantAdminId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
       if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
     }
@@ -53,18 +67,17 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
     const tenantAdminId = sessionAdminId(session);
     const agenteId = sessionAgenteId(session);
+    const lugarId = Number((session.user as any)?.lugarId ?? null);
     const usuarioId = Number((session.user as any).id);
 
-    const leadId = leadIdFromPath(req);
-    if (!leadId || Number.isNaN(leadId)) {
-      return NextResponse.json({ error: "ID no válido" }, { status: 400 });
-    }
+    const leadId = parseId(params.id);
+    if (!leadId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
     const existente = await prisma.lead.findUnique({
       where: { id: leadId },
@@ -72,6 +85,7 @@ export async function PATCH(req: NextRequest) {
         id: true,
         adminId: true,
         agenteId: true,
+        lugarId: true,
         estado: true,
         notas: true,
         proximaAccion: true,
@@ -81,6 +95,7 @@ export async function PATCH(req: NextRequest) {
 
     if (!existente) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
+    // ✅ permisos
     if (role !== "SUPERADMIN") {
       if ((existente.adminId ?? null) !== tenantAdminId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -88,13 +103,23 @@ export async function PATCH(req: NextRequest) {
       if (role === "AGENTE" && agenteId && existente.agenteId !== agenteId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
+      if (role === "LUGAR" && lugarId && existente.lugarId !== lugarId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
     }
 
     const body = await req.json().catch(() => ({}));
 
     const nextEstado = body?.estado ? String(body.estado) : null;
-    const nextNotas = Object.prototype.hasOwnProperty.call(body, "notas") ? (body.notas ? String(body.notas) : null) : undefined;
-    const nextAccion = Object.prototype.hasOwnProperty.call(body, "proximaAccion") ? (body.proximaAccion ? String(body.proximaAccion) : null) : undefined;
+
+    const nextNotas = Object.prototype.hasOwnProperty.call(body, "notas")
+      ? (body.notas ? String(body.notas) : null)
+      : undefined;
+
+    const nextAccion = Object.prototype.hasOwnProperty.call(body, "proximaAccion")
+      ? (body.proximaAccion ? String(body.proximaAccion) : null)
+      : undefined;
+
     const nextAccionEn = Object.prototype.hasOwnProperty.call(body, "proximaAccionEn")
       ? (body.proximaAccionEn ? new Date(String(body.proximaAccionEn)) : null)
       : undefined;
@@ -113,7 +138,7 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    // ✅ Actividades automáticas:
+    // ✅ Actividades automáticas
     const actividadesToCreate: Array<{ tipo: string; titulo: string; detalle?: string | null }> = [];
 
     if (nextEstado && nextEstado !== (existente.estado || "pendiente")) {

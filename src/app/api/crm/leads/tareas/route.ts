@@ -1,4 +1,5 @@
 // src/app/api/crm/leads/tareas/route.ts
+// src/app/api/crm/leads/tareas/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -11,27 +12,24 @@ type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 function tenantWhere(sessionUser: any) {
   const role = sessionUser?.role as Role | undefined;
 
-  // SUPERADMIN ve todo
   if (role === "SUPERADMIN") return {};
 
-  // ADMIN ve solo lo suyo: adminId = su propio id
   if (role === "ADMIN") return { adminId: Number(sessionUser.id) };
 
-  // AGENTE ve lo suyo: adminId = su adminId y agenteId = el suyo
-  if (role === "AGENTE")
+  if (role === "AGENTE") {
     return {
       adminId: Number(sessionUser.adminId),
       agenteId: Number(sessionUser.agenteId),
     };
+  }
 
-  // LUGAR ve lo suyo: adminId = su adminId y lugarId = el suyo
-  if (role === "LUGAR")
+  if (role === "LUGAR") {
     return {
       adminId: Number(sessionUser.adminId),
       lugarId: Number(sessionUser.lugarId),
     };
+  }
 
-  // CLIENTE (si lo usas) -> por defecto nada
   return { id: -1 };
 }
 
@@ -59,30 +57,21 @@ export async function GET() {
 
     const [vencidos, hoy, nuevos, todos] = await Promise.all([
       prisma.lead.findMany({
-        where: {
-          ...baseWhere,
-          proximaAccionEn: { lt: inicioHoy },
-        },
+        where: { ...baseWhere, proximaAccionEn: { lt: inicioHoy } },
         orderBy: [{ proximaAccionEn: "asc" }, { creadoEn: "desc" }],
         include,
         take: 500,
       }),
 
       prisma.lead.findMany({
-        where: {
-          ...baseWhere,
-          proximaAccionEn: { gte: inicioHoy, lte: finHoy },
-        },
+        where: { ...baseWhere, proximaAccionEn: { gte: inicioHoy, lte: finHoy } },
         orderBy: [{ proximaAccionEn: "asc" }, { creadoEn: "desc" }],
         include,
         take: 500,
       }),
 
       prisma.lead.findMany({
-        where: {
-          ...baseWhere,
-          creadoEn: { gte: hace24h },
-        },
+        where: { ...baseWhere, creadoEn: { gte: hace24h } },
         orderBy: { creadoEn: "desc" },
         include,
         take: 500,
@@ -98,7 +87,7 @@ export async function GET() {
 
     return NextResponse.json({ vencidos, hoy, nuevos, todos });
   } catch (e) {
-    console.error(e);
+    console.error("tareas leads error:", e);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

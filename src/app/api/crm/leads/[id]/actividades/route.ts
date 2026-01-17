@@ -1,3 +1,6 @@
+// src/app/api/crm/leads/[id]/actividades/route.ts
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -7,41 +10,41 @@ import {
   sessionRole,
 } from "@/lib/auth-server";
 
-function leadIdFromPath(req: NextRequest) {
-  // /api/crm/leads/[id]/actividades  => el [id] está en el penúltimo segmento
-  const idStr = req.nextUrl.pathname.split("/").slice(-2)[0];
-  const leadId = Number(idStr);
-  return leadId;
+type Params = { params: { id: string } };
+
+function parseId(id: string) {
+  const n = Number(id);
+  return !n || Number.isNaN(n) ? null : n;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
     const tenantAdminId = sessionAdminId(session);
     const agenteId = sessionAgenteId(session);
+    const lugarId = Number((session.user as any)?.lugarId ?? null);
 
-    const leadId = leadIdFromPath(req);
-    if (!leadId || Number.isNaN(leadId)) {
+    const leadId = parseId(params.id);
+    if (!leadId) {
       return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
     }
 
-    // 1) Cargar lead con control de acceso
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
-      select: { id: true, adminId: true, agenteId: true },
+      select: { id: true, adminId: true, agenteId: true, lugarId: true },
     });
 
     if (!lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
-    // Permisos
     if (role !== "SUPERADMIN") {
-      // Debe pertenecer al tenant
       if ((lead.adminId ?? null) !== tenantAdminId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
-      // Si es AGENTE, debe ser su lead
       if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
     }
@@ -65,32 +68,35 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest, { params }: Params) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
     const tenantAdminId = sessionAdminId(session);
     const agenteId = sessionAgenteId(session);
+    const lugarId = Number((session.user as any)?.lugarId ?? null);
     const usuarioId = Number((session.user as any).id);
 
-    const leadId = leadIdFromPath(req);
-    if (!leadId || Number.isNaN(leadId)) {
+    const leadId = parseId(params.id);
+    if (!leadId) {
       return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
     }
 
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
-      select: { id: true, adminId: true, agenteId: true },
+      select: { id: true, adminId: true, agenteId: true, lugarId: true },
     });
 
     if (!lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
-    // Permisos
     if (role !== "SUPERADMIN") {
       if ((lead.adminId ?? null) !== tenantAdminId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
       if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
       }
     }
