@@ -1,8 +1,7 @@
 // src/app/api/crm/leads/[id]/route.ts
-// src/app/api/crm/leads/[id]/route.ts
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   getSessionOrThrow,
@@ -11,15 +10,12 @@ import {
   sessionRole,
 } from "@/lib/auth-server";
 
-function parseId(id: string) {
+function parseId(id: unknown) {
   const n = Number(id);
   return !n || Number.isNaN(n) ? null : n;
 }
 
-export async function GET(
-  _req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(_req: Request, ctx: any) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -27,7 +23,7 @@ export async function GET(
     const agenteId = sessionAgenteId(session);
     const lugarId = Number((session.user as any)?.lugarId ?? null);
 
-    const leadId = parseId(context.params.id);
+    const leadId = parseId(ctx?.params?.id);
     if (!leadId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
     const lead = await prisma.lead.findUnique({
@@ -70,10 +66,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PATCH(req: Request, ctx: any) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -82,7 +75,7 @@ export async function PATCH(
     const lugarId = Number((session.user as any)?.lugarId ?? null);
     const usuarioId = Number((session.user as any).id);
 
-    const leadId = parseId(context.params.id);
+    const leadId = parseId(ctx?.params?.id);
     if (!leadId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
     const existente = await prisma.lead.findUnique({
