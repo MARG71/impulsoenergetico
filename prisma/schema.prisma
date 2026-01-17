@@ -218,6 +218,9 @@ model Usuario {
   productosGestionados    ProductoGanadero[]  @relation("AdminProductos")
   solicitudesGestionadas  SolicitudContrato[] @relation("AdminSolicitudes")
 
+  leadActividadesCreadas     LeadActividad[] @relation("UsuarioLeadActividades")
+  leadActividadesGestionadas LeadActividad[] @relation("AdminLeadActividades")
+
   cartelesCreados     CartelGenerado[] @relation("UsuarioCartelesCreados")
   cartelesGestionados CartelGenerado[] @relation("AdminCartelesGenerados")
 
@@ -251,11 +254,12 @@ model Lead {
   comparativaId Int?
   contratoId    Int?
 
+  actividades LeadActividad[]
+
   @@index([adminId])
   @@index([estado, creadoEn])
   @@index([proximaAccionEn])
 }
-
 
 model DatosFactura {
   id                   Int         @id @default(autoincrement())
@@ -666,4 +670,27 @@ model CartelGenerado {
   @@index([tipo, accion, creadoEn])
   @@index([adminId])
   @@map("carteles_generados")
+}
+
+model LeadActividad {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+
+  tipo    String
+  titulo  String
+  detalle String?
+
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // quién creó la actividad (usuario logueado)
+  usuarioId Int?
+  usuario   Usuario? @relation("UsuarioLeadActividades", fields: [usuarioId], references: [id])
+
+  // tenant / admin propietario
+  adminId Int?
+  admin   Usuario? @relation("AdminLeadActividades", fields: [adminId], references: [id])
+
+  @@index([leadId, creadoEn])
+  @@index([adminId])
 }
