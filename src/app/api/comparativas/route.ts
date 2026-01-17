@@ -103,16 +103,27 @@ export async function POST(request: Request) {
 
     // 4) Resultados
     await prisma.resultadoComparativa.createMany({
-      data: resultados.map((r: any) => ({
-        compañia: r.compañia,
-        tarifa: r.tarifa,
-        coste: Number(r.coste) || 0,
-        ahorro: Number(r.ahorro) || 0,
+    data: resultados.map((r: any) => {
+        const coste = Number(r.coste) || 0;
+        const ahorro = Number(r.ahorro) || 0;
+
+        return {
+        compañia: r.compañia ?? r.compañia ?? "",
+        tarifa: r.tarifa ?? "",
+        coste,
+        ahorro,
         ahorroPct: Number(r.ahorroPct) || 0,
         comision: Number(r.comision) || 0,
+
+        // ✅ CAMPOS NUEVOS (obligatorios en tu Prisma)
+        precioAnual: coste,          // si no tienes otro cálculo, usa coste anual estimado
+        ahorroEstimado: ahorro,      // mapeo directo desde tu cálculo
+
         comparativaId: nuevaComparativa.id,
-      })),
+        };
+    }),
     });
+
 
     // ✅ 5) AUTO-LINK con Lead (si existe por email/teléfono + agente/lugar)
     // (Si tu modelo Lead NO tiene comparativaId, dime tu schema y lo ajusto)
