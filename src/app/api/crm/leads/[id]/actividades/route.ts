@@ -1,4 +1,5 @@
 // src/app/api/crm/leads/[id]/actividades/route.ts
+// src/app/api/crm/leads/[id]/actividades/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,14 +11,15 @@ import {
   sessionRole,
 } from "@/lib/auth-server";
 
-type Params = { params: { id: string } };
-
 function parseId(id: string) {
   const n = Number(id);
   return !n || Number.isNaN(n) ? null : n;
 }
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(
+  _req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -25,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const agenteId = sessionAgenteId(session);
     const lugarId = Number((session.user as any)?.lugarId ?? null);
 
-    const leadId = parseId(params.id);
+    const leadId = parseId(context.params.id);
     if (!leadId) {
       return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
     }
@@ -68,7 +70,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 }
 
-export async function POST(req: NextRequest, { params }: Params) {
+export async function POST(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const lugarId = Number((session.user as any)?.lugarId ?? null);
     const usuarioId = Number((session.user as any).id);
 
-    const leadId = parseId(params.id);
+    const leadId = parseId(context.params.id);
     if (!leadId) {
       return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
     }

@@ -11,14 +11,15 @@ import {
   sessionRole,
 } from "@/lib/auth-server";
 
-type Params = { params: { id: string } };
-
 function parseId(id: string) {
   const n = Number(id);
   return !n || Number.isNaN(n) ? null : n;
 }
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(
+  _req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -26,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const agenteId = sessionAgenteId(session);
     const lugarId = Number((session.user as any)?.lugarId ?? null);
 
-    const leadId = parseId(params.id);
+    const leadId = parseId(context.params.id);
     if (!leadId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
     const lead = await prisma.lead.findUnique({
@@ -61,13 +62,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     return NextResponse.json(lead);
   } catch (e: any) {
-    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    if (e?.message === "NO_AUTH") {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
     console.error("GET lead crm error:", e);
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: Params) {
+export async function PATCH(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
@@ -76,7 +82,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const lugarId = Number((session.user as any)?.lugarId ?? null);
     const usuarioId = Number((session.user as any).id);
 
-    const leadId = parseId(params.id);
+    const leadId = parseId(context.params.id);
     if (!leadId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
     const existente = await prisma.lead.findUnique({
@@ -95,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (!existente) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
-    // ✅ permisos
+    // ✅ permisos multi-tenant
     if (role !== "SUPERADMIN") {
       if ((existente.adminId ?? null) !== tenantAdminId) {
         return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -158,16 +164,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const oldAccion = existente.proximaAccion || "";
-    const oldAccionEn = existente.proximaAccionEn ? new Date(existente.proximaAccionEn).toISOString() : "";
+    const oldAccionEn = existente.proximaAccionEn
+      ? new Date(existente.proximaAccionEn).toISOString()
+      : "";
 
     const newAccion = nextAccion !== undefined ? (nextAccion || "") : oldAccion;
-    const newAccionEn = nextAccionEn !== undefined ? (nextAccionEn ? nextAccionEn.toISOString() : "") : oldAccionEn;
+    const newAccionEn =
+      nextAccionEn !== undefined ? (nextAccionEn ? nextAccionEn.toISOString() : "") : oldAccionEn;
 
     if (newAccion !== oldAccion || newAccionEn !== oldAccionEn) {
       actividadesToCreate.push({
         tipo: "accion",
         titulo: "Próxima acción",
-        detalle: `${newAccion || "—"} ${newAccionEn ? "· " + new Date(newAccionEn).toLocaleString("es-ES") : ""}`,
+        detalle: `${newAccion || "—"} ${
+          newAccionEn ? "· " + new Date(newAccionEn).toLocaleString("es-ES") : ""
+        }`,
       });
     }
 
@@ -186,7 +197,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     return NextResponse.json(updated);
   } catch (e: any) {
-    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    if (e?.message === "NO_AUTH") {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
     console.error("PATCH lead crm error:", e);
     return NextResponse.json({ error: "Error guardando" }, { status: 500 });
   }
