@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const comparativaId = Number(params.id);
+// GET /api/comparativas/[id]
+export async function GET(req: Request, ctx: any) {
+  const id = ctx?.params?.id;
+
+  const comparativaId = Number(id);
 
   if (!comparativaId) {
     return NextResponse.json({ error: "ID no válido" }, { status: 400 });
@@ -21,7 +24,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     });
 
     if (!comparativa) {
-      return NextResponse.json({ error: "Comparativa no encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Comparativa no encontrada" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(comparativa);
