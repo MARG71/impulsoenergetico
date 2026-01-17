@@ -84,14 +84,33 @@ export async function GET(req: NextRequest) {
       _count: { _all: true },
     });
 
-    const estados = ESTADOS.reduce((acc, s) => {
-      acc[s] = 0;
-      return acc;
-    }, {} as Record<(typeof ESTADOS)[number], number>);
+    type EstadoKey = "pendiente" | "contactado" | "comparativa" | "contrato" | "cerrado" | "perdido";
+
+    function isEstadoKey(x: string): x is EstadoKey {
+    return (
+        x === "pendiente" ||
+        x === "contactado" ||
+        x === "comparativa" ||
+        x === "contrato" ||
+        x === "cerrado" ||
+        x === "perdido"
+    );
+    }
+
+    const estados: Record<EstadoKey, number> = {
+    pendiente: 0,
+    contactado: 0,
+    comparativa: 0,
+    contrato: 0,
+    cerrado: 0,
+    perdido: 0,
+    };
 
     for (const row of groupEstados) {
-      const key = String(row.estado || "pendiente").toLowerCase() as any;
-      if (key in estados) estados[key] = row._count._all;
+    const keyRaw = String((row as any)?.estado ?? "pendiente").toLowerCase();
+    if (isEstadoKey(keyRaw)) {
+        estados[keyRaw] = Number((row as any)?._count?._all ?? 0);
+    }
     }
 
     // top agentes
