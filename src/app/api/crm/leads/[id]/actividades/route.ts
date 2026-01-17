@@ -1,47 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const leadId = Number(params.id);
+export async function GET(req: NextRequest) {
+  try {
+    const idStr = req.nextUrl.pathname.split("/").slice(-2)[0]; // .../leads/[id]/actividades
+    const leadId = Number(idStr);
 
-  const actividades = await prisma.leadActividad.findMany({
-    where: { leadId },
-    orderBy: { creadoEn: "desc" },
-    include: {
-      usuario: { select: { nombre: true } },
-    },
-  });
+    if (!leadId || Number.isNaN(leadId)) {
+      return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
+    }
 
-  return NextResponse.json(actividades);
+    const actividades = await prisma.leadActividad.findMany({
+      where: { leadId },
+      orderBy: { creadoEn: "desc" },
+      take: 200,
+    });
+
+    return NextResponse.json({ items: actividades });
+  } catch (e) {
+    console.error("GET actividades lead error:", e);
+    return NextResponse.json({ error: "Error obteniendo actividades" }, { status: 500 });
+  }
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+export async function POST(req: NextRequest) {
+  try {
+    const idStr = req.nextUrl.pathname.split("/").slice(-2)[0]; // .../leads/[id]/actividades
+    const leadId = Number(idStr);
+
+    if (!leadId || Number.isNaN(leadId)) {
+      return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+
+    const tipo = String(body?.tipo || "nota");
+    const titulo = String(body?.titulo || "Actividad");
+    const detalle = body?.detalle ? String(body.detalle) : null;
+
+    // Intentamos resolver adminId desde el Lead (para trazabilidad multi-tenant)
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { id: true, adminId: true },
+    });
+
+    if (!lead) {
+      return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
+    }
+
+    const created = await prisma.leadActividad.create({
+      data: {
+        leadId,
+        tipo,
+        titulo,
+        detalle,
+        adminId: lead.adminId ?? null,
+        // usuarioId: aquí lo añadimos en el siguiente paso cuando lo leamos de sesión
+      },
+    });
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (e) {
+    console.error("POST actividades lead error:", e);
+    return NextResponse.json({ error: "Error creando actividad" }, { status: 500 });
   }
-
-  const leadId = Number(params.id);
-  const body = await req.json();
-
-  const actividad = await prisma.leadActividad.create({
-    data: {
-      leadId,
-      tipo: body.tipo,
-      titulo: body.titulo,
-      detalle: body.detalle || null,
-      usuarioId: (session.user as any).id,
-      adminId: (session.user as any).adminId,
-    },
-  });
-
-  return NextResponse.json(actividad, { status: 201 });
 }
