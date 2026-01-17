@@ -9,11 +9,9 @@ type LeadMini = {
   email: string;
   telefono: string;
   estado?: string | null;
-  creadoEn?: string | null;
-
+  creadoEn: string;
   proximaAccion?: string | null;
   proximaAccionEn?: string | null;
-
   agente?: { id: number; nombre: string | null } | null;
   lugar?: { id: number; nombre: string | null } | null;
 };
@@ -31,16 +29,17 @@ type Tareas = {
   pendientes?: LeadMini[];
   vencidas?: LeadMini[];
   hoy?: LeadMini[];
+  meta?: any;
 };
 
-async function fetchJson(url: string, init?: RequestInit, ms = 15000) {
+async function fetchJson<T = any>(url: string, init?: RequestInit, ms = 15000): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const res = await fetch(url, { ...init, cache: "no-store", signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
-    return data;
+    if (!res.ok) throw new Error((data as any)?.error || `Error ${res.status}`);
+    return data as T;
   } finally {
     clearTimeout(t);
   }
@@ -67,13 +66,58 @@ function pillEstado(estado?: string | null) {
   return `${base} bg-slate-900/60 text-slate-200 border-slate-700`;
 }
 
+function pillUrgencia(l: LeadMini, tipo: "vencidas" | "hoy" | "pendientes") {
+  const base = "inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold border";
+  const dt = l.proximaAccionEn ? new Date(l.proximaAccionEn) : null;
+
+  if (!dt) {
+    // sin siguiente paso (muy importante en pendientes)
+    return `${base} bg-fuchsia-600/15 border-fuchsia-400 text-fuchsia-100`;
+  }
+
+  const now = Date.now();
+  const msDiff = dt.getTime() - now;
+
+  if (tipo === "vencidas") {
+    // cuanto más retraso, más importante (visual simple)
+    return `${base} bg-red-600/15 border-red-400 text-red-100`;
+  }
+
+  if (tipo === "hoy") {
+    return `${base} bg-amber-600/15 border-amber-400 text-amber-100`;
+  }
+
+  // pendientes (futuras)
+  if (msDiff <= 24 * 60 * 60 * 1000) {
+    return `${base} bg-indigo-600/15 border-indigo-400 text-indigo-100`;
+  }
+  return `${base} bg-slate-900/60 border-slate-700 text-slate-200`;
+}
+
+function sortByProximaAscNullsLast(a: LeadMini, b: LeadMini) {
+  const da = a.proximaAccionEn ? new Date(a.proximaAccionEn).getTime() : Number.POSITIVE_INFINITY;
+  const db = b.proximaAccionEn ? new Date(b.proximaAccionEn).getTime() : Number.POSITIVE_INFINITY;
+  return da - db;
+}
+
+function sortPendientesPro(a: LeadMini, b: LeadMini) {
+  // 1) primero SIN proximaAccionEn (null)
+  const aNull = !a.proximaAccionEn;
+  const bNull = !b.proximaAccionEn;
+  if (aNull && !bNull) return -1;
+  if (!aNull && bNull) return 1;
+
+  // 2) luego por fecha asc
+  return sortByProximaAscNullsLast(a, b);
+}
+
 export default function LeadsContenido() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [rango, setRango] = useState<"hoy" | "7d" | "30d">("7d");
+  const [rango, setRango] = useState<"hoy" | "7d" | "30d">("30d");
   const [stats, setStats] = useState<LeadStats | null>(null);
   const [tareas, setTareas] = useState<Tareas | null>(null);
 
@@ -84,10 +128,10 @@ export default function LeadsContenido() {
     setError(null);
 
     try {
-      const t = (await fetchJson("/api/crm/leads/tareas")) as Tareas;
+      const t = await fetchJson<Tareas>("/api/crm/leads/tareas");
       setTareas(t);
 
-      const s = (await fetchJson(`/api/crm/leads/stats?rango=${rango}`)) as LeadStats;
+      const s = await fetchJson<LeadStats>(`/api/crm/leads/stats?rango=${rango}`);
       setStats(s);
     } catch (e: any) {
       setError(e?.message || "Error cargando Lead Center");
@@ -103,9 +147,9 @@ export default function LeadsContenido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rango]);
 
-  const pendientes = tareas?.pendientes || [];
-  const hoy = tareas?.hoy || [];
-  const vencidas = tareas?.vencidas || [];
+  const pendientesRaw = tareas?.pendientes ?? [];
+  const hoyRaw = tareas?.hoy ?? [];
+  const vencidasRaw = tareas?.vencidas ?? [];
 
   const filtrar = (items: LeadMini[]) => {
     const term = q.trim().toLowerCase();
@@ -114,23 +158,23 @@ export default function LeadsContenido() {
     return items.filter((l) => {
       const s = `${l.id} ${l.nombre} ${l.email} ${l.telefono} ${l.estado ?? ""} ${l.agente?.nombre ?? ""} ${
         l.lugar?.nombre ?? ""
-      }`.toLowerCase();
+      } ${l.proximaAccion ?? ""}`.toLowerCase();
       return s.includes(term);
     });
   };
 
-  const pendientesF = useMemo(() => filtrar(pendientes), [q, tareas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const hoyF = useMemo(() => filtrar(hoy), [q, tareas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const vencidasF = useMemo(() => filtrar(vencidas), [q, tareas]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pendientes = useMemo(() => filtrar(pendientesRaw).slice().sort(sortPendientesPro), [q, pendientesRaw]);
+  const hoy = useMemo(() => filtrar(hoyRaw).slice().sort(sortByProximaAscNullsLast), [q, hoyRaw]);
+  const vencidas = useMemo(() => filtrar(vencidasRaw).slice().sort(sortByProximaAscNullsLast), [q, vencidasRaw]);
 
-  if (loading) return <div className="p-6 text-slate-200">Cargando leads…</div>;
+  if (loading) return <div className="p-6 text-slate-200 text-base">Cargando leads…</div>;
 
   if (error) {
     return (
       <div className="p-6">
         <div className="max-w-2xl rounded-3xl bg-red-900/40 border border-red-500/40 text-red-100 p-5">
           <div className="text-xl font-extrabold">Error</div>
-          <div className="mt-2">{error}</div>
+          <div className="mt-2 text-base">{error}</div>
           <button
             onClick={cargar}
             className="mt-4 inline-flex px-4 py-2 rounded-full bg-slate-950 border border-slate-700 text-slate-100 font-bold hover:border-emerald-400"
@@ -142,7 +186,15 @@ export default function LeadsContenido() {
     );
   }
 
-  const Card = ({ title, items }: { title: string; items: LeadMini[] }) => (
+  const Card = ({
+    title,
+    items,
+    tipo,
+  }: {
+    title: string;
+    items: LeadMini[];
+    tipo: "vencidas" | "hoy" | "pendientes";
+  }) => (
     <div className="rounded-3xl bg-slate-950/85 border border-slate-700 p-5">
       <div className="flex items-center justify-between gap-3">
         <div className="text-xl font-extrabold text-white">{title}</div>
@@ -151,45 +203,60 @@ export default function LeadsContenido() {
 
       <div className="mt-3 space-y-2">
         {items.length === 0 ? (
-          <div className="rounded-2xl bg-slate-950/60 border border-slate-800 p-5 text-slate-400">
+          <div className="rounded-2xl bg-slate-950/60 border border-slate-800 p-5 text-slate-400 text-base">
             Sin leads en esta sección.
           </div>
         ) : (
-          items.slice(0, 14).map((l) => (
-            <button
-              key={l.id}
-              onClick={() => router.push(`/leads/${l.id}`)}
-              className="w-full text-left rounded-2xl bg-slate-900/60 border border-slate-800 px-4 py-3 hover:border-emerald-500/40 transition"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-white font-extrabold text-base">
-                    #{l.id} · {l.nombre}
+          items.slice(0, 16).map((l) => {
+            const urg = pillUrgencia(l, tipo);
+            const urgTxt = !l.proximaAccionEn
+              ? "SIN SIGUIENTE PASO"
+              : tipo === "vencidas"
+              ? "RETRASO"
+              : tipo === "hoy"
+              ? "HOY"
+              : "PROGRAMADA";
+
+            return (
+              <button
+                key={l.id}
+                onClick={() => router.push(`/leads/${l.id}`)}
+                className="w-full text-left rounded-2xl bg-slate-900/60 border border-slate-800 px-4 py-3 hover:border-emerald-500/40 transition"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-white font-extrabold text-base">
+                      #{l.id} · {l.nombre || "Lead sin nombre"}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={urg}>{urgTxt}</span>
+                      <span className={pillEstado(l.estado)}>{String(l.estado || "pendiente").toUpperCase()}</span>
+                    </div>
                   </div>
-                  <span className={pillEstado(l.estado)}>{String(l.estado || "pendiente").toUpperCase()}</span>
-                </div>
 
-                <div className="text-slate-300 text-sm">
-                  {l.email} · {l.telefono}
-                </div>
+                  <div className="text-slate-300 text-sm">
+                    {l.email || "—"} · {l.telefono || "—"}
+                  </div>
 
-                <div className="text-slate-400 text-sm">
-                  Próxima: <span className="font-bold text-slate-200">{l.proximaAccion || "—"}</span> ·{" "}
-                  <span className="font-bold text-slate-200">{fmt(l.proximaAccionEn)}</span>
-                </div>
+                  <div className="text-slate-400 text-sm">
+                    Próxima: <span className="font-extrabold text-slate-200">{l.proximaAccion || "—"}</span> ·{" "}
+                    <span className="font-extrabold text-slate-200">{fmt(l.proximaAccionEn)}</span>
+                  </div>
 
-                <div className="text-slate-500 text-xs">
-                  Agente: {l.agente?.nombre || "—"} · Lugar: {l.lugar?.nombre || "—"} · Creado: {fmt(l.creadoEn)}
+                  <div className="text-slate-500 text-xs">
+                    Agente: {l.agente?.nombre || "—"} · Lugar: {l.lugar?.nombre || "—"} · Creado: {fmt(l.creadoEn)}
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))
+              </button>
+            );
+          })
         )}
       </div>
 
-      {items.length > 14 && (
+      {items.length > 16 && (
         <div className="mt-3 text-xs text-slate-500 font-semibold">
-          Mostrando 14 de {items.length}. (Luego añadimos paginación si quieres)
+          Mostrando 16 de {items.length}. (Luego añadimos paginación)
         </div>
       )}
     </div>
@@ -201,7 +268,7 @@ export default function LeadsContenido() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold text-white">Lead Center PRO</h1>
-          <p className="text-slate-300 mt-1">Tareas, métricas y seguimiento comercial.</p>
+          <p className="text-slate-300 mt-1 text-base">Tareas, métricas y seguimiento comercial.</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -209,12 +276,12 @@ export default function LeadsContenido() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nombre, email, teléfono, agente, lugar…"
-            className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 font-bold outline-none focus:border-emerald-400 w-[320px] max-w-full"
+            className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 font-bold outline-none focus:border-emerald-400 w-[360px] max-w-full"
           />
 
           <select
             value={rango}
-            onChange={(e) => setRango(e.target.value as any)}
+            onChange={(e) => setRango(e.target.value as "hoy" | "7d" | "30d")}
             className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 font-bold"
           >
             <option value="hoy">Hoy</option>
@@ -256,9 +323,9 @@ export default function LeadsContenido() {
 
       {/* Tareas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="🔥 Vencidas" items={vencidasF} />
-        <Card title="📅 Para hoy" items={hoyF} />
-        <Card title="🧠 Pendientes" items={pendientesF} />
+        <Card title="🔥 Vencidas" items={vencidas} tipo="vencidas" />
+        <Card title="📅 Para hoy" items={hoy} tipo="hoy" />
+        <Card title="🧠 Pendientes" items={pendientes} tipo="pendientes" />
       </div>
     </div>
   );

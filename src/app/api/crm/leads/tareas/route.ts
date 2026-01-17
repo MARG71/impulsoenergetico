@@ -3,91 +3,135 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import {
+  getSessionOrThrow,
+  sessionAdminId,
+  sessionAgenteId,
+  sessionRole,
+} from "@/lib/auth-server";
 
 type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
-function tenantWhere(sessionUser: any) {
-  const role = sessionUser?.role as Role | undefined;
+function pickTenantWhere(session: any) {
+  const role = sessionRole(session) as Role;
+  const adminId = sessionAdminId(session);
+  const agenteId = sessionAgenteId(session);
+  const lugarId = Number((session.user as any)?.lugarId ?? null);
 
   if (role === "SUPERADMIN") return {};
 
-  if (role === "ADMIN") return { adminId: Number(sessionUser.id) };
+  // ADMIN: solo su tenant (adminId)
+  if (role === "ADMIN") return { adminId };
 
-  if (role === "AGENTE") {
-    return {
-      adminId: Number(sessionUser.adminId),
-      agenteId: Number(sessionUser.agenteId),
-    };
-  }
+  // AGENTE: solo sus leads
+  if (role === "AGENTE") return { adminId, agenteId };
 
-  if (role === "LUGAR") {
-    return {
-      adminId: Number(sessionUser.adminId),
-      lugarId: Number(sessionUser.lugarId),
-    };
-  }
+  // LUGAR: solo sus leads
+  if (role === "LUGAR") return { adminId, lugarId };
 
+  // resto, nada
   return { id: -1 };
 }
 
+function startOfDay(d = new Date()) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfDay(d = new Date()) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+const leadSelect = {
+  id: true,
+  nombre: true,
+  email: true,
+  telefono: true,
+  estado: true,
+  creadoEn: true,
+  proximaAccion: true,
+  proximaAccionEn: true,
+  agente: { select: { id: true, nombre: true } },
+  lugar: { select: { id: true, nombre: true } },
+} as const;
+
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-    }
+    const session = await getSessionOrThrow();
+    const tenantWhere = pickTenantWhere(session);
 
-    const baseWhere = tenantWhere(session.user);
+    const now = new Date();
+    const hoyStart = startOfDay(now);
+    const hoyEnd = endOfDay(now);
 
-    const inicioHoy = new Date();
-    inicioHoy.setHours(0, 0, 0, 0);
-
-    const finHoy = new Date();
-    finHoy.setHours(23, 59, 59, 999);
-
-    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    const include = {
-      agente: { select: { id: true, nombre: true } },
-      lugar: { select: { id: true, nombre: true } },
-    } as const;
-
-    const [vencidos, hoy, nuevos, todos] = await Promise.all([
+    /**
+     * Definición PRO:
+     * - vencidas: proximaAccionEn < NOW (no solo antes de hoy)
+     * - hoy: proximaAccionEn entre hoyStart y hoyEnd
+     * - pendientes:
+     *    a) proximaAccionEn > hoyEnd (futuras)
+     *    b) proximaAccionEn = null (sin siguiente acción -> prioridad real)
+     */
+    const [vencidas, hoy, pendientes] = await Promise.all([
       prisma.lead.findMany({
-        where: { ...baseWhere, proximaAccionEn: { lt: inicioHoy } },
+        where: {
+          ...tenantWhere,
+          proximaAccionEn: { not: null, lt: now },
+        },
         orderBy: [{ proximaAccionEn: "asc" }, { creadoEn: "desc" }],
-        include,
+        select: leadSelect,
         take: 500,
       }),
 
       prisma.lead.findMany({
-        where: { ...baseWhere, proximaAccionEn: { gte: inicioHoy, lte: finHoy } },
+        where: {
+          ...tenantWhere,
+          proximaAccionEn: { gte: hoyStart, lte: hoyEnd },
+        },
         orderBy: [{ proximaAccionEn: "asc" }, { creadoEn: "desc" }],
-        include,
+        select: leadSelect,
         take: 500,
       }),
 
       prisma.lead.findMany({
-        where: { ...baseWhere, creadoEn: { gte: hace24h } },
-        orderBy: { creadoEn: "desc" },
-        include,
+        where: {
+          ...tenantWhere,
+          OR: [
+            { proximaAccionEn: { gt: hoyEnd } }, // futuras
+            { proximaAccionEn: null }, // sin siguiente paso
+          ],
+        },
+        orderBy: [
+          { proximaAccionEn: "asc" }, // nulls first o last depende DB; ok igualmente
+          { creadoEn: "desc" },
+        ],
+        select: leadSelect,
         take: 500,
-      }),
-
-      prisma.lead.findMany({
-        where: { ...baseWhere },
-        orderBy: { creadoEn: "desc" },
-        include,
-        take: 2000,
       }),
     ]);
 
-    return NextResponse.json({ vencidos, hoy, nuevos, todos });
-  } catch (e) {
-    console.error("tareas leads error:", e);
+    // Para depurar rápido si quieres ver qué está entrando:
+    // console.log({ vencidas: vencidas.length, hoy: hoy.length, pendientes: pendientes.length });
+
+    return NextResponse.json({
+      vencidas,
+      hoy,
+      pendientes,
+      meta: {
+        now: now.toISOString(),
+        hoyStart: hoyStart.toISOString(),
+        hoyEnd: hoyEnd.toISOString(),
+      },
+    });
+  } catch (e: any) {
+    if (e?.message === "NO_AUTH") {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    console.error("crm leads tareas error:", e);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
