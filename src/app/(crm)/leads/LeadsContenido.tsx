@@ -112,7 +112,8 @@ export default function LeadsContenido() {
     setLoading(true);
     try {
       // ✅ TAREAS
-      const res = await fetch("/api/leads/tareas", { cache: "no-store" });
+      const res = await fetch("/api/crm/leads/tareas", { cache: "no-store" });
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Error al cargar leads");
