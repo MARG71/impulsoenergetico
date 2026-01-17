@@ -1,79 +1,33 @@
 // src/app/api/crm/leads/[id]/route.ts
-// src/app/api/crm/leads/[id]/route.ts
-export const runtime = "nodejs";
-
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
+import {
+  getSessionOrThrow,
+  sessionAdminId,
+  sessionAgenteId,
+  sessionRole,
+} from "@/lib/auth-server";
 
-type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
-
-function getIdFromPath(req: NextRequest) {
-  const parts = req.nextUrl.pathname.split("/").filter(Boolean);
-  const idStr = parts[parts.length - 1];
-  const id = Number(idStr);
-  return Number.isFinite(id) ? id : null;
+function leadIdFromPath(req: NextRequest) {
+  const idStr = req.nextUrl.pathname.split("/").pop();
+  const leadId = Number(idStr);
+  return leadId;
 }
 
-function tenantWhereFromToken(token: any) {
-  const role = (token?.role as Role | undefined) || undefined;
-
-  const isSuperadmin = role === "SUPERADMIN";
-  const isAdmin = role === "ADMIN";
-  const isAgente = role === "AGENTE";
-  const isLugar = role === "LUGAR";
-
-  // 🔐 Tenant adminId:
-  // - ADMIN: su tenant es su propio id
-  // - AGENTE/LUGAR: tenant = token.adminId (lo setea authOptions)
-  // - SUPERADMIN: sin filtro
-  const tenantAdminId =
-    isAdmin ? Number(token?.id) : Number(token?.adminId ?? null);
-
-  const where: any = {};
-
-  if (!isSuperadmin) {
-    if (!tenantAdminId || !Number.isFinite(tenantAdminId)) {
-      // Si no hay adminId en un rol que lo requiere, bloqueamos
-      return { error: "Tenant no resuelto", where: null };
-    }
-    where.adminId = tenantAdminId;
-  }
-
-  // Restricciones por rol
-  if (isAgente) {
-    const agenteId = Number(token?.agenteId ?? null);
-    if (!agenteId || !Number.isFinite(agenteId)) {
-      return { error: "agenteId no válido", where: null };
-    }
-    where.agenteId = agenteId;
-  }
-
-  if (isLugar) {
-    const lugarId = Number(token?.lugarId ?? null);
-    if (!lugarId || !Number.isFinite(lugarId)) {
-      return { error: "lugarId no válido", where: null };
-    }
-    where.lugarId = lugarId;
-  }
-
-  return { error: null, where };
-}
-
-// ✅ GET /api/crm/leads/[id]
 export async function GET(req: NextRequest) {
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    const session = await getSessionOrThrow();
+    const role = sessionRole(session);
+    const tenantAdminId = sessionAdminId(session);
+    const agenteId = sessionAgenteId(session);
 
-    const id = getIdFromPath(req);
-    if (!id) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
+    const leadId = leadIdFromPath(req);
+    if (!leadId || Number.isNaN(leadId)) {
+      return NextResponse.json({ error: "ID no válido" }, { status: 400 });
+    }
 
-    const { error, where } = tenantWhereFromToken(token);
-    if (error || !where) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-
-    const lead = await prisma.lead.findFirst({
-      where: { id, ...where },
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
       include: {
         agente: { select: { id: true, nombre: true } },
         lugar: { select: { id: true, nombre: true } },
@@ -82,62 +36,133 @@ export async function GET(req: NextRequest) {
 
     if (!lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
+    if (role !== "SUPERADMIN") {
+      if ((lead.adminId ?? null) !== tenantAdminId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+
     return NextResponse.json(lead);
-  } catch (e) {
-    console.error("GET lead error:", e);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  } catch (e: any) {
+    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    console.error("GET lead crm error:", e);
+    return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
 
-// ✅ PATCH /api/crm/leads/[id]
 export async function PATCH(req: NextRequest) {
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    const session = await getSessionOrThrow();
+    const role = sessionRole(session);
+    const tenantAdminId = sessionAdminId(session);
+    const agenteId = sessionAgenteId(session);
+    const usuarioId = Number((session.user as any).id);
 
-    const id = getIdFromPath(req);
-    if (!id) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
-
-    const { error, where } = tenantWhereFromToken(token);
-    if (error || !where) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-
-    const body = await req.json().catch(() => ({}));
-
-    // Campos permitidos (ajusta si quieres)
-    const data: any = {};
-
-    if (typeof body.estado === "string") data.estado = body.estado;
-    if (typeof body.notas === "string") data.notas = body.notas;
-    if (typeof body.proximaAccion === "string") data.proximaAccion = body.proximaAccion;
-
-    // proximaAccionEn puede venir como ISO string o null
-    if (body.proximaAccionEn === null) {
-      data.proximaAccionEn = null;
-    } else if (typeof body.proximaAccionEn === "string" && body.proximaAccionEn.trim()) {
-      const d = new Date(body.proximaAccionEn);
-      if (Number.isFinite(d.getTime())) data.proximaAccionEn = d;
+    const leadId = leadIdFromPath(req);
+    if (!leadId || Number.isNaN(leadId)) {
+      return NextResponse.json({ error: "ID no válido" }, { status: 400 });
     }
 
-    // Seguridad: solo actualiza si existe y pertenece al tenant/rol
-    const existente = await prisma.lead.findFirst({
-      where: { id, ...where },
-      select: { id: true },
+    const existente = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: {
+        id: true,
+        adminId: true,
+        agenteId: true,
+        estado: true,
+        notas: true,
+        proximaAccion: true,
+        proximaAccionEn: true,
+      },
     });
 
     if (!existente) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
+    if (role !== "SUPERADMIN") {
+      if ((existente.adminId ?? null) !== tenantAdminId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "AGENTE" && agenteId && existente.agenteId !== agenteId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+
+    const body = await req.json().catch(() => ({}));
+
+    const nextEstado = body?.estado ? String(body.estado) : null;
+    const nextNotas = Object.prototype.hasOwnProperty.call(body, "notas") ? (body.notas ? String(body.notas) : null) : undefined;
+    const nextAccion = Object.prototype.hasOwnProperty.call(body, "proximaAccion") ? (body.proximaAccion ? String(body.proximaAccion) : null) : undefined;
+    const nextAccionEn = Object.prototype.hasOwnProperty.call(body, "proximaAccionEn")
+      ? (body.proximaAccionEn ? new Date(String(body.proximaAccionEn)) : null)
+      : undefined;
+
     const updated = await prisma.lead.update({
-      where: { id },
-      data,
+      where: { id: leadId },
+      data: {
+        ...(nextEstado ? { estado: nextEstado } : {}),
+        ...(nextNotas !== undefined ? { notas: nextNotas } : {}),
+        ...(nextAccion !== undefined ? { proximaAccion: nextAccion } : {}),
+        ...(nextAccionEn !== undefined ? { proximaAccionEn: nextAccionEn } : {}),
+      },
       include: {
         agente: { select: { id: true, nombre: true } },
         lugar: { select: { id: true, nombre: true } },
       },
     });
 
+    // ✅ Actividades automáticas:
+    const actividadesToCreate: Array<{ tipo: string; titulo: string; detalle?: string | null }> = [];
+
+    if (nextEstado && nextEstado !== (existente.estado || "pendiente")) {
+      actividadesToCreate.push({
+        tipo: "estado",
+        titulo: "Cambio de estado",
+        detalle: `${(existente.estado || "pendiente").toUpperCase()} → ${nextEstado.toUpperCase()}`,
+      });
+    }
+
+    if (nextNotas !== undefined && (nextNotas || "") !== (existente.notas || "")) {
+      actividadesToCreate.push({
+        tipo: "nota",
+        titulo: "Nota actualizada",
+        detalle: (nextNotas || "").slice(0, 600) || "(vacía)",
+      });
+    }
+
+    const oldAccion = existente.proximaAccion || "";
+    const oldAccionEn = existente.proximaAccionEn ? new Date(existente.proximaAccionEn).toISOString() : "";
+
+    const newAccion = nextAccion !== undefined ? (nextAccion || "") : oldAccion;
+    const newAccionEn = nextAccionEn !== undefined ? (nextAccionEn ? nextAccionEn.toISOString() : "") : oldAccionEn;
+
+    if (newAccion !== oldAccion || newAccionEn !== oldAccionEn) {
+      actividadesToCreate.push({
+        tipo: "accion",
+        titulo: "Próxima acción",
+        detalle: `${newAccion || "—"} ${newAccionEn ? "· " + new Date(newAccionEn).toLocaleString("es-ES") : ""}`,
+      });
+    }
+
+    if (actividadesToCreate.length) {
+      await prisma.leadActividad.createMany({
+        data: actividadesToCreate.map((a) => ({
+          leadId,
+          tipo: a.tipo,
+          titulo: a.titulo,
+          detalle: a.detalle ?? null,
+          usuarioId,
+          adminId: existente.adminId ?? tenantAdminId ?? null,
+        })),
+      });
+    }
+
     return NextResponse.json(updated);
-  } catch (e) {
-    console.error("PATCH lead error:", e);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  } catch (e: any) {
+    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    console.error("PATCH lead crm error:", e);
+    return NextResponse.json({ error: "Error guardando" }, { status: 500 });
   }
 }
