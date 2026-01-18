@@ -224,6 +224,8 @@ model Usuario {
   cartelesCreados     CartelGenerado[] @relation("UsuarioCartelesCreados")
   cartelesGestionados CartelGenerado[] @relation("AdminCartelesGenerados")
 
+  plantillasMensajes PlantillaMensaje[]
+
   @@index([adminId])
 }
 
@@ -693,4 +695,26 @@ model LeadActividad {
 
   @@index([leadId, creadoEn])
   @@index([adminId])
+}
+
+model PlantillaMensaje {
+  id            Int      @id @default(autoincrement())
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  // Multi-tenant
+  adminId Int?
+  admin   Usuario? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  // Clasificación
+  canal    String  @default("whatsapp") // whatsapp | email | sms (futuro)
+  etapa    String // primero | seguimiento | factura | oferta | cierre | referidos
+  variante String  @default("A") // A | B
+  activa   Boolean @default(true)
+
+  // Contenido
+  titulo    String
+  contenido String
+
+  @@index([adminId, canal, etapa, variante])
 }

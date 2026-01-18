@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type PlantillaMsg = { etapa: string; variante: "A" | "B"; contenido: string; activa: boolean };
+
+
 type LeadMini = {
   id: number;
   nombre: string;
@@ -119,22 +122,28 @@ function leadEstado(estado?: string | null) {
 }
 
 /** Plantillas (2.6) — luego las hacemos editables desde CRM */
-function plantillaWA(lead: LeadMini, kind: "primero" | "seguimiento" | "factura" | "oferta" | "cierre") {
-  const nombre = lead.nombre || "";
-  if (kind === "primero") {
-    return `Hola ${nombre}, soy de Impulso Energético. Te escribo por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`;
-  }
-  if (kind === "seguimiento") {
-    return `Hola ${nombre}, te hago un seguimiento 😊 ¿Pudiste verlo? Si quieres, lo resolvemos en 2 minutos.`;
-  }
-  if (kind === "factura") {
-    return `Genial ${nombre}. Para prepararte el ahorro exacto necesito una foto de tu última factura (o CUPS y potencia). ¿Me la puedes enviar por aquí?`;
-  }
-  if (kind === "oferta") {
-    return `Perfecto ${nombre}. Te preparo una oferta con el mejor ahorro posible. ¿Prefieres que te la envíe por WhatsApp o por email?`;
-  }
-  return `Vamos a cerrarlo ${nombre} ✅ Si te parece, te dejo el contrato listo hoy. ¿Te viene bien que lo firmemos ahora?`;
+function renderPlantilla(
+  tpl: string,
+  lead: { nombre?: string | null }
+) {
+  return tpl.replaceAll("{{nombre}}", lead?.nombre || "");
 }
+
+function getTpl(plantillas: PlantillaMsg[], etapa: string, variante: "A" | "B") {
+  return plantillas.find((p) => p.etapa === etapa && p.variante === variante)?.contenido || null;
+}
+
+function chooseVar(abFlip: 0 | 1): "A" | "B" {
+  return abFlip === 0 ? "A" : "B";
+}
+
+function msgFromCRM(etapa: string, lead: any, plantillas: PlantillaMsg[], abFlip: 0 | 1) {
+  const varSel = chooseVar(abFlip);
+  const tpl = getTpl(plantillas, etapa, varSel) || getTpl(plantillas, etapa, "A") || "";
+  const msg = tpl ? renderPlantilla(tpl, lead) : `Hola ${lead?.nombre || ""}, soy de Impulso Energético.`;
+  return { msg, variante: varSel };
+}
+
 
 type Playbook = {
   key: string;
@@ -157,6 +166,21 @@ export default function LeadsContenido() {
 
   const [q, setQ] = useState("");
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+
+  const [plantillas, setPlantillas] = useState<PlantillaMsg[]>([]);
+  const [abFlip, setAbFlip] = useState<0 | 1>(0); // alterna A/B
+
+  const cargarPlantillas = async () => {
+    const data = await fetchJson("/api/crm/plantillas?canal=whatsapp");
+    const items = Array.isArray(data?.items) ? data.items : [];
+    setPlantillas(items.filter((p: any) => p.activa));
+  };
+
+  useEffect(() => {
+    cargarPlantillas().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const showOk = (msg: string) => {
     setToast({ type: "ok", msg });
@@ -269,7 +293,10 @@ export default function LeadsContenido() {
           hint: "WhatsApp de seguimiento + próxima en 24h",
           tone: "red",
           run: async (l) => {
-            await doWhatsApp(l, plantillaWA(l, "seguimiento"), "Seguimiento WhatsApp");
+            const { msg, variante } = msgFromCRM("seguimiento", l, plantillas, abFlip);
+            await doWhatsApp(l, msg, `Seguimiento WhatsApp (${variante})`);
+            setAbFlip((x) => (x === 0 ? 1 : 0));
+
             await patchLead(l.id, { proximaAccion: "Llamar (recuperación)", proximaAccionEn: addHoursISO(24) });
           },
         };
@@ -283,7 +310,10 @@ export default function LeadsContenido() {
           hint: "WhatsApp + próxima mañana 10:00",
           tone: "emerald",
           run: async (l) => {
-            await doWhatsApp(l, plantillaWA(l, "primero"), "Primer WhatsApp");
+            const { msg, variante } = msgFromCRM("seguimiento", l, plantillas, abFlip);
+            await doWhatsApp(l, msg, `Seguimiento WhatsApp (${variante})`);
+            setAbFlip((x) => (x === 0 ? 1 : 0));
+
             await patchLead(l.id, { proximaAccion: "Llamar (seguimiento)", proximaAccionEn: tomorrowAt10ISO() });
           },
         };
@@ -311,7 +341,10 @@ export default function LeadsContenido() {
           hint: "WhatsApp pidiendo factura + próxima mañana 10:00",
           tone: "blue",
           run: async (l) => {
-            await doWhatsApp(l, plantillaWA(l, "factura"), "Solicitud de factura");
+            const { msg, variante } = msgFromCRM("seguimiento", l, plantillas, abFlip);
+            await doWhatsApp(l, msg, `Seguimiento WhatsApp (${variante})`);
+            setAbFlip((x) => (x === 0 ? 1 : 0));
+
             await patchLead(l.id, { proximaAccion: "Llamar (si no responde)", proximaAccionEn: tomorrowAt10ISO() });
           },
         };
@@ -325,7 +358,10 @@ export default function LeadsContenido() {
           hint: "WhatsApp oferta + próxima en 24h",
           tone: "purple",
           run: async (l) => {
-            await doWhatsApp(l, plantillaWA(l, "oferta"), "Oferta enviada");
+            const { msg, variante } = msgFromCRM("seguimiento", l, plantillas, abFlip);
+            await doWhatsApp(l, msg, `Seguimiento WhatsApp (${variante})`);
+            setAbFlip((x) => (x === 0 ? 1 : 0));
+
             await patchLead(l.id, { proximaAccion: "Llamar (cierre oferta)", proximaAccionEn: addHoursISO(24) });
           },
         };
@@ -339,7 +375,10 @@ export default function LeadsContenido() {
           hint: "WhatsApp cierre + próxima en 6h",
           tone: "amber",
           run: async (l) => {
-            await doWhatsApp(l, plantillaWA(l, "cierre"), "Cierre / firma");
+            const { msg, variante } = msgFromCRM("seguimiento", l, plantillas, abFlip);
+            await doWhatsApp(l, msg, `Seguimiento WhatsApp (${variante})`);
+            setAbFlip((x) => (x === 0 ? 1 : 0));
+
             await patchLead(l.id, { proximaAccion: "Llamar (firma)", proximaAccionEn: addHoursISO(6) });
           },
         };
@@ -497,7 +536,10 @@ export default function LeadsContenido() {
                 setBusyId(l.id);
                 (async () => {
                   try {
-                    await doWhatsApp(l, plantillaWA(l, "seguimiento"), "Seguimiento WhatsApp");
+                    const { msg, variante } = msgFromCRM("seguimiento", l, plantillas, abFlip);
+                    await doWhatsApp(l, msg, `Seguimiento WhatsApp (${variante})`);
+                    setAbFlip((x) => (x === 0 ? 1 : 0));
+
                     showOk(`WhatsApp ✅ (#${l.id})`);
                     await cargar();
                   } catch (err: any) {
