@@ -123,6 +123,43 @@ export default function LeadsContenido() {
 
   const [q, setQ] = useState("");
 
+  const [toast, setToast] = useState<string | null>(null);
+
+  const ejecutarAccion = async (lead: LeadMini, canal: "whatsapp" | "llamada") => {
+    try {
+      const res = await fetchJson<{
+        ok: boolean;
+        whatsappUrl?: string;
+        nextAt?: string;
+      }>(`/api/crm/leads/${lead.id}/next-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canal, delayHours: 48 }),
+      });
+
+      setToast(`✅ Acción registrada (${canal}) · Próxima en 48h`);
+      setTimeout(() => setToast(null), 2200);
+
+      // refresca listas + stats
+      await cargar();
+
+      // si es WhatsApp, abrimos el link
+      if (canal === "whatsapp" && res.whatsappUrl) {
+        window.open(res.whatsappUrl, "_blank", "noopener,noreferrer");
+      }
+
+      // si es llamada, abrimos tel:
+      if (canal === "llamada") {
+        const tel = String(lead.telefono || "").replace(/\s/g, "");
+        window.location.href = `tel:${tel}`;
+      }
+    } catch (e: any) {
+     setToast(`❌ ${e?.message || "No se pudo ejecutar"}`);
+      setTimeout(() => setToast(null), 2500);
+    }
+  };
+
+
   const cargar = async () => {
     setLoading(true);
     setError(null);
