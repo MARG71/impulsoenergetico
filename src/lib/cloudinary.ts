@@ -42,11 +42,13 @@ export async function uploadBufferToCloudinary(params: {
       {
         folder,
         resource_type: resourceType,
+        type: "upload", // ✅ fuerza que sea público
         filename_override: filename,
         use_filename: true,
         unique_filename: true,
         overwrite: false,
       },
+
       (error, result) => {
         if (error || !result) return reject(error || new Error("Upload failed"));
         resolve({
