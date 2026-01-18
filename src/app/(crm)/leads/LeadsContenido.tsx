@@ -14,6 +14,11 @@ type LeadMini = {
   proximaAccionEn?: string | null;
   agente?: { id: number; nombre: string | null } | null;
   lugar?: { id: number; nombre: string | null } | null;
+
+  // viene del backend tareas
+  score?: number;
+  recomendacion?: string;
+  lastActAt?: string | null;
 };
 
 type LeadStats = {
@@ -29,17 +34,21 @@ type Tareas = {
   pendientes?: LeadMini[];
   vencidas?: LeadMini[];
   hoy?: LeadMini[];
-  meta?: any;
+  alertas?: {
+    vencidas48h?: LeadMini[];
+    sinActividad?: LeadMini[];
+    calientes?: LeadMini[];
+  };
 };
 
-async function fetchJson<T = any>(url: string, init?: RequestInit, ms = 15000): Promise<T> {
+async function fetchJson(url: string, init?: RequestInit, ms = 15000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const res = await fetch(url, { ...init, cache: "no-store", signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((data as any)?.error || `Error ${res.status}`);
-    return data as T;
+    if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
+    return data;
   } finally {
     clearTimeout(t);
   }
@@ -54,6 +63,20 @@ function fmt(dt?: string | null) {
   }
 }
 
+function cleanPhone(raw?: string | null) {
+  const s = String(raw ?? "").replace(/[^\d+]/g, "");
+  return s;
+}
+
+function makeWhatsAppLink(nombre?: string | null, telefono?: string | null) {
+  const tel = cleanPhone(telefono);
+  const texto = encodeURIComponent(
+    `Hola ${nombre || ""}, soy de Impulso Energético. Te contacto por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`
+  );
+  if (!tel) return null;
+  return `https://wa.me/${tel}?text=${texto}`;
+}
+
 function pillEstado(estado?: string | null) {
   const e = String(estado || "pendiente").toLowerCase();
   const base = "inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold border";
@@ -66,18 +89,28 @@ function pillEstado(estado?: string | null) {
   return `${base} bg-slate-900/60 text-slate-200 border-slate-700`;
 }
 
-function pillNext(proximaAccion?: string | null, proximaAccionEn?: string | null) {
+function pillScore(score?: number) {
+  const s = Math.max(0, Math.min(100, Number(score ?? 0)));
   const base = "inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold border";
-  if (!proximaAccion && !proximaAccionEn) {
-    return { text: "SIN SIGUIENTE PASO", className: `${base} bg-purple-900/35 text-purple-100 border-purple-500/40` };
-  }
-  return { text: "SIGUIENTE PASO", className: `${base} bg-slate-900/60 text-slate-200 border-slate-700` };
+  if (s >= 80) return `${base} bg-emerald-600/20 text-emerald-100 border-emerald-400/70`;
+  if (s >= 70) return `${base} bg-green-900/25 text-green-100 border-green-500/40`;
+  if (s >= 50) return `${base} bg-amber-900/25 text-amber-100 border-amber-500/40`;
+  if (s >= 30) return `${base} bg-blue-900/25 text-blue-100 border-blue-500/40`;
+  return `${base} bg-slate-900/60 text-slate-200 border-slate-700`;
+}
+
+function tomorrowAt10ISO() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  return d.toISOString();
 }
 
 export default function LeadsContenido() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [rango, setRango] = useState<"hoy" | "7d" | "30d">("30d");
@@ -85,16 +118,26 @@ export default function LeadsContenido() {
   const [tareas, setTareas] = useState<Tareas | null>(null);
 
   const [q, setQ] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+
+  const showOk = (msg: string) => {
+    setToast({ type: "ok", msg });
+    setTimeout(() => setToast(null), 2200);
+  };
+  const showErr = (msg: string) => {
+    setToast({ type: "err", msg });
+    setTimeout(() => setToast(null), 3200);
+  };
 
   const cargar = async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const t = await fetchJson<Tareas>("/api/crm/leads/tareas");
+      const t = (await fetchJson("/api/crm/leads/tareas")) as Tareas;
       setTareas(t);
 
-      const s = await fetchJson<LeadStats>(`/api/crm/leads/stats?rango=${rango}`);
+      const s = (await fetchJson(`/api/crm/leads/stats?rango=${rango}`)) as LeadStats;
       setStats(s);
     } catch (e: any) {
       setError(e?.message || "Error cargando Lead Center");
@@ -110,53 +153,119 @@ export default function LeadsContenido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rango]);
 
-  const ejecutarAccion = async (lead: LeadMini, canal: "whatsapp" | "llamada") => {
-    try {
-      const res = await fetchJson<{ ok: boolean; whatsappUrl?: string }>(
-        `/api/crm/leads/${lead.id}/next-action`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ canal, delayHours: 48 }),
-        }
-      );
-
-      setToast(`✅ Acción registrada (${canal}) · Próxima en 48h`);
-      setTimeout(() => setToast(null), 2200);
-
-      await cargar();
-
-      if (canal === "whatsapp" && res.whatsappUrl) {
-        window.open(res.whatsappUrl, "_blank", "noopener,noreferrer");
-      }
-
-      if (canal === "llamada") {
-        const tel = String(lead.telefono || "").replace(/\s/g, "");
-        window.location.href = `tel:${tel}`;
-      }
-    } catch (e: any) {
-      setToast(`❌ ${e?.message || "No se pudo ejecutar"}`);
-      setTimeout(() => setToast(null), 2500);
-    }
-  };
-
   const pendientes = tareas?.pendientes || [];
   const hoy = tareas?.hoy || [];
   const vencidas = tareas?.vencidas || [];
 
+  const alertas = tareas?.alertas || {};
+  const calientes = alertas.calientes || [];
+  const sinActividad = alertas.sinActividad || [];
+  const vencidas48h = alertas.vencidas48h || [];
+
   const filtrar = (items: LeadMini[]) => {
     const term = q.trim().toLowerCase();
     if (!term) return items;
+
     return items.filter((l) => {
-      const s =
-        `${l.id} ${l.nombre} ${l.email} ${l.telefono} ${l.estado ?? ""} ${l.agente?.nombre ?? ""} ${l.lugar?.nombre ?? ""}`.toLowerCase();
+      const s = `${l.id} ${l.nombre} ${l.email} ${l.telefono} ${l.estado ?? ""} ${l.agente?.nombre ?? ""} ${
+        l.lugar?.nombre ?? ""
+      } ${(l.recomendacion ?? "")}`.toLowerCase();
       return s.includes(term);
     });
   };
 
-  const pendientesF = useMemo(() => filtrar(pendientes), [q, tareas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const hoyF = useMemo(() => filtrar(hoy), [q, tareas]); // eslint-disable-line react-hooks/exhaustive-deps
-  const vencidasF = useMemo(() => filtrar(vencidas), [q, tareas]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pendientesF = useMemo(() => filtrar(pendientes), [q, tareas]); // eslint-disable-line
+  const hoyF = useMemo(() => filtrar(hoy), [q, tareas]); // eslint-disable-line
+  const vencidasF = useMemo(() => filtrar(vencidas), [q, tareas]); // eslint-disable-line
+
+  // --------- Acciones rápidas (2.5) ----------
+  const postActividad = async (leadId: number, tipo: string, titulo: string, detalle?: string | null) => {
+    await fetchJson(`/api/crm/leads/${leadId}/actividades`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo, titulo, detalle: detalle ?? null }),
+    });
+  };
+
+  const patchLead = async (
+    leadId: number,
+    data: Partial<{
+      estado: string;
+      notas: string | null;
+      proximaAccion: string | null;
+      proximaAccionEn: string | null;
+    }>
+  ) => {
+    await fetchJson(`/api/crm/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  };
+
+  const accionLlamada = async (l: LeadMini) => {
+    setBusyId(l.id);
+    try {
+      await postActividad(l.id, "llamada", "Llamada realizada", "Se intentó contactar por teléfono.");
+      showOk(`Llamada registrada (#${l.id})`);
+      await cargar();
+    } catch (e: any) {
+      showErr(e?.message || "Error registrando llamada");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const accionWhatsApp = async (l: LeadMini) => {
+    const link = makeWhatsAppLink(l.nombre, l.telefono);
+    if (!link) {
+      showErr("Teléfono no válido para WhatsApp");
+      return;
+    }
+
+    setBusyId(l.id);
+    try {
+      await postActividad(l.id, "whatsapp", "WhatsApp enviado", "Se envió mensaje por WhatsApp.");
+      showOk(`WhatsApp registrado (#${l.id})`);
+      window.open(link, "_blank", "noopener,noreferrer");
+      await cargar();
+    } catch (e: any) {
+      showErr(e?.message || "Error registrando WhatsApp");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const accionContactado = async (l: LeadMini) => {
+    setBusyId(l.id);
+    try {
+      await patchLead(l.id, { estado: "contactado" });
+      showOk(`Estado CONTACTADO (#${l.id})`);
+      await cargar();
+    } catch (e: any) {
+      showErr(e?.message || "Error cambiando estado");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const accionProximaManana10 = async (l: LeadMini) => {
+    setBusyId(l.id);
+    try {
+      await patchLead(l.id, {
+        proximaAccion: "Llamar (seguimiento)",
+        proximaAccionEn: tomorrowAt10ISO(),
+      });
+      showOk(`Próxima acción mañana 10:00 (#${l.id})`);
+      await cargar();
+    } catch (e: any) {
+      showErr(e?.message || "Error programando próxima acción");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // ------------------------------------------
 
   if (loading) return <div className="p-6 text-slate-200">Cargando leads…</div>;
 
@@ -177,6 +286,116 @@ export default function LeadsContenido() {
     );
   }
 
+  const LeadRow = ({ l }: { l: LeadMini }) => {
+    const isBusy = busyId === l.id;
+    return (
+      <button
+        onClick={() => router.push(`/leads/${l.id}`)}
+        className="w-full text-left rounded-2xl bg-slate-900/60 border border-slate-800 px-4 py-3 hover:border-emerald-500/40 transition"
+      >
+        <div className="flex flex-col gap-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-white font-extrabold text-base">
+              #{l.id} · {l.nombre || "Sin nombre"}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <span className={pillScore(l.score)}>{`SCORE ${Math.round(Number(l.score ?? 0))}`}</span>
+              <span className={pillEstado(l.estado)}>{String(l.estado || "pendiente").toUpperCase()}</span>
+            </div>
+          </div>
+
+          <div className="text-slate-300 text-sm">
+            {l.email} · {l.telefono}
+          </div>
+
+          <div className="text-slate-400 text-sm">
+            Próxima: <span className="font-bold text-slate-200">{l.proximaAccion || "—"}</span> ·{" "}
+            <span className="font-bold text-slate-200">{fmt(l.proximaAccionEn)}</span>
+          </div>
+
+          {/* Recomendación + última actividad */}
+          <div className="mt-1 rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2">
+            <div className="text-xs font-extrabold text-emerald-200">🧠 Recomendación</div>
+            <div className="text-sm text-slate-200 mt-0.5">{l.recomendacion || "—"}</div>
+            <div className="text-xs text-slate-500 mt-1">
+              Última actividad: <span className="font-semibold text-slate-300">{fmt(l.lastActAt ?? null)}</span>
+            </div>
+          </div>
+
+          {/* Botonera 2.5 */}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                accionLlamada(l);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-blue-900/35 border border-blue-500/40 text-blue-100 text-xs font-extrabold hover:bg-blue-900/45 disabled:opacity-60"
+              title="Registrar llamada como actividad"
+            >
+              📞 Llamada
+            </button>
+
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                accionWhatsApp(l);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-xs font-extrabold hover:bg-emerald-600/25 disabled:opacity-60"
+              title="Abrir WhatsApp y registrar actividad"
+            >
+              💬 WhatsApp
+            </button>
+
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                accionContactado(l);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-slate-950 border border-slate-700 text-slate-100 text-xs font-extrabold hover:border-emerald-400 disabled:opacity-60"
+              title="Cambiar estado a CONTACTADO (genera actividad automática)"
+            >
+              ✅ Contactado
+            </button>
+
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                accionProximaManana10(l);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-purple-600/15 border border-purple-400 text-purple-100 text-xs font-extrabold hover:bg-purple-600/25 disabled:opacity-60"
+              title="Programar próxima acción mañana a las 10:00"
+            >
+              📅 Mañana 10:00
+            </button>
+
+            {isBusy && (
+              <span className="inline-flex items-center px-3 py-2 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold">
+                Guardando…
+              </span>
+            )}
+          </div>
+
+          <div className="text-slate-500 text-xs mt-1">
+            Agente: {l.agente?.nombre || "—"} · Lugar: {l.lugar?.nombre || "—"} · Creado: {fmt(l.creadoEn)}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
   const Card = ({ title, items }: { title: string; items: LeadMini[] }) => (
     <div className="rounded-3xl bg-slate-950/85 border border-slate-700 p-5">
       <div className="flex items-center justify-between gap-3">
@@ -190,98 +409,67 @@ export default function LeadsContenido() {
             Sin leads en esta sección.
           </div>
         ) : (
-          items.slice(0, 14).map((l) => {
-            const next = pillNext(l.proximaAccion, l.proximaAccionEn);
-
-            return (
-              <button
-                key={l.id}
-                onClick={() => router.push(`/leads/${l.id}`)}
-                className="w-full text-left rounded-2xl bg-slate-900/60 border border-slate-800 px-4 py-3 hover:border-emerald-500/40 transition"
-              >
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-white font-extrabold text-base">
-                      #{l.id} · {l.nombre}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className={next.className}>{next.text}</span>
-                      <span className={pillEstado(l.estado)}>{String(l.estado || "pendiente").toUpperCase()}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-slate-300 text-sm">
-                    {l.email} · {l.telefono}
-                  </div>
-
-                  <div className="text-slate-400 text-sm">
-                    Próxima: <span className="font-bold text-slate-200">{l.proximaAccion || "—"}</span> ·{" "}
-                    <span className="font-bold text-slate-200">{fmt(l.proximaAccionEn)}</span>
-                  </div>
-
-                  <div className="text-slate-500 text-xs">
-                    Agente: {l.agente?.nombre || "—"} · Lugar: {l.lugar?.nombre || "—"} · Creado: {fmt(l.creadoEn)}
-                  </div>
-
-                  {/* Botones PRO */}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        ejecutarAccion(l, "llamada");
-                      }}
-                      className="px-3 py-1.5 rounded-full bg-blue-900/35 border border-blue-500/40 text-blue-100 text-xs font-extrabold hover:bg-blue-900/45"
-                    >
-                      📞 Llamar + programar
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        ejecutarAccion(l, "whatsapp");
-                      }}
-                      className="px-3 py-1.5 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-xs font-extrabold hover:bg-emerald-600/25"
-                    >
-                      💬 WhatsApp + programar
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        router.push(`/leads/${l.id}`);
-                      }}
-                      className="px-3 py-1.5 rounded-full bg-slate-950 border border-slate-700 text-slate-200 text-xs font-extrabold hover:border-emerald-400"
-                    >
-                      ⚡ Abrir lead
-                    </button>
-                  </div>
-                </div>
-              </button>
-            );
-          })
+          items.slice(0, 12).map((l) => <LeadRow key={l.id} l={l} />)
         )}
       </div>
 
-      {items.length > 14 && (
+      {items.length > 12 && (
         <div className="mt-3 text-xs text-slate-500 font-semibold">
-          Mostrando 14 de {items.length}. (Luego añadimos paginación si quieres)
+          Mostrando 12 de {items.length}. (Luego metemos paginación)
         </div>
       )}
     </div>
   );
 
+  const AlertBox = ({ title, subtitle, items }: { title: string; subtitle: string; items: LeadMini[] }) => (
+    <div className="rounded-3xl bg-slate-950/80 border border-slate-700 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-white font-extrabold text-base">{title}</div>
+          <div className="text-slate-400 text-sm">{subtitle}</div>
+        </div>
+        <div className="text-slate-300 font-extrabold text-lg">{items.length}</div>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {items.length === 0 ? (
+          <div className="rounded-2xl bg-slate-950/60 border border-slate-800 p-4 text-slate-400 text-sm">
+            Todo controlado ✅
+          </div>
+        ) : (
+          items.slice(0, 5).map((l) => (
+            <button
+              key={l.id}
+              onClick={() => router.push(`/leads/${l.id}`)}
+              className="w-full text-left rounded-2xl bg-slate-900/60 border border-slate-800 px-3 py-2 hover:border-emerald-500/40 transition"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-slate-100 font-extrabold text-sm">
+                  #{l.id} · {l.nombre}
+                </div>
+                <span className={pillScore(l.score)}>{`S ${Math.round(Number(l.score ?? 0))}`}</span>
+              </div>
+              <div className="text-slate-300 text-xs mt-0.5">{l.recomendacion || "—"}</div>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
+      {/* Toast */}
       {toast && (
-        <div className="fixed z-50 bottom-6 right-6 rounded-2xl bg-emerald-900/35 border border-emerald-500/40 text-emerald-100 px-4 py-3 font-semibold shadow-[0_0_25px_rgba(16,185,129,0.25)]">
-          {toast}
+        <div
+          className={[
+            "fixed z-50 bottom-6 right-6 rounded-2xl px-4 py-3 font-semibold border shadow-[0_0_25px_rgba(0,0,0,0.25)]",
+            toast.type === "ok"
+              ? "bg-emerald-900/35 border-emerald-500/40 text-emerald-100"
+              : "bg-red-900/35 border-red-500/40 text-red-100",
+          ].join(" ")}
+        >
+          {toast.msg}
         </div>
       )}
 
@@ -289,7 +477,7 @@ export default function LeadsContenido() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold text-white">Lead Center PRO</h1>
-          <p className="text-slate-300 mt-1">Tareas, métricas y seguimiento comercial.</p>
+          <p className="text-slate-300 mt-1">Tareas, métricas y seguimiento comercial (operativo).</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -297,7 +485,7 @@ export default function LeadsContenido() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nombre, email, teléfono, agente, lugar…"
-            className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 font-bold outline-none focus:border-emerald-400 w-[320px] max-w-full"
+            className="px-4 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 font-bold outline-none focus:border-emerald-400 w-[340px] max-w-full"
           />
 
           <select
@@ -317,6 +505,13 @@ export default function LeadsContenido() {
             Actualizar
           </button>
         </div>
+      </div>
+
+      {/* Alertas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <AlertBox title="🔥 Calientes" subtitle="Score alto (prioridad máxima)" items={calientes} />
+        <AlertBox title="🕳️ Sin actividad" subtitle="72h sin tocar (se enfría)" items={sinActividad} />
+        <AlertBox title="⏰ Vencidas +48h" subtitle="Ya deberíamos haber actuado" items={vencidas48h} />
       </div>
 
       {/* Stats */}
