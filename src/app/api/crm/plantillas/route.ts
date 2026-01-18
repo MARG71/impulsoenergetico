@@ -1,30 +1,45 @@
+// src/app/api/crm/plantillas/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
+import { getSessionOrThrow, sessionAdminId, sessionRole } from "@/lib/auth-server";
 
-function canWrite(role: string) {
+type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+
+function canWrite(role: Role) {
   return role === "SUPERADMIN" || role === "ADMIN";
+}
+
+function roleSafe(x: unknown): Role {
+  const r = String(x || "").toUpperCase();
+  if (r === "SUPERADMIN") return "SUPERADMIN";
+  if (r === "ADMIN") return "ADMIN";
+  if (r === "AGENTE") return "AGENTE";
+  if (r === "LUGAR") return "LUGAR";
+  return "CLIENTE";
 }
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getSessionOrThrow();
-    const role = sessionRole(session);
+    const role = roleSafe(sessionRole(session));
     const tenantAdminId = sessionAdminId(session);
 
     const url = new URL(req.url);
-    const canal = url.searchParams.get("canal") || "whatsapp";
+    const canal = url.searchParams.get("canal"); // opcional
+    const etapa = url.searchParams.get("etapa"); // opcional
 
-    const where =
-      role === "SUPERADMIN"
-        ? { canal }
-        : { canal, adminId: tenantAdminId ?? -1 };
+    // ✅ multi-tenant
+    const where: any = {};
+    if (role !== "SUPERADMIN") where.adminId = tenantAdminId ?? -1;
+    if (canal) where.canal = String(canal);
+    if (etapa) where.etapa = String(etapa);
 
     const items = await prisma.plantillaMensaje.findMany({
       where,
-      orderBy: [{ canal: "asc" }, { etapa: "asc" }, { variante: "asc" }, { actualizadaEn: "desc" }],
+      orderBy: { actualizadaEn: "desc" },
+      take: 500,
     });
 
     return NextResponse.json({ items });
@@ -38,20 +53,26 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSessionOrThrow();
-    const role = sessionRole(session);
+    const role = roleSafe(sessionRole(session));
     const tenantAdminId = sessionAdminId(session);
 
-    if (!canWrite(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (!canWrite(role)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
 
     const body = await req.json().catch(() => ({}));
+
     const canal = String(body?.canal || "whatsapp");
     const etapa = String(body?.etapa || "primero");
-    const variante = String(body?.variante || "A");
+    const variante = String(body?.variante || "A").toUpperCase() === "B" ? "B" : "A";
     const titulo = String(body?.titulo || `${etapa.toUpperCase()} ${variante}`);
     const contenido = String(body?.contenido || "");
     const activa = Boolean(body?.activa ?? true);
 
-    if (!contenido.trim()) return NextResponse.json({ error: "Contenido requerido" }, { status: 400 });
+    // SUPERADMIN puede crear plantillas globales (adminId null) si quiere
+    // ADMIN crea siempre para su tenant
+    const adminIdToSet =
+      role === "SUPERADMIN" ? (body?.adminId != null ? Number(body.adminId) : null) : (tenantAdminId ?? null);
 
     const created = await prisma.plantillaMensaje.create({
       data: {
@@ -61,7 +82,8 @@ export async function POST(req: NextRequest) {
         titulo,
         contenido,
         activa,
-        adminId: role === "SUPERADMIN" ? (body?.adminId ? Number(body.adminId) : null) : (tenantAdminId ?? null),
+        adminId: adminIdToSet,
+        actualizadaEn: new Date(),
       },
     });
 
