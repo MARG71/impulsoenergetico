@@ -62,20 +62,24 @@ export async function POST(req: NextRequest, context: any) {
 
     // ✅ permisos multi-tenant
     if (role !== "SUPERADMIN") {
-      if ((lead.adminId ?? null) !== tenantAdminId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      if ((lead.adminId ?? null) !== tenantAdminId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
     }
 
     const body = await req.json().catch(() => ({}));
-
-    // canal: "whatsapp" | "llamada" | "nota"
-    const canal = String(body?.canal || "whatsapp").toLowerCase();
+    const canal = String(body?.canal || "whatsapp").toLowerCase(); // whatsapp | llamada
     const delayHours = Number(body?.delayHours ?? 48);
+
     const now = new Date();
     const nextAt = addHours(now, Number.isFinite(delayHours) ? delayHours : 48);
 
-    // Plantilla simple (luego la hacemos inteligente por estado)
     const nombre = lead.nombre || "";
     const textoWhatsApp =
       body?.mensaje ||
@@ -93,10 +97,6 @@ export async function POST(req: NextRequest, context: any) {
       tipo = "llamada";
       titulo = "Llamada realizada";
       detalle = "Se registró una llamada desde Lead Center PRO.";
-    } else if (canal === "nota") {
-      tipo = "nota";
-      titulo = "Nota";
-      detalle = body?.detalle ? String(body.detalle) : "Nota registrada.";
     }
 
     // ✅ 1) Crear actividad
@@ -111,16 +111,16 @@ export async function POST(req: NextRequest, context: any) {
       },
     });
 
-    // ✅ 2) Programar siguiente acción (+48h por defecto)
+    // ✅ 2) Programar siguiente acción
     await prisma.lead.update({
       where: { id: leadId },
       data: {
-        proximaAccion: canal === "whatsapp" ? "Seguimiento WhatsApp" : canal === "llamada" ? "Seguimiento llamada" : "Seguimiento",
+        proximaAccion: canal === "whatsapp" ? "Seguimiento WhatsApp" : "Seguimiento llamada",
         proximaAccionEn: nextAt,
       },
     });
 
-    // ✅ 3) Respuesta para UI (link WA listo)
+    // ✅ 3) Respuesta para UI
     const whatsappUrl = buildWhatsAppLink(lead.telefono || "", textoWhatsApp);
 
     return NextResponse.json({
