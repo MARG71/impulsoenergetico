@@ -224,7 +224,10 @@ model Usuario {
   cartelesCreados     CartelGenerado[] @relation("UsuarioCartelesCreados")
   cartelesGestionados CartelGenerado[] @relation("AdminCartelesGenerados")
 
-  plantillasMensajes PlantillaMensaje[]
+  // ✅ Plantillas / A-B tracking
+  plantillaMensajes PlantillaMensaje[] @relation("PlantillaMensajeAdmin")
+  plantillaEnvio    PlantillaEnvio[]   @relation("PlantillaEnvioUsuario")
+  plantillaEnvios   PlantillaEnvio[]
 
   @@index([adminId])
 }
@@ -256,7 +259,8 @@ model Lead {
   comparativaId Int?
   contratoId    Int?
 
-  actividades LeadActividad[]
+  actividades     LeadActividad[]
+  plantillaEnvios PlantillaEnvio[]
 
   @@index([adminId])
   @@index([estado, creadoEn])
@@ -702,19 +706,42 @@ model PlantillaMensaje {
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  // Multi-tenant
+  adminId Int?
+  admin   Usuario? @relation("PlantillaMensajeAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+
+  canal    String  @default("whatsapp")
+  etapa    String
+  variante String  @default("A")
+  activa   Boolean @default(true)
+
+  titulo          String
+  contenido       String
+  plantillaEnvios PlantillaEnvio[]
+
+  @@index([adminId, canal, etapa, variante])
+}
+
+model PlantillaEnvio {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+
+  canal    String
+  etapa    String
+  variante String // "A" | "B"
+
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  plantillaId Int?
+  plantilla   PlantillaMensaje? @relation(fields: [plantillaId], references: [id], onDelete: SetNull)
+
   adminId Int?
   admin   Usuario? @relation(fields: [adminId], references: [id], onDelete: SetNull)
 
-  // Clasificación
-  canal    String  @default("whatsapp") // whatsapp | email | sms (futuro)
-  etapa    String // primero | seguimiento | factura | oferta | cierre | referidos
-  variante String  @default("A") // A | B
-  activa   Boolean @default(true)
+  usuarioId Int?
+  usuario   Usuario? @relation("PlantillaEnvioUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
 
-  // Contenido
-  titulo    String
-  contenido String
-
-  @@index([adminId, canal, etapa, variante])
+  @@index([adminId, creadoEn])
+  @@index([leadId, creadoEn])
+  @@index([etapa, variante, creadoEn])
 }

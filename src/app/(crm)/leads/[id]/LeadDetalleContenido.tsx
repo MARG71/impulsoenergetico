@@ -31,7 +31,6 @@ type Lead = {
 };
 
 const ESTADOS = ["pendiente", "contactado", "comparativa", "contrato", "cerrado", "perdido"] as const;
-
 type EstadoKey = (typeof ESTADOS)[number];
 
 function fmt(dt?: string | null) {
@@ -124,6 +123,31 @@ export default function LeadDetalleContenido() {
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // ✅ Tracking A/B: registrar un "envío" de plantilla (no bloquea el flujo si falla)
+  const trackPlantillaEnvio = async (opts: {
+    leadId: number;
+    canal?: string;
+    etapa: string;
+    variante: "A" | "B";
+    plantillaId?: number | null;
+  }) => {
+    try {
+      await fetch("/api/crm/plantillas/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: opts.leadId,
+          canal: opts.canal || "whatsapp",
+          etapa: opts.etapa,
+          variante: opts.variante,
+          plantillaId: opts.plantillaId ?? null,
+        }),
+      });
+    } catch {
+      // NO hacemos nada: esto es tracking, no debe romper el envío
+    }
+  };
 
   const crearActividad = async (tipo: string, titulo: string, detalle?: string | null) => {
     if (!id) return;
@@ -250,7 +274,19 @@ export default function LeadDetalleContenido() {
               href={waLink}
               target="_blank"
               rel="noreferrer"
-              onClick={() => crearActividad("whatsapp", "WhatsApp enviado", "Se envió mensaje por WhatsApp.")}
+              onClick={async () => {
+                // ✅ 1) Track A/B (por ahora fijo a primero/A, luego lo haremos dinámico)
+                await trackPlantillaEnvio({
+                  leadId: lead.id,
+                  canal: "whatsapp",
+                  etapa: "primero",
+                  variante: "A",
+                  plantillaId: null,
+                });
+
+                // ✅ 2) Actividad timeline
+                await crearActividad("whatsapp", "WhatsApp enviado", "Se envió mensaje por WhatsApp.");
+              }}
               className="inline-flex px-4 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25"
             >
               💬 WhatsApp
