@@ -63,18 +63,27 @@ export async function GET(_req: Request, ctx: any) {
     const rt = (doc.resourceType as any) || "raw";
 
     // ✅ Sacar el version real desde la URL guardada (…/v1768762222/…)
-    const m = String(doc.url || "").match(/\/v(\d+)\//);
-    const version = m ? Number(m[1]) : undefined;
+    // ✅ version real desde doc.url (…/v12345/…)
+    const mv = String(doc.url || "").match(/\/v(\d+)\//);
+    const version = mv ? Number(mv[1]) : undefined;
+
+    // ✅ Si publicId viene con extensión (…/archivo.pdf), Cloudinary RAW la quiere como format aparte
+    const mExt = String(doc.publicId || "").match(/^(.*)\.([a-z0-9]+)$/i);
+    const publicIdClean = mExt ? mExt[1] : doc.publicId;
+    const format = mExt ? mExt[2].toLowerCase() : undefined;
+
 
 
     // ✅ 7 días
     const { url, expiresAt } = cloudinarySignedUrl({
-      publicId: doc.publicId,
+      publicId: publicIdClean,
       resourceType: rt,
       expiresInSeconds: 60 * 60 * 24 * 7,
       attachment: false,
-      version, // ✅ CLAVE
+      version,
+      format,
     });
+
 
 
     return NextResponse.json({

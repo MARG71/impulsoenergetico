@@ -162,10 +162,10 @@ export default function LeadDetalleContenido() {
 
   // ✅ Genera un link firmado (7 días) para abrir/compartir documentos
   const getSignedDocUrl = async (docId: number) => {
-    if (!id) return "";
     const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/signed`);
     return String(data?.url || "").trim();
   };
+
 
 
   const [estado, setEstado] = useState<EstadoKey>("pendiente");
