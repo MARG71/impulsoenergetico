@@ -41,23 +41,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
     }
 
-    // 1) Buscar plantilla activa por canal+etapa (la más reciente)
+    // ✅ 1) Buscar plantilla activa por canal+etapa (más reciente por creadaEn)
     const plantilla = await prisma.plantillaMensaje.findFirst({
-      where: {
-        canal,
-        etapa,
-        activa: true,
-      },
-      orderBy: { actualizadoEn: "desc" as any }, // por si tienes actualizadoEn
-    }).catch(async () => {
-      // fallback si tu modelo no tiene actualizadoEn
-      return prisma.plantillaMensaje.findFirst({
-        where: { canal, etapa, activa: true },
-        orderBy: { creadaEn: "desc" as any },
-      });
+      where: { canal, etapa, activa: true },
+      orderBy: { creadaEn: "desc" }, // <-- este campo sí existe en tu modelo (por el error que has puesto)
     });
 
-    // 2) Si no hay plantilla, fallback a texto genérico
+    // ✅ 2) Fallback si no hay plantilla creada todavía
     const fallbackBase =
       `Hola {{nombre}}, soy de Impulso Energético. ` +
       `Te contacto por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`;
@@ -65,9 +55,9 @@ export async function POST(req: Request) {
     const textoA = plantilla?.textoA || fallbackBase;
     const textoB = plantilla?.textoB || fallbackBase;
 
-    // 3) Elegir variante A/B de forma balanceada según envíos históricos (si existe PlantillaEnvio)
+    // ✅ 3) Elegir variante A/B balanceando por envíos históricos si hay plantilla
     let variante: Variante = "A";
-    let plantillaId: number | null = plantilla?.id ?? null;
+    const plantillaId: number | null = plantilla?.id ?? null;
 
     if (plantillaId) {
       const [countA, countB] = await Promise.all([
@@ -83,7 +73,7 @@ export async function POST(req: Request) {
       variante = Math.random() < 0.5 ? "A" : "B";
     }
 
-    // 4) Variables disponibles
+    // ✅ 4) Variables disponibles para {{...}}
     const vars: Record<string, string> = {
       id: String(lead.id),
       nombre: lead.nombre || "",
@@ -92,7 +82,7 @@ export async function POST(req: Request) {
       agente: lead.agente?.nombre || "",
       lugar: lead.lugar?.nombre || "",
       estado: String(lead.estado || ""),
-      etapa: String(etapa || ""),
+      etapa,
     };
 
     const base = variante === "A" ? textoA : textoB;
