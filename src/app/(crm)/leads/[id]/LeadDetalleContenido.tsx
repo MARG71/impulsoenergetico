@@ -66,6 +66,24 @@ async function fetchJson(url: string, init?: RequestInit, ms = 15000) {
   }
 }
 
+// ✅ Mapeo estado -> etapa (ajústalo si tu “flujo” tiene nombres distintos)
+function estadoToEtapa(estado?: string | null): string {
+  const s = String(estado || "pendiente").toLowerCase();
+  if (s === "pendiente") return "primero";
+  if (s === "contactado") return "seguimiento";
+  if (s === "comparativa") return "comparativa";
+  if (s === "contrato") return "contrato";
+  if (s === "cerrado") return "cerrado";
+  if (s === "perdido") return "reenganche";
+  return "primero";
+}
+
+// ✅ normaliza teléfono para wa.me (solo dígitos)
+function normalizePhoneForWa(raw: string) {
+  const digits = String(raw || "").replace(/[^\d]/g, "");
+  return digits;
+}
+
 export default function LeadDetalleContenido() {
   const params = useParams();
   const router = useRouter();
@@ -85,14 +103,7 @@ export default function LeadDetalleContenido() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const waLink = useMemo(() => {
-    const tel = String(lead?.telefono || "").replace(/\s/g, "");
-    if (!tel) return null;
-    const texto = encodeURIComponent(
-      `Hola ${lead?.nombre || ""}, soy de Impulso Energético. Te contacto por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`
-    );
-    return `https://wa.me/${tel}?text=${texto}`;
-  }, [lead?.telefono, lead?.nombre]);
+  const telWa = useMemo(() => normalizePhoneForWa(lead?.telefono || ""), [lead?.telefono]);
 
   const cargar = async () => {
     if (!id) return;
@@ -145,7 +156,7 @@ export default function LeadDetalleContenido() {
         }),
       });
     } catch {
-      // NO hacemos nada: esto es tracking, no debe romper el envío
+      // tracking no debe romper el flujo
     }
   };
 
@@ -201,6 +212,70 @@ export default function LeadDetalleContenido() {
       await cargar();
     } catch (e: any) {
       setToast(e?.message || "No se pudo guardar");
+      setTimeout(() => setToast(null), 2600);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ✅ WhatsApp AUTO: resolve plantilla + tracking + actividad + abrir WhatsApp
+  const enviarWhatsAppAutomatico = async () => {
+    if (!lead) return;
+
+    const etapa = estadoToEtapa(lead.estado || estado);
+
+    if (!telWa) {
+      setToast("⚠️ El lead no tiene teléfono válido");
+      setTimeout(() => setToast(null), 2400);
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // 1) Resolver plantilla + variante + texto renderizado
+      const resolved = await fetchJson(
+        "/api/crm/plantillas/resolve",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: lead.id,
+            canal: "whatsapp",
+            etapa,
+          }),
+        },
+        15000
+      );
+
+      const textoFinal = String(resolved?.texto || "").trim();
+      const variante = (resolved?.variante === "B" ? "B" : "A") as "A" | "B";
+      const plantillaId = (typeof resolved?.plantillaId === "number" ? resolved.plantillaId : null) as number | null;
+
+      // 2) Tracking A/B (no bloquea)
+      await trackPlantillaEnvio({
+        leadId: lead.id,
+        canal: "whatsapp",
+        etapa,
+        variante,
+        plantillaId,
+      });
+
+      // 3) Actividad timeline (sí queremos registrarla)
+      await crearActividad(
+        "whatsapp",
+        "WhatsApp enviado",
+        `Etapa: ${etapa} · Variante: ${variante}${plantillaId ? ` · PlantillaID: ${plantillaId}` : ""}\n\nTexto:\n${textoFinal}`
+      );
+
+      // 4) Abrir WhatsApp con el texto generado
+      const url = `https://wa.me/${telWa}?text=${encodeURIComponent(textoFinal)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+
+      setToast("WhatsApp preparado ✅");
+      setTimeout(() => setToast(null), 2000);
+    } catch (e: any) {
+      setToast(e?.message || "No se pudo preparar WhatsApp");
       setTimeout(() => setToast(null), 2600);
     } finally {
       setSaving(false);
@@ -269,29 +344,15 @@ export default function LeadDetalleContenido() {
             📞 Registrar llamada
           </a>
 
-          {waLink && (
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noreferrer"
-              onClick={async () => {
-                // ✅ 1) Track A/B (por ahora fijo a primero/A, luego lo haremos dinámico)
-                await trackPlantillaEnvio({
-                  leadId: lead.id,
-                  canal: "whatsapp",
-                  etapa: "primero",
-                  variante: "A",
-                  plantillaId: null,
-                });
-
-                // ✅ 2) Actividad timeline
-                await crearActividad("whatsapp", "WhatsApp enviado", "Se envió mensaje por WhatsApp.");
-              }}
-              className="inline-flex px-4 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25"
-            >
-              💬 WhatsApp
-            </a>
-          )}
+          {/* ✅ WhatsApp automático A/B */}
+          <button
+            disabled={saving}
+            onClick={enviarWhatsAppAutomatico}
+            className="inline-flex px-4 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25 disabled:opacity-60"
+            title="Auto: elige plantilla por etapa + A/B + tracking + abre WhatsApp"
+          >
+            💬 WhatsApp (Auto A/B)
+          </button>
 
           <button
             disabled={saving}
