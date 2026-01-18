@@ -8,6 +8,11 @@ function pickVarianteBalanced(countA: number, countB: number): Variante {
   return countA < countB ? "A" : "B";
 }
 
+function normalizeVariante(v: any): Variante {
+  const s = String(v || "").toUpperCase();
+  return s === "B" ? "B" : "A";
+}
+
 function renderTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
     const v = vars[key];
@@ -41,39 +46,56 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
     }
 
-    // ✅ 1) Buscar plantilla activa por canal+etapa (más reciente por creadaEn)
-    const plantilla = await prisma.plantillaMensaje.findFirst({
+    // ✅ Traemos las plantillas activas para esa etapa/canal (idealmente 1 por variante A y 1 por B)
+    const plantillas = await prisma.plantillaMensaje.findMany({
       where: { canal, etapa, activa: true },
-      orderBy: { creadaEn: "desc" }, // <-- este campo sí existe en tu modelo (por el error que has puesto)
+      orderBy: { creadaEn: "desc" },
+      take: 20,
     });
 
-    // ✅ 2) Fallback si no hay plantilla creada todavía
+    // Separamos por variante
+    const plantillaA = plantillas.find((p) => normalizeVariante((p as any).variante) === "A") || null;
+    const plantillaB = plantillas.find((p) => normalizeVariante((p as any).variante) === "B") || null;
+
+    // ✅ Fallback base si no existe ninguna
     const fallbackBase =
       `Hola {{nombre}}, soy de Impulso Energético. ` +
       `Te contacto por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`;
 
-    const textoA = plantilla?.textoA || fallbackBase;
-    const textoB = plantilla?.textoB || fallbackBase;
-
-    // ✅ 3) Elegir variante A/B balanceando por envíos históricos si hay plantilla
+    // ✅ Si existe al menos una, balanceamos envíos por variante (si no existe una variante, usamos la disponible)
     let variante: Variante = "A";
-    const plantillaId: number | null = plantilla?.id ?? null;
-
-    if (plantillaId) {
+    if (plantillaA && plantillaB) {
       const [countA, countB] = await Promise.all([
         prisma.plantillaEnvio.count({
-          where: { plantillaId, canal, etapa, variante: "A" },
+          where: {
+            canal,
+            etapa,
+            variante: "A",
+            plantillaId: plantillaA.id,
+          },
         }),
         prisma.plantillaEnvio.count({
-          where: { plantillaId, canal, etapa, variante: "B" },
+          where: {
+            canal,
+            etapa,
+            variante: "B",
+            plantillaId: plantillaB.id,
+          },
         }),
       ]);
       variante = pickVarianteBalanced(countA, countB);
+    } else if (plantillaB && !plantillaA) {
+      variante = "B";
     } else {
-      variante = Math.random() < 0.5 ? "A" : "B";
+      variante = "A";
     }
 
-    // ✅ 4) Variables disponibles para {{...}}
+    const plantillaElegida = variante === "B" ? (plantillaB || plantillaA) : (plantillaA || plantillaB);
+    const plantillaId: number | null = plantillaElegida?.id ?? null;
+
+    const contenido = String((plantillaElegida as any)?.contenido || "").trim();
+    const base = contenido || fallbackBase;
+
     const vars: Record<string, string> = {
       id: String(lead.id),
       nombre: lead.nombre || "",
@@ -85,7 +107,6 @@ export async function POST(req: Request) {
       etapa,
     };
 
-    const base = variante === "A" ? textoA : textoB;
     const texto = renderTemplate(base, vars).trim();
 
     return NextResponse.json({
