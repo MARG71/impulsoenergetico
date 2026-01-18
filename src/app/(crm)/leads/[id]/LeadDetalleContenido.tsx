@@ -160,7 +160,9 @@ export default function LeadDetalleContenido() {
     }
   };
 
+  // ✅ Genera un link firmado (7 días) para abrir/compartir documentos
   const getSignedDocUrl = async (docId: number) => {
+    if (!id) return "";
     const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/signed`);
     return String(data?.url || "").trim();
   };
@@ -176,6 +178,61 @@ export default function LeadDetalleContenido() {
   const [toast, setToast] = useState<string | null>(null);
 
   const telWa = useMemo(() => normalizePhoneForWa(lead?.telefono || ""), [lead?.telefono]);
+
+  const abrirDoc = async (docId: number) => {
+    try {
+      setSaving(true);
+      const signed = await getSignedDocUrl(docId);
+      if (!signed) throw new Error("No se pudo generar el enlace firmado");
+      window.open(signed, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      setToast(e?.message || "No se pudo abrir el documento");
+      setTimeout(() => setToast(null), 2500);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copiarLinkDoc = async (docId: number) => {
+    try {
+      setSaving(true);
+      const signed = await getSignedDocUrl(docId);
+      if (!signed) throw new Error("No se pudo generar el enlace firmado");
+      await navigator.clipboard.writeText(signed);
+      setToast("Enlace firmado copiado ✅ (7 días)");
+      setTimeout(() => setToast(null), 1800);
+    } catch (e: any) {
+      setToast(e?.message || "No se pudo copiar el enlace");
+      setTimeout(() => setToast(null), 2500);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const enviarWhatsAppDoc = async (doc: LeadDocumento) => {
+    try {
+      const tel = telWa;
+      if (!tel) {
+        setToast("⚠️ Teléfono inválido");
+        setTimeout(() => setToast(null), 2000);
+        return;
+      }
+
+      setSaving(true);
+      const signed = await getSignedDocUrl(doc.id);
+      if (!signed) throw new Error("No se pudo generar el enlace firmado");
+
+      const msg = `Hola ${lead?.nombre}, te envío el documento: ${doc.nombre}\n\n${signed}`;
+
+      window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+      await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${doc.nombre}\n${signed}`);
+    } catch (e: any) {
+      setToast(e?.message || "No se pudo preparar WhatsApp");
+      setTimeout(() => setToast(null), 2500);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const cargar = async () => {
     if (!id) return;
@@ -202,10 +259,14 @@ export default function LeadDetalleContenido() {
     }
   };
 
+
+
   useEffect(() => {
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+
 
   // ✅ Tracking A/B: registrar un "envío" de plantilla (no bloquea el flujo si falla)
   const trackPlantillaEnvio = async (opts: {
@@ -374,6 +435,8 @@ export default function LeadDetalleContenido() {
       </div>
     );
   }
+
+  
 
 return (
   <>
@@ -692,67 +755,33 @@ return (
 
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={async () => {
-                          try {
-                            const signed = await getSignedDocUrl(d.id);
-                            if (!signed) throw new Error("No se pudo generar el enlace del documento");
-                            window.open(signed, "_blank", "noopener,noreferrer");
-                          } catch (e: any) {
-                            setToast(e?.message || "No se pudo abrir");
-                            setTimeout(() => setToast(null), 2000);
-                          }
-                        }}
-                        className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400"
+                        disabled={saving}
+                        onClick={() => abrirDoc(d.id)}
+                        className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400 disabled:opacity-60"
                       >
                         Abrir
                       </button>
 
 
+
                       <button
-                        onClick={async () => {
-                          try {
-                            const signed = await getSignedDocUrl(d.id);
-                            if (!signed) throw new Error("No se pudo generar el enlace del documento");
-                            await navigator.clipboard.writeText(signed);
-                            setToast("Enlace copiado ✅");
-                            setTimeout(() => setToast(null), 1600);
-                          } catch (e: any) {
-                            setToast(e?.message || "No se pudo copiar");
-                            setTimeout(() => setToast(null), 2000);
-                          }
-                        }}
-                        className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400"
+                        disabled={saving}
+                        onClick={() => copiarLinkDoc(d.id)}
+                        className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400 disabled:opacity-60"
                       >
                         Copiar enlace
                       </button>
 
 
+
                       <button
-                        onClick={async () => {
-                          try {
-                            const tel = telWa;
-                            if (!tel) {
-                              setToast("⚠️ Teléfono inválido");
-                              setTimeout(() => setToast(null), 2000);
-                              return;
-                            }
-
-                            const signed = await getSignedDocUrl(d.id);
-                            if (!signed) throw new Error("No se pudo generar el enlace del documento");
-
-                            const msg = `Hola ${lead?.nombre}, te envío el documento: ${d.nombre}\n\n${signed}`;
-
-                            window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
-                            await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${d.nombre}\n${signed}`);
-                          } catch (e: any) {
-                            setToast(e?.message || "No se pudo enviar");
-                            setTimeout(() => setToast(null), 2200);
-                          }
-                        }}
-                        className="px-3 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25"
+                        disabled={saving}
+                        onClick={() => enviarWhatsAppDoc(d)}
+                        className="px-3 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25 disabled:opacity-60"
                       >
                         Enviar WhatsApp
                       </button>
+
 
                     </div>
                   </div>

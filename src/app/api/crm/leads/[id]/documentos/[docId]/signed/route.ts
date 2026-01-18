@@ -62,13 +62,20 @@ export async function GET(_req: Request, ctx: any) {
 
     const rt = (doc.resourceType as any) || "raw";
 
+    // ✅ Sacar el version real desde la URL guardada (…/v1768762222/…)
+    const m = String(doc.url || "").match(/\/v(\d+)\//);
+    const version = m ? Number(m[1]) : undefined;
+
+
     // ✅ 7 días
     const { url, expiresAt } = cloudinarySignedUrl({
       publicId: doc.publicId,
       resourceType: rt,
       expiresInSeconds: 60 * 60 * 24 * 7,
       attachment: false,
+      version, // ✅ CLAVE
     });
+
 
     return NextResponse.json({
       url,
