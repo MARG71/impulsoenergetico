@@ -15,7 +15,7 @@ type LeadMini = {
   agente?: { id: number; nombre: string | null } | null;
   lugar?: { id: number; nombre: string | null } | null;
 
-  // viene del backend tareas
+  // si tu /tareas ya devuelve esto, lo mostramos. Si no, no pasa nada.
   score?: number;
   recomendacion?: string;
   lastActAt?: string | null;
@@ -64,17 +64,13 @@ function fmt(dt?: string | null) {
 }
 
 function cleanPhone(raw?: string | null) {
-  const s = String(raw ?? "").replace(/[^\d+]/g, "");
-  return s;
+  return String(raw ?? "").replace(/[^\d+]/g, "");
 }
 
-function makeWhatsAppLink(nombre?: string | null, telefono?: string | null) {
+function buildWaLink(telefono: string, msg: string) {
   const tel = cleanPhone(telefono);
-  const texto = encodeURIComponent(
-    `Hola ${nombre || ""}, soy de Impulso Energético. Te contacto por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`
-  );
   if (!tel) return null;
-  return `https://wa.me/${tel}?text=${texto}`;
+  return `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
 }
 
 function pillEstado(estado?: string | null) {
@@ -99,12 +95,54 @@ function pillScore(score?: number) {
   return `${base} bg-slate-900/60 text-slate-200 border-slate-700`;
 }
 
+function addHoursISO(hours: number) {
+  const d = new Date();
+  d.setHours(d.getHours() + hours);
+  return d.toISOString();
+}
+
 function tomorrowAt10ISO() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   d.setHours(10, 0, 0, 0);
   return d.toISOString();
 }
+
+function isVencida(proximaAccionEn?: string | null) {
+  if (!proximaAccionEn) return false;
+  const t = new Date(proximaAccionEn).getTime();
+  return Number.isFinite(t) && t < Date.now();
+}
+
+function leadEstado(estado?: string | null) {
+  return String(estado || "pendiente").toLowerCase();
+}
+
+/** Plantillas (2.6) — luego las hacemos editables desde CRM */
+function plantillaWA(lead: LeadMini, kind: "primero" | "seguimiento" | "factura" | "oferta" | "cierre") {
+  const nombre = lead.nombre || "";
+  if (kind === "primero") {
+    return `Hola ${nombre}, soy de Impulso Energético. Te escribo por tu solicitud para ahorrar en tus facturas. ¿Te viene bien si lo vemos?`;
+  }
+  if (kind === "seguimiento") {
+    return `Hola ${nombre}, te hago un seguimiento 😊 ¿Pudiste verlo? Si quieres, lo resolvemos en 2 minutos.`;
+  }
+  if (kind === "factura") {
+    return `Genial ${nombre}. Para prepararte el ahorro exacto necesito una foto de tu última factura (o CUPS y potencia). ¿Me la puedes enviar por aquí?`;
+  }
+  if (kind === "oferta") {
+    return `Perfecto ${nombre}. Te preparo una oferta con el mejor ahorro posible. ¿Prefieres que te la envíe por WhatsApp o por email?`;
+  }
+  return `Vamos a cerrarlo ${nombre} ✅ Si te parece, te dejo el contrato listo hoy. ¿Te viene bien que lo firmemos ahora?`;
+}
+
+type Playbook = {
+  key: string;
+  label: string;
+  hint: string;
+  tone: "emerald" | "blue" | "amber" | "purple" | "red" | "slate";
+  run: (lead: LeadMini) => Promise<void>;
+};
 
 export default function LeadsContenido() {
   const router = useRouter();
@@ -178,7 +216,7 @@ export default function LeadsContenido() {
   const hoyF = useMemo(() => filtrar(hoy), [q, tareas]); // eslint-disable-line
   const vencidasF = useMemo(() => filtrar(vencidas), [q, tareas]); // eslint-disable-line
 
-  // --------- Acciones rápidas (2.5) ----------
+  // --------- Acciones (API existente) ----------
   const postActividad = async (leadId: number, tipo: string, titulo: string, detalle?: string | null) => {
     await fetchJson(`/api/crm/leads/${leadId}/actividades`, {
       method: "POST",
@@ -203,63 +241,148 @@ export default function LeadsContenido() {
     });
   };
 
-  const accionLlamada = async (l: LeadMini) => {
-    setBusyId(l.id);
-    try {
-      await postActividad(l.id, "llamada", "Llamada realizada", "Se intentó contactar por teléfono.");
-      showOk(`Llamada registrada (#${l.id})`);
-      await cargar();
-    } catch (e: any) {
-      showErr(e?.message || "Error registrando llamada");
-    } finally {
-      setBusyId(null);
-    }
+  const doWhatsApp = async (l: LeadMini, msg: string, titulo = "WhatsApp enviado") => {
+    const link = buildWaLink(String(l.telefono || ""), msg);
+    if (!link) throw new Error("Teléfono no válido para WhatsApp");
+    await postActividad(l.id, "whatsapp", titulo, msg);
+    window.open(link, "_blank", "noopener,noreferrer");
   };
 
-  const accionWhatsApp = async (l: LeadMini) => {
-    const link = makeWhatsAppLink(l.nombre, l.telefono);
-    if (!link) {
-      showErr("Teléfono no válido para WhatsApp");
-      return;
-    }
-
-    setBusyId(l.id);
-    try {
-      await postActividad(l.id, "whatsapp", "WhatsApp enviado", "Se envió mensaje por WhatsApp.");
-      showOk(`WhatsApp registrado (#${l.id})`);
-      window.open(link, "_blank", "noopener,noreferrer");
-      await cargar();
-    } catch (e: any) {
-      showErr(e?.message || "Error registrando WhatsApp");
-    } finally {
-      setBusyId(null);
-    }
+  const doLlamada = async (l: LeadMini, titulo = "Llamada realizada") => {
+    await postActividad(l.id, "llamada", titulo, "Se registró una llamada desde Lead Center PRO.");
+    const tel = cleanPhone(l.telefono);
+    if (tel) window.location.href = `tel:${tel}`;
   };
 
-  const accionContactado = async (l: LeadMini) => {
-    setBusyId(l.id);
-    try {
-      await patchLead(l.id, { estado: "contactado" });
-      showOk(`Estado CONTACTADO (#${l.id})`);
-      await cargar();
-    } catch (e: any) {
-      showErr(e?.message || "Error cambiando estado");
-    } finally {
-      setBusyId(null);
-    }
+  // --------- 2.6 PLAYBOOK ----------
+  const getPlaybook = (): ((lead: LeadMini) => Playbook) => {
+    return (lead) => {
+      const estado = leadEstado(lead.estado);
+      const vencida = isVencida(lead.proximaAccionEn);
+      const score = Number(lead.score ?? 0);
+
+      // 1) Si está vencida => Recuperación
+      if (vencida) {
+        return {
+          key: "recuperacion",
+          label: "▶ Recuperar",
+          hint: "WhatsApp de seguimiento + próxima en 24h",
+          tone: "red",
+          run: async (l) => {
+            await doWhatsApp(l, plantillaWA(l, "seguimiento"), "Seguimiento WhatsApp");
+            await patchLead(l.id, { proximaAccion: "Llamar (recuperación)", proximaAccionEn: addHoursISO(24) });
+          },
+        };
+      }
+
+      // 2) Pendiente => Primer contacto
+      if (estado === "pendiente") {
+        return {
+          key: "primer_contacto",
+          label: "▶ Primer contacto",
+          hint: "WhatsApp + próxima mañana 10:00",
+          tone: "emerald",
+          run: async (l) => {
+            await doWhatsApp(l, plantillaWA(l, "primero"), "Primer WhatsApp");
+            await patchLead(l.id, { proximaAccion: "Llamar (seguimiento)", proximaAccionEn: tomorrowAt10ISO() });
+          },
+        };
+      }
+
+      // 3) Contactado => Pedir factura / llamada
+      if (estado === "contactado") {
+        // si score alto, apretar: llamada + agenda
+        if (score >= 70) {
+          return {
+            key: "llamada_cierre",
+            label: "▶ Llamar (cierre)",
+            hint: "Llamada + próxima en 24h",
+            tone: "amber",
+            run: async (l) => {
+              await doLlamada(l, "Llamada (cierre)");
+              await patchLead(l.id, { proximaAccion: "WhatsApp con factura", proximaAccionEn: addHoursISO(24) });
+            },
+          };
+        }
+
+        return {
+          key: "pedir_factura",
+          label: "▶ Pedir factura",
+          hint: "WhatsApp pidiendo factura + próxima mañana 10:00",
+          tone: "blue",
+          run: async (l) => {
+            await doWhatsApp(l, plantillaWA(l, "factura"), "Solicitud de factura");
+            await patchLead(l.id, { proximaAccion: "Llamar (si no responde)", proximaAccionEn: tomorrowAt10ISO() });
+          },
+        };
+      }
+
+      // 4) Comparativa => Enviar oferta / empujar decisión
+      if (estado === "comparativa") {
+        return {
+          key: "enviar_oferta",
+          label: "▶ Enviar oferta",
+          hint: "WhatsApp oferta + próxima en 24h",
+          tone: "purple",
+          run: async (l) => {
+            await doWhatsApp(l, plantillaWA(l, "oferta"), "Oferta enviada");
+            await patchLead(l.id, { proximaAccion: "Llamar (cierre oferta)", proximaAccionEn: addHoursISO(24) });
+          },
+        };
+      }
+
+      // 5) Contrato => Empujar firma
+      if (estado === "contrato") {
+        return {
+          key: "firma",
+          label: "▶ Empujar firma",
+          hint: "WhatsApp cierre + próxima en 6h",
+          tone: "amber",
+          run: async (l) => {
+            await doWhatsApp(l, plantillaWA(l, "cierre"), "Cierre / firma");
+            await patchLead(l.id, { proximaAccion: "Llamar (firma)", proximaAccionEn: addHoursISO(6) });
+          },
+        };
+      }
+
+      // 6) Cerrado/Perdido => Acción suave
+      if (estado === "cerrado") {
+        return {
+          key: "referidos",
+          label: "▶ Pedir referidos",
+          hint: "WhatsApp referidos + próxima en 7 días",
+          tone: "emerald",
+          run: async (l) => {
+            const msg = `Gracias ${l.nombre || ""} ✅ Si conoces a alguien que quiera ahorrar en luz/gas, pásame su contacto y le ayudamos encantados.`;
+            await doWhatsApp(l, msg, "Referidos");
+            await patchLead(l.id, { proximaAccion: "Revisar referidos", proximaAccionEn: addHoursISO(24 * 7) });
+          },
+        };
+      }
+
+      return {
+        key: "accion",
+        label: "▶ Siguiente",
+        hint: "Abrir lead",
+        tone: "slate",
+        run: async (l) => {
+          router.push(`/leads/${l.id}`);
+        },
+      };
+    };
   };
 
-  const accionProximaManana10 = async (l: LeadMini) => {
+  const choosePlaybook = useMemo(() => getPlaybook(), [router]);
+
+  const runPlaybook = async (l: LeadMini) => {
+    const pb = choosePlaybook(l);
     setBusyId(l.id);
     try {
-      await patchLead(l.id, {
-        proximaAccion: "Llamar (seguimiento)",
-        proximaAccionEn: tomorrowAt10ISO(),
-      });
-      showOk(`Próxima acción mañana 10:00 (#${l.id})`);
+      await pb.run(l);
+      showOk(`${pb.label.replace("▶ ", "")} ✅ (#${l.id})`);
       await cargar();
     } catch (e: any) {
-      showErr(e?.message || "Error programando próxima acción");
+      showErr(e?.message || "No se pudo ejecutar la acción");
     } finally {
       setBusyId(null);
     }
@@ -286,8 +409,21 @@ export default function LeadsContenido() {
     );
   }
 
+  const toneBtn = (tone: Playbook["tone"]) => {
+    const base =
+      "inline-flex items-center gap-2 px-3 py-2 rounded-full text-xs font-extrabold border hover:opacity-[0.95] disabled:opacity-60";
+    if (tone === "emerald") return `${base} bg-emerald-600/15 border-emerald-400 text-emerald-100`;
+    if (tone === "blue") return `${base} bg-blue-900/35 border-blue-500/40 text-blue-100`;
+    if (tone === "amber") return `${base} bg-amber-900/25 border-amber-500/40 text-amber-100`;
+    if (tone === "purple") return `${base} bg-purple-600/15 border-purple-400 text-purple-100`;
+    if (tone === "red") return `${base} bg-red-900/25 border-red-500/40 text-red-100`;
+    return `${base} bg-slate-950 border-slate-700 text-slate-100 hover:border-emerald-400`;
+  };
+
   const LeadRow = ({ l }: { l: LeadMini }) => {
     const isBusy = busyId === l.id;
+    const pb = choosePlaybook(l);
+
     return (
       <button
         onClick={() => router.push(`/leads/${l.id}`)}
@@ -314,29 +450,67 @@ export default function LeadsContenido() {
             <span className="font-bold text-slate-200">{fmt(l.proximaAccionEn)}</span>
           </div>
 
-          {/* Recomendación + última actividad */}
+          {/* Playbook + recomendación */}
           <div className="mt-1 rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2">
-            <div className="text-xs font-extrabold text-emerald-200">🧠 Recomendación</div>
-            <div className="text-sm text-slate-200 mt-0.5">{l.recomendacion || "—"}</div>
+            <div className="text-xs font-extrabold text-emerald-200">🧠 Playbook</div>
+            <div className="text-sm text-slate-200 mt-0.5">
+              <span className="font-extrabold">{pb.label.replace("▶ ", "")}</span>
+              <span className="text-slate-400"> · {pb.hint}</span>
+            </div>
+
+            {l.recomendacion && (
+              <div className="text-sm text-slate-300 mt-1">
+                <span className="text-slate-500">Recomendación:</span> {l.recomendacion}
+              </div>
+            )}
+
             <div className="text-xs text-slate-500 mt-1">
               Última actividad: <span className="font-semibold text-slate-300">{fmt(l.lastActAt ?? null)}</span>
             </div>
           </div>
 
-          {/* Botonera 2.5 */}
+          {/* Botonera 2.6 */}
           <div className="mt-2 flex flex-wrap gap-2">
+            {/* botón principal */}
             <button
               type="button"
               disabled={isBusy}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                accionLlamada(l);
+                runPlaybook(l);
               }}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-blue-900/35 border border-blue-500/40 text-blue-100 text-xs font-extrabold hover:bg-blue-900/45 disabled:opacity-60"
-              title="Registrar llamada como actividad"
+              className={toneBtn(pb.tone)}
+              title="Ejecuta el siguiente paso recomendado (actividad + próxima acción)"
             >
-              📞 Llamada
+              {pb.label}
+            </button>
+
+            {/* secundarios */}
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // WhatsApp rápido (seguimiento)
+                setBusyId(l.id);
+                (async () => {
+                  try {
+                    await doWhatsApp(l, plantillaWA(l, "seguimiento"), "Seguimiento WhatsApp");
+                    showOk(`WhatsApp ✅ (#${l.id})`);
+                    await cargar();
+                  } catch (err: any) {
+                    showErr(err?.message || "Error WhatsApp");
+                  } finally {
+                    setBusyId(null);
+                  }
+                })();
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-600/10 border border-emerald-400 text-emerald-100 text-xs font-extrabold hover:bg-emerald-600/18 disabled:opacity-60"
+              title="Seguimiento rápido"
+            >
+              💬 Seguimiento
             </button>
 
             <button
@@ -345,45 +519,17 @@ export default function LeadsContenido() {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                accionWhatsApp(l);
-              }}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-xs font-extrabold hover:bg-emerald-600/25 disabled:opacity-60"
-              title="Abrir WhatsApp y registrar actividad"
-            >
-              💬 WhatsApp
-            </button>
-
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                accionContactado(l);
+                router.push(`/leads/${l.id}`);
               }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-slate-950 border border-slate-700 text-slate-100 text-xs font-extrabold hover:border-emerald-400 disabled:opacity-60"
-              title="Cambiar estado a CONTACTADO (genera actividad automática)"
+              title="Abrir detalle"
             >
-              ✅ Contactado
-            </button>
-
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                accionProximaManana10(l);
-              }}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-purple-600/15 border border-purple-400 text-purple-100 text-xs font-extrabold hover:bg-purple-600/25 disabled:opacity-60"
-              title="Programar próxima acción mañana a las 10:00"
-            >
-              📅 Mañana 10:00
+              ⚡ Abrir
             </button>
 
             {isBusy && (
               <span className="inline-flex items-center px-3 py-2 rounded-full bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold">
-                Guardando…
+                Ejecutando…
               </span>
             )}
           </div>
@@ -449,7 +595,7 @@ export default function LeadsContenido() {
                 </div>
                 <span className={pillScore(l.score)}>{`S ${Math.round(Number(l.score ?? 0))}`}</span>
               </div>
-              <div className="text-slate-300 text-xs mt-0.5">{l.recomendacion || "—"}</div>
+              <div className="text-slate-300 text-xs mt-0.5">{choosePlaybook(l).label.replace("▶ ", "")}</div>
             </button>
           ))
         )}
@@ -477,7 +623,7 @@ export default function LeadsContenido() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold text-white">Lead Center PRO</h1>
-          <p className="text-slate-300 mt-1">Tareas, métricas y seguimiento comercial (operativo).</p>
+          <p className="text-slate-300 mt-1">Auto-Playbook: ejecuta el siguiente paso en 1 click.</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -509,9 +655,9 @@ export default function LeadsContenido() {
 
       {/* Alertas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <AlertBox title="🔥 Calientes" subtitle="Score alto (prioridad máxima)" items={calientes} />
-        <AlertBox title="🕳️ Sin actividad" subtitle="72h sin tocar (se enfría)" items={sinActividad} />
-        <AlertBox title="⏰ Vencidas +48h" subtitle="Ya deberíamos haber actuado" items={vencidas48h} />
+        <AlertBox title="🔥 Calientes" subtitle="Prioridad máxima" items={calientes} />
+        <AlertBox title="🕳️ Sin actividad" subtitle="Se enfrían (tócalos hoy)" items={sinActividad} />
+        <AlertBox title="⏰ Vencidas +48h" subtitle="Recuperación urgente" items={vencidas48h} />
       </div>
 
       {/* Stats */}
