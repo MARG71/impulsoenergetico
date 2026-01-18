@@ -1,54 +1,137 @@
+// src/app/api/crm/plantillas/[id]/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
+import { getSessionOrThrow, sessionAdminId, sessionRole } from "@/lib/auth-server";
 
-function parseId(x: unknown) {
-  const n = Number(x);
+function parseId(id: unknown) {
+  const n = Number(id);
   return !n || Number.isNaN(n) ? null : n;
 }
-function canWrite(role: string) {
-  return role === "SUPERADMIN" || role === "ADMIN";
-}
 
-export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
+// GET /api/crm/plantillas/[id]
+export async function GET(_req: NextRequest, context: any) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
     const tenantAdminId = sessionAdminId(session);
 
-    if (!canWrite(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    const plantillaId = parseId(context?.params?.id);
+    if (!plantillaId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
 
-    const id = parseId(context?.params?.id);
-    if (!id) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
+    const item = await prisma.plantillaMensaje.findUnique({
+      where: { id: plantillaId },
+    });
 
-    const actual = await prisma.plantillaMensaje.findUnique({ where: { id } });
-    if (!actual) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    if (!item) return NextResponse.json({ error: "Plantilla no encontrada" }, { status: 404 });
 
-    // permiso multi-tenant
-    if (role !== "SUPERADMIN" && actual.adminId !== tenantAdminId) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    // Permisos multi-tenant (si no eres SUPERADMIN, solo tus plantillas)
+    if (role !== "SUPERADMIN") {
+      if ((item.adminId ?? null) !== (tenantAdminId ?? null)) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+
+    return NextResponse.json(item);
+  } catch (e: any) {
+    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    console.error("GET plantilla error:", e);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+// PATCH /api/crm/plantillas/[id]
+export async function PATCH(req: NextRequest, context: any) {
+  try {
+    const session = await getSessionOrThrow();
+    const role = sessionRole(session);
+    const tenantAdminId = sessionAdminId(session);
+
+    const plantillaId = parseId(context?.params?.id);
+    if (!plantillaId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
+
+    const existente = await prisma.plantillaMensaje.findUnique({
+      where: { id: plantillaId },
+      select: { id: true, adminId: true },
+    });
+
+    if (!existente) return NextResponse.json({ error: "Plantilla no encontrada" }, { status: 404 });
+
+    // Permisos multi-tenant
+    if (role !== "SUPERADMIN") {
+      if ((existente.adminId ?? null) !== (tenantAdminId ?? null)) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
     }
 
     const body = await req.json().catch(() => ({}));
 
+    // Campos editables (validación sencilla)
+    const patch: any = {};
+
+    if (Object.prototype.hasOwnProperty.call(body, "titulo")) {
+      patch.titulo = body.titulo ? String(body.titulo) : "";
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "contenido")) {
+      patch.contenido = body.contenido ? String(body.contenido) : "";
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "activa")) {
+      patch.activa = Boolean(body.activa);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "etapa")) {
+      patch.etapa = body.etapa ? String(body.etapa) : "primero";
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "canal")) {
+      patch.canal = body.canal ? String(body.canal) : "whatsapp";
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "variante")) {
+      patch.variante = body.variante ? String(body.variante).toUpperCase() : "A";
+    }
+
+    patch.actualizadaEn = new Date();
+
     const updated = await prisma.plantillaMensaje.update({
-      where: { id },
-      data: {
-        ...(body?.titulo !== undefined ? { titulo: String(body.titulo) } : {}),
-        ...(body?.contenido !== undefined ? { contenido: String(body.contenido) } : {}),
-        ...(body?.activa !== undefined ? { activa: Boolean(body.activa) } : {}),
-        ...(body?.etapa !== undefined ? { etapa: String(body.etapa) } : {}),
-        ...(body?.variante !== undefined ? { variante: String(body.variante) } : {}),
-        ...(body?.canal !== undefined ? { canal: String(body.canal) } : {}),
-      },
+      where: { id: plantillaId },
+      data: patch,
     });
 
     return NextResponse.json(updated);
   } catch (e: any) {
     if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     console.error("PATCH plantilla error:", e);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ error: "Error guardando" }, { status: 500 });
+  }
+}
+
+// DELETE /api/crm/plantillas/[id] (opcional, por si lo necesitas)
+export async function DELETE(_req: NextRequest, context: any) {
+  try {
+    const session = await getSessionOrThrow();
+    const role = sessionRole(session);
+    const tenantAdminId = sessionAdminId(session);
+
+    const plantillaId = parseId(context?.params?.id);
+    if (!plantillaId) return NextResponse.json({ error: "ID no válido" }, { status: 400 });
+
+    const existente = await prisma.plantillaMensaje.findUnique({
+      where: { id: plantillaId },
+      select: { id: true, adminId: true },
+    });
+
+    if (!existente) return NextResponse.json({ error: "Plantilla no encontrada" }, { status: 404 });
+
+    if (role !== "SUPERADMIN") {
+      if ((existente.adminId ?? null) !== (tenantAdminId ?? null)) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+    }
+
+    await prisma.plantillaMensaje.delete({ where: { id: plantillaId } });
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    console.error("DELETE plantilla error:", e);
+    return NextResponse.json({ error: "Error eliminando" }, { status: 500 });
   }
 }
