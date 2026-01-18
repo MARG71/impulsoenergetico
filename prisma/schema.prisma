@@ -228,6 +228,11 @@ model Usuario {
   plantillaMensajes PlantillaMensaje[] @relation("PlantillaMensajeAdmin")
   plantillaEnvio    PlantillaEnvio[]   @relation("PlantillaEnvioUsuario")
   plantillaEnvios   PlantillaEnvio[]
+  
+  leadDocumentosCreados LeadDocumento[] @relation("LeadDocumentoCreadoPor")
+  leadDocumentosGestionados LeadDocumento[] @relation("LeadDocumentoAdmin")
+
+
 
   @@index([adminId])
 }
@@ -261,6 +266,9 @@ model Lead {
 
   actividades     LeadActividad[]
   plantillaEnvios PlantillaEnvio[]
+
+  documentos LeadDocumento[]
+
 
   @@index([adminId])
   @@index([estado, creadoEn])
@@ -744,4 +752,37 @@ model PlantillaEnvio {
   @@index([adminId, creadoEn])
   @@index([leadId, creadoEn])
   @@index([etapa, variante, creadoEn])
+}
+
+enum CanalEnvioDocumento {
+  WHATSAPP
+  EMAIL
+  OTRO
+}
+
+model LeadDocumento {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // archivo
+  nombre       String
+  url          String
+  publicId     String?
+  resourceType String? // raw | image | video
+  mime         String?
+  size         Int?
+
+  // trazabilidad
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("LeadDocumentoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  adminId Int?
+  admin   Usuario? @relation("LeadDocumentoAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+
+
+  @@index([leadId, creadoEn])
+  @@index([adminId, creadoEn])
 }
