@@ -160,6 +160,11 @@ export default function LeadDetalleContenido() {
     }
   };
 
+  const getSignedDocUrl = async (docId: number) => {
+    const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/signed`);
+    return String(data?.url || "").trim();
+  };
+
 
   const [estado, setEstado] = useState<EstadoKey>("pendiente");
   const [notas, setNotas] = useState("");
@@ -686,48 +691,69 @@ return (
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <a
-                        href={d.url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        onClick={async () => {
+                          try {
+                            const signed = await getSignedDocUrl(d.id);
+                            if (!signed) throw new Error("No se pudo generar el enlace del documento");
+                            window.open(signed, "_blank", "noopener,noreferrer");
+                          } catch (e: any) {
+                            setToast(e?.message || "No se pudo abrir");
+                            setTimeout(() => setToast(null), 2000);
+                          }
+                        }}
                         className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400"
                       >
                         Abrir
-                      </a>
+                      </button>
+
 
                       <button
                         onClick={async () => {
-                          await navigator.clipboard.writeText(d.url);
-                          setToast("Enlace copiado ✅");
-                          setTimeout(() => setToast(null), 1600);
+                          try {
+                            const signed = await getSignedDocUrl(d.id);
+                            if (!signed) throw new Error("No se pudo generar el enlace del documento");
+                            await navigator.clipboard.writeText(signed);
+                            setToast("Enlace copiado ✅");
+                            setTimeout(() => setToast(null), 1600);
+                          } catch (e: any) {
+                            setToast(e?.message || "No se pudo copiar");
+                            setTimeout(() => setToast(null), 2000);
+                          }
                         }}
                         className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400"
                       >
                         Copiar enlace
                       </button>
 
+
                       <button
                         onClick={async () => {
-                          const tel = telWa;
-                          if (!tel) {
-                            setToast("⚠️ Teléfono inválido");
-                            setTimeout(() => setToast(null), 2000);
-                            return;
+                          try {
+                            const tel = telWa;
+                            if (!tel) {
+                              setToast("⚠️ Teléfono inválido");
+                              setTimeout(() => setToast(null), 2000);
+                              return;
+                            }
+
+                            const signed = await getSignedDocUrl(d.id);
+                            if (!signed) throw new Error("No se pudo generar el enlace del documento");
+
+                            const msg = `Hola ${lead?.nombre}, te envío el documento: ${d.nombre}\n\n${signed}`;
+
+                            window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+                            await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${d.nombre}\n${signed}`);
+                          } catch (e: any) {
+                            setToast(e?.message || "No se pudo enviar");
+                            setTimeout(() => setToast(null), 2200);
                           }
-                          const urlToSend =
-                            (d.mime?.includes("pdf") || d.url.toLowerCase().includes(".pdf"))
-                              ? `${d.url}?dl=1`
-                              : d.url;
-
-                          const msg = `Hola ${lead?.nombre}, te envío el documento: ${d.nombre}\n\n${urlToSend}`;
-
-                          window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
-                          await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${d.nombre}\n${d.url}`);
                         }}
                         className="px-3 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25"
                       >
                         Enviar WhatsApp
                       </button>
+
                     </div>
                   </div>
                 </div>
