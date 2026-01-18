@@ -14,6 +14,16 @@ type Actividad = {
   usuario?: UsuarioMini | null;
 };
 
+type LeadDocumento = {
+  id: number;
+  creadoEn: string;
+  nombre: string;
+  url: string;
+  mime?: string | null;
+  size?: number | null;
+  creadoPor?: { id: number; nombre: string | null; rol?: string | null } | null;
+};
+
 type Lead = {
   id: number;
   nombre: string;
@@ -93,6 +103,63 @@ export default function LeadDetalleContenido() {
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [docs, setDocs] = useState<LeadDocumento[]>([]);
+  const [docNombre, setDocNombre] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docsLoading, setDocsLoading] = useState(false);
+
+  const cargarDocumentos = async () => {
+    if (!id) return;
+    setDocsLoading(true);
+    try {
+      const data = await fetchJson(`/api/crm/leads/${id}/documentos`);
+      setDocs(Array.isArray(data?.items) ? data.items : []);
+    } catch {
+      setDocs([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  };
+
+  const subirDocumento = async () => {
+    if (!id) return;
+    if (!docFile) {
+      setToast("⚠️ Selecciona un archivo");
+      setTimeout(() => setToast(null), 2000);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const form = new FormData();
+      form.append("file", docFile);
+      if (docNombre.trim()) form.append("nombre", docNombre.trim());
+
+      const res = await fetch(`/api/crm/leads/${id}/documentos/upload`, {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Error subiendo documento");
+
+      setToast("Documento subido ✅");
+      setTimeout(() => setToast(null), 2000);
+
+      setDocFile(null);
+      setDocNombre("");
+      await cargarDocumentos();
+      await cargar(); // refresca timeline (porque el upload crea actividad)
+    } catch (e: any) {
+      setToast(e?.message || "No se pudo subir");
+      setTimeout(() => setToast(null), 2600);
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   const [estado, setEstado] = useState<EstadoKey>("pendiente");
   const [notas, setNotas] = useState("");
@@ -303,7 +370,8 @@ export default function LeadDetalleContenido() {
     );
   }
 
-  return (
+return (
+  <>
     <div className="p-6 space-y-5 text-base">
       {toast && (
         <div className="fixed z-50 bottom-6 right-6 rounded-2xl bg-emerald-900/35 border border-emerald-500/40 text-emerald-100 px-4 py-3 font-semibold shadow-[0_0_25px_rgba(16,185,129,0.25)]">
@@ -326,25 +394,33 @@ export default function LeadDetalleContenido() {
           </h1>
 
           <p className="text-base text-slate-300 mt-1">
-            {lead.email} · {lead.telefono} · Creado: <span className="font-bold">{fmt(lead.creadoEn)}</span>
+            {lead.email} · {lead.telefono} · Creado:{" "}
+            <span className="font-bold">{fmt(lead.creadoEn)}</span>
           </p>
 
           <p className="text-sm text-slate-400 mt-1">
-            Agente: <span className="font-semibold text-slate-200">{lead.agente?.nombre || "—"}</span> · Lugar:{" "}
-            <span className="font-semibold text-slate-200">{lead.lugar?.nombre || "—"}</span>
+            Agente:{" "}
+            <span className="font-semibold text-slate-200">
+              {lead.agente?.nombre || "—"}
+            </span>{" "}
+            · Lugar:{" "}
+            <span className="font-semibold text-slate-200">
+              {lead.lugar?.nombre || "—"}
+            </span>
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <a
             href={`tel:${lead.telefono}`}
-            onClick={() => crearActividad("llamada", "Llamada realizada", "Se intentó contactar por teléfono.")}
+            onClick={() =>
+              crearActividad("llamada", "Llamada realizada", "Se intentó contactar por teléfono.")
+            }
             className="inline-flex px-4 py-2 rounded-full bg-blue-900/35 border border-blue-500/40 text-blue-100 text-sm font-extrabold hover:bg-blue-900/45"
           >
             📞 Registrar llamada
           </a>
 
-          {/* ✅ WhatsApp automático A/B */}
           <button
             disabled={saving}
             onClick={enviarWhatsAppAutomatico}
@@ -356,10 +432,23 @@ export default function LeadDetalleContenido() {
 
           <button
             disabled={saving}
-            onClick={() => crearActividad("accion", "Acción registrada", "Acción manual registrada desde Lead Center PRO.")}
+            onClick={() =>
+              crearActividad("accion", "Acción registrada", "Acción manual registrada desde Lead Center PRO.")
+            }
             className="inline-flex px-4 py-2 rounded-full bg-slate-950 border border-slate-700 text-slate-200 text-sm font-extrabold hover:border-emerald-400 disabled:opacity-60"
           >
             ⚡ Acción
+          </button>
+
+          <button
+            disabled={saving}
+            onClick={async () => {
+              setDocsOpen(true);
+              await cargarDocumentos();
+            }}
+            className="inline-flex px-4 py-2 rounded-full bg-slate-950 border border-slate-700 text-slate-200 text-sm font-extrabold hover:border-emerald-400 disabled:opacity-60"
+          >
+            📎 Documentos
           </button>
         </div>
       </div>
@@ -414,7 +503,8 @@ export default function LeadDetalleContenido() {
             />
 
             <p className="text-sm text-slate-400 mt-2">
-              Actual: <span className="font-bold text-slate-200">{lead.proximaAccion || "—"}</span> ·{" "}
+              Actual:{" "}
+              <span className="font-bold text-slate-200">{lead.proximaAccion || "—"}</span> ·{" "}
               <span className="font-bold text-slate-200">{fmt(lead.proximaAccionEn)}</span>
             </p>
           </div>
@@ -493,7 +583,11 @@ export default function LeadDetalleContenido() {
                       </div>
                     </div>
 
-                    {a.detalle && <div className="mt-2 text-base text-slate-200 leading-relaxed">{a.detalle}</div>}
+                    {a.detalle && (
+                      <div className="mt-2 text-base text-slate-200 leading-relaxed whitespace-pre-line">
+                        {a.detalle}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -524,5 +618,119 @@ export default function LeadDetalleContenido() {
         </div>
       </div>
     </div>
-  );
+
+    {/* ✅ MODAL DOCUMENTOS */}
+    {docsOpen && (
+      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+        <div className="w-full max-w-3xl rounded-3xl bg-slate-950 border border-slate-700 p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-extrabold text-white">📎 Documentos del lead</h3>
+            <button
+              onClick={() => setDocsOpen(false)}
+              className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-200 font-extrabold hover:border-emerald-400"
+            >
+              Cerrar
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              value={docNombre}
+              onChange={(e) => setDocNombre(e.target.value)}
+              placeholder="Nombre del documento (opcional)"
+              className="md:col-span-2 w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 outline-none focus:border-emerald-400"
+            />
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+              className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100"
+            />
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              disabled={saving || !docFile}
+              onClick={subirDocumento}
+              className="px-4 py-2 rounded-full bg-emerald-600/20 border border-emerald-400 text-emerald-100 font-extrabold hover:bg-emerald-600/30 disabled:opacity-60"
+            >
+              Subir documento
+            </button>
+
+            <button
+              disabled={saving}
+              onClick={cargarDocumentos}
+              className="px-4 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 font-extrabold hover:border-emerald-400 disabled:opacity-60"
+            >
+              Recargar
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-3 max-h-[50vh] overflow-auto pr-1">
+            {docsLoading ? (
+              <div className="text-slate-300">Cargando…</div>
+            ) : docs.length === 0 ? (
+              <div className="rounded-2xl bg-slate-950/60 border border-slate-800 p-4 text-slate-300">
+                No hay documentos todavía.
+              </div>
+            ) : (
+              docs.map((d) => (
+                <div key={d.id} className="rounded-2xl bg-slate-950/60 border border-slate-800 p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                      <div className="text-white font-extrabold">{d.nombre}</div>
+                      <div className="text-sm text-slate-400">
+                        {fmt(d.creadoEn)}
+                        {d.creadoPor?.nombre ? ` · ${d.creadoPor.nombre}` : ""}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={d.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400"
+                      >
+                        Abrir
+                      </a>
+
+                      <button
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(d.url);
+                          setToast("Enlace copiado ✅");
+                          setTimeout(() => setToast(null), 1600);
+                        }}
+                        className="px-3 py-2 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm font-extrabold hover:border-emerald-400"
+                      >
+                        Copiar enlace
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          const tel = telWa;
+                          if (!tel) {
+                            setToast("⚠️ Teléfono inválido");
+                            setTimeout(() => setToast(null), 2000);
+                            return;
+                          }
+                          const msg = `Hola ${lead?.nombre}, te envío el documento: ${d.nombre}\n\n${d.url}`;
+                          window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+                          await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${d.nombre}\n${d.url}`);
+                        }}
+                        className="px-3 py-2 rounded-full bg-emerald-600/15 border border-emerald-400 text-emerald-100 text-sm font-extrabold hover:bg-emerald-600/25"
+                      >
+                        Enviar WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+  </>
+);
 }
