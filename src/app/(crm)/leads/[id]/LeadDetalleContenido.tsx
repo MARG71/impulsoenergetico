@@ -714,7 +714,13 @@ return (
                             setTimeout(() => setToast(null), 2000);
                             return;
                           }
-                          const msg = `Hola ${lead?.nombre}, te envío el documento: ${d.nombre}\n\n${d.url}`;
+                          const urlToSend =
+                            (d.mime?.includes("pdf") || d.url.toLowerCase().includes(".pdf"))
+                              ? `${d.url}?dl=1`
+                              : d.url;
+
+                          const msg = `Hola ${lead?.nombre}, te envío el documento: ${d.nombre}\n\n${urlToSend}`;
+
                           window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
                           await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${d.nombre}\n${d.url}`);
                         }}
