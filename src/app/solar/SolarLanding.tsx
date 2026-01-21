@@ -1,113 +1,78 @@
 "use client";
 
-import React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
-
-type ExtraParams = Record<string, string>;
-
-function useBuildQuery() {
-  const searchParams = useSearchParams();
-
-  const nombre = searchParams.get("nombre") || "";
-  const agenteId = searchParams.get("agenteId") || "";
-  const lugarId = searchParams.get("lugarId") || "";
-
-  const buildQuery = (extra?: ExtraParams) => {
-    const p = new URLSearchParams();
-
-    if (nombre) p.set("nombre", nombre);
-    if (agenteId) p.set("agenteId", agenteId);
-    if (lugarId) p.set("lugarId", lugarId);
-
-    if (extra) {
-      Object.entries(extra).forEach(([k, v]) => {
-        if (v != null) p.set(k, v);
-      });
-    }
-
-    const qs = p.toString();
-    return qs ? `?${qs}` : "";
-  };
-
-  return { nombre: nombre || null, agenteId, lugarId, buildQuery };
-}
+import SolarHeader from "./_shared/SolarHeader";
+import SolarFooter from "./_shared/SolarFooter";
+import SolarHeroImage from "./_shared/SolarHeroImage";
+import { useBuildQuery } from "./_shared/useBuildQuery";
 
 export default function SolarLanding() {
   const router = useRouter();
   const { nombre, agenteId, lugarId, buildQuery } = useBuildQuery();
 
-  const irPantallaPrincipal = () => {
-    router.push(`/bienvenida${buildQuery()}`);
-  };
+  // Mini-calculadora (orientativa)
+  const [gasto, setGasto] = useState<string>("80");
+  const [tipo, setTipo] = useState<"vivienda" | "empresa">("vivienda");
+  const [provincia, setProvincia] = useState<string>("");
 
-  const irComparadorLuz = () => {
-    router.push(`/comparador${buildQuery({ tipo: "luz" })}`);
+  const ahorroEstimado = useMemo(() => {
+    // Fórmula orientativa (NO técnica): rango “bonito” tipo landing.
+    // Ajusta si quieres: simplemente es una estimación visual para empujar al estudio.
+    const g = Number(String(gasto).replace(",", "."));
+    if (!isFinite(g) || g <= 0) return null;
+
+    const factor = tipo === "vivienda" ? 0.45 : 0.35;
+    const anual = g * 12;
+    const ahorro = anual * factor;
+
+    // rango +- 12%
+    const min = Math.round(ahorro * 0.88);
+    const max = Math.round(ahorro * 1.12);
+
+    return { min, max };
+  }, [gasto, tipo]);
+
+  const go = (path: string, extra?: Record<string, string>) => {
+    router.push(`${path}${buildQuery(extra)}`);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
       <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-6 md:py-10">
-        {/* CABECERA */}
-        <header className="flex items-center justify-between gap-4 mb-8 md:mb-10">
-          <div className="flex items-center gap-4">
-            <div className="relative h-10 w-44 sm:h-12 sm:w-56">
-              <Image
-                src="/logo-impulso.png"
-                alt="Impulso Energético"
-                fill
-                className="object-contain drop-shadow-[0_0_24px_rgba(16,185,129,0.8)]"
-                priority
-              />
-            </div>
-            <div className="hidden sm:flex flex-col">
-              <span className="text-[10px] md:text-xs tracking-[0.30em] uppercase text-emerald-300 font-semibold">
-                IMPULSO ENERGÉTICO · ESPECIAL SOLAR
-              </span>
-              <span className="text-xs text-slate-300">
-                Autoconsumo, ahorro y autonomía energética
-              </span>
-            </div>
-          </div>
+        <SolarHeader />
 
-          <button
-            onClick={irPantallaPrincipal}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-900/70 px-4 py-2 text-xs md:text-sm text-slate-100 hover:bg-slate-800"
-          >
-            ← Volver a la pantalla principal
-          </button>
-        </header>
+        {/* HERO (tipo SotySolar: directo a conversión) */}
+        <section className="relative overflow-hidden rounded-3xl border border-emerald-500/35 bg-gradient-to-br from-emerald-600/25 via-emerald-500/5 to-slate-950/95 p-6 md:p-10 shadow-[0_0_40px_rgba(16,185,129,0.45)] mb-8 md:mb-10">
+          <span className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-400/25 blur-3xl" />
+          <span className="pointer-events-none absolute -left-20 bottom-0 h-36 w-36 rounded-full bg-amber-300/15 blur-3xl" />
 
-        {/* HERO PRINCIPAL */}
-        <section className="relative overflow-hidden rounded-3xl border border-emerald-500/40 bg-gradient-to-br from-emerald-600/25 via-emerald-500/5 to-slate-950/95 p-6 md:p-10 shadow-[0_0_40px_rgba(16,185,129,0.55)] mb-8 md:mb-10">
-          <span className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-400/30 blur-3xl" />
-          <span className="pointer-events-none absolute -left-20 bottom-0 h-36 w-36 rounded-full bg-yellow-300/20 blur-3xl" />
-
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr),minmax(0,1fr)] items-center relative z-10">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr),minmax(0,1fr)] items-start relative z-10">
+            {/* Texto */}
             <div className="space-y-4">
               <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
                 SOLAR IMPULSO · AUTOCONSUMO FOTOVOLTAICO
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight">
-                {nombre && (
+                {nombre ? (
                   <>
                     Hola,{" "}
                     <span className="text-emerald-300 font-extrabold">
                       {nombre}
                     </span>
-                    ,{" "}
+                    .{" "}
                   </>
-                )}
-                transforma tu tejado en{" "}
-                <span className="text-amber-300">ahorro y autonomía</span>.
+                ) : null}
+                Ahorra en tu factura con una instalación{" "}
+                <span className="text-amber-300">a medida</span>.
               </h1>
 
               <p className="text-sm md:text-base text-slate-100/90 max-w-2xl">
-                Analizamos tu consumo, superficie disponible y potencia
-                contratada para diseñar una instalación fotovoltaica a medida.
-                Tú decides: solo autoconsumo, con batería, o solución integral
-                con aerotermia y gestión inteligente.
+                Te hacemos un <b>estudio gratuito</b> con estimación de ahorro,
+                dimensionado y opciones (con batería, coche eléctrico o aerotermia).
+                Sin compromiso y con acompañamiento en trámites.
               </p>
 
               {(agenteId || lugarId) && (
@@ -126,172 +91,469 @@ export default function SolarLanding() {
                 </p>
               )}
 
-              <div className="flex flex-wrap gap-3 pt-2">
+              {/* CTAs */}
+              <div className="flex flex-wrap gap-3 pt-1">
                 <button
-                  onClick={irComparadorLuz}
+                  onClick={() => go("/solar/estudio")}
                   className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-2.5 text-xs md:text-sm font-semibold text-slate-950 shadow shadow-emerald-500/50 hover:bg-emerald-400"
                 >
-                  Estudiar ahorro en mi factura de luz
+                  Quiero mi estudio gratuito (2 min)
                 </button>
+
                 <button
-                  onClick={() =>
-                    router.push(`/registro${buildQuery({ origen: "solar" })}`)
-                  }
+                  onClick={() => go("/solar/tienda")}
                   className="inline-flex items-center justify-center rounded-full border border-emerald-300/70 bg-slate-950/60 px-5 py-2.5 text-xs md:text-sm font-semibold text-emerald-100 hover:bg-slate-900"
                 >
-                  Quiero que me llaméis para estudio solar
+                  Ver tienda solar
+                </button>
+
+                <button
+                  onClick={() => go("/comparador", { tipo: "luz" })}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-700 bg-slate-950/60 px-5 py-2.5 text-xs md:text-sm font-semibold text-slate-100 hover:bg-slate-900"
+                >
+                  Estimar ahorro en mi luz
+                </button>
+              </div>
+
+              {/* Confianza tipo landing */}
+              <div className="grid gap-3 sm:grid-cols-3 pt-4">
+                <TrustChip title="✅ Estudio sin compromiso" subtitle="En 24–48h" />
+                <TrustChip title="🧩 Diseño a medida" subtitle="Consumo y tejado" />
+                <TrustChip title="🛠️ Instalación profesional" subtitle="Acompañamiento" />
+              </div>
+            </div>
+
+            {/* Tarjeta derecha tipo “form” + imagen */}
+            <div className="space-y-4">
+              <SolarHeroImage src="/solar/hero.jpg" alt="Instalación solar profesional" priority />
+
+              <div className="rounded-3xl border border-slate-700 bg-slate-950/65 p-5">
+                <p className="text-xs font-semibold text-emerald-200">
+                  Recibe una llamada para tu estudio
+                </p>
+                <p className="text-[11px] text-slate-300 mt-1">
+                  Te llevamos al formulario de estudio (2 minutos).
+                </p>
+
+                <div className="mt-4 grid gap-2 text-xs">
+                  <button
+                    onClick={() => go("/solar/estudio")}
+                    className="rounded-full bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+                  >
+                    Empezar estudio ahora →
+                  </button>
+
+                  <button
+                    onClick={() => go("/solar/subvenciones")}
+                    className="rounded-full border border-slate-700 px-4 py-2.5 text-xs font-semibold text-slate-100 hover:bg-slate-900"
+                  >
+                    Ver ayudas y trámites
+                  </button>
+
+                  <button
+                    onClick={() => go("/solar/faq")}
+                    className="rounded-full border border-slate-700 px-4 py-2.5 text-xs font-semibold text-slate-100 hover:bg-slate-900"
+                  >
+                    Dudas frecuentes (FAQ)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* BLOQUE: CÓMO FUNCIONA (tipo SotySolar: pasos claros) */}
+        <section className="rounded-3xl border border-slate-700 bg-slate-950/75 p-6 md:p-7 mb-8 md:mb-10">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
+            <div>
+              <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
+                Proceso claro · sin sorpresas
+              </div>
+              <h2 className="text-lg md:text-xl font-extrabold mt-1">
+                ¿Cómo trabajamos tu proyecto solar?
+              </h2>
+              <p className="text-sm text-slate-200 mt-1 max-w-3xl">
+                Te guiamos desde el estudio hasta la puesta en marcha y la monitorización.
+              </p>
+            </div>
+
+            <button
+              onClick={() => go("/solar/como-funciona")}
+              className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold hover:bg-slate-900 w-fit"
+            >
+              Ver el proceso completo →
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-5 text-xs md:text-sm">
+            <StepCard n="1" title="Estudio" desc="Consumo, tejado y objetivos." />
+            <StepCard n="2" title="Diseño" desc="Paneles, inversor y protecciones." />
+            <StepCard n="3" title="Trámites" desc="Licencias, legalización y ayudas." />
+            <StepCard n="4" title="Instalación" desc="Montaje y puesta en marcha." />
+            <StepCard n="5" title="Ahorro" desc="Monitorización y optimización." />
+          </div>
+        </section>
+
+        {/* BLOQUE: CALCULADORA (lead magnet) */}
+        <section className="grid gap-5 lg:grid-cols-[1.15fr,0.85fr] mb-8 md:mb-10">
+          <div className="rounded-3xl border border-emerald-500/25 bg-slate-950/70 p-6 md:p-8 shadow-[0_0_40px_rgba(16,185,129,0.15)]">
+            <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
+              Calcula tu ahorro (orientativo)
+            </div>
+            <h2 className="text-lg md:text-xl font-extrabold mt-2">
+              Estimación rápida en 20 segundos
+            </h2>
+            <p className="text-sm text-slate-200 mt-2">
+              Te damos un rango orientativo y luego lo afinamos con tu factura real.
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-3 mt-6">
+              <Select
+                label="Tipo"
+                value={tipo}
+                onChange={(v) => setTipo(v as any)}
+                options={[
+                  { value: "vivienda", label: "Vivienda" },
+                  { value: "empresa", label: "Empresa" },
+                ]}
+              />
+              <Input
+                label="Gasto mensual (€)"
+                value={gasto}
+                onChange={setGasto}
+                placeholder="Ej. 80"
+              />
+              <Input
+                label="Provincia (opcional)"
+                value={provincia}
+                onChange={setProvincia}
+                placeholder="Ej. Madrid"
+              />
+            </div>
+
+            <div className="mt-6 rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+              <p className="text-xs text-slate-300">
+                Resultado orientativo
+              </p>
+
+              {ahorroEstimado ? (
+                <>
+                  <p className="text-xl md:text-2xl font-extrabold mt-1">
+                    <span className="text-emerald-300">
+                      {ahorroEstimado.min}€ – {ahorroEstimado.max}€
+                    </span>{" "}
+                    <span className="text-slate-200 text-base font-semibold">
+                      /año
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    *Depende de horario, tejado, sombras, potencia y tarifas. El estudio gratuito ajusta números reales.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-200 mt-1">
+                  Introduce un gasto válido para ver el rango.
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  onClick={() =>
+                    go("/solar/estudio", {
+                      tipo,
+                      gastoMensual: gasto,
+                      provincia,
+                    })
+                  }
+                  className="rounded-full bg-emerald-500 px-5 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+                >
+                  Afinar con estudio gratuito →
+                </button>
+
+                <button
+                  onClick={() => go("/solar/tienda")}
+                  className="rounded-full border border-slate-700 px-5 py-2.5 text-xs font-semibold hover:bg-slate-900"
+                >
+                  Ver equipos en tienda
                 </button>
               </div>
             </div>
+          </div>
 
-            <div className="relative h-52 sm:h-60 lg:h-72">
-              <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950 border border-emerald-500/40 shadow-[0_0_35px_rgba(8,47,35,0.9)] flex flex-col justify-between p-5">
-                <div className="flex items-center justify-between text-xs text-slate-200">
-                  <span className="font-semibold">Simulación solar</span>
-                  <span className="text-emerald-300 text-[11px]">
-                    Ahorro estimado
-                  </span>
-                </div>
+          <div className="space-y-4">
+            <SolarHeroImage src="/solar/proceso.jpg" alt="Proceso y equipo técnico" />
+            <div className="rounded-3xl border border-slate-700 bg-slate-950/60 p-5 text-xs text-slate-200">
+              <p className="font-semibold text-emerald-200">Consejo</p>
+              <p className="mt-2">
+                Si puedes, ten a mano una factura para ajustar consumo (kWh), potencia y tarifas.
+              </p>
+            </div>
+          </div>
+        </section>
 
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-300">Reducción consumo red</span>
-                    <span className="font-semibold text-emerald-300">
-                      hasta 60–70%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-300">Retorno estimado</span>
-                    <span className="font-semibold text-amber-300">
-                      5–8 años
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-300">CO₂ evitado</span>
-                    <span className="font-semibold text-sky-300">
-                      + toneladas/año
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-slate-400">
-                  *Datos orientativos. Realizamos un estudio detallado según tu
-                  tejado, orientación, consumo y tarifas actuales.
-                </p>
+        {/* BLOQUE: SOLUCIONES (tarjetas como SotySolar) */}
+        <section className="mb-8 md:mb-10">
+          <div className="flex items-end justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
+                Soluciones
               </div>
+              <h2 className="text-lg md:text-xl font-extrabold mt-1">
+                Elige tu camino: ahorro, autonomía o solución integral
+              </h2>
             </div>
-          </div>
-        </section>
 
-        {/* BLOQUES DE VENTAJAS */}
-        <section className="grid gap-5 lg:grid-cols-3 mb-8 md:mb-10">
-          {/* Ahorro */}
-          <div className="rounded-2xl border border-emerald-700/70 bg-slate-950/80 p-5 shadow-lg shadow-emerald-900/40">
-            <h2 className="text-sm md:text-base font-semibold mb-2 flex items-center gap-2">
-              💸 Ahorro directo en tu factura
-            </h2>
-            <ul className="text-xs md:text-sm text-slate-200 space-y-1.5">
-              <li>• Produces tu propia energía a precio estable.</li>
-              <li>
-                • Menos dependencia de subidas de la luz y precios de mercado.
-              </li>
-              <li>
-                • Posibilidad de compensar excedentes según la compañía
-                comercializadora.
-              </li>
-            </ul>
-          </div>
-
-          {/* Autonomía */}
-          <div className="rounded-2xl border border-amber-600/70 bg-gradient-to-br from-amber-500/10 via-slate-950 to-slate-950 p-5 shadow-lg shadow-amber-900/40">
-            <h2 className="text-sm md:text-base font-semibold mb-2 flex items-center gap-2">
-              🔋 Autonomía y sistema con batería
-            </h2>
-            <ul className="text-xs md:text-sm text-slate-200 space-y-1.5">
-              <li>• Opciones con batería para aprovechar aún más tu producción.</li>
-              <li>• Gestión inteligente de cargas: coche eléctrico, ACS, etc.</li>
-              <li>• Preparado para combinar con aerotermia y otros sistemas.</li>
-            </ul>
-          </div>
-
-          {/* Sostenibilidad */}
-          <div className="rounded-2xl border border-sky-700/70 bg-slate-950/90 p-5 shadow-lg shadow-sky-900/40">
-            <h2 className="text-sm md:text-base font-semibold mb-2 flex items-center gap-2">
-              🌍 Sostenibilidad y valor para tu vivienda
-            </h2>
-            <ul className="text-xs md:text-sm text-slate-200 space-y-1.5">
-              <li>• Reduces tu huella de carbono año tras año.</li>
-              <li>• Revalorizas la vivienda al incorporar autoconsumo.</li>
-              <li>• Imagen responsable y moderna para negocios y comunidades.</li>
-            </ul>
-          </div>
-        </section>
-
-        {/* PASOS DEL PROCESO */}
-        <section className="rounded-3xl border border-slate-700 bg-slate-950/80 p-6 md:p-7 mb-10">
-          <h2 className="text-base md:text-lg font-semibold mb-4 flex items-center gap-2">
-            🧩 ¿Cómo trabajamos tu proyecto solar?
-          </h2>
-
-          <div className="grid gap-4 md:grid-cols-4 text-xs md:text-sm">
-            <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-4">
-              <p className="text-[11px] font-semibold text-emerald-300 mb-1">
-                1 · Estudio de consumo
-              </p>
-              <p className="text-slate-200">
-                Analizamos tus facturas de luz y perfil horario para dimensionar
-                la instalación adecuada.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-4">
-              <p className="text-[11px] font-semibold text-emerald-300 mb-1">
-                2 · Diseño e ingeniería
-              </p>
-              <p className="text-slate-200">
-                Cálculo de paneles, inversores, estructura y cableado, todo
-                supervisado por ingeniería especializada.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-4">
-              <p className="text-[11px] font-semibold text-emerald-300 mb-1">
-                3 · Tramitación y ayudas
-              </p>
-              <p className="text-slate-200">
-                Te ayudamos con licencias, legalización y posibles subvenciones
-                disponibles en tu zona.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-4">
-              <p className="text-[11px] font-semibold text-emerald-300 mb-1">
-                4 · Instalación y seguimiento
-              </p>
-              <p className="text-slate-200">
-                Instalación profesional, puesta en marcha y monitorización para
-                que veas tu ahorro real día a día.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA FINAL */}
-        <section className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-t border-slate-800 pt-4 text-[11px] md:text-xs text-slate-400">
-          <span>© 2025 Impulso Energético · Solar IMPULSO</span>
-          <div className="flex flex-wrap gap-3">
             <button
-              onClick={irComparadorLuz}
-              className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+              onClick={() => go("/solar/estudio")}
+              className="rounded-full border border-emerald-300/70 bg-slate-950/60 px-4 py-2 text-xs font-semibold text-emerald-100 hover:bg-slate-900"
             >
-              Ver mi ahorro estimado en luz
-            </button>
-            <button
-              onClick={irPantallaPrincipal}
-              className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-900"
-            >
-              Volver a bienvenida
+              Estudio gratuito →
             </button>
           </div>
+
+          <div className="grid gap-5 lg:grid-cols-3">
+            <SolutionCard
+              image="/solar/residencial.jpg"
+              title="Autoconsumo residencial"
+              desc="Dimensionado perfecto para tu vivienda, con ahorro estable y monitorización."
+              cta1={{ label: "Pedir estudio", onClick: () => go("/solar/estudio") }}
+              cta2={{ label: "Ver tienda", onClick: () => go("/solar/tienda") }}
+            />
+            <SolutionCard
+              image="/solar/empresa.jpg"
+              title="Empresas y negocios"
+              desc="Reduce costes fijos, mejora tu competitividad y proyecta imagen sostenible."
+              cta1={{ label: "Estudio para empresa", onClick: () => go("/solar/estudio", { tipo: "empresa" }) }}
+              cta2={{ label: "Ver equipos", onClick: () => go("/solar/tienda") }}
+            />
+            <SolutionCard
+              image="/solar/bateria.jpg"
+              title="Baterías y autonomía"
+              desc="Aprovecha más producción, reduce compra a red y gana independencia."
+              cta1={{ label: "Evaluar batería", onClick: () => go("/solar/estudio") }}
+              cta2={{ label: "Baterías en tienda", onClick: () => go("/solar/tienda/categoria/baterias") }}
+            />
+          </div>
         </section>
+
+        {/* BLOQUE: PRUEBA SOCIAL (testimonios placeholder) */}
+        <section className="rounded-3xl border border-slate-700 bg-slate-950/70 p-6 md:p-8 mb-8 md:mb-10">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
+            <div>
+              <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
+                Confianza
+              </div>
+              <h2 className="text-lg md:text-xl font-extrabold mt-1">
+                Clientes que ya han dado el paso
+              </h2>
+              <p className="text-sm text-slate-200 mt-1">
+                Sustituye estos textos por reseñas reales cuando quieras.
+              </p>
+            </div>
+
+            <button
+              onClick={() => go("/solar/faq")}
+              className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold hover:bg-slate-900 w-fit"
+            >
+              Ver FAQ →
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Testimonial
+              name="Cliente residencial"
+              text="Me explicaron todo con claridad. El estudio fue rápido y la instalación quedó perfecta."
+            />
+            <Testimonial
+              name="Negocio local"
+              text="Ahora controlamos el gasto energético y tenemos previsión. Gran acompañamiento en trámites."
+            />
+            <Testimonial
+              name="Vivienda con batería"
+              text="Con batería aprovechamos más. La monitorización es muy útil para ver el ahorro real."
+            />
+          </div>
+        </section>
+
+        {/* BLOQUE: TIENDA TEASER */}
+        <section className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr] items-start mb-10">
+          <div className="rounded-3xl border border-emerald-500/25 bg-slate-950/70 p-6 md:p-8">
+            <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
+              Tienda Solar Impulso
+            </div>
+            <h2 className="text-lg md:text-xl font-extrabold mt-2">
+              Kits, paneles, baterías e inversores
+            </h2>
+            <p className="text-sm text-slate-200 mt-2 max-w-2xl">
+              Compra equipos solares con asesoramiento. Si no sabes qué elegir, te guiamos.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <MiniLink label="Kits solares" onClick={() => go("/solar/tienda/categoria/kits")} />
+              <MiniLink label="Paneles solares" onClick={() => go("/solar/tienda/categoria/paneles")} />
+              <MiniLink label="Baterías" onClick={() => go("/solar/tienda/categoria/baterias")} />
+              <MiniLink label="Inversores" onClick={() => go("/solar/tienda/categoria/inversores")} />
+            </div>
+
+            <div className="flex flex-wrap gap-3 mt-6">
+              <button
+                onClick={() => go("/solar/tienda")}
+                className="rounded-full bg-emerald-500 px-5 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+              >
+                Entrar en la tienda →
+              </button>
+              <button
+                onClick={() => go("/solar/estudio")}
+                className="rounded-full border border-slate-700 px-5 py-2.5 text-xs font-semibold hover:bg-slate-900"
+              >
+                Quiero asesoramiento (estudio)
+              </button>
+            </div>
+          </div>
+
+          <SolarHeroImage src="/solar/tienda.jpg" alt="Tienda de productos solares" />
+        </section>
+
+        <SolarFooter />
       </div>
     </div>
+  );
+}
+
+/* ---------- UI helpers ---------- */
+
+function TrustChip({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-700 bg-slate-950/55 px-4 py-3">
+      <p className="text-xs font-semibold text-slate-100">{title}</p>
+      <p className="text-[11px] text-slate-300 mt-0.5">{subtitle}</p>
+    </div>
+  );
+}
+
+function StepCard({ n, title, desc }: { n: string; title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-900/70 border border-slate-700 p-4">
+      <p className="text-[11px] font-semibold text-emerald-300 mb-1">
+        {n} · {title}
+      </p>
+      <p className="text-slate-200 text-xs md:text-sm">{desc}</p>
+    </div>
+  );
+}
+
+function SolutionCard({
+  image,
+  title,
+  desc,
+  cta1,
+  cta2,
+}: {
+  image: string;
+  title: string;
+  desc: string;
+  cta1: { label: string; onClick: () => void };
+  cta2: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-700 bg-slate-950/65 overflow-hidden">
+      <div className="relative h-40">
+        <Image src={image} alt={title} fill className="object-cover opacity-90" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+      </div>
+      <div className="p-5">
+        <p className="text-emerald-300 font-semibold">{title}</p>
+        <p className="text-sm text-slate-200 mt-1">{desc}</p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <button
+            onClick={cta1.onClick}
+            className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+          >
+            {cta1.label}
+          </button>
+          <button
+            onClick={cta2.onClick}
+            className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold hover:bg-slate-900"
+          >
+            {cta2.label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Testimonial({ name, text }: { name: string; text: string }) {
+  return (
+    <div className="rounded-3xl border border-slate-700 bg-slate-950/55 p-5">
+      <p className="text-sm font-semibold text-emerald-200">{name}</p>
+      <p className="text-sm text-slate-200 mt-2 leading-relaxed">“{text}”</p>
+      <p className="text-[11px] text-slate-500 mt-3">★★★★★</p>
+    </div>
+  );
+}
+
+function MiniLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-left rounded-2xl border border-slate-700 bg-slate-950/55 px-4 py-3 hover:bg-slate-900 transition"
+    >
+      <p className="text-xs font-semibold text-slate-100">{label}</p>
+      <p className="text-[11px] text-slate-400 mt-0.5">Ver productos →</p>
+    </button>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="grid gap-1">
+      <span className="text-xs text-slate-200 font-semibold">{label}</span>
+      <input
+        className="rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
+function Select({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="grid gap-1">
+      <span className="text-xs text-slate-200 font-semibold">{label}</span>
+      <select
+        className="rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-slate-950">
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
