@@ -1,0 +1,10 @@
+import React, { Suspense } from "react";
+import TiendaHome from "./TiendaHome";
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">Cargando tienda…</div>}>
+      <TiendaHome />
+    </Suspense>
+  );
+}
