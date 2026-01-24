@@ -1,106 +1,89 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import SolarHeader from "../_shared/SolarHeader";
 import SolarFooter from "../_shared/SolarFooter";
-import SolarHeroImage from "../_shared/SolarHeroImage";
-import { useBuildQuery } from "../_shared/useBuildQuery";
-import { solarCategories, solarProducts } from "@/lib/solarStore";
-import { useSolarCart } from "@/lib/solarCart";
+
+const productos = [
+  {
+    t: "Placas Solares Premium",
+    d: "Paneles de última generación, alta eficiencia y garantía extendida.",
+    cta: "Ver Placas",
+  },
+  {
+    t: "Inversores Inteligentes",
+    d: "Conversión avanzada y monitorización en tiempo real vía app.",
+    cta: "Ver Inversores",
+  },
+  {
+    t: "Baterías de Almacenamiento",
+    d: "Aprovecha tu energía incluso de noche. Más independencia.",
+    cta: "Ver Baterías",
+  },
+  {
+    t: "Kits Solares Completos",
+    d: "Soluciones integrales según consumo y presupuesto.",
+    cta: "Ver Kits",
+  },
+];
 
 export default function TiendaHome() {
-  const router = useRouter();
-  const { buildQuery } = useBuildQuery();
-  const { add } = useSolarCart();
-
-  const [q, setQ] = useState("");
-
-  const destacados = useMemo(
-    () => solarProducts.filter((p) => p.destacado || p.titulo.toLowerCase().includes(q.toLowerCase())),
-    [q]
-  );
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-6 md:py-10">
-        <SolarHeader />
+    <div className="min-h-screen bg-[#070A16] text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_20%_10%,rgba(16,185,129,0.16),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(800px_450px_at_80%_20%,rgba(34,211,238,0.12),transparent_60%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#070A16] via-[#070A16] to-[#050712]" />
+      </div>
 
-        <section className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr] items-start mb-10">
-          <div className="rounded-3xl border border-emerald-500/25 bg-slate-950/70 p-6 md:p-8">
-            <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
-              Tienda Solar Impulso
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold mt-2">Compra equipos solares con asesoramiento</h1>
-            <p className="text-sm text-slate-200 mt-2 max-w-2xl">
-              Kits, paneles, baterías e inversores. Si no sabes cuál elegir, te ayudamos gratis.
-            </p>
+      <SolarHeader />
 
-            <div className="mt-5">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar: kit 3kW, batería litio, panel 450W…"
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-              />
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {solarCategories.map((c) => (
-                <button
-                  key={c.slug}
-                  onClick={() => router.push(`/solar/tienda/categoria/${c.slug}${buildQuery()}`)}
-                  className="text-left rounded-3xl border border-slate-700 bg-slate-900/60 p-5 hover:border-emerald-500/40 hover:bg-slate-900/80 transition"
-                >
-                  <p className="text-emerald-300 font-semibold">{c.titulo}</p>
-                  <p className="text-xs text-slate-200 mt-1">{c.descripcion}</p>
-                </button>
-              ))}
-            </div>
+      <section className="px-4 sm:px-6 lg:px-10 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-5 py-2 text-base font-extrabold text-emerald-100">
+            TIENDA ONLINE
           </div>
 
-          <SolarHeroImage src="/solar/tienda.jpg" alt="Tienda Solar Impulso" />
-        </section>
+          <h1 className="mt-6 text-5xl sm:text-6xl font-extrabold leading-[1.02]">
+            Todo lo que necesitas para tu proyecto solar
+          </h1>
 
-        <section className="mb-10">
-          <div className="flex items-end justify-between gap-3 mb-4">
-            <h2 className="text-lg font-semibold">Productos destacados</h2>
-            <button
-              onClick={() => router.push(`/solar/tienda/carrito${buildQuery()}`)}
-              className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold hover:bg-slate-900"
-            >
-              Ver carrito →
-            </button>
-          </div>
+          <p className="mt-6 text-xl text-white/75 leading-8 max-w-3xl">
+            Catálogo orientativo. Si quieres, con el estudio te recomendamos el kit exacto para tu consumo.
+          </p>
 
-          <div className="grid gap-5 md:grid-cols-3">
-            {destacados.slice(0, 6).map((p) => (
-              <div key={p.slug} className="rounded-3xl border border-slate-700 bg-slate-950/60 p-5">
-                <p className="text-emerald-300 font-semibold">{p.titulo}</p>
-                <p className="text-xs text-slate-200 mt-1">{p.resumen}</p>
-                <p className="text-amber-300 font-extrabold mt-3">{p.precio.toFixed(2)} €</p>
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">
+            {productos.map((p) => (
+              <div
+                key={p.t}
+                className="rounded-3xl border border-white/10 bg-white/5 p-8"
+              >
+                <div className="text-3xl font-extrabold">{p.t}</div>
+                <div className="mt-3 text-lg leading-8 text-white/75">
+                  {p.d}
+                </div>
 
-                <div className="flex flex-wrap gap-2 mt-4">
-                  <button
-                    onClick={() => router.push(`/solar/tienda/producto/${p.slug}${buildQuery()}`)}
-                    className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold hover:bg-slate-900"
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <Link
+                    href="/solar/estudio"
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-4 text-lg font-extrabold text-slate-950 hover:bg-emerald-300"
                   >
-                    Ver detalles
-                  </button>
-                  <button
-                    onClick={() => add(p.slug, 1)}
-                    className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400"
+                    Pedir Estudio
+                  </Link>
+                  <Link
+                    href="/solar"
+                    className="inline-flex items-center justify-center rounded-full border border-emerald-300/40 bg-transparent px-7 py-4 text-lg font-bold text-emerald-100 hover:bg-emerald-300/10"
                   >
-                    Añadir
-                  </button>
+                    Volver a la landing
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <SolarFooter />
-      </div>
+      <SolarFooter />
     </div>
   );
 }

@@ -1,245 +1,38 @@
 // src/app/solar/estudio/SolarEstudio.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import SolarHeader from "../_shared/SolarHeader";
 import SolarFooter from "../_shared/SolarFooter";
-import SolarHeroImage from "../_shared/SolarHeroImage";
-import { useBuildQuery } from "../_shared/useBuildQuery";
 
-type FormState = {
-  nombre: string;
-  telefono: string;
-  email: string;
-  tipo: "vivienda" | "empresa";
-  provincia: string;
-  gastoMensual: string; // texto para no romper
-  sombras: "no" | "si";
-};
-
-const provinciasSugeridas = [
-  "Madrid","Barcelona","Valencia","Sevilla","Málaga","Zaragoza","Murcia","Alicante","Cádiz","Pontevedra"
-];
-
-export default function SolarEstudio() {
-  const router = useRouter();
-  const { buildQuery, nombre: nombreFromQS } = useBuildQuery();
-
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-
-  const [f, setF] = useState<FormState>({
-    nombre: nombreFromQS || "",
-    telefono: "",
-    email: "",
-    tipo: "vivienda",
-    provincia: "",
-    gastoMensual: "",
-    sombras: "no",
-  });
-
-  const canNext1 = useMemo(() => f.nombre.trim() && f.telefono.trim() && f.email.trim(), [f]);
-  const canNext2 = useMemo(() => f.provincia.trim() && f.gastoMensual.trim(), [f]);
-
-  const onSubmit = async () => {
-    setLoading(true);
-    try {
-      // Opción simple y segura: reusar tu /registro para guardar lead como ya lo tienes montado
-      // y que mantenga agenteId/lugarId + trazabilidad.
-      router.push(
-        `/registro${buildQuery({
-          origen: "solar",
-          nombre: f.nombre,
-          telefono: f.telefono,
-          email: f.email,
-        })}`
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-16 py-6 md:py-10">
-        <SolarHeader />
-
-        <section className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr] items-start mb-8">
-          <div className="rounded-3xl border border-emerald-500/25 bg-slate-950/70 p-6 md:p-8 shadow-[0_0_40px_rgba(16,185,129,0.20)]">
-            <div className="text-[10px] md:text-xs font-semibold tracking-[0.30em] text-emerald-200 uppercase">
-              Estudio gratuito · Solar Impulso
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold mt-2">
-              Te llamamos y diseñamos tu instalación a medida
-            </h1>
-            <p className="text-sm text-slate-200 mt-2 max-w-2xl">
-              En 2 minutos nos dejas tus datos y te contacta un especialista. Sin compromiso.
-            </p>
-
-            {/* Steps */}
-            <div className="mt-6 flex items-center gap-2 text-xs">
-              {[1, 2, 3].map((n) => (
-                <div
-                  key={n}
-                  className={`px-3 py-1 rounded-full border ${
-                    step === n ? "border-emerald-300 bg-emerald-500/15 text-emerald-100" : "border-slate-700 text-slate-300"
-                  }`}
-                >
-                  Paso {n}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6">
-              {step === 1 && (
-                <div className="grid gap-4">
-                  <Input label="Nombre" value={f.nombre} onChange={(v) => setF((s) => ({ ...s, nombre: v }))} placeholder="Ej. Miguel" />
-                  <Input label="Teléfono" value={f.telefono} onChange={(v) => setF((s) => ({ ...s, telefono: v }))} placeholder="Ej. 6XX XXX XXX" />
-                  <Input label="Email" value={f.email} onChange={(v) => setF((s) => ({ ...s, email: v }))} placeholder="Ej. tuemail@email.com" />
-                  <div className="flex justify-end">
-                    <button
-                      disabled={!canNext1}
-                      onClick={() => setStep(2)}
-                      className="rounded-full bg-emerald-500 px-5 py-2.5 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40"
-                    >
-                      Continuar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === 2 && (
-                <div className="grid gap-4">
-                  <Select
-                    label="Tipo de instalación"
-                    value={f.tipo}
-                    onChange={(v) => setF((s) => ({ ...s, tipo: v as any }))}
-                    options={[
-                      { value: "vivienda", label: "Vivienda" },
-                      { value: "empresa", label: "Empresa / negocio" },
-                    ]}
-                  />
-
-                  <Select
-                    label="Provincia"
-                    value={f.provincia}
-                    onChange={(v) => setF((s) => ({ ...s, provincia: v }))}
-                    options={[
-                      { value: "", label: "Selecciona..." },
-                      ...provinciasSugeridas.map((p) => ({ value: p, label: p })),
-                    ]}
-                  />
-
-                  <Input
-                    label="Gasto mensual aproximado (€/mes)"
-                    value={f.gastoMensual}
-                    onChange={(v) => setF((s) => ({ ...s, gastoMensual: v }))}
-                    placeholder="Ej. 80"
-                  />
-
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => setStep(1)}
-                      className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-900"
-                    >
-                      ← Atrás
-                    </button>
-                    <button
-                      disabled={!canNext2}
-                      onClick={() => setStep(3)}
-                      className="rounded-full bg-emerald-500 px-5 py-2.5 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-40"
-                    >
-                      Continuar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === 3 && (
-                <div className="grid gap-4">
-                  <Select
-                    label="¿Hay sombras importantes en el tejado?"
-                    value={f.sombras}
-                    onChange={(v) => setF((s) => ({ ...s, sombras: v as any }))}
-                    options={[
-                      { value: "no", label: "No / mínimas" },
-                      { value: "si", label: "Sí, bastantes" },
-                    ]}
-                  />
-
-                  <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 text-xs text-slate-200">
-                    <p className="font-semibold text-emerald-200 mb-1">Resumen</p>
-                    <div className="grid gap-1">
-                      <p>• Nombre: <b>{f.nombre || "—"}</b></p>
-                      <p>• Tipo: <b>{f.tipo}</b></p>
-                      <p>• Provincia: <b>{f.provincia || "—"}</b></p>
-                      <p>• Gasto: <b>{f.gastoMensual || "—"} €/mes</b></p>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-2">
-                      Al enviar, te llevamos al registro (para guardar el lead con trazabilidad QR).
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => setStep(2)}
-                      className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-900"
-                    >
-                      ← Atrás
-                    </button>
-                    <button
-                      onClick={onSubmit}
-                      disabled={loading}
-                      className="rounded-full bg-emerald-500 px-5 py-2.5 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
-                    >
-                      {loading ? "Enviando…" : "Enviar y recibir llamada"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <SolarHeroImage src="/solar/hero.jpg" alt="Solar Impulso - instalación profesional" priority />
-            <div className="rounded-3xl border border-slate-700 bg-slate-950/60 p-5 text-xs text-slate-200">
-              <p className="font-semibold text-emerald-200">¿Qué obtienes?</p>
-              <ul className="mt-2 space-y-1.5">
-                <li>• Dimensionado de paneles e inversor</li>
-                <li>• Ahorro estimado y retorno</li>
-                <li>• Opciones con batería</li>
-                <li>• Tramitación y ayudas (según zona)</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <SolarFooter />
-      </div>
-    </div>
-  );
-}
+type Estado = "idle" | "loading" | "ok" | "error";
 
 function Input({
   label,
   value,
   onChange,
+  type = "text",
   placeholder,
+  required = true,
 }: {
   label: string;
   value: string;
-  placeholder?: string;
   onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
 }) {
   return (
-    <label className="grid gap-1">
-      <span className="text-xs text-slate-200 font-semibold">{label}</span>
+    <label className="grid gap-3">
+      <span className="text-lg font-extrabold text-white/90">{label}</span>
       <input
-        className="rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
         value={value}
-        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        type={type}
+        placeholder={placeholder}
+        required={required}
+        className="h-14 rounded-2xl border border-white/10 bg-white/5 px-5 text-lg text-white outline-none placeholder:text-white/40 focus:border-emerald-300/60"
       />
     </label>
   );
@@ -257,19 +50,221 @@ function Select({
   options: { value: string; label: string }[];
 }) {
   return (
-    <label className="grid gap-1">
-      <span className="text-xs text-slate-200 font-semibold">{label}</span>
+    <label className="grid gap-3">
+      <span className="text-lg font-extrabold text-white/90">{label}</span>
       <select
-        className="rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        className="h-14 rounded-2xl border border-white/10 bg-white/5 px-5 text-lg text-white outline-none focus:border-emerald-300/60"
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-slate-950">
+          <option key={o.value} value={o.value} className="bg-[#070A16]">
             {o.label}
           </option>
         ))}
       </select>
     </label>
+  );
+}
+
+export default function SolarEstudio() {
+  const [estado, setEstado] = useState<Estado>("idle");
+  const [mensaje, setMensaje] = useState<string>("");
+
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [cp, setCp] = useState("");
+  const [tipo, setTipo] = useState("vivienda");
+  const [interes, setInteres] = useState("fotovoltaica");
+
+  const year = useMemo(() => new Date().getFullYear(), []);
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEstado("loading");
+    setMensaje("");
+
+    try {
+      // Guarda en /api/leads si existe (tu CRM ya lo tenía en otras partes)
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre,
+          email,
+          telefono,
+          codigoPostal: cp,
+          servicio: "SOLAR",
+          tipoInstalacion: tipo,
+          productoInteres: interes,
+          origen: "solar/estudio",
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || "No se pudo enviar");
+      }
+
+      setEstado("ok");
+      setMensaje(
+        "¡Perfecto! Hemos recibido tu solicitud. Te contactaremos lo antes posible."
+      );
+      setNombre("");
+      setEmail("");
+      setTelefono("");
+      setCp("");
+      setTipo("vivienda");
+      setInteres("fotovoltaica");
+    } catch (err) {
+      setEstado("error");
+      setMensaje(
+        "No hemos podido enviar el formulario automáticamente. Escríbenos a info@impulsoenergetico.es y te lo gestionamos al momento."
+      );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#070A16] text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_20%_10%,rgba(16,185,129,0.18),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(800px_450px_at_80%_20%,rgba(34,211,238,0.14),transparent_60%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#070A16] via-[#070A16] to-[#050712]" />
+      </div>
+
+      <SolarHeader />
+
+      <section className="px-4 sm:px-6 lg:px-10 py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl grid gap-10 lg:grid-cols-2 items-start">
+          <div>
+            <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-400/10 px-5 py-2 text-base font-extrabold text-emerald-100">
+              ESTUDIO GRATUITO
+            </div>
+
+            <h1 className="mt-6 text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.02]">
+              Solicita tu estudio en 3 minutos
+            </h1>
+
+            <p className="mt-6 text-xl text-white/75 leading-8">
+              Te diremos cuánto puedes ahorrar, qué kit encaja contigo y opciones de financiación.
+              Sin compromiso y con asesoramiento real.
+            </p>
+
+            <div className="mt-8 grid gap-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-lg text-white/80">
+                ✅ Respuesta rápida · ✅ Estudio orientativo · ✅ Trámites incluidos
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/solar"
+                  className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 py-3 text-base font-bold text-white/80 hover:bg-white/10"
+                >
+                  Volver a la landing
+                </Link>
+                <Link
+                  href="/solar/faq"
+                  className="inline-flex items-center justify-center rounded-full border border-emerald-300/40 bg-transparent px-6 py-3 text-base font-bold text-emerald-100 hover:bg-emerald-300/10"
+                >
+                  Ver FAQ
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-7 sm:p-8">
+            <h2 className="text-2xl font-extrabold">Datos de contacto</h2>
+            <p className="mt-2 text-lg text-white/70 leading-7">
+              Completa el formulario y te llamamos para preparar el estudio.
+            </p>
+
+            <form onSubmit={enviar} className="mt-7 grid gap-6">
+              <Input
+                label="Nombre y apellidos"
+                value={nombre}
+                onChange={setNombre}
+                placeholder="Tu nombre"
+              />
+              <Input
+                label="Email"
+                value={email}
+                onChange={setEmail}
+                type="email"
+                placeholder="tuemail@dominio.com"
+              />
+              <Input
+                label="Teléfono"
+                value={telefono}
+                onChange={setTelefono}
+                placeholder="600 000 000"
+              />
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <Input
+                  label="Código Postal"
+                  value={cp}
+                  onChange={setCp}
+                  placeholder="31001"
+                />
+                <Select
+                  label="Tipo de instalación"
+                  value={tipo}
+                  onChange={setTipo}
+                  options={[
+                    { value: "vivienda", label: "Vivienda unifamiliar" },
+                    { value: "comunidad", label: "Comunidad de vecinos" },
+                    { value: "empresa", label: "Empresa / Nave" },
+                  ]}
+                />
+              </div>
+
+              <Select
+                label="¿Qué te interesa?"
+                value={interes}
+                onChange={setInteres}
+                options={[
+                  { value: "fotovoltaica", label: "Fotovoltaica" },
+                  { value: "baterias", label: "Baterías" },
+                  { value: "cargador", label: "Cargador VE" },
+                  { value: "kit", label: "Kit completo" },
+                ]}
+              />
+
+              <button
+                type="submit"
+                disabled={estado === "loading"}
+                className="mt-2 inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-4 text-lg font-extrabold text-slate-950 hover:bg-emerald-300 disabled:opacity-60"
+              >
+                {estado === "loading" ? "Enviando..." : "Solicitar Estudio Gratis"}
+              </button>
+
+              {mensaje ? (
+                <div
+                  className={[
+                    "rounded-2xl border p-5 text-base font-bold",
+                    estado === "ok"
+                      ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100"
+                      : "border-red-300/30 bg-red-500/10 text-red-100",
+                  ].join(" ")}
+                >
+                  {mensaje}
+                </div>
+              ) : null}
+
+              <div className="text-sm text-white/50 leading-6">
+                Al enviar aceptas que te contactemos para el estudio. Email: info@impulsoenergetico.es
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <SolarFooter />
+
+      <div className="py-6 text-center text-xs text-white/40">
+        © {year} Impulso Energético
+      </div>
+    </div>
   );
 }
