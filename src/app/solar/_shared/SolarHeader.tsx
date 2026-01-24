@@ -1,43 +1,49 @@
 // src/app/solar/_shared/SolarHeader.tsx
 "use client";
 
-import React from "react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useBuildQuery } from "./useBuildQuery";
+import Link from "next/link";
+
+const nav = [
+  { href: "/solar#por-que", label: "Por qué" },
+  { href: "/solar#beneficios", label: "Beneficios" },
+  { href: "/solar#kits", label: "Kits" },
+  { href: "/solar#proceso", label: "Proceso" },
+  { href: "/solar/tienda", label: "Tienda" },
+  { href: "/solar/faq", label: "FAQ" },
+];
 
 export default function SolarHeader() {
-  const router = useRouter();
-  const { buildQuery } = useBuildQuery();
-
   return (
-    <header className="flex items-center justify-between gap-4 mb-8 md:mb-10">
-      <div className="flex items-center gap-4">
-        <div className="relative h-10 w-44 sm:h-12 sm:w-56">
-          <Image
-            src="/logo-impulso.png"
-            alt="Impulso Energético"
-            fill
-            className="object-contain drop-shadow-[0_0_24px_rgba(16,185,129,0.8)]"
-            priority
-          />
-        </div>
-        <div className="hidden sm:flex flex-col">
-          <span className="text-[10px] md:text-xs tracking-[0.30em] uppercase text-emerald-300 font-semibold">
-            IMPULSO ENERGÉTICO · SOLAR IMPULSO
-          </span>
-          <span className="text-xs text-slate-300">
-            Autoconsumo, ahorro y autonomía energética
-          </span>
-        </div>
-      </div>
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#070A16]/70 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-10">
+        <Link href="/solar" className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-emerald-400" />
+          <div className="leading-tight">
+            <div className="text-sm font-extrabold tracking-tight">
+              IMPULSO ENERGÉTICO
+            </div>
+            <div className="text-xs text-white/60">Energía Solar</div>
+          </div>
+        </Link>
 
-      <button
-        onClick={() => router.push(`/bienvenida${buildQuery()}`)}
-        className="inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-900/70 px-4 py-2 text-xs md:text-sm text-slate-100 hover:bg-slate-800"
-      >
-        ← Volver a la pantalla principal
-      </button>
+        <nav className="hidden items-center gap-2 md:flex">
+          {nav.map((i) => (
+            <Link
+              key={i.href}
+              href={i.href}
+              className="rounded-full px-3 py-2 text-sm font-semibold text-white/75 transition hover:bg-white/5 hover:text-white"
+            >
+              {i.label}
+            </Link>
+          ))}
+          <Link
+            href="/solar/estudio"
+            className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-sm font-extrabold text-slate-950 hover:bg-emerald-300"
+          >
+            Pedir estudio
+          </Link>
+        </nav>
+      </div>
     </header>
   );
 }
