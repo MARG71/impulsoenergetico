@@ -2,7 +2,7 @@
 // src/app/share/doc/[token]/route.ts
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
 
@@ -49,13 +49,16 @@ function htmlPage(title: string, message: string) {
 </html>`;
 }
 
-// ✅ Next.js 15: el segundo argumento debe ser EXACTAMENTE { params: { token: string } }
-export async function GET(
-  _req: Request,
-  { params }: { params: { token: string } }
-) {
+function getTokenFromPath(pathname: string) {
+  // pathname: /share/doc/<token>
+  const parts = pathname.split("/").filter(Boolean);
+  const token = parts[parts.length - 1] || "";
+  return token.trim();
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const token = String(params.token || "").trim();
+    const token = getTokenFromPath(req.nextUrl.pathname);
     if (!token) {
       return new NextResponse(htmlPage("Enlace inválido", "El enlace no es válido o está incompleto."), {
         status: 400,
@@ -97,13 +100,10 @@ export async function GET(
       },
     });
 
-    const resourceType = asResourceType(doc.resourceType);
-    const deliveryType = asDeliveryType(doc.deliveryType);
-
     const { url } = cloudinarySignedUrl({
       publicId: doc.publicId,
-      resourceType,
-      deliveryType,
+      resourceType: asResourceType(doc.resourceType),
+      deliveryType: asDeliveryType(doc.deliveryType),
       expiresInSeconds: 60 * 20,
       attachment: false,
     });

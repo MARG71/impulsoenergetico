@@ -5,16 +5,8 @@ import { getToken } from "next-auth/jwt";
 type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 // ✅ Rutas públicas (no requieren sesión)
-const PUBLIC_PREFIX = [
-  "/login",
-  "/unauthorized",
-  "/bienvenida",
-  "/registro",
-  "/contratar",
+const PUBLIC_PREFIX = ["/login", "/unauthorized", "/bienvenida", "/registro", "/contratar", "/share"];
 
-  // ✅ IMPORTANTE: compartir documentos sin login
-  "/share",
-];
 
 // ✅ Dashboard común (cualquier rol autenticado)
 const DASHBOARD_PREFIX = ["/dashboard"];
