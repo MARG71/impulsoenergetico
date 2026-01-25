@@ -2,8 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
-
 import SolarFooter from "./_shared/SolarFooter";
 
 const CTA_PRIMARY_HREF = "/solar/estudio";
@@ -19,15 +17,7 @@ function Section({
   className?: string;
 }) {
   return (
-    <section
-      id={id}
-      className={[
-        "w-full",
-        "px-4 sm:px-6 lg:px-10",
-        "py-14 sm:py-16 lg:py-20",
-        className,
-      ].join(" ")}
-    >
+    <section id={id} className={["w-full px-4 sm:px-6 lg:px-10 py-14 sm:py-16 lg:py-20", className].join(" ")}>
       <div className="mx-auto w-full max-w-[1600px]">{children}</div>
     </section>
   );
@@ -41,45 +31,26 @@ function Chip({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Card({
-  title,
-  children,
-  className = "",
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      className={[
-        "rounded-3xl border border-white/10 bg-white/5 p-7 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur",
-        className,
-      ].join(" ")}
-    >
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur">
       <h3 className="text-xl md:text-2xl font-extrabold text-white">{title}</h3>
       <div className="mt-3 text-base md:text-lg leading-8 text-white/80">{children}</div>
     </div>
   );
 }
 
-function GhostButton({ href, children }: { href: string; children: React.ReactNode }) {
+function PrimaryButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-7 py-4 text-base md:text-lg font-extrabold text-white transition hover:bg-white/10"
-    >
+    <Link href={href} className="inline-flex items-center justify-center rounded-full bg-[#FFC107] px-7 py-4 text-base md:text-lg font-extrabold text-black hover:opacity-95">
       {children}
     </Link>
   );
 }
 
-function PrimaryButton({ href, children }: { href: string; children: React.ReactNode }) {
+function GhostButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-full bg-[#FFC107] px-7 py-4 text-base md:text-lg font-extrabold text-black transition hover:opacity-95"
-    >
+    <Link href={href} className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-7 py-4 text-base md:text-lg font-extrabold text-white hover:bg-white/10">
       {children}
     </Link>
   );
@@ -94,11 +65,9 @@ function GammaPreview({ src, alt }: { src: string; alt: string }) {
 }
 
 export default function SolarLanding() {
-  const year = useMemo(() => new Date().getFullYear(), []);
-
   return (
     <>
-      {/* HERO */}
+      {/* 01 HERO */}
       <Section className="pt-10 sm:pt-14">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
@@ -143,40 +112,116 @@ export default function SolarLanding() {
         </div>
       </Section>
 
-      {/* ... aquí dejas el resto de secciones tal cual las tienes ... */}
-
-      {/* CTA FINAL */}
-      <Section id="cta" className="pb-12">
+      {/* 02 POR QUÉ */}
+      <Section id="por-que">
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
-            <Chip>EMPIEZA HOY</Chip>
-            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
-              Comienza tu Revolución Solar Hoy
-            </h2>
+            <Chip>POR QUÉ</Chip>
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold">Por qué elegirnos</h2>
             <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
-              Solicita tu estudio y te damos un plan claro: ahorro estimado, diseño recomendado, financiación y pasos.
+              Diseño a medida, instalación certificada y acompañamiento total.
             </p>
 
-            <div className="mt-9 flex flex-wrap gap-4">
-              <PrimaryButton href="/solar/estudio">Solicitar Estudio Gratis</PrimaryButton>
-              <GhostButton href="/solar/tienda">Ver Productos</GhostButton>
-            </div>
-
-            <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-7 text-lg md:text-xl text-white/75">
-              <div className="font-extrabold text-white">Atención al cliente</div>
-              <div className="mt-2">Lunes a viernes de 9:00 a 20:00</div>
-              <div className="mt-4">
-                <span className="font-extrabold text-white">Email:</span> info@impulsoenergetico.es
-              </div>
-            </div>
-
-            <div className="mt-8 text-sm text-white/50">
-              © {year} Impulso Energético — Energía Solar
+            <div className="mt-9 grid gap-5 sm:grid-cols-3">
+              <Card title="+3.300 clientes">Confianza y satisfacción acumulada.</Card>
+              <Card title="Paneles Tier-1">Componentes premium y duraderos.</Card>
+              <Card title="Diseño personalizado">Adaptado a tu consumo real.</Card>
             </div>
           </div>
 
-          <GammaPreview src="/solar/gamma/12-cta.png" alt="CTA Gamma" />
+          <GammaPreview src="/solar/gamma/02-por-que.png" alt="Por qué Gamma" />
         </div>
+      </Section>
+
+      {/* 03 BENEFICIOS */}
+      <Section id="beneficios">
+        <div className="grid gap-12 lg:grid-cols-2">
+          <div>
+            <Chip>BENEFICIOS</Chip>
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold">Beneficios reales</h2>
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
+              Ahorro, independencia y revalorización.
+            </p>
+
+            <div className="mt-9 grid gap-5 sm:grid-cols-2">
+              <Card title="Ahorro inmediato">Reduce tu factura desde el primer mes.</Card>
+              <Card title="Energía limpia">Menos emisiones y más sostenibilidad.</Card>
+              <Card title="Independencia">Menos impacto de subidas de luz.</Card>
+              <Card title="Valor vivienda">Mejor eficiencia y atractivo.</Card>
+            </div>
+          </div>
+
+          <GammaPreview src="/solar/gamma/03-beneficios.png" alt="Beneficios Gamma" />
+        </div>
+      </Section>
+
+      {/* 04 TIENDA */}
+      <Section id="tienda">
+        <div className="grid gap-12 lg:grid-cols-2">
+          <div>
+            <Chip>TIENDA</Chip>
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold">Productos y kits</h2>
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
+              Paneles, inversores, baterías y kits listos para instalar.
+            </p>
+
+            <div className="mt-9 flex flex-wrap gap-4">
+              <PrimaryButton href="/solar/tienda">Ver Tienda</PrimaryButton>
+              <GhostButton href="/solar/estudio">Pedir Estudio</GhostButton>
+            </div>
+          </div>
+
+          <GammaPreview src="/solar/gamma/04-tienda.png" alt="Tienda Gamma" />
+        </div>
+      </Section>
+
+      {/* 05 KITS */}
+      <Section id="kits">
+        <div className="grid gap-12 lg:grid-cols-2">
+          <div>
+            <Chip>KITS</Chip>
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold">Kits completos</h2>
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
+              Soluciones integrales según consumo y presupuesto.
+            </p>
+          </div>
+
+          <GammaPreview src="/solar/gamma/05-kits.png" alt="Kits Gamma" />
+        </div>
+      </Section>
+
+      {/* 06 PROCESO */}
+      <Section id="proceso">
+        <div className="grid gap-12 lg:grid-cols-2">
+          <div>
+            <Chip>PROCESO</Chip>
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold">Proceso sencillo</h2>
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
+              Estudio → Presupuesto → Instalación → Ahorro
+            </p>
+
+            <div className="mt-9">
+              <PrimaryButton href="/solar/como-funciona">Ver cómo funciona</PrimaryButton>
+            </div>
+          </div>
+
+          <GammaPreview src="/solar/gamma/06-proceso.png" alt="Proceso Gamma" />
+        </div>
+      </Section>
+
+      {/* 07..12 */}
+      <Section>
+        <GammaPreview src="/solar/gamma/07-casos.png" alt="Casos Gamma" />
+        <div className="mt-6" />
+        <GammaPreview src="/solar/gamma/08-financiacion.png" alt="Financiación Gamma" />
+        <div className="mt-6" />
+        <GammaPreview src="/solar/gamma/09-tecnologia.png" alt="Tecnología Gamma" />
+        <div className="mt-6" />
+        <GammaPreview src="/solar/gamma/10-garantias.png" alt="Garantías Gamma" />
+        <div className="mt-6" />
+        <GammaPreview src="/solar/gamma/11-faq.png" alt="FAQ Gamma" />
+        <div className="mt-6" />
+        <GammaPreview src="/solar/gamma/12-cta.png" alt="CTA Gamma" />
       </Section>
 
       <SolarFooter />

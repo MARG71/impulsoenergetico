@@ -28,7 +28,6 @@ export default function SolarLeadPopup() {
 
   const [open, setOpen] = useState(false);
 
-  // Form
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -38,7 +37,6 @@ export default function SolarLeadPopup() {
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  // Timings solicitados
   const firstDelaySeconds = 30;
   const repeatDelaySeconds = 60;
 
@@ -58,7 +56,6 @@ export default function SolarLeadPopup() {
   };
 
   const openPopup = () => {
-    // ✅ protección anti-doble trigger
     if (open || disabled) return;
     setOpen(true);
     sessionStorage.setItem(SS_SHOWN_ONCE, "1");
@@ -66,12 +63,8 @@ export default function SolarLeadPopup() {
 
   const schedule = () => {
     clearTimer();
-    if (disabled) return;
+    if (disabled || open) return;
 
-    // ✅ evita rearmar si ya está abierto
-    if (open) return;
-
-    // Evita que se reabra inmediatamente si lo cerró hace muy poco
     const lastClose = Number(sessionStorage.getItem(SS_LAST_CLOSE) || "0");
     const now = Date.now();
     if (now - lastClose < 10_000) return;
@@ -81,7 +74,6 @@ export default function SolarLeadPopup() {
     }, delayMs);
   };
 
-  // IMPORTANTE: “cada vez que entras en una opción” se rearma
   useEffect(() => {
     if (disabled) return;
     schedule();
@@ -89,14 +81,11 @@ export default function SolarLeadPopup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, disabled, delayMs]);
 
-  // Exit-intent (solo desktop)
   useEffect(() => {
     if (disabled) return;
 
     const onMouseOut = (e: MouseEvent) => {
-      if (e.clientY <= 0) {
-        openPopup();
-      }
+      if (e.clientY <= 0) openPopup();
     };
 
     window.addEventListener("mouseout", onMouseOut);
@@ -108,13 +97,9 @@ export default function SolarLeadPopup() {
     setOpen(false);
     sessionStorage.setItem(SS_LAST_CLOSE, String(Date.now()));
 
-    // Reprograma para reaparecer según regla de 60s
     clearTimer();
     timerRef.current = window.setTimeout(() => {
-      if (!disabled) {
-        setOpen(true);
-        sessionStorage.setItem(SS_SHOWN_ONCE, "1");
-      }
+      if (!disabled) setOpen(true);
     }, repeatDelaySeconds * 1000);
   };
 
@@ -154,7 +139,6 @@ export default function SolarLeadPopup() {
 
       setOkMsg("¡Perfecto! Te contactamos en breve.");
       setErrMsg(null);
-
       window.setTimeout(() => setOpen(false), 1200);
     } catch (e: any) {
       setErrMsg(e?.message || "Error enviando el formulario.");
@@ -163,8 +147,7 @@ export default function SolarLeadPopup() {
     }
   };
 
-  if (disabled) return null;
-  if (!open) return null;
+  if (disabled || !open) return null;
 
   const productBtn = (key: ProductoNecesario, label: string) => {
     const active = producto === key;
@@ -307,7 +290,7 @@ export default function SolarLeadPopup() {
             </div>
 
             <p className="mt-4 text-xs text-white/50">
-              Al enviar, aceptas contacto comercial. (Podemos añadir checkbox RGPD si lo necesitas)
+              Al enviar, aceptas contacto comercial.
             </p>
           </div>
         </div>
