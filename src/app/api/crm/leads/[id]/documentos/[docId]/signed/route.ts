@@ -108,7 +108,7 @@ export async function GET(_req: Request, ctx: any) {
       resourceType: rt,
       deliveryType: resolved.deliveryType,
       expiresInSeconds: 60 * 60 * 24 * 7, // 7 días
-      attachment: false,
+      attachment: true,
       version: resolved.version,
       format: resolved.format,
     });

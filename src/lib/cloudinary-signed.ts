@@ -1,10 +1,9 @@
 import { v2 as cloudinary } from "cloudinary";
 
 /**
- * Genera una URL firmada que expira (en segundos).
- * Funciona para raw (pdf), image, video.
- * Soporta assets privados usando deliveryType: authenticated | private | upload
- * Soporta version y format para evitar 404 por mismatch.
+ * URL firmada (expira).
+ * Para privados: authenticated/private/upload.
+ * Si attachment=true => fuerza descarga (evita visor de Cloudinary).
  */
 export function cloudinarySignedUrl(opts: {
   publicId: string;
@@ -12,8 +11,8 @@ export function cloudinarySignedUrl(opts: {
   deliveryType?: "authenticated" | "private" | "upload";
   expiresInSeconds?: number;
   attachment?: boolean;
-  version?: number; // ✅ IMPORTANTE
-  format?: string;  // ✅ IMPORTANTE (ej: pdf)
+  format?: string;
+  version?: number;
 }) {
   const {
     publicId,
@@ -21,8 +20,8 @@ export function cloudinarySignedUrl(opts: {
     deliveryType = "authenticated",
     expiresInSeconds = 60 * 60 * 24 * 7, // 7 días
     attachment = false,
-    version,
     format,
+    version,
   } = opts;
 
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
@@ -33,14 +32,12 @@ export function cloudinarySignedUrl(opts: {
     sign_url: true,
     expires_at: expiresAt,
 
-    // ✅ Si tenemos version, se añade para que Cloudinary resuelva la ruta correcta
-    ...(typeof version === "number" ? { version } : {}),
-
-    // ✅ Si tenemos formato, lo añadimos (raw a veces lo necesita)
-    ...(format ? { format } : {}),
-
-    // ✅ Descarga forzada (si lo activas)
+    // 👇 Esto es CLAVE:
+    // fuerza descarga y evita el visor que te está fallando
     ...(attachment ? { flags: "attachment" } : {}),
+
+    ...(typeof version === "number" ? { version } : {}),
+    ...(format ? { format } : {}),
   });
 
   return { url, expiresAt };
