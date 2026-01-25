@@ -769,11 +769,18 @@ model LeadDocumento {
 
   // archivo
   nombre       String
-  url          String
-  publicId     String?
-  resourceType String? // raw | image | video
+  url          String?   // ✅ ahora opcional (no lo uses para compartir)
+  publicId     String    // ✅ obligatorio (vamos a firmar SIEMPRE con esto)
+  resourceType String?   // raw | image | video
+  deliveryType String?   // upload | authenticated | private
   mime         String?
   size         Int?
+
+  // ✅ compartir por WhatsApp sin login
+  shareToken    String?  @unique
+  shareExpiraEn DateTime?
+  accesos       Int      @default(0)
+  ultimoAcceso  DateTime?
 
   // trazabilidad
   creadoPorId Int?
@@ -781,7 +788,6 @@ model LeadDocumento {
 
   adminId Int?
   admin   Usuario? @relation("LeadDocumentoAdmin", fields: [adminId], references: [id], onDelete: SetNull)
-
 
   @@index([leadId, creadoEn])
   @@index([adminId, creadoEn])
