@@ -225,6 +225,7 @@ export default function LeadDetalleContenido() {
   };
 
 
+
   const abrirDoc = async (docId: number) => {
     await runBusy(async () => {
       try {
@@ -374,6 +375,7 @@ export default function LeadDetalleContenido() {
       }
     });
   };
+
 
 
   // ✅ WhatsApp AUTO: resolve plantilla + tracking + actividad + abrir WhatsApp
