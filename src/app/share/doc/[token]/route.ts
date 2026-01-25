@@ -1,7 +1,8 @@
 // src/app/share/doc/[token]/route.ts
+// src/app/share/doc/[token]/route.ts
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
 
@@ -48,9 +49,13 @@ function htmlPage(title: string, message: string) {
 </html>`;
 }
 
-export async function GET(req: NextRequest, ctx: { params: { token?: string } }) {
+// ✅ Next.js 15: el segundo argumento debe ser EXACTAMENTE { params: { token: string } }
+export async function GET(
+  _req: Request,
+  { params }: { params: { token: string } }
+) {
   try {
-    const token = String(ctx?.params?.token || "").trim();
+    const token = String(params.token || "").trim();
     if (!token) {
       return new NextResponse(htmlPage("Enlace inválido", "El enlace no es válido o está incompleto."), {
         status: 400,
@@ -83,7 +88,7 @@ export async function GET(req: NextRequest, ctx: { params: { token?: string } })
       );
     }
 
-    // tracking (no bloqueante)
+    // tracking
     await prisma.leadDocumento.update({
       where: { id: doc.id },
       data: {
@@ -92,11 +97,9 @@ export async function GET(req: NextRequest, ctx: { params: { token?: string } })
       },
     });
 
-    // ✅ Normalizamos tipos
     const resourceType = asResourceType(doc.resourceType);
     const deliveryType = asDeliveryType(doc.deliveryType);
 
-    // ✅ Generamos URL firmada corta (20 min)
     const { url } = cloudinarySignedUrl({
       publicId: doc.publicId,
       resourceType,
@@ -105,7 +108,6 @@ export async function GET(req: NextRequest, ctx: { params: { token?: string } })
       attachment: false,
     });
 
-    // Seguridad extra: si Cloudinary devolviera una URL rara
     if (!url || typeof url !== "string" || !url.startsWith("https://")) {
       return new NextResponse(
         htmlPage("Error abriendo documento", "No se pudo generar el acceso al documento. Inténtalo de nuevo en unos minutos."),
@@ -113,7 +115,6 @@ export async function GET(req: NextRequest, ctx: { params: { token?: string } })
       );
     }
 
-    // ✅ Redirigir
     return NextResponse.redirect(url, { status: 302 });
   } catch (e) {
     console.error("share/doc token error:", e);
