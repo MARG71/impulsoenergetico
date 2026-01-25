@@ -1,17 +1,24 @@
 // src/middleware.ts
+// src/middleware.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 // ✅ Rutas públicas (no requieren sesión)
-const PUBLIC_PREFIX = ["/login", "/unauthorized", "/bienvenida", "/registro", "/contratar", "/share"];
-
+const PUBLIC_PREFIX = [
+  "/login",
+  "/unauthorized",
+  "/bienvenida",
+  "/registro",
+  "/contratar",
+  "/share", // ✅ IMPORTANTÍSIMO: permite abrir links compartidos sin login
+];
 
 // ✅ Dashboard común (cualquier rol autenticado)
 const DASHBOARD_PREFIX = ["/dashboard"];
 
-// ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN
+// ✅ Zona Lugar
 const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
 
 // ✅ SOLO SUPERADMIN

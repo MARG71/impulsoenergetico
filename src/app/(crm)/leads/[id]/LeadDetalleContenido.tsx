@@ -213,18 +213,20 @@ export default function LeadDetalleContenido() {
   };
 
   // ✅ Genera un link firmado (7 días) para abrir/compartir documentos
+  // ✅ Genera link público (token) para compartir sin login
+  const getShareDocUrl = async (docId: number) => {
+    const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/share`, {
+      method: "POST",
+    });
+    return String(data?.shareUrl || "").trim();
+  };
+
+  // ✅ Abrir doc en CRM: puedes abrir firmado (como lo tienes)
+  // (lo dejo igual)
   const getSignedDocUrl = async (docId: number) => {
     const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/signed`);
     return String(data?.url || "").trim();
   };
-
-  // ✅ Crea/obtiene un link público por token (14 días) para compartir por WhatsApp
-  const getShareDocUrl = async (docId: number) => {
-    const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/share`, { method: "POST" });
-    return String(data?.shareUrl || "").trim();
-  };
-
-
 
   const abrirDoc = async (docId: number) => {
     await runBusy(async () => {
@@ -239,14 +241,14 @@ export default function LeadDetalleContenido() {
     });
   };
 
-
+  // ✅ Copiar enlace: COPIA EL SHARE (no el signed)
   const copiarLinkDoc = async (docId: number) => {
     await runBusy(async () => {
       try {
         const shareUrl = await getShareDocUrl(docId);
         if (!shareUrl) throw new Error("No se pudo generar el enlace para compartir");
         await navigator.clipboard.writeText(shareUrl);
-        setToast("Enlace público copiado ✅ (14 días)");
+        setToast("Enlace para cliente copiado ✅");
         setTimeout(() => setToast(null), 1800);
       } catch (e: any) {
         setToast(e?.message || "No se pudo copiar el enlace");
@@ -254,6 +256,7 @@ export default function LeadDetalleContenido() {
       }
     });
   };
+
 
 
   // ✅ Tracking A/B: registrar un "envío" de plantilla (no bloquea el flujo si falla)
@@ -346,6 +349,7 @@ export default function LeadDetalleContenido() {
     });
   };
 
+  // ✅ Enviar WhatsApp: ENVÍA EL SHARE (token)
   const enviarWhatsAppDoc = async (doc: LeadDocumento) => {
     const tel = telWa;
     if (!tel) {
