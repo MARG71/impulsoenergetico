@@ -22,20 +22,15 @@ async function assertLeadAccess(leadId: number) {
     select: { id: true, adminId: true, agenteId: true, lugarId: true },
   });
 
-  if (!lead) throw new Error("FORBIDDEN");
+  if (!lead) return { session, lead: null as any, role, tenantAdminId };
 
   if (role !== "SUPERADMIN") {
     if ((lead.adminId ?? null) !== tenantAdminId) throw new Error("FORBIDDEN");
     if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) throw new Error("FORBIDDEN");
     if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) throw new Error("FORBIDDEN");
   }
-}
 
-function detectDeliveryTypeFromUrl(url: string): "upload" | "authenticated" | "private" {
-  const u = String(url || "");
-  if (u.includes("/authenticated/")) return "authenticated";
-  if (u.includes("/private/")) return "private";
-  return "upload";
+  return { session, lead, role, tenantAdminId };
 }
 
 export async function GET(_req: Request, ctx: any) {
@@ -55,7 +50,7 @@ export async function GET(_req: Request, ctx: any) {
 
     if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-    // Si no hay publicId, devolvemos la url guardada (fallback)
+    // Fallback: si no hay publicId, devolvemos la url guardada
     if (!doc.publicId) {
       return NextResponse.json({
         url: doc.url,
@@ -66,25 +61,17 @@ export async function GET(_req: Request, ctx: any) {
 
     const rt = (doc.resourceType as any) || "raw";
 
-    // ✅ Detecta el tipo real leyendo doc.url (upload/authenticated/private)
-    const deliveryType = detectDeliveryTypeFromUrl(doc.url);
-
-    // ✅ version real desde doc.url (…/v12345/…)
-    const mv = String(doc.url || "").match(/\/v(\d+)\//);
-    const version = mv ? Number(mv[1]) : undefined;
-
-    // ✅ Si publicId viene con extensión, separar format
+    // Si publicId viene con extensión, la separamos
     const mExt = String(doc.publicId || "").match(/^(.*)\.([a-z0-9]+)$/i);
     const publicIdClean = mExt ? mExt[1] : doc.publicId;
-    const format = mExt ? mExt[2].toLowerCase() : undefined;
+    const format = (mExt ? mExt[2].toLowerCase() : "pdf") || "pdf";
 
     const { url, expiresAt } = cloudinarySignedUrl({
       publicId: publicIdClean,
       resourceType: rt,
-      deliveryType,                // ✅ CLAVE: usa el tipo real del asset
+      deliveryType: "authenticated", // ✅ clave para privado
       expiresInSeconds: 60 * 60 * 24 * 7,
-      attachment: false,            // descarga
-      version,
+      attachment: false, // primero que abra. Luego ya veremos descarga
       format,
     });
 
@@ -94,7 +81,6 @@ export async function GET(_req: Request, ctx: any) {
       nombre: doc.nombre,
       docId: doc.id,
       leadId,
-      deliveryType,
     });
   } catch (e: any) {
     if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
