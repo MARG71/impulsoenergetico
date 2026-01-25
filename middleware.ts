@@ -5,26 +5,30 @@ import { getToken } from "next-auth/jwt";
 type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
 // ✅ Rutas públicas (no requieren sesión)
-const PUBLIC_PREFIX = ["/login", "/unauthorized", "/bienvenida", "/registro", "/contratar"];
+const PUBLIC_PREFIX = [
+  "/login",
+  "/unauthorized",
+  "/bienvenida",
+  "/registro",
+  "/contratar",
+
+  // ✅ IMPORTANTE: compartir documentos sin login
+  "/share",
+];
 
 // ✅ Dashboard común (cualquier rol autenticado)
 const DASHBOARD_PREFIX = ["/dashboard"];
 
-// ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN por si quieres revisar
+// ✅ Zona Lugar (LUGAR) — permitimos también ADMIN/AGENTE/SUPERADMIN
 const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
 
 // ✅ SOLO SUPERADMIN
 const SUPERADMIN_ONLY_PREFIX = ["/admins"];
 
 // ✅ Rutas SOLO ADMIN/SUPERADMIN
-const ADMIN_ONLY_PREFIX = [
-  "/crear-usuario",
-  "/dashboard/comisiones",
-  "/lugares/fondos",
-];
+const ADMIN_ONLY_PREFIX = ["/crear-usuario", "/dashboard/comisiones", "/lugares/fondos"];
 
 // ✅ CRM (ADMIN/AGENTE/SUPERADMIN)
-// ⚠️ Ojo: NO metas aquí rutas que ya estén en ADMIN_ONLY_PREFIX o SUPERADMIN_ONLY_PREFIX
 const CRM_PREFIX = [
   "/pipeline-agentes",
   "/agentes",
@@ -65,7 +69,6 @@ export async function middleware(req: NextRequest) {
   const isAdmin = role === "ADMIN";
   const isAgente = role === "AGENTE";
   const isLugar = role === "LUGAR";
-  // const isCliente = role === "CLIENTE";
 
   // ✅ 3) Dashboard (TODOS autenticados)
   if (matchesPrefix(path, DASHBOARD_PREFIX)) {
@@ -101,7 +104,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|logo-impulso.jpeg).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|logo-impulso.jpeg).*)"],
 };
