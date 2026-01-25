@@ -1,10 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
 
-/**
- * URL firmada (expira).
- * Para privados: authenticated/private/upload.
- * Si attachment=true => fuerza descarga (evita visor de Cloudinary).
- */
 export function cloudinarySignedUrl(opts: {
   publicId: string;
   resourceType?: "raw" | "image" | "video";
@@ -17,8 +12,8 @@ export function cloudinarySignedUrl(opts: {
   const {
     publicId,
     resourceType = "raw",
-    deliveryType = "authenticated",
-    expiresInSeconds = 60 * 60 * 24 * 7, // 7 días
+    deliveryType = "authenticated", // ✅ IMPORTANTE
+    expiresInSeconds = 60 * 60 * 24 * 7,
     attachment = false,
     format,
     version,
@@ -28,14 +23,10 @@ export function cloudinarySignedUrl(opts: {
 
   const url = cloudinary.url(publicId, {
     resource_type: resourceType,
-    type: deliveryType,
+    type: deliveryType,         // ✅ ESTO DEFINE /authenticated/ o /private/ o /upload/
     sign_url: true,
     expires_at: expiresAt,
-
-    // 👇 Esto es CLAVE:
-    // fuerza descarga y evita el visor que te está fallando
     ...(attachment ? { flags: "attachment" } : {}),
-
     ...(typeof version === "number" ? { version } : {}),
     ...(format ? { format } : {}),
   });

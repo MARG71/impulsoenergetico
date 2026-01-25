@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
 import { getSessionOrThrow, sessionAdminId, sessionAgenteId, sessionRole } from "@/lib/auth-server";
-import { v2 as cloudinary } from "cloudinary";
 
 function parseId(id: unknown) {
   const n = Number(id);
@@ -23,43 +22,13 @@ async function assertLeadAccess(leadId: number) {
     select: { id: true, adminId: true, agenteId: true, lugarId: true },
   });
 
-  if (!lead) return { session, lead: null as any, role, tenantAdminId };
+  if (!lead) return;
 
   if (role !== "SUPERADMIN") {
     if ((lead.adminId ?? null) !== tenantAdminId) throw new Error("FORBIDDEN");
     if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) throw new Error("FORBIDDEN");
     if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) throw new Error("FORBIDDEN");
   }
-
-  return { session, lead, role, tenantAdminId };
-}
-
-/**
- * 🔎 Busca el recurso real en Cloudinary probando types:
- * authenticated -> private -> upload
- * Devuelve el type correcto + version + format reales.
- */
-async function resolveCloudinaryResource(opts: { publicId: string; resourceType: "raw" | "image" | "video" }) {
-  const tryTypes: Array<"authenticated" | "private" | "upload"> = ["authenticated", "private", "upload"];
-
-  for (const t of tryTypes) {
-    try {
-      const r: any = await cloudinary.api.resource(opts.publicId, {
-        resource_type: opts.resourceType,
-        type: t,
-      });
-
-      return {
-        deliveryType: t,
-        version: typeof r?.version === "number" ? r.version : undefined,
-        format: typeof r?.format === "string" ? r.format : undefined,
-      };
-    } catch {
-      // probar siguiente type
-    }
-  }
-
-  return null;
 }
 
 export async function GET(_req: Request, ctx: any) {
@@ -81,48 +50,31 @@ export async function GET(_req: Request, ctx: any) {
 
     // Fallback si no hay publicId
     if (!doc.publicId) {
-      return NextResponse.json({
-        url: doc.url,
-        expiresAt: null,
-        fallback: true,
-      });
+      return NextResponse.json({ url: doc.url, expiresAt: null, fallback: true });
     }
 
-    const rt = ((doc.resourceType as any) || "raw") as "raw" | "image" | "video";
+    const rt = (doc.resourceType as any) || "raw";
 
-    // ✅ 1) Resolver el recurso real en Cloudinary
-    const resolved = await resolveCloudinaryResource({ publicId: doc.publicId, resourceType: rt });
+    // version desde url (…/v12345/…)
+    const mv = String(doc.url || "").match(/\/v(\d+)\//);
+    const version = mv ? Number(mv[1]) : undefined;
 
-    if (!resolved) {
-      // Esto explica exactamente lo que te está pasando ahora:
-      // el publicId guardado no coincide con el recurso real o el type no es el esperado.
-      return NextResponse.json(
-        { error: "Cloudinary: no se encontró el recurso con ese publicId (authenticated/private/upload)" },
-        { status: 404 }
-      );
-    }
+    // si publicId viene con .pdf => separar formato
+    const mExt = String(doc.publicId || "").match(/^(.*)\.([a-z0-9]+)$/i);
+    const publicIdClean = mExt ? mExt[1] : doc.publicId;
+    const format = mExt ? mExt[2].toLowerCase() : undefined;
 
-    // ✅ 2) Generar URL firmada con datos reales
     const { url, expiresAt } = cloudinarySignedUrl({
-      publicId: doc.publicId,
+      publicId: publicIdClean,
       resourceType: rt,
-      deliveryType: resolved.deliveryType,
-      expiresInSeconds: 60 * 60 * 24 * 7, // 7 días
-      attachment: true,
-      version: resolved.version,
-      format: resolved.format,
+      deliveryType: "authenticated",   // ✅ CLAVE (evita /upload/ y el 401)
+      expiresInSeconds: 60 * 60 * 24 * 7,
+      attachment: true,                // ✅ descarga (evita visor)
+      version,
+      format,
     });
 
-    return NextResponse.json({
-      url,
-      expiresAt,
-      nombre: doc.nombre,
-      docId: doc.id,
-      leadId,
-      deliveryType: resolved.deliveryType,
-      version: resolved.version ?? null,
-      format: resolved.format ?? null,
-    });
+    return NextResponse.json({ url, expiresAt, nombre: doc.nombre, docId: doc.id, leadId });
   } catch (e: any) {
     if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     if (e?.message === "FORBIDDEN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
