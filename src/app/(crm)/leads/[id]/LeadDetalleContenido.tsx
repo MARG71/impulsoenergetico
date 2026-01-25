@@ -218,6 +218,13 @@ export default function LeadDetalleContenido() {
     return String(data?.url || "").trim();
   };
 
+  // ✅ Crea/obtiene un link público por token (14 días) para compartir por WhatsApp
+  const getShareDocUrl = async (docId: number) => {
+    const data = await fetchJson(`/api/crm/leads/${id}/documentos/${docId}/share`, { method: "POST" });
+    return String(data?.shareUrl || "").trim();
+  };
+
+
   const abrirDoc = async (docId: number) => {
     await runBusy(async () => {
       try {
@@ -231,13 +238,14 @@ export default function LeadDetalleContenido() {
     });
   };
 
+
   const copiarLinkDoc = async (docId: number) => {
     await runBusy(async () => {
       try {
-        const signed = await getSignedDocUrl(docId);
-        if (!signed) throw new Error("No se pudo generar el enlace firmado");
-        await navigator.clipboard.writeText(signed);
-        setToast("Enlace firmado copiado ✅ (7 días)");
+        const shareUrl = await getShareDocUrl(docId);
+        if (!shareUrl) throw new Error("No se pudo generar el enlace para compartir");
+        await navigator.clipboard.writeText(shareUrl);
+        setToast("Enlace público copiado ✅ (14 días)");
         setTimeout(() => setToast(null), 1800);
       } catch (e: any) {
         setToast(e?.message || "No se pudo copiar el enlace");
@@ -245,6 +253,7 @@ export default function LeadDetalleContenido() {
       }
     });
   };
+
 
   // ✅ Tracking A/B: registrar un "envío" de plantilla (no bloquea el flujo si falla)
   const trackPlantillaEnvio = async (opts: {
@@ -346,13 +355,13 @@ export default function LeadDetalleContenido() {
 
     await runBusy(async () => {
       try {
-        const signed = await getSignedDocUrl(doc.id);
-        if (!signed) throw new Error("No se pudo generar el enlace firmado");
+        const shareUrl = await getShareDocUrl(doc.id);
+        if (!shareUrl) throw new Error("No se pudo generar el enlace para compartir");
 
-        const msg = `Hola ${lead?.nombre}, te envío el documento: ${doc.nombre}\n\n${signed}`;
+        const msg = `Hola ${lead?.nombre}, te envío el documento: ${doc.nombre}\n\n${shareUrl}`;
         window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
 
-        await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${doc.nombre}\n${signed}`, {
+        await crearActividad("whatsapp", "Documento enviado por WhatsApp", `${doc.nombre}\n${shareUrl}`, {
           refresh: true,
           silentToast: true,
         });
@@ -365,6 +374,7 @@ export default function LeadDetalleContenido() {
       }
     });
   };
+
 
   // ✅ WhatsApp AUTO: resolve plantilla + tracking + actividad + abrir WhatsApp
   const enviarWhatsAppAutomatico = async () => {
