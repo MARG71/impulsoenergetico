@@ -1,3 +1,4 @@
+// src/lib/cloudinary.ts
 import { v2 as cloudinary } from "cloudinary";
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
@@ -15,6 +16,9 @@ cloudinary.config({
   api_key: API_KEY,
   api_secret: API_SECRET,
 });
+
+// ✅ IMPORTANTE: exportamos la instancia YA configurada
+export { cloudinary };
 
 export type UploadResourceType = "image" | "video" | "raw";
 export type DeliveryType = "upload" | "authenticated" | "private";
@@ -49,7 +53,6 @@ export async function uploadBufferToCloudinary(params: {
     accessMode,
   } = params;
 
-  // ✅ Default inteligente: documentos raw => authenticated, imágenes => upload
   const finalDeliveryType: DeliveryType =
     deliveryType ?? (resourceType === "raw" ? "authenticated" : "upload");
 
@@ -61,11 +64,8 @@ export async function uploadBufferToCloudinary(params: {
       {
         folder,
         resource_type: resourceType,
-
-        // ✅ AQUÍ estaba el problema: antes forzabas siempre upload/public
         type: finalDeliveryType,
         access_mode: finalAccessMode,
-
         filename_override: filename,
         use_filename: true,
         unique_filename: true,
@@ -94,7 +94,7 @@ export async function uploadBufferToCloudinary(params: {
  */
 export async function deleteFromCloudinary(params: {
   publicId: string;
-  resourceType?: UploadResourceType | string | null; // por si viene null/undefined
+  resourceType?: UploadResourceType | string | null;
 }): Promise<{ result: string }> {
   const rt = (params.resourceType || "image") as UploadResourceType;
 

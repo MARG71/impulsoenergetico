@@ -1,4 +1,5 @@
-import { v2 as cloudinary } from "cloudinary";
+// src/lib/cloudinary-signed.ts
+import { cloudinary } from "@/lib/cloudinary";
 
 export function cloudinarySignedUrl(opts: {
   publicId: string;
@@ -19,13 +20,12 @@ export function cloudinarySignedUrl(opts: {
 
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
 
-  // ✅ IMPORTANTE: resource_type y type deben ser EXACTAMENTE estos campos
   const url = cloudinary.url(publicId, {
     secure: true,
     sign_url: true,
     expires_at: expiresAt,
-    resource_type: resourceType,   // ✅ raw|image|video
-    type: deliveryType,            // ✅ authenticated|private|upload
+    resource_type: resourceType, // raw|image|video
+    type: deliveryType,          // authenticated|private|upload
     ...(attachment ? { flags: "attachment" } : {}),
     ...(format ? { format } : {}),
   });
