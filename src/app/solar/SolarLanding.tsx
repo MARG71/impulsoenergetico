@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import SolarHeader from "./_shared/SolarHeader";
 import SolarFooter from "./_shared/SolarFooter";
 import SolarLeadPopup from "./_shared/SolarLeadPopup";
+import SolarQuickActions from "./_shared/SolarQuickActions";
 
 const CTA_PRIMARY_HREF = "/solar/estudio";
 const CTA_SECONDARY_HREF = "/solar/tienda";
@@ -27,18 +28,18 @@ function Section({
       className={[
         "w-full",
         "px-4 sm:px-6 lg:px-10",
-        "py-16 sm:py-20 lg:py-24",
+        "py-14 sm:py-16 lg:py-20",
         className,
       ].join(" ")}
     >
-      <div className="mx-auto w-full max-w-6xl">{children}</div>
+      <div className="mx-auto w-full max-w-[1600px]">{children}</div>
     </section>
   );
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold tracking-wide text-emerald-100">
+    <span className="inline-flex items-center gap-2 rounded-full border border-[#FFC107]/30 bg-[#FFC107]/10 px-4 py-2 text-sm md:text-base font-extrabold tracking-wide text-[#FFE8A3]">
       {children}
     </span>
   );
@@ -56,44 +57,32 @@ function Card({
   return (
     <div
       className={[
-        "rounded-2xl border border-white/10 bg-white/5 p-7 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur",
+        "rounded-3xl border border-white/10 bg-white/5 p-7 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur",
         className,
       ].join(" ")}
     >
-      <h3 className="text-xl font-extrabold text-white">{title}</h3>
-      <div className="mt-3 text-base leading-7 text-white/80">{children}</div>
+      <h3 className="text-xl md:text-2xl font-extrabold text-white">{title}</h3>
+      <div className="mt-3 text-base md:text-lg leading-8 text-white/80">{children}</div>
     </div>
   );
 }
 
-function GhostButton({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
+function GhostButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-full border border-emerald-300/40 bg-transparent px-7 py-4 text-base font-extrabold text-emerald-100 transition hover:border-emerald-200/70 hover:bg-emerald-300/10"
+      className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-7 py-4 text-base md:text-lg font-extrabold text-white transition hover:bg-white/10"
     >
       {children}
     </Link>
   );
 }
 
-function PrimaryButton({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
+function PrimaryButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-4 text-base font-extrabold text-slate-950 transition hover:bg-emerald-300"
+      className="inline-flex items-center justify-center rounded-full bg-[#FFC107] px-7 py-4 text-base md:text-lg font-extrabold text-black transition hover:opacity-95"
     >
       {children}
     </Link>
@@ -102,12 +91,12 @@ function PrimaryButton({
 
 function GammaPreview({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl">
       <Image
         src={src}
         alt={alt}
-        width={1600}
-        height={900}
+        width={2000}
+        height={1125}
         className="h-auto w-full object-cover"
         priority={false}
       />
@@ -119,20 +108,27 @@ export default function SolarLanding() {
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
-    <div className="min-h-screen bg-[#070A16] text-white">
-      {/* Fondo general */}
+    <div className="min-h-screen text-white bg-[#061513]">
+      {/* Fondo “solar” más colorido */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_20%_10%,rgba(16,185,129,0.20),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(800px_450px_at_80%_20%,rgba(34,211,238,0.15),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(700px_400px_at_70%_90%,rgba(59,130,246,0.12),transparent_60%)]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#070A16] via-[#070A16] to-[#050712]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_20%_10%,rgba(255,193,7,0.16),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_520px_at_80%_20%,rgba(16,185,129,0.20),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_520px_at_70%_90%,rgba(255,140,0,0.14),transparent_60%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#061513] via-[#061513] to-[#040B0A]" />
       </div>
 
       <SolarHeader />
       <SolarLeadPopup />
 
+      {/* Botonera fija estilo Sotysolar */}
+      <SolarQuickActions
+        phone="+34 692 137 048"
+        estudioHref={CTA_PRIMARY_HREF}
+        guiaHref="/solar/faq"
+      />
+
       {/* HERO */}
-      <Section className="pt-12 sm:pt-16">
+      <Section className="pt-10 sm:pt-14">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
             <div className="flex flex-wrap gap-3">
@@ -141,12 +137,12 @@ export default function SolarLanding() {
               <Chip>INSTALACIÓN PROFESIONAL</Chip>
             </div>
 
-            <h1 className="mt-7 text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+            <h1 className="mt-7 text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.03] tracking-tight">
               IMPULSO ENERGÉTICO
               <span className="block text-white/80">Tu futuro solar comienza aquí</span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-lg leading-8 text-white/75">
+            <p className="mt-6 max-w-2xl text-xl md:text-2xl leading-9 text-white/75">
               Diseñamos e instalamos sistemas fotovoltaicos para hogar y empresa.
               Ahorra desde el primer mes, con garantías y acompañamiento total.
             </p>
@@ -156,18 +152,18 @@ export default function SolarLanding() {
               <GhostButton href={CTA_SECONDARY_HREF}>Ver Productos</GhostButton>
             </div>
 
-            <div className="mt-10 grid grid-cols-3 gap-4 text-sm text-white/75">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-white text-xl font-extrabold">Hasta 70%</div>
-                <div className="mt-1">Ahorro estimado</div>
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 text-white/75">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                <div className="text-white text-2xl font-extrabold">Hasta 70%</div>
+                <div className="mt-1 text-base">Ahorro estimado</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-white text-xl font-extrabold">1–2 días</div>
-                <div className="mt-1">Instalación</div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                <div className="text-white text-2xl font-extrabold">1–2 días</div>
+                <div className="mt-1 text-base">Instalación</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-white text-xl font-extrabold">Financiación</div>
-                <div className="mt-1">A tu medida</div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                <div className="text-white text-2xl font-extrabold">Financiación</div>
+                <div className="mt-1 text-base">A tu medida</div>
               </div>
             </div>
           </div>
@@ -181,10 +177,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>POR QUÉ ELEGIRNOS</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Líderes en Energía Solar Residencial
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Tecnología de vanguardia, instalación certificada y diseño a medida.
               Nos enfocamos en que el cliente entienda el ahorro y lo vea reflejado.
             </p>
@@ -205,10 +201,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>BENEFICIOS</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Beneficios de la Energía Solar
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Reduce gastos, gana independencia y mejora el valor de tu vivienda,
               mientras contribuyes al cuidado del planeta.
             </p>
@@ -230,8 +226,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>TIENDA ONLINE</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">Nuestros Productos Estrella</h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
+              Nuestros Productos Estrella
+            </h2>
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Paneles, inversores, baterías y kits listos para instalar.
               Materiales seleccionados y garantías extendidas.
             </p>
@@ -242,7 +240,7 @@ export default function SolarLanding() {
               <Card title="Baterías de Almacenamiento">Autonomía y máximo aprovechamiento.</Card>
             </div>
 
-            <div className="mt-9 flex gap-4">
+            <div className="mt-9 flex flex-wrap gap-4">
               <PrimaryButton href="/solar/tienda">Ver Tienda</PrimaryButton>
               <GhostButton href="/solar/estudio">Pedir Estudio</GhostButton>
             </div>
@@ -257,8 +255,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>KITS SOLARES</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">Kits Solares Completos</h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
+              Kits Solares Completos
+            </h2>
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Soluciones integrales según consumo y presupuesto. Incluimos instalación y legalización.
             </p>
 
@@ -278,10 +278,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>PROCESO</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Proceso de Instalación Simple y Rápido
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Nos encargamos de todo: estudio, trámites, instalación y puesta en marcha.
             </p>
 
@@ -293,14 +293,14 @@ export default function SolarLanding() {
                 ["Instalación profesional", "Equipo certificado en 1–2 días."],
                 ["Activación y ahorro", "Monitorización y soporte continuo."],
               ].map(([t, d], idx) => (
-                <li key={t} className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                <li key={t} className="rounded-3xl border border-white/10 bg-white/5 p-6">
                   <div className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-slate-950 text-lg font-extrabold">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFC107] text-black text-lg font-extrabold">
                       {idx + 1}
                     </div>
                     <div>
-                      <div className="text-lg font-extrabold">{t}</div>
-                      <div className="mt-1 text-base text-white/70 leading-7">{d}</div>
+                      <div className="text-xl font-extrabold">{t}</div>
+                      <div className="mt-1 text-lg text-white/70 leading-8">{d}</div>
                     </div>
                   </div>
                 </li>
@@ -319,23 +319,25 @@ export default function SolarLanding() {
       {/* CASOS */}
       <Section id="casos">
         <Chip>RESULTADOS REALES</Chip>
-        <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">Casos de Éxito</h2>
-        <p className="mt-5 max-w-3xl text-lg text-white/75 leading-8">
+        <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
+          Casos de Éxito
+        </h2>
+        <p className="mt-5 max-w-4xl text-xl md:text-2xl text-white/75 leading-9">
           Ejemplos para transmitir confianza. Más adelante podemos hacerlos dinámicos si quieres.
         </p>
 
         <div className="mt-10 grid gap-5 lg:grid-cols-3">
           <Card title="Familia Martínez — Madrid">
             “Bajamos la factura y ahora controlamos la producción desde la app.”
-            <div className="mt-4 text-emerald-200 text-lg font-extrabold">Ahorro anual: 1.620€</div>
+            <div className="mt-4 text-[#FFE8A3] text-xl font-extrabold">Ahorro anual: 1.620€</div>
           </Card>
           <Card title="Chalet García — Valencia">
             “Con baterías somos casi autosuficientes.”
-            <div className="mt-4 text-emerald-200 text-lg font-extrabold">Ahorro anual: 2.890€</div>
+            <div className="mt-4 text-[#FFE8A3] text-xl font-extrabold">Ahorro anual: 2.890€</div>
           </Card>
           <Card title="Vivienda López — Barcelona">
             “La monitorización en tiempo real es increíble.”
-            <div className="mt-4 text-emerald-200 text-lg font-extrabold">Ahorro anual: 1.340€</div>
+            <div className="mt-4 text-[#FFE8A3] text-xl font-extrabold">Ahorro anual: 1.340€</div>
           </Card>
         </div>
 
@@ -349,10 +351,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>FINANCIACIÓN</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Financiación Flexible a tu Medida
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Opciones para empezar sin fricción: sin entrada, plazos flexibles y cuota sostenible con el ahorro.
             </p>
 
@@ -363,7 +365,7 @@ export default function SolarLanding() {
               <Card title="Aprobación rápida">Respuesta rápida (según entidad).</Card>
             </div>
 
-            <div className="mt-9 flex gap-4">
+            <div className="mt-9 flex flex-wrap gap-4">
               <PrimaryButton href="/solar/estudio">Calcular mi ahorro</PrimaryButton>
               <GhostButton href="/solar/subvenciones">Ver subvenciones</GhostButton>
             </div>
@@ -378,14 +380,14 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>TECNOLOGÍA</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Monitorización Inteligente 24/7
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Controla tu instalación desde cualquier lugar. Informes claros, alertas y métricas para ver tu ahorro.
             </p>
 
-            <ul className="mt-9 space-y-3 text-lg text-white/80">
+            <ul className="mt-9 space-y-3 text-xl text-white/80">
               {[
                 "Dashboard intuitivo y fácil de usar",
                 "Histórico completo de producción",
@@ -394,7 +396,7 @@ export default function SolarLanding() {
                 "Soporte técnico integrado",
               ].map((x) => (
                 <li key={x} className="flex items-start gap-3">
-                  <span className="mt-3 h-2 w-2 rounded-full bg-emerald-300" />
+                  <span className="mt-4 h-2 w-2 rounded-full bg-[#FFC107]" />
                   <span>{x}</span>
                 </li>
               ))}
@@ -410,10 +412,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>GARANTÍAS</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Garantías y Servicio Post-Venta
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Te acompañamos antes, durante y después. Mantenimiento, revisiones y soporte para máximo rendimiento.
             </p>
 
@@ -432,20 +434,40 @@ export default function SolarLanding() {
       {/* FAQ */}
       <Section id="faq">
         <Chip>PREGUNTAS FRECUENTES</Chip>
-        <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">Resolvemos tus Dudas</h2>
+        <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
+          Resolvemos tus Dudas
+        </h2>
 
         <div className="mt-10 grid gap-5 lg:grid-cols-2">
           {[
-            ["¿Cuánto puedo ahorrar realmente?", "El ahorro medio suele estar en el 60–70% (depende de consumo, orientación y hábitos)."],
-            ["¿Cuánto dura la instalación?", "La instalación física suele completarse en 1–2 días. El proceso completo puede variar por permisos."],
-            ["¿Qué pasa los días nublados?", "Los paneles siguen produciendo (menos). Con baterías aprovechas energía almacenada; si no, la red complementa."],
-            ["¿Necesito permisos especiales?", "Nos encargamos de trámites, legalización y conexión con distribuidora cuando aplica."],
-            ["¿Qué mantenimiento requiere?", "Mínimo: limpieza ocasional y revisiones preventivas. Te asesoramos según zona e instalación."],
-            ["¿Puedo vender el excedente?", "Sí, en modalidad de compensación simplificada el excedente puede descontarse en factura (según condiciones)."],
+            [
+              "¿Cuánto puedo ahorrar realmente?",
+              "El ahorro medio suele estar en el 60–70% (depende de consumo, orientación y hábitos).",
+            ],
+            [
+              "¿Cuánto dura la instalación?",
+              "La instalación física suele completarse en 1–2 días. El proceso completo puede variar por permisos.",
+            ],
+            [
+              "¿Qué pasa los días nublados?",
+              "Los paneles siguen produciendo (menos). Con baterías aprovechas energía almacenada; si no, la red complementa.",
+            ],
+            [
+              "¿Necesito permisos especiales?",
+              "Nos encargamos de trámites, legalización y conexión con distribuidora cuando aplica.",
+            ],
+            [
+              "¿Qué mantenimiento requiere?",
+              "Mínimo: limpieza ocasional y revisiones preventivas. Te asesoramos según zona e instalación.",
+            ],
+            [
+              "¿Puedo vender el excedente?",
+              "Sí, en modalidad de compensación simplificada el excedente puede descontarse en factura (según condiciones).",
+            ],
           ].map(([q, a]) => (
-            <div key={q} className="rounded-2xl border border-white/10 bg-white/5 p-7">
-              <div className="text-xl font-extrabold">{q}</div>
-              <div className="mt-3 text-lg leading-8 text-white/75">{a}</div>
+            <div key={q} className="rounded-3xl border border-white/10 bg-white/5 p-7">
+              <div className="text-xl md:text-2xl font-extrabold">{q}</div>
+              <div className="mt-3 text-lg md:text-xl leading-9 text-white/75">{a}</div>
             </div>
           ))}
         </div>
@@ -464,10 +486,10 @@ export default function SolarLanding() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Chip>EMPIEZA HOY</Chip>
-            <h2 className="mt-5 text-4xl font-extrabold sm:text-5xl">
+            <h2 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Comienza tu Revolución Solar Hoy
             </h2>
-            <p className="mt-5 text-lg text-white/75 leading-8">
+            <p className="mt-5 text-xl md:text-2xl text-white/75 leading-9">
               Solicita tu estudio y te damos un plan claro: ahorro estimado, diseño recomendado, financiación y pasos.
             </p>
 
@@ -476,7 +498,7 @@ export default function SolarLanding() {
               <GhostButton href="/solar/tienda">Ver Productos</GhostButton>
             </div>
 
-            <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-7 text-lg text-white/75">
+            <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-7 text-lg md:text-xl text-white/75">
               <div className="font-extrabold text-white">Atención al cliente</div>
               <div className="mt-2">Lunes a viernes de 9:00 a 20:00</div>
               <div className="mt-4">

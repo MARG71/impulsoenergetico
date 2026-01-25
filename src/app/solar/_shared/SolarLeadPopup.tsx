@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type ProductoNecesario =
   | "fotovoltaica"
@@ -24,7 +25,13 @@ function setLS(key: string, value: string) {
   } catch {}
 }
 
+const SS_SHOWN_ONCE = "impulso_solar_popup_shown_once_session";
+const SS_LAST_CLOSE = "impulso_solar_popup_last_close_ts_session";
+
 export default function SolarLeadPopup() {
+  const pathname = usePathname();
+  const disabled = pathname?.startsWith("/solar/estudio");
+
   const [open, setOpen] = useState(false);
 
   // Form
@@ -37,61 +44,76 @@ export default function SolarLeadPopup() {
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  const cooldownDays = 7;
+  // Timings solicitados
+  const firstDelaySeconds = 30;
+  const repeatDelaySeconds = 60;
 
-  const lastShownKey = "impulso_solar_popup_last_shown";
-  const dismissedKey = "impulso_solar_popup_dismissed"; // para si lo cierran
+  const timerRef = useRef<number | null>(null);
 
-  const shouldShow = useMemo(() => {
-    const dismissed = getLS(dismissedKey);
-    if (dismissed === "1") return false;
+  const delayMs = useMemo(() => {
+    if (typeof window === "undefined") return firstDelaySeconds * 1000;
+    const shownOnce = sessionStorage.getItem(SS_SHOWN_ONCE) === "1";
+    return (shownOnce ? repeatDelaySeconds : firstDelaySeconds) * 1000;
+  }, [firstDelaySeconds, repeatDelaySeconds, pathname]);
 
-    const lastShown = getLS(lastShownKey);
-    if (!lastShown) return true;
+  const clearTimer = () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
-    const last = Number(lastShown);
-    if (!Number.isFinite(last)) return true;
+  const schedule = () => {
+    clearTimer();
+    if (disabled) return;
 
-    const diffMs = Date.now() - last;
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return diffDays >= cooldownDays;
-  }, []);
+    // Evita que se reabra inmediatamente si lo cerró hace muy poco
+    const lastClose = Number(sessionStorage.getItem(SS_LAST_CLOSE) || "0");
+    const now = Date.now();
+    if (now - lastClose < 10_000) return;
 
-  useEffect(() => {
-    if (!shouldShow) return;
-
-    let opened = false;
-
-    const openPopup = () => {
-      if (opened) return;
-      opened = true;
+    timerRef.current = window.setTimeout(() => {
+      if (disabled) return;
       setOpen(true);
-      setLS(lastShownKey, String(Date.now()));
+      sessionStorage.setItem(SS_SHOWN_ONCE, "1");
+    }, delayMs);
+  };
+
+  // IMPORTANTE: esto hace que “cada vez que entras en una opción” se rearme el popup
+  useEffect(() => {
+    if (disabled) return;
+    schedule();
+    return () => clearTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, disabled]);
+
+  // Exit-intent (solo desktop)
+  useEffect(() => {
+    if (disabled) return;
+
+    const onMouseOut = (e: MouseEvent) => {
+      if (e.clientY <= 0) {
+        setOpen(true);
+        sessionStorage.setItem(SS_SHOWN_ONCE, "1");
+      }
     };
 
-    // 1) por tiempo
-    const t = window.setTimeout(() => {
-      openPopup();
-    }, 25000); // 25s (ajustable)
-
-    // 2) por scroll
-    const onScroll = () => {
-      const doc = document.documentElement;
-      const scrolled = (doc.scrollTop || document.body.scrollTop) / (doc.scrollHeight - doc.clientHeight);
-      if (scrolled > 0.35) openPopup();
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [shouldShow]);
+    window.addEventListener("mouseout", onMouseOut);
+    return () => window.removeEventListener("mouseout", onMouseOut);
+  }, [disabled]);
 
   const close = () => {
     setOpen(false);
-    setLS(dismissedKey, "1"); // si lo cierra, no molesta más (si quieres solo "por sesión", lo cambiamos)
+    sessionStorage.setItem(SS_LAST_CLOSE, String(Date.now()));
+
+    // Reprograma para reaparecer según regla de 60s
+    clearTimer();
+    timerRef.current = window.setTimeout(() => {
+      if (!disabled) {
+        setOpen(true);
+        sessionStorage.setItem(SS_SHOWN_ONCE, "1");
+      }
+    }, repeatDelaySeconds * 1000);
   };
 
   const submit = async () => {
@@ -103,7 +125,7 @@ export default function SolarLeadPopup() {
     if (!email.trim()) return setErrMsg("Añade tu email.");
     if (!cp.trim()) return setErrMsg("Añade tu código postal.");
 
-    // Recuperamos tracking como en tu sistema (si existe)
+    // Tracking (mantengo tu lógica)
     const agenteId = getLS("agenteId");
     const lugarId = getLS("lugarId");
 
@@ -116,7 +138,6 @@ export default function SolarLeadPopup() {
           nombre,
           email,
           telefono,
-          // campos extra
           codigoPostal: cp,
           productoNecesario: producto,
           origen: "popup-solar",
@@ -133,7 +154,6 @@ export default function SolarLeadPopup() {
       setOkMsg("¡Perfecto! Te contactamos en breve.");
       setErrMsg(null);
 
-      // opcional: cerrar tras éxito
       window.setTimeout(() => setOpen(false), 1200);
     } catch (e: any) {
       setErrMsg(e?.message || "Error enviando el formulario.");
@@ -142,6 +162,7 @@ export default function SolarLeadPopup() {
     }
   };
 
+  if (disabled) return null;
   if (!open) return null;
 
   const productBtn = (key: ProductoNecesario, label: string) => {
@@ -153,7 +174,7 @@ export default function SolarLeadPopup() {
         className={[
           "rounded-xl border px-3 py-2 text-sm font-semibold transition",
           active
-            ? "border-emerald-300 bg-emerald-400/15 text-emerald-100"
+            ? "border-[#FFC107]/60 bg-[#FFC107]/10 text-[#FFE8A3]"
             : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10",
         ].join(" ")}
       >
@@ -163,15 +184,19 @@ export default function SolarLeadPopup() {
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-950 via-slate-950 to-emerald-950 shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-end md:items-center justify-center bg-black/65 p-4">
+      <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#04110E] via-[#061513] to-[#2A1B00] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="text-white">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-              Preguntas rápidas · Presupuesto
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFC107]/30 bg-[#FFC107]/10 px-3 py-1 text-xs font-semibold text-[#FFE8A3]">
+              Presupuesto · Solar
             </div>
-            <h3 className="mt-3 text-2xl font-extrabold">¿Pensando en pasarte al autoconsumo?</h3>
-            <p className="mt-1 text-white/70">Te llamamos y te decimos si te compensa en 3 minutos.</p>
+            <h3 className="mt-3 text-2xl md:text-3xl font-extrabold">
+              ¿Pensando en pasarte al autoconsumo?
+            </h3>
+            <p className="mt-1 text-white/75 text-base md:text-lg">
+              Te llamamos y te decimos si te compensa en 3 minutos.
+            </p>
           </div>
 
           <button
@@ -184,57 +209,57 @@ export default function SolarLeadPopup() {
         </div>
 
         <div className="grid gap-0 md:grid-cols-2">
-          {/* Columna izquierda (visual) */}
-          <div className="relative min-h-[240px] bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.35),transparent_55%)] p-6">
+          {/* Columna izquierda */}
+          <div className="relative min-h-[220px] bg-[radial-gradient(circle_at_top,rgba(255,193,7,0.28),transparent_55%)] p-6">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white">
               <p className="text-sm text-white/70">Descubre en menos de</p>
-              <p className="mt-1 text-4xl font-black text-emerald-200">3 minutos</p>
+              <p className="mt-1 text-4xl md:text-5xl font-black text-[#FFE8A3]">3 minutos</p>
               <p className="mt-2 text-white/70">si tu instalación te sale a cuenta.</p>
               <p className="mt-4 text-xs text-white/50">
-                (Este mensaje aparece ocasionalmente y no volverá a molestarte.)
+                Primera vez a los {firstDelaySeconds}s · luego cada {repeatDelaySeconds}s.
               </p>
             </div>
           </div>
 
-          {/* Columna derecha (form) */}
+          {/* Form */}
           <div className="p-6">
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="md:col-span-1">
+              <div>
                 <label className="text-xs font-semibold text-white/70">Nombre</label>
                 <input
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-emerald-300/50"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[#FFC107]/40"
                   placeholder="Tu nombre y apellidos"
                 />
               </div>
 
-              <div className="md:col-span-1">
+              <div>
                 <label className="text-xs font-semibold text-white/70">Email</label>
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-emerald-300/50"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[#FFC107]/40"
                   placeholder="tucorreo@..."
                 />
               </div>
 
-              <div className="md:col-span-1">
+              <div>
                 <label className="text-xs font-semibold text-white/70">Teléfono</label>
                 <input
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-emerald-300/50"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[#FFC107]/40"
                   placeholder="Tu teléfono"
                 />
               </div>
 
-              <div className="md:col-span-1">
+              <div>
                 <label className="text-xs font-semibold text-white/70">Código Postal</label>
                 <input
                   value={cp}
                   onChange={(e) => setCp(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-emerald-300/50"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-[#FFC107]/40"
                   placeholder="CP"
                 />
               </div>
@@ -256,7 +281,9 @@ export default function SolarLeadPopup() {
               <div
                 className={[
                   "mt-4 rounded-xl border px-3 py-2 text-sm",
-                  okMsg ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100" : "border-red-300/30 bg-red-400/10 text-red-100",
+                  okMsg
+                    ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100"
+                    : "border-red-300/30 bg-red-400/10 text-red-100",
                 ].join(" ")}
               >
                 {okMsg || errMsg}
@@ -267,14 +294,14 @@ export default function SolarLeadPopup() {
               <button
                 disabled={loading}
                 onClick={submit}
-                className="rounded-2xl bg-emerald-400 px-5 py-3 font-extrabold text-slate-950 hover:bg-emerald-300 disabled:opacity-60"
+                className="rounded-2xl bg-[#FFC107] px-5 py-3 font-extrabold text-black hover:opacity-95 disabled:opacity-60"
               >
                 {loading ? "Enviando..." : "Te llamamos"}
               </button>
 
               <a
                 href="/solar/estudio"
-                className="rounded-2xl border border-emerald-300/40 bg-transparent px-5 py-3 text-center font-bold text-emerald-100 hover:bg-emerald-400/10"
+                className="rounded-2xl border border-[#FFC107]/40 bg-transparent px-5 py-3 text-center font-extrabold text-[#FFE8A3] hover:bg-[#FFC107]/10"
               >
                 Solicitar estudio gratis
               </a>
