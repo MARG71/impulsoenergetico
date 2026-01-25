@@ -19,12 +19,6 @@ function getLS(key: string) {
   }
 }
 
-function setLS(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {}
-}
-
 const SS_SHOWN_ONCE = "impulso_solar_popup_shown_once_session";
 const SS_LAST_CLOSE = "impulso_solar_popup_last_close_ts_session";
 
@@ -63,9 +57,19 @@ export default function SolarLeadPopup() {
     }
   };
 
+  const openPopup = () => {
+    // ✅ protección anti-doble trigger
+    if (open || disabled) return;
+    setOpen(true);
+    sessionStorage.setItem(SS_SHOWN_ONCE, "1");
+  };
+
   const schedule = () => {
     clearTimer();
     if (disabled) return;
+
+    // ✅ evita rearmar si ya está abierto
+    if (open) return;
 
     // Evita que se reabra inmediatamente si lo cerró hace muy poco
     const lastClose = Number(sessionStorage.getItem(SS_LAST_CLOSE) || "0");
@@ -73,19 +77,17 @@ export default function SolarLeadPopup() {
     if (now - lastClose < 10_000) return;
 
     timerRef.current = window.setTimeout(() => {
-      if (disabled) return;
-      setOpen(true);
-      sessionStorage.setItem(SS_SHOWN_ONCE, "1");
+      openPopup();
     }, delayMs);
   };
 
-  // IMPORTANTE: esto hace que “cada vez que entras en una opción” se rearme el popup
+  // IMPORTANTE: “cada vez que entras en una opción” se rearma
   useEffect(() => {
     if (disabled) return;
     schedule();
     return () => clearTimer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, disabled]);
+  }, [pathname, disabled, delayMs]);
 
   // Exit-intent (solo desktop)
   useEffect(() => {
@@ -93,14 +95,14 @@ export default function SolarLeadPopup() {
 
     const onMouseOut = (e: MouseEvent) => {
       if (e.clientY <= 0) {
-        setOpen(true);
-        sessionStorage.setItem(SS_SHOWN_ONCE, "1");
+        openPopup();
       }
     };
 
     window.addEventListener("mouseout", onMouseOut);
     return () => window.removeEventListener("mouseout", onMouseOut);
-  }, [disabled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, open]);
 
   const close = () => {
     setOpen(false);
@@ -125,7 +127,6 @@ export default function SolarLeadPopup() {
     if (!email.trim()) return setErrMsg("Añade tu email.");
     if (!cp.trim()) return setErrMsg("Añade tu código postal.");
 
-    // Tracking (mantengo tu lógica)
     const agenteId = getLS("agenteId");
     const lugarId = getLS("lugarId");
 
@@ -209,7 +210,6 @@ export default function SolarLeadPopup() {
         </div>
 
         <div className="grid gap-0 md:grid-cols-2">
-          {/* Columna izquierda */}
           <div className="relative min-h-[220px] bg-[radial-gradient(circle_at_top,rgba(255,193,7,0.28),transparent_55%)] p-6">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white">
               <p className="text-sm text-white/70">Descubre en menos de</p>
@@ -221,7 +221,6 @@ export default function SolarLeadPopup() {
             </div>
           </div>
 
-          {/* Form */}
           <div className="p-6">
             <div className="grid gap-3 md:grid-cols-2">
               <div>

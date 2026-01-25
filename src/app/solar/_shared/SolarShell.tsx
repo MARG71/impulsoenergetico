@@ -1,65 +1,63 @@
 "use client";
 
-import { ReactNode, useMemo } from "react";
+import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 
 import SolarHeader from "./SolarHeader";
-import SolarFooter from "./SolarFooter";
 import SolarLeadPopup from "./SolarLeadPopup";
 import SolarQuickActions from "./SolarQuickActions";
-import { useBuildQuery } from "./useBuildQuery";
+
+const LOGO_SRC = "/brand/impulso-logo.png"; // ajusta si tu logo tiene otro nombre
+const CTA_PRIMARY_HREF = "/solar/estudio";
 
 export default function SolarShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const buildQuery = useBuildQuery();
 
-  const LOGO_SRC = "/brand/impulso-logo.png";
-
-  const links = useMemo(
-    () => [
-      { label: "Por qué", href: buildQuery("/solar#por-que") },
-      { label: "Beneficios", href: buildQuery("/solar#beneficios") },
-      { label: "Kits", href: buildQuery("/solar#kits") },
-      { label: "Proceso", href: buildQuery("/solar/como-funciona") },
-      { label: "Tienda", href: buildQuery("/solar/tienda") },
-      { label: "FAQ", href: buildQuery("/solar/faq") },
-      { label: "Subvenciones", href: buildQuery("/solar/subvenciones") },
-    ],
-    [buildQuery]
-  );
-
-  const estudioHref = useMemo(() => buildQuery("/solar/estudio"), [buildQuery]);
+  // ✅ No mostrar popup en /solar/estudio
   const disablePopup = pathname?.startsWith("/solar/estudio");
+
+  // ✅ Menú (como tu idea Sotysolar)
+  const headerLinks = useMemo(
+    () => [
+      { label: "Por qué", href: "/solar#por-que" },
+      { label: "Beneficios", href: "/solar#beneficios" },
+      { label: "Kits", href: "/solar#kits" },
+      { label: "Proceso", href: "/solar#proceso" },
+      { label: "Tienda", href: "/solar/tienda" },
+      { label: "FAQ", href: "/solar/faq" },
+      { label: "Subvenciones", href: "/solar/subvenciones" },
+    ],
+    []
+  );
 
   return (
     <div className="min-h-screen bg-[#061513] text-white">
-      {/* Fondo más “solar” + colorido */}
+      {/* Fondo “solar” global */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,193,7,0.10),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(24,166,118,0.16),transparent_55%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35),rgba(0,0,0,0.85))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_20%_10%,rgba(255,193,7,0.16),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_520px_at_80%_20%,rgba(16,185,129,0.20),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_520px_at_70%_90%,rgba(255,140,0,0.14),transparent_60%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#061513] via-[#061513] to-[#040B0A]" />
       </div>
 
-      <SolarHeader logoSrc={LOGO_SRC} links={links} cta={{ label: "Pedir estudio", href: estudioHref }} />
-
-      {/* Botonera fija estilo Sotysolar */}
-      <SolarQuickActions
-        phone="+34 600 000 000"
-        estudioHref={estudioHref}
-        guiaHref={buildQuery("/solar/guia")} // si no existe aún, luego lo creamos o lo cambiamos a PDF
+      <SolarHeader
+        logoSrc={LOGO_SRC}
+        links={headerLinks}
+        cta={{ label: "Pedir estudio", href: CTA_PRIMARY_HREF }}
       />
 
-      {/* Popup: 30s primera vez, luego 60s. En cada ruta se rearma. */}
-      <SolarLeadPopup
-        disabled={disablePopup}
-        ctaHref={estudioHref}
-        firstDelaySeconds={30}
-        repeatDelaySeconds={60}
-        armOnRouteChange
+      {/* Popup global (si NO está en /solar/estudio) */}
+      {!disablePopup && <SolarLeadPopup />}
+
+      {/* Botonera fija global */}
+      <SolarQuickActions
+        phone="+34 692 137 048"
+        estudioHref={CTA_PRIMARY_HREF}
+        guiaHref="/solar/faq"
       />
 
       {children}
-
-      <SolarFooter />
     </div>
   );
 }
