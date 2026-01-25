@@ -12,7 +12,7 @@ export function cloudinarySignedUrl(opts: {
   const {
     publicId,
     resourceType = "raw",
-    deliveryType = "authenticated", // ✅ IMPORTANTE
+    deliveryType = "upload",
     expiresInSeconds = 60 * 60 * 24 * 7,
     attachment = false,
     format,
@@ -23,7 +23,7 @@ export function cloudinarySignedUrl(opts: {
 
   const url = cloudinary.url(publicId, {
     resource_type: resourceType,
-    type: deliveryType,         // ✅ ESTO DEFINE /authenticated/ o /private/ o /upload/
+    type: deliveryType,
     sign_url: true,
     expires_at: expiresAt,
     ...(attachment ? { flags: "attachment" } : {}),
