@@ -33,6 +33,43 @@ async function assertLeadAccess(leadId: number) {
   return { session, lead, role, tenantAdminId };
 }
 
+/**
+ * Extrae publicId + resourceType + deliveryType desde una URL de Cloudinary:
+ * Ej:
+ * https://res.cloudinary.com/<cloud>/raw/authenticated/v1769339857/impulso/leads/25/archivo.pdf
+ * pathname parts => [ "raw", "authenticated", "v1769339857", "impulso", "leads", "25", "archivo.pdf" ]
+ */
+function extractFromCloudinaryUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+
+    // ✅ OJO: parts[0] es "raw" | "image" | "video"
+    const resourceType = (parts[0] || "raw") as "raw" | "image" | "video";
+
+    // ✅ parts[1] es "upload" | "authenticated" | "private"
+    const deliveryType = (parts[1] || "upload") as "upload" | "authenticated" | "private";
+
+    // buscamos índice de "v12345" (si existe)
+    const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
+    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : parts.slice(2);
+
+    const last = afterV[afterV.length - 1] || "";
+    const mExt = last.match(/^(.*)\.([a-z0-9]+)$/i);
+
+    const format = mExt ? mExt[2].toLowerCase() : undefined;
+
+    // reconstruye publicId sin extensión
+    const fileNoExt = mExt ? mExt[1] : last;
+    const folder = afterV.slice(0, -1);
+    const publicId = [...folder, fileNoExt].join("/");
+
+    return { resourceType, deliveryType, publicId, format };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(_req: Request, ctx: any) {
   try {
     const leadId = parseId(ctx?.params?.id);
@@ -50,29 +87,39 @@ export async function GET(_req: Request, ctx: any) {
 
     if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-    // Fallback: si no hay publicId, devolvemos la url guardada
-    if (!doc.publicId) {
+    const fromUrl = extractFromCloudinaryUrl(doc.url || "");
+
+    // ✅ Si el doc es público (upload), devolvemos directamente doc.url
+    if (fromUrl?.deliveryType === "upload") {
       return NextResponse.json({
         url: doc.url,
         expiresAt: null,
-        fallback: true,
+        nombre: doc.nombre,
+        docId: doc.id,
+        leadId,
+        fallback: "public-url",
       });
     }
 
-    const rt = (doc.resourceType as any) || "raw";
+    // ✅ Para authenticated/private: derivar de doc.url (más fiable)
+    const publicId = fromUrl?.publicId || doc.publicId;
+    if (!publicId) {
+      return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
+    }
 
-    // Si publicId viene con extensión, la separamos
-    const mExt = String(doc.publicId || "").match(/^(.*)\.([a-z0-9]+)$/i);
-    const publicIdClean = mExt ? mExt[1] : doc.publicId;
-    const format = (mExt ? mExt[2].toLowerCase() : "pdf") || "pdf";
+    const rt = (fromUrl?.resourceType || (doc.resourceType as any) || "raw") as "raw" | "image" | "video";
+    const deliveryType = (fromUrl?.deliveryType || "authenticated") as "authenticated" | "private" | "upload";
+
+    // ✅ Para RAW/PDF lo más robusto es NO forzar format
+    const format = rt === "raw" ? undefined : fromUrl?.format;
 
     const { url, expiresAt } = cloudinarySignedUrl({
-      publicId: publicIdClean,
+      publicId,
       resourceType: rt,
-      deliveryType: "authenticated", // ✅ clave para privado
+      deliveryType,
       expiresInSeconds: 60 * 60 * 24 * 7,
-      attachment: false, // primero que abra. Luego ya veremos descarga
-      format,
+      attachment: false,
+      ...(format ? { format } : {}),
     });
 
     return NextResponse.json({

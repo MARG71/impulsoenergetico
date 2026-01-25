@@ -23,9 +23,10 @@ export async function POST(req: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
-    if (role !== "SUPERADMIN" && role !== "ADMIN") {
+    if (role !== "SUPERADMIN" && role !== "ADMIN" && role !== "AGENTE" && role !== "LUGAR") {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
+
 
     // 2) FormData
     const form = await req.formData();
@@ -50,7 +51,10 @@ export async function POST(req: NextRequest) {
       folder,
       filename: file.name,
       resourceType,
+      deliveryType: "authenticated",
+      accessMode: "authenticated",
     });
+
 
     return NextResponse.json({
       ok: true,

@@ -17,15 +17,20 @@ cloudinary.config({
 });
 
 export type UploadResourceType = "image" | "video" | "raw";
+export type DeliveryType = "upload" | "authenticated" | "private";
+export type AccessMode = "public" | "authenticated";
 
 /**
  * Sube un buffer a Cloudinary usando upload_stream (ideal para Route Handlers).
+ * - Por defecto: raw => authenticated (privado), image/video => upload (público)
  */
 export async function uploadBufferToCloudinary(params: {
   buffer: Buffer;
   folder: string;
   filename?: string;
   resourceType?: UploadResourceType; // image/video/raw
+  deliveryType?: DeliveryType;       // upload/authenticated/private
+  accessMode?: AccessMode;           // public/authenticated
 }): Promise<{
   secure_url: string;
   public_id: string;
@@ -35,22 +40,37 @@ export async function uploadBufferToCloudinary(params: {
   format?: string;
   resource_type: string;
 }> {
-  const { buffer, folder, filename, resourceType = "image" } = params;
+  const {
+    buffer,
+    folder,
+    filename,
+    resourceType = "image",
+    deliveryType,
+    accessMode,
+  } = params;
+
+  // ✅ Default inteligente: documentos raw => authenticated, imágenes => upload
+  const finalDeliveryType: DeliveryType =
+    deliveryType ?? (resourceType === "raw" ? "authenticated" : "upload");
+
+  const finalAccessMode: AccessMode =
+    accessMode ?? (finalDeliveryType === "authenticated" ? "authenticated" : "public");
 
   return await new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder,
         resource_type: resourceType,
-        type: "upload",           // ✅ fuerza delivery normal
-        access_mode: "public",    // ✅ fuerza acceso público
+
+        // ✅ AQUÍ estaba el problema: antes forzabas siempre upload/public
+        type: finalDeliveryType,
+        access_mode: finalAccessMode,
+
         filename_override: filename,
         use_filename: true,
         unique_filename: true,
         overwrite: false,
       },
-
-
       (error, result) => {
         if (error || !result) return reject(error || new Error("Upload failed"));
         resolve({
