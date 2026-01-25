@@ -64,25 +64,47 @@ export async function POST(req: Request, ctx: any) {
     const { session, lead, tenantAdminId } = await assertLeadAccess(leadId);
     if (!lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
 
-    const usuarioId = Number((session.user as any)?.id);
+    const usuarioId = Number((session.user as any)?.id ?? null);
 
     const body = await req.json().catch(() => ({}));
+
+    // ✅ nombre obligatorio
     const nombre = String(body?.nombre || "").trim();
+
+    // ✅ publicId obligatorio (en tu schema es String NO opcional)
+    const publicId = String(body?.publicId || "").trim();
+
+    // url es opcional en tu schema
     const url = String(body?.url || "").trim();
 
-    if (!nombre || !url) {
-      return NextResponse.json({ error: "nombre y url son requeridos" }, { status: 400 });
+    // opcionales
+    const resourceType = body?.resourceType ? String(body.resourceType).trim() : null;
+    const deliveryType = body?.deliveryType ? String(body.deliveryType).trim() : null;
+    const mime = body?.mime ? String(body.mime).trim() : null;
+    const size = body?.size != null && body?.size !== "" ? Number(body.size) : null;
+
+    if (!nombre) {
+      return NextResponse.json({ error: "nombre es requerido" }, { status: 400 });
+    }
+
+    // ✅ aquí está la clave: si no viene publicId, no creamos (porque Prisma lo exige)
+    if (!publicId) {
+      return NextResponse.json(
+        { error: "publicId es requerido (LeadDocumento.publicId es obligatorio en schema.prisma)" },
+        { status: 400 }
+      );
     }
 
     const created = await prisma.leadDocumento.create({
       data: {
         leadId,
         nombre,
-        url,
-        publicId: body?.publicId ? String(body.publicId) : null,
-        resourceType: body?.resourceType ? String(body.resourceType) : null,
-        mime: body?.mime ? String(body.mime) : null,
-        size: body?.size ? Number(body.size) : null,
+        url: url || null,        // ✅ opcional
+        publicId,                // ✅ obligatorio (string siempre)
+        resourceType,            // ✅ opcional
+        deliveryType,            // ✅ opcional
+        mime,                    // ✅ opcional
+        size,                    // ✅ opcional
         creadoPorId: usuarioId || null,
         adminId: lead.adminId ?? tenantAdminId ?? null,
       },
