@@ -3,7 +3,13 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
-import { getSessionOrThrow, sessionAdminId, sessionAgenteId, sessionRole } from "@/lib/auth-server";
+import {
+  getSessionOrThrow,
+  sessionAdminId,
+  sessionAgenteId,
+  sessionRole,
+} from "@/lib/auth-server";
+import { v2 as cloudinary } from "cloudinary";
 
 function parseId(id: unknown) {
   const n = Number(id);
@@ -24,14 +30,46 @@ async function assertLeadAccess(leadId: number) {
 
   if (!lead) return { session, lead: null as any, role, tenantAdminId };
 
-  // ✅ no filtramos “SUPERADMIN” a nivel UI; aquí solo es control interno
   if (role !== "SUPERADMIN") {
     if ((lead.adminId ?? null) !== tenantAdminId) throw new Error("FORBIDDEN");
-    if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) throw new Error("FORBIDDEN");
-    if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) throw new Error("FORBIDDEN");
+    if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId)
+      throw new Error("FORBIDDEN");
+    if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId)
+      throw new Error("FORBIDDEN");
   }
 
   return { session, lead, role, tenantAdminId };
+}
+
+// ✅ Detecta en qué "type" existe el asset en Cloudinary: authenticated / private / upload
+async function resolveDeliveryTypeAndMeta(opts: {
+  publicId: string;
+  resourceType: "raw" | "image" | "video";
+}) {
+  const candidates: Array<"authenticated" | "private" | "upload"> = [
+    "authenticated",
+    "private",
+    "upload",
+  ];
+
+  for (const type of candidates) {
+    try {
+      const r = await cloudinary.api.resource(opts.publicId, {
+        resource_type: opts.resourceType,
+        type,
+      });
+
+      return {
+        deliveryType: type,
+        version: typeof r?.version === "number" ? r.version : undefined,
+        format: typeof r?.format === "string" ? r.format : undefined,
+      };
+    } catch {
+      // probar siguiente
+    }
+  }
+
+  throw new Error("CLOUDINARY_NOT_FOUND_ANY_TYPE");
 }
 
 export async function GET(_req: Request, ctx: any) {
@@ -39,8 +77,10 @@ export async function GET(_req: Request, ctx: any) {
     const leadId = parseId(ctx?.params?.id);
     const docId = parseId(ctx?.params?.docId);
 
-    if (!leadId) return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
-    if (!docId) return NextResponse.json({ error: "ID de documento no válido" }, { status: 400 });
+    if (!leadId)
+      return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
+    if (!docId)
+      return NextResponse.json({ error: "ID de documento no válido" }, { status: 400 });
 
     await assertLeadAccess(leadId);
 
@@ -49,9 +89,10 @@ export async function GET(_req: Request, ctx: any) {
       select: { id: true, nombre: true, url: true, publicId: true, resourceType: true },
     });
 
-    if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
+    if (!doc)
+      return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-    // Si no hay publicId, devolvemos la url guardada (fallback)
+    // ✅ Fallback si no hay publicId
     if (!doc.publicId) {
       return NextResponse.json({
         url: doc.url,
@@ -60,31 +101,54 @@ export async function GET(_req: Request, ctx: any) {
       });
     }
 
-    const rt = (doc.resourceType as any) || "raw";
+    const rt = ((doc.resourceType as any) || "raw") as "raw" | "image" | "video";
 
-    // ✅ Sacar el version real desde la URL guardada (…/v1768762222/…)
-    // ✅ version real desde doc.url (…/v12345/…)
-    const mv = String(doc.url || "").match(/\/v(\d+)\//);
-    const version = mv ? Number(mv[1]) : undefined;
-
-    // ✅ Si publicId viene con extensión (…/archivo.pdf), Cloudinary RAW la quiere como format aparte
+    // ✅ Si publicId viene con extensión (archivo.pdf), separamos format
     const mExt = String(doc.publicId || "").match(/^(.*)\.([a-z0-9]+)$/i);
     const publicIdClean = mExt ? mExt[1] : doc.publicId;
-    const format = mExt ? mExt[2].toLowerCase() : undefined;
+    const formatFromPublicId = mExt ? mExt[2].toLowerCase() : undefined;
 
+    // ✅ Intentamos leer meta real desde Cloudinary (type + version + format)
+    let deliveryType: "authenticated" | "private" | "upload" = "authenticated";
+    let version: number | undefined = undefined;
+    let format: string | undefined = formatFromPublicId;
 
+    try {
+      const meta = await resolveDeliveryTypeAndMeta({
+        publicId: publicIdClean,
+        resourceType: rt,
+      });
+
+      deliveryType = meta.deliveryType;
+      version = meta.version ?? version;
+      format = meta.format ?? format;
+    } catch (e: any) {
+      // si no existe en ningún type, devolvemos 404 claro
+      if (e?.message === "CLOUDINARY_NOT_FOUND_ANY_TYPE") {
+        return NextResponse.json(
+          { error: "Documento no encontrado en Cloudinary (type mismatch)" },
+          { status: 404 }
+        );
+      }
+      // otros errores: seguimos con fallback (por si Cloudinary API falla puntual)
+    }
+
+    // ✅ Si no conseguimos version por API, la sacamos de la URL guardada (…/v1768762222/…)
+    if (!version) {
+      const mv = String(doc.url || "").match(/\/v(\d+)\//);
+      version = mv ? Number(mv[1]) : undefined;
+    }
 
     // ✅ 7 días
     const { url, expiresAt } = cloudinarySignedUrl({
       publicId: publicIdClean,
       resourceType: rt,
+      deliveryType, // 🔥 la clave: authenticated / private / upload correcto
       expiresInSeconds: 60 * 60 * 24 * 7,
       attachment: false,
       version,
       format,
     });
-
-
 
     return NextResponse.json({
       url,
@@ -92,10 +156,16 @@ export async function GET(_req: Request, ctx: any) {
       nombre: doc.nombre,
       docId: doc.id,
       leadId,
+      deliveryType,
+      version,
+      format,
     });
   } catch (e: any) {
-    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-    if (e?.message === "FORBIDDEN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (e?.message === "NO_AUTH")
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    if (e?.message === "FORBIDDEN")
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
     console.error("GET signed doc error:", e);
     return NextResponse.json({ error: "Error generando link firmado" }, { status: 500 });
   }
