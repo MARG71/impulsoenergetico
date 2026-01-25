@@ -3,29 +3,31 @@ import { v2 as cloudinary } from "cloudinary";
 export function cloudinarySignedUrl(opts: {
   publicId: string;
   resourceType?: "raw" | "image" | "video";
+  deliveryType?: "authenticated" | "private" | "upload";
   expiresInSeconds?: number;
   attachment?: boolean;
-  deliveryType?: "authenticated" | "private" | "upload";
   format?: string;
 }) {
   const {
     publicId,
     resourceType = "raw",
-    expiresInSeconds = 60 * 60 * 24 * 7, // 7 días
-    attachment = false,
     deliveryType = "authenticated",
+    expiresInSeconds = 60 * 60 * 24 * 7,
+    attachment = false,
     format,
   } = opts;
 
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
 
+  // ✅ IMPORTANTE: resource_type y type deben ser EXACTAMENTE estos campos
   const url = cloudinary.url(publicId, {
-    resource_type: resourceType,
-    type: deliveryType,
+    secure: true,
     sign_url: true,
     expires_at: expiresAt,
-    ...(format ? { format } : {}),
+    resource_type: resourceType,   // ✅ raw|image|video
+    type: deliveryType,            // ✅ authenticated|private|upload
     ...(attachment ? { flags: "attachment" } : {}),
+    ...(format ? { format } : {}),
   });
 
   return { url, expiresAt };
