@@ -83,7 +83,7 @@ export async function GET(_req: Request, ctx: any) {
       resourceType: rt,
       deliveryType,                // ✅ CLAVE: usa el tipo real del asset
       expiresInSeconds: 60 * 60 * 24 * 7,
-      attachment: true,            // descarga
+      attachment: false,            // descarga
       version,
       format,
     });
