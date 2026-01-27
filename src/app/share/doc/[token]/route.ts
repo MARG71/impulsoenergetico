@@ -3,7 +3,43 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cloudinary } from "@/lib/cloudinary";
+import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
+
+function normalizePublicId(input: string) {
+  return String(input || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\.[a-z0-9]+$/i, "");
+}
+
+function extractFromCloudinaryUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+
+    // /<cloud_name>/<resource_type>/<type>/...
+    const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
+    const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
+
+    const vPart = parts.find((p) => /^v\d+$/.test(p));
+    const version = vPart ? Number(vPart.slice(1)) : undefined;
+
+    const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
+    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
+
+    const last = afterV[afterV.length - 1] || "";
+    const mExt = last.match(/^(.*)\.([a-z0-9]+)$/i);
+    const format = mExt ? mExt[2].toLowerCase() : undefined;
+
+    const fileNoExt = mExt ? mExt[1] : last;
+    const folder = afterV.slice(0, -1);
+    const publicId = [...folder, fileNoExt].join("/");
+
+    return { resourceType, deliveryType, publicId, format, version };
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(
   _req: Request,
@@ -18,8 +54,10 @@ export async function GET(
     select: {
       id: true,
       nombre: true,
+      url: true,
       publicId: true,
       resourceType: true,
+      deliveryType: true, // ✅ CLAVE
       mime: true,
       shareExpiraEn: true,
     },
@@ -37,18 +75,29 @@ export async function GET(
     data: { accesos: { increment: 1 }, ultimoAcceso: new Date() },
   });
 
-  if (!doc.publicId) {
-    return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
-  }
+  const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-  // ✅ Generamos URL firmada SERVER-SIDE
-  const signedUrl = cloudinary.url(doc.publicId, {
-    resource_type: (doc.resourceType as any) || "raw",
-    secure: true,
-    sign_url: true,
+  const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
+  if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
+
+  const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
+
+  // ✅ CLAVE: si no hay deliveryType guardado, lo intentamos inferir desde la url
+  const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
+    | "upload"
+    | "authenticated"
+    | "private";
+
+  // Si es público (/upload), no hace falta firmar, pero firmar también funciona.
+  const { url: signedUrl } = cloudinarySignedUrl({
+    publicId,
+    resourceType: rt,
+    deliveryType: dt,      // ✅ CLAVE: ahora sí
+    attachment: false,
+    format: fromUrl?.format,
+    version: fromUrl?.version,
   });
 
-  // ✅ Bajamos el archivo en el servidor
   const r = await fetch(signedUrl, { cache: "no-store" });
 
   if (!r.ok) {
@@ -58,16 +107,13 @@ export async function GET(
     );
   }
 
-  // ✅ Devolvemos el stream al navegador
-  const contentType =
-    doc.mime || r.headers.get("content-type") || "application/pdf";
+  const contentType = doc.mime || r.headers.get("content-type") || "application/octet-stream";
 
   return new Response(r.body, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      // inline = abre en navegador; attachment = fuerza descarga
-      "Content-Disposition": `inline; filename="${doc.nombre || "documento.pdf"}"`,
+      "Content-Disposition": `inline; filename="${doc.nombre || "documento"}"`,
       "Cache-Control": "no-store",
     },
   });

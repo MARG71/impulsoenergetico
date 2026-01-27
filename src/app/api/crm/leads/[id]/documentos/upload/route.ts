@@ -1,3 +1,4 @@
+// src/app/api/crm/leads/[id]/documentos/upload/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest, ctx: any) {
     data: {
       leadId,
       nombre: file.name,
+      url: result.secure_url,          // ✅ AÑADIR ESTO
       publicId: result.public_id,
       resourceType: result.resource_type,
       deliveryType: "upload",
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest, ctx: any) {
       shareExpiraEn: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
     },
   });
+
 
   return NextResponse.json({ ok: true, documento: doc });
 }

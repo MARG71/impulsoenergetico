@@ -1,3 +1,4 @@
+// src/app/api/crm/leads/[id]/documentos/[docId]/share/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
