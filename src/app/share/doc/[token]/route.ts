@@ -113,7 +113,8 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Content-Disposition": `inline; filename="${doc.nombre || "documento"}"`,
+      "Content-Disposition": `attachment; filename="${doc.nombre || "documento.pdf"}"`,
+
       "Cache-Control": "no-store",
     },
   });

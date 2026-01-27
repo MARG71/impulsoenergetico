@@ -35,6 +35,7 @@ export async function uploadBufferToCloudinary(params: {
   resourceType?: UploadResourceType; // image/video/raw
   deliveryType?: DeliveryType;       // upload/authenticated/private
   accessMode?: AccessMode;           // public/authenticated
+  contentType?: string;              // ✅ NUEVO
 }): Promise<{
   secure_url: string;
   public_id: string;
@@ -51,6 +52,7 @@ export async function uploadBufferToCloudinary(params: {
     resourceType = "image",
     deliveryType,
     accessMode,
+    contentType, // ✅ NUEVO
   } = params;
 
   const finalDeliveryType: DeliveryType =
@@ -70,6 +72,7 @@ export async function uploadBufferToCloudinary(params: {
         use_filename: true,
         unique_filename: true,
         overwrite: false,
+        ...(contentType ? { content_type: contentType } : {}), // ✅ CLAVE
       },
       (error, result) => {
         if (error || !result) return reject(error || new Error("Upload failed"));
@@ -88,6 +91,7 @@ export async function uploadBufferToCloudinary(params: {
     stream.end(buffer);
   });
 }
+
 
 /**
  * Borra un asset en Cloudinary por publicId.

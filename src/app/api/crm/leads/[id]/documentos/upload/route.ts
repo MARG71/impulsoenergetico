@@ -44,7 +44,9 @@ export async function POST(req: NextRequest, ctx: any) {
     resourceType,
     deliveryType: "upload",
     accessMode: "public",
+    contentType: file.type || "application/octet-stream", // ✅ CLAVE
   });
+
 
   const shareToken = makeShareToken();
 
