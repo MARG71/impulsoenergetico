@@ -1,4 +1,5 @@
 // src/app/share/doc/[token]/route.ts
+// src/app/share/doc/[token]/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -41,6 +42,44 @@ function extractFromCloudinaryUrl(url: string) {
   }
 }
 
+async function fetchCloudinaryWithFallback(opts: {
+  publicId: string;
+  resourceType: "raw" | "image" | "video";
+  deliveryType: "upload" | "authenticated" | "private";
+  format?: string;
+  version?: number;
+}) {
+  const attempt = async (dt: "upload" | "authenticated" | "private") => {
+    const { url } = cloudinarySignedUrl({
+      publicId: opts.publicId,
+      resourceType: opts.resourceType,
+      deliveryType: dt,
+      attachment: false,
+      format: opts.format,
+      version: opts.version,
+    });
+
+    const r = await fetch(url, { cache: "no-store" });
+    return { r, url, dt };
+  };
+
+  // 1) intentamos con el deliveryType "real" guardado/inferido
+  let first = await attempt(opts.deliveryType);
+  if (first.r.ok) return first;
+
+  // 2) fallback: si falló, probamos con el otro más común
+  // (esto arregla docs antiguos o bd incoherente)
+  const fallbackOrder: ("upload" | "authenticated")[] =
+    opts.deliveryType === "upload" ? ["authenticated"] : ["upload"];
+
+  for (const dt of fallbackOrder) {
+    const t = await attempt(dt);
+    if (t.r.ok) return t;
+  }
+
+  return first; // devolvemos el primer fallo para informar status real
+}
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ token: string }> }
@@ -57,7 +96,7 @@ export async function GET(
       url: true,
       publicId: true,
       resourceType: true,
-      deliveryType: true, // ✅ CLAVE
+      deliveryType: true, // ✅ MUY IMPORTANTE
       mime: true,
       shareExpiraEn: true,
     },
@@ -69,7 +108,6 @@ export async function GET(
     return NextResponse.json({ error: "Link caducado" }, { status: 410 });
   }
 
-  // logging de accesos
   await prisma.leadDocumento.update({
     where: { id: doc.id },
     data: { accesos: { increment: 1 }, ultimoAcceso: new Date() },
@@ -82,27 +120,24 @@ export async function GET(
 
   const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
 
-  // ✅ CLAVE: si no hay deliveryType guardado, lo intentamos inferir desde la url
+  // ✅ aquí está la clave: si no hay deliveryType en BD, inferimos por URL,
+  // y si no existe, asumimos authenticated (más seguro)
   const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
     | "upload"
     | "authenticated"
     | "private";
 
-  // Si es público (/upload), no hace falta firmar, pero firmar también funciona.
-  const { url: signedUrl } = cloudinarySignedUrl({
+  const { r, dt: usedDt } = await fetchCloudinaryWithFallback({
     publicId,
     resourceType: rt,
-    deliveryType: dt,      // ✅ CLAVE: ahora sí
-    attachment: false,
+    deliveryType: dt,
     format: fromUrl?.format,
     version: fromUrl?.version,
   });
 
-  const r = await fetch(signedUrl, { cache: "no-store" });
-
   if (!r.ok) {
     return NextResponse.json(
-      { error: "No se pudo descargar de Cloudinary", status: r.status },
+      { error: "No se pudo descargar de Cloudinary", status: r.status, usedDeliveryType: usedDt },
       { status: 502 }
     );
   }
@@ -113,8 +148,8 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Content-Disposition": `attachment; filename="${doc.nombre || "documento.pdf"}"`,
-
+      // ✅ descarga siempre (evita el bug de Chrome con raw PDFs)
+      "Content-Disposition": `attachment; filename="${doc.nombre || "documento"}"`,
       "Cache-Control": "no-store",
     },
   });
