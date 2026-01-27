@@ -1,5 +1,4 @@
 // src/lib/cloudinary-signed.ts
-// src/lib/cloudinary-signed.ts
 import { cloudinary } from "@/lib/cloudinary";
 
 export function cloudinarySignedUrl(opts: {
@@ -8,7 +7,8 @@ export function cloudinarySignedUrl(opts: {
   deliveryType?: "authenticated" | "private" | "upload";
   expiresInSeconds?: number;
   attachment?: boolean;
-  format?: string; // ✅ NUEVO (pdf, jpg, png...)
+  format?: string;
+  version?: number; // ✅ CLAVE: v1769509475
 }) {
   const {
     publicId,
@@ -17,6 +17,7 @@ export function cloudinarySignedUrl(opts: {
     expiresInSeconds = 60 * 20,
     attachment = false,
     format,
+    version,
   } = opts;
 
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
@@ -27,7 +28,8 @@ export function cloudinarySignedUrl(opts: {
     expires_at: expiresAt,
     resource_type: resourceType,
     type: deliveryType,
-    ...(format ? { format } : {}), // ✅ NUEVO
+    ...(typeof version === "number" ? { version } : {}), // ✅ evita que meta v1
+    ...(format ? { format } : {}),
     ...(attachment ? { flags: "attachment" } : {}),
   });
 

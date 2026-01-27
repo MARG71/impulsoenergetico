@@ -30,8 +30,6 @@ async function assertLeadAccess(leadId: number) {
     if (role === "AGENTE" && agenteId && lead.agenteId !== agenteId) throw new Error("FORBIDDEN");
     if (role === "LUGAR" && lugarId && lead.lugarId !== lugarId) throw new Error("FORBIDDEN");
   }
-
-  return { session, lead, role, tenantAdminId };
 }
 
 function inferFormatFromMimeOrName(mime?: string | null, name?: string | null) {
@@ -59,6 +57,9 @@ function extractFromCloudinaryUrl(url: string) {
     const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
     const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
 
+    const vPart = parts.find((p) => /^v\d+$/.test(p));
+    const version = vPart ? Number(vPart.slice(1)) : undefined;
+
     const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
     const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
 
@@ -70,7 +71,7 @@ function extractFromCloudinaryUrl(url: string) {
     const folder = afterV.slice(0, -1);
     const publicId = [...folder, fileNoExt].join("/");
 
-    return { resourceType, deliveryType, publicId, format };
+    return { resourceType, deliveryType, publicId, format, version };
   } catch {
     return null;
   }
@@ -88,39 +89,28 @@ export async function GET(_req: Request, ctx: any) {
 
     const doc = await prisma.leadDocumento.findFirst({
       where: { id: docId, leadId },
-      select: {
-        id: true,
-        nombre: true,
-        mime: true,
-        url: true,
-        publicId: true,
-        resourceType: true,
-        deliveryType: true,
-      },
+      select: { id: true, nombre: true, mime: true, url: true, publicId: true, resourceType: true, deliveryType: true },
     });
 
     if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
     const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-    // Si fuese público upload de verdad, podrías devolver doc.url,
-    // pero en tu caso casi todo es raw/authenticated → firmamos siempre.
     const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
     if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
     const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
-    const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
-      | "authenticated"
-      | "private"
-      | "upload";
+    const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as "authenticated" | "private" | "upload";
 
     const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
+    const version = fromUrl?.version; // ✅ CLAVE
 
     const { url, expiresAt } = cloudinarySignedUrl({
       publicId,
       resourceType: rt,
       deliveryType: dt === "upload" ? "authenticated" : dt,
-      format: rt === "raw" ? format : format,
+      format,
+      version, // ✅
       expiresInSeconds: 60 * 60 * 24 * 7,
       attachment: false,
     });
