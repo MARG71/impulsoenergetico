@@ -1,4 +1,5 @@
 // src/app/share/doc/[token]/route.ts
+// src/app/share/doc/[token]/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -62,7 +63,7 @@ async function fetchCloudinaryWithFallback(opts: {
     });
 
     const r = await fetch(url, { cache: "no-store" });
-    return { r, url, dt, withFormat };
+    return { r, dt, withFormat, url };
   };
 
   const tries: Delivery[] =
@@ -75,15 +76,12 @@ async function fetchCloudinaryWithFallback(opts: {
   let last = await attempt(tries[0], true);
 
   for (const dt of tries) {
-    // 1) con format
     last = await attempt(dt, true);
     if (last.r.ok) return last;
 
-    // 2) sin format
     last = await attempt(dt, false);
     if (last.r.ok) return last;
 
-    // si no es 401/404 no tiene sentido seguir
     if (![401, 404].includes(last.r.status)) break;
   }
 
@@ -118,7 +116,6 @@ export async function GET(
     return NextResponse.json({ error: "Link caducado" }, { status: 410 });
   }
 
-  // logging de accesos
   await prisma.leadDocumento.update({
     where: { id: doc.id },
     data: { accesos: { increment: 1 }, ultimoAcceso: new Date() },
@@ -126,13 +123,36 @@ export async function GET(
 
   const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-  // ✅ PRIORIDAD: lo que venga de la URL (más fiable)
   const publicId = normalizePublicId(fromUrl?.publicId || doc.publicId || "");
   if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
   const rt = ((fromUrl?.resourceType as any) || (doc.resourceType as any) || "raw") as Resource;
   const dt = ((fromUrl?.deliveryType as any) || (doc.deliveryType as any) || "authenticated") as Delivery;
 
+  // ✅ CASO CLAVE: si es PUBLICO (upload) y tengo doc.url, lo descargo DIRECTO (sin firmas)
+  if (dt === "upload" && doc.url) {
+    const r0 = await fetch(doc.url, { cache: "no-store" });
+
+    if (!r0.ok) {
+      return NextResponse.json(
+        { error: "No se pudo descargar Cloudinary (direct url)", status: r0.status },
+        { status: 502 }
+      );
+    }
+
+    const contentType = doc.mime || r0.headers.get("content-type") || "application/octet-stream";
+
+    return new Response(r0.body, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${doc.nombre || "documento"}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  // 🔒 Si no es upload (authenticated/private), usamos fallback firmado
   const result = await fetchCloudinaryWithFallback({
     publicId,
     resourceType: rt,
@@ -141,29 +161,26 @@ export async function GET(
     version: fromUrl?.version,
   });
 
-  const r = result.r;
-
-  if (!r.ok) {
+  if (!result.r.ok) {
     return NextResponse.json(
       {
         error: "No se pudo descargar Cloudinary",
-        status: r.status,
+        status: result.r.status,
         usedDeliveryType: result.dt,
         withFormat: result.withFormat,
-        // ✅ DEBUG temporal (quítalo cuando funcione)
+        // DEBUG temporal (quitar luego)
         debug: { publicId, rt, dt, fromUrl },
       },
       { status: 502 }
     );
   }
 
-  const contentType = doc.mime || r.headers.get("content-type") || "application/octet-stream";
+  const contentType = doc.mime || result.r.headers.get("content-type") || "application/octet-stream";
 
-  return new Response(r.body, {
+  return new Response(result.r.body, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      // ✅ descarga siempre (evita el bug de Chrome con raw PDFs)
       "Content-Disposition": `attachment; filename="${doc.nombre || "documento"}"`,
       "Cache-Control": "no-store",
     },
