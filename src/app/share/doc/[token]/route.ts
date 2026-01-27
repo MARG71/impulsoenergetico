@@ -120,17 +120,14 @@ export async function GET(
 
   const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-  const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
+  // ✅ PRIORIDAD: lo que venga de la URL (es lo más fiable)
+  const publicId = normalizePublicId(fromUrl?.publicId || doc.publicId || "");
+
   if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
-  const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
+  const rt = ((fromUrl?.resourceType as any) || (doc.resourceType as any) || "raw") as "raw" | "image" | "video";
+  const dt = ((fromUrl?.deliveryType as any) || (doc.deliveryType as any) || "authenticated") as "upload" | "authenticated" | "private";
 
-  // ✅ aquí está la clave: si no hay deliveryType en BD, inferimos por URL,
-  // y si no existe, asumimos authenticated (más seguro)
-  const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
-    | "upload"
-    | "authenticated"
-    | "private";
 
   const { r, dt: usedDt } = await fetchCloudinaryWithFallback({
     publicId,
@@ -142,10 +139,16 @@ export async function GET(
 
   if (!r.ok) {
     return NextResponse.json(
-      { error: "No se pudo descargar de Cloudinary", status: r.status, usedDeliveryType: usedDt },
+      {
+        error: "No se pudo descargar Cloudinary",
+        status: r.status,
+        usedDeliveryType: usedDt,
+        debug: { publicId, rt, dt, fromUrl },
+      },
       { status: 502 }
     );
   }
+
 
 
   const contentType = doc.mime || r.headers.get("content-type") || "application/octet-stream";
