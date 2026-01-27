@@ -63,11 +63,15 @@ async function fetchCloudinaryWithFallback(opts: {
     return { r, url, dt };
   };
 
-  const tries: ("upload" | "authenticated" | "private")[] = [
-    opts.deliveryType,
-    opts.deliveryType === "upload" ? "authenticated" : "upload",
-    "private",
-  ].filter((v, i, a) => a.indexOf(v) === i); // unique
+  type Delivery = "upload" | "authenticated" | "private";
+
+  const tries: Delivery[] =
+    opts.deliveryType === "upload"
+      ? ["upload", "authenticated", "private"]
+      : opts.deliveryType === "authenticated"
+      ? ["authenticated", "upload", "private"]
+      : ["private", "authenticated", "upload"];
+
 
   let last = await attempt(tries[0]);
 
