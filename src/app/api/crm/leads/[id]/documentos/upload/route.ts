@@ -65,6 +65,14 @@ export async function POST(req: NextRequest, ctx: any) {
     },
   });
 
+  console.log("CLOUDINARY RESULT", {
+    public_id: result.public_id,
+    resource_type: result.resource_type,
+    secure_url: result.secure_url,
+  });
+
+
 
   return NextResponse.json({ ok: true, documento: doc });
 }
+

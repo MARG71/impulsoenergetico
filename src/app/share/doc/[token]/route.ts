@@ -63,21 +63,22 @@ async function fetchCloudinaryWithFallback(opts: {
     return { r, url, dt };
   };
 
-  // 1) intentamos con el deliveryType "real" guardado/inferido
-  let first = await attempt(opts.deliveryType);
-  if (first.r.ok) return first;
+  const tries: ("upload" | "authenticated" | "private")[] = [
+    opts.deliveryType,
+    opts.deliveryType === "upload" ? "authenticated" : "upload",
+    "private",
+  ].filter((v, i, a) => a.indexOf(v) === i); // unique
 
-  // 2) fallback: si falló, probamos con el otro más común
-  // (esto arregla docs antiguos o bd incoherente)
-  const fallbackOrder: ("upload" | "authenticated")[] =
-    opts.deliveryType === "upload" ? ["authenticated"] : ["upload"];
+  let last = await attempt(tries[0]);
 
-  for (const dt of fallbackOrder) {
-    const t = await attempt(dt);
-    if (t.r.ok) return t;
+  for (const dt of tries) {
+    last = await attempt(dt);
+    if (last.r.ok) return last;
+    // si es 401, probamos siguiente
+    if (![401, 404].includes(last.r.status)) break;
   }
 
-  return first; // devolvemos el primer fallo para informar status real
+  return last; // devuelve el último intento real
 }
 
 export async function GET(
@@ -141,6 +142,7 @@ export async function GET(
       { status: 502 }
     );
   }
+
 
   const contentType = doc.mime || r.headers.get("content-type") || "application/octet-stream";
 
