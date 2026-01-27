@@ -1,46 +1,55 @@
 // src/app/share/doc/[token]/route.ts
 export const runtime = "nodejs";
 
-import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { cloudinary } from "@/lib/cloudinary";
+import https from "https";
 
 export async function GET(
-  _req: NextRequest,
-  ctx: { params: Promise<{ token: string }> } // ✅ Next 15
+  _req: Request,
+  ctx: { params: Promise<{ token: string }> }
 ) {
   const { token } = await ctx.params;
-  const t = String(token || "").trim();
-
-  if (!t) return NextResponse.json({ error: "Token no válido" }, { status: 400 });
 
   const doc = await prisma.leadDocumento.findUnique({
-    where: { shareToken: t },
+    where: { shareToken: token },
     select: {
-      id: true,
-      url: true,
+      nombre: true,
+      publicId: true,
+      resourceType: true,
       shareExpiraEn: true,
     },
   });
 
-  if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
-
-  if (doc.shareExpiraEn && doc.shareExpiraEn.getTime() < Date.now()) {
+  if (!doc) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  if (doc.shareExpiraEn && doc.shareExpiraEn < new Date()) {
     return NextResponse.json({ error: "Link caducado" }, { status: 410 });
   }
 
-  if (!doc.url) {
-    return NextResponse.json({ error: "Documento sin URL" }, { status: 500 });
-  }
-
-  // tracking
-  await prisma.leadDocumento.update({
-    where: { id: doc.id },
-    data: {
-      accesos: { increment: 1 },
-      ultimoAcceso: new Date(),
-    },
+  // 🔐 URL privada firmada SERVER-SIDE
+  const signedUrl = cloudinary.url(doc.publicId, {
+    resource_type: doc.resourceType as any,
+    secure: true,
+    sign_url: true,
   });
 
-  return NextResponse.redirect(doc.url, { status: 302 });
+  // ⬇️ Descargamos desde Cloudinary y lo reenviamos
+  return new Promise((resolve) => {
+    https.get(signedUrl, (cloudRes) => {
+      const headers = new Headers();
+      headers.set("Content-Type", "application/pdf");
+      headers.set(
+        "Content-Disposition",
+        `inline; filename="${doc.nombre}"`
+      );
+
+      resolve(
+        new Response(cloudRes as any, {
+          status: 200,
+          headers,
+        })
+      );
+    });
+  });
 }
