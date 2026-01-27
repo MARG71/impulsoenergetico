@@ -2,14 +2,17 @@
 // src/lib/cloudinary-signed.ts
 import { cloudinary } from "@/lib/cloudinary";
 
+export type Delivery = "authenticated" | "private" | "upload";
+export type Resource = "raw" | "image" | "video";
+
 export function cloudinarySignedUrl(opts: {
   publicId: string;
-  resourceType?: "raw" | "image" | "video";
-  deliveryType?: "authenticated" | "private" | "upload";
+  resourceType?: Resource;
+  deliveryType?: Delivery;
   attachment?: boolean;
   format?: string;
   version?: number;
-  expiresInSeconds?: number; // lo mantenemos solo para devolver expiresAt (TU lógica), no se manda a Cloudinary
+  expiresInSeconds?: number; // solo informativo
 }) {
   const {
     publicId,
@@ -21,10 +24,10 @@ export function cloudinarySignedUrl(opts: {
     expiresInSeconds = 60 * 20,
   } = opts;
 
-  // ✅ Esto es solo informativo para tu app (BD/shareExpiraEn manda)
   const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
 
-  // ✅ CLAVE: NO pasar expires_at a Cloudinary
+  // ✅ Nota: en Cloudinary el "type" define upload/authenticated/private
+  // ✅ version ayuda MUCHO a evitar 404 cuando hay colisiones/invalidate
   const url = cloudinary.url(publicId, {
     secure: true,
     sign_url: true,
@@ -37,4 +40,3 @@ export function cloudinarySignedUrl(opts: {
 
   return { url, expiresAt };
 }
-

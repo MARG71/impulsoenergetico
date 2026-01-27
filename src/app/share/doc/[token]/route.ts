@@ -1,10 +1,12 @@
 // src/app/share/doc/[token]/route.ts
-// src/app/share/doc/[token]/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
+
+type Delivery = "upload" | "authenticated" | "private";
+type Resource = "raw" | "image" | "video";
 
 function normalizePublicId(input: string) {
   return String(input || "")
@@ -19,8 +21,8 @@ function extractFromCloudinaryUrl(url: string) {
     const parts = u.pathname.split("/").filter(Boolean);
 
     // /<cloud_name>/<resource_type>/<type>/...
-    const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
-    const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
+    const resourceType = (parts[1] || "raw") as Resource;
+    const deliveryType = (parts[2] || "upload") as Delivery;
 
     const vPart = parts.find((p) => /^v\d+$/.test(p));
     const version = vPart ? Number(vPart.slice(1)) : undefined;
@@ -44,26 +46,24 @@ function extractFromCloudinaryUrl(url: string) {
 
 async function fetchCloudinaryWithFallback(opts: {
   publicId: string;
-  resourceType: "raw" | "image" | "video";
-  deliveryType: "upload" | "authenticated" | "private";
+  resourceType: Resource;
+  deliveryType: Delivery;
   format?: string;
   version?: number;
 }) {
-  const attempt = async (dt: "upload" | "authenticated" | "private") => {
+  const attempt = async (dt: Delivery, withFormat: boolean) => {
     const { url } = cloudinarySignedUrl({
       publicId: opts.publicId,
       resourceType: opts.resourceType,
       deliveryType: dt,
       attachment: false,
-      format: opts.format,
-      version: opts.version,
+      ...(withFormat && opts.format ? { format: opts.format } : {}),
+      ...(typeof opts.version === "number" ? { version: opts.version } : {}),
     });
 
     const r = await fetch(url, { cache: "no-store" });
-    return { r, url, dt };
+    return { r, url, dt, withFormat };
   };
-
-  type Delivery = "upload" | "authenticated" | "private";
 
   const tries: Delivery[] =
     opts.deliveryType === "upload"
@@ -72,17 +72,22 @@ async function fetchCloudinaryWithFallback(opts: {
       ? ["authenticated", "upload", "private"]
       : ["private", "authenticated", "upload"];
 
-
-  let last = await attempt(tries[0]);
+  let last = await attempt(tries[0], true);
 
   for (const dt of tries) {
-    last = await attempt(dt);
+    // 1) con format
+    last = await attempt(dt, true);
     if (last.r.ok) return last;
-    // si es 401, probamos siguiente
+
+    // 2) sin format
+    last = await attempt(dt, false);
+    if (last.r.ok) return last;
+
+    // si no es 401/404 no tiene sentido seguir
     if (![401, 404].includes(last.r.status)) break;
   }
 
-  return last; // devuelve el último intento real
+  return last;
 }
 
 export async function GET(
@@ -101,7 +106,7 @@ export async function GET(
       url: true,
       publicId: true,
       resourceType: true,
-      deliveryType: true, // ✅ MUY IMPORTANTE
+      deliveryType: true,
       mime: true,
       shareExpiraEn: true,
     },
@@ -113,6 +118,7 @@ export async function GET(
     return NextResponse.json({ error: "Link caducado" }, { status: 410 });
   }
 
+  // logging de accesos
   await prisma.leadDocumento.update({
     where: { id: doc.id },
     data: { accesos: { increment: 1 }, ultimoAcceso: new Date() },
@@ -120,16 +126,14 @@ export async function GET(
 
   const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-  // ✅ PRIORIDAD: lo que venga de la URL (es lo más fiable)
+  // ✅ PRIORIDAD: lo que venga de la URL (más fiable)
   const publicId = normalizePublicId(fromUrl?.publicId || doc.publicId || "");
-
   if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
-  const rt = ((fromUrl?.resourceType as any) || (doc.resourceType as any) || "raw") as "raw" | "image" | "video";
-  const dt = ((fromUrl?.deliveryType as any) || (doc.deliveryType as any) || "authenticated") as "upload" | "authenticated" | "private";
+  const rt = ((fromUrl?.resourceType as any) || (doc.resourceType as any) || "raw") as Resource;
+  const dt = ((fromUrl?.deliveryType as any) || (doc.deliveryType as any) || "authenticated") as Delivery;
 
-
-  const { r, dt: usedDt } = await fetchCloudinaryWithFallback({
+  const result = await fetchCloudinaryWithFallback({
     publicId,
     resourceType: rt,
     deliveryType: dt,
@@ -137,19 +141,21 @@ export async function GET(
     version: fromUrl?.version,
   });
 
+  const r = result.r;
+
   if (!r.ok) {
     return NextResponse.json(
       {
         error: "No se pudo descargar Cloudinary",
         status: r.status,
-        usedDeliveryType: usedDt,
+        usedDeliveryType: result.dt,
+        withFormat: result.withFormat,
+        // ✅ DEBUG temporal (quítalo cuando funcione)
         debug: { publicId, rt, dt, fromUrl },
       },
       { status: 502 }
     );
   }
-
-
 
   const contentType = doc.mime || r.headers.get("content-type") || "application/octet-stream";
 
