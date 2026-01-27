@@ -49,34 +49,6 @@ function normalizePublicId(input: string) {
     .replace(/\.[a-z0-9]+$/i, "");
 }
 
-function extractFromCloudinaryUrl(url: string) {
-  try {
-    const u = new URL(url);
-    const parts = u.pathname.split("/").filter(Boolean);
-
-    const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
-    const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
-
-    const vPart = parts.find((p) => /^v\d+$/.test(p));
-    const version = vPart ? Number(vPart.slice(1)) : undefined;
-
-    const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
-    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
-
-    const last = afterV[afterV.length - 1] || "";
-    const mExt = last.match(/^(.*)\.([a-z0-9]+)$/i);
-    const format = mExt ? mExt[2].toLowerCase() : undefined;
-
-    const fileNoExt = mExt ? mExt[1] : last;
-    const folder = afterV.slice(0, -1);
-    const publicId = [...folder, fileNoExt].join("/");
-
-    return { resourceType, deliveryType, publicId, format, version };
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(_req: Request, ctx: any) {
   try {
     const leadId = parseId(ctx?.params?.id);
@@ -89,28 +61,38 @@ export async function GET(_req: Request, ctx: any) {
 
     const doc = await prisma.leadDocumento.findFirst({
       where: { id: docId, leadId },
-      select: { id: true, nombre: true, mime: true, url: true, publicId: true, resourceType: true, deliveryType: true },
+      select: {
+        id: true,
+        nombre: true,
+        mime: true,
+        url: true,
+        publicId: true,
+        resourceType: true,
+        deliveryType: true,
+      },
     });
 
     if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-    const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
+    // ✅ CAMBIO CLAVE: si es público, devolvemos doc.url tal cual
+    if (doc.deliveryType === "upload") {
+      if (!doc.url) return NextResponse.json({ error: "Documento sin url" }, { status: 500 });
+      return NextResponse.json({ url: doc.url, expiresAt: null, nombre: doc.nombre, docId: doc.id, leadId });
+    }
 
-    const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
+    // (legacy) si algún día vuelves a authenticated:
+    const publicId = normalizePublicId(doc.publicId || "");
     if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
-    const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
-    const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as "authenticated" | "private" | "upload";
-
-    const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
-    const version = fromUrl?.version; // ✅ CLAVE
+    const rt = ((doc.resourceType as any) || "raw") as "raw" | "image" | "video";
+    const dt = ((doc.deliveryType as any) || "authenticated") as "authenticated" | "private" | "upload";
+    const format = inferFormatFromMimeOrName(doc.mime, doc.nombre);
 
     const { url, expiresAt } = cloudinarySignedUrl({
       publicId,
       resourceType: rt,
       deliveryType: dt === "upload" ? "authenticated" : dt,
       format,
-      version, // ✅
       expiresInSeconds: 60 * 60 * 24 * 7,
       attachment: false,
     });
@@ -121,6 +103,6 @@ export async function GET(_req: Request, ctx: any) {
     if (e?.message === "FORBIDDEN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     if (e?.message === "NOT_FOUND") return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
     console.error("GET signed doc error:", e);
-    return NextResponse.json({ error: "Error generando link firmado" }, { status: 500 });
+    return NextResponse.json({ error: "Error generando link" }, { status: 500 });
   }
 }

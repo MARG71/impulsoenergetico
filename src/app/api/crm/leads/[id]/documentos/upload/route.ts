@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { uploadBufferToCloudinary } from "@/lib/cloudinary";
-import { makeShareToken } from "@/lib/share-token"; // ✅ nuevo
+import { makeShareToken } from "@/lib/share-token";
 import { getSessionOrThrow, sessionAdminId, sessionAgenteId, sessionRole } from "@/lib/auth-server";
 
 function parseId(id: unknown) {
@@ -66,11 +66,8 @@ export async function POST(req: NextRequest, ctx: any) {
 
     const resourceType = guessResourceType(file.type);
 
-    // ✅ 4) FORZAR deliveryType correcto:
-    // - raw (pdf, docs) => authenticated (privado)
-    // - image/video => upload (público) si quisieras, pero para docs mejor authenticated
-    const deliveryType: "authenticated" | "upload" =
-      resourceType === "raw" ? "authenticated" : "upload";
+    // ✅ CAMBIO CLAVE: TODO público (upload)
+    const deliveryType: "upload" = "upload";
 
     // 5) upload cloudinary (carpeta por lead)
     const folder = `impulso/leads/${leadId}`;
@@ -79,11 +76,11 @@ export async function POST(req: NextRequest, ctx: any) {
       folder,
       filename: file.name,
       resourceType,
-      deliveryType,                 // ✅ nuevo
-      accessMode: deliveryType === "authenticated" ? "authenticated" : "public", // ✅ nuevo
+      deliveryType: "upload",
+      accessMode: "public",
     });
 
-    // ✅ 6) generar token de share
+    // 6) token de share
     const shareToken = makeShareToken();
     const shareExpiraEn = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14); // 14 días
 
@@ -93,29 +90,26 @@ export async function POST(req: NextRequest, ctx: any) {
         leadId,
         nombre: nombre || file.name,
 
-        // ✅ NO usar esto para compartir; solo debug si quieres
+        // ✅ aquí ya puedes usarla para abrir porque es pública
         url: result.secure_url,
 
-        // ✅ usar esto siempre para firmar y abrir
+        // ✅ seguimos guardando publicId por si quieres migrar luego
         publicId: result.public_id,
         resourceType: result.resource_type,
-        deliveryType, // ✅ nuevo campo en prisma
+        deliveryType: "upload",
 
         mime: file.type || null,
         size: result.bytes,
 
-        // trazabilidad
         creadoPorId: usuarioId || null,
         adminId: lead.adminId ?? tenantAdminId ?? null,
 
-        // ✅ share
         shareToken,
         shareExpiraEn,
       },
       include: { creadoPor: { select: { id: true, nombre: true, rol: true } } },
     });
 
-    // (opcional) actividad automática
     await prisma.leadActividad.create({
       data: {
         leadId,
@@ -127,7 +121,6 @@ export async function POST(req: NextRequest, ctx: any) {
       },
     });
 
-    // ✅ 8) devolver shareUrl listo para WhatsApp
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXTAUTH_URL ||
@@ -135,10 +128,7 @@ export async function POST(req: NextRequest, ctx: any) {
 
     const shareUrl = `${baseUrl.replace(/\/$/, "")}/share/doc/${shareToken}`;
 
-    return NextResponse.json(
-      { ok: true, documento: doc, shareUrl },
-      { status: 201 }
-    );
+    return NextResponse.json({ ok: true, documento: doc, shareUrl }, { status: 201 });
   } catch (e: any) {
     if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     console.error("Lead documento upload error:", e);
