@@ -20,7 +20,7 @@ function normalizePublicId(input: string) {
   return String(input || "")
     .trim()
     .replace(/^\/+/, "")
-    .replace(/\.[a-z0-9]+$/i, ""); // quita .pdf, .png...
+    .replace(/\.[a-z0-9]+$/i, "");
 }
 
 function extractFromCloudinaryUrl(url: string) {
@@ -28,9 +28,11 @@ function extractFromCloudinaryUrl(url: string) {
     const u = new URL(url);
     const parts = u.pathname.split("/").filter(Boolean);
 
-    // /<cloud>/<rt>/<type>/.../v123/<publicId>.<ext>
     const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
     const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
+
+    const vPart = parts.find((p) => /^v\d+$/.test(p));
+    const version = vPart ? Number(vPart.slice(1)) : undefined;
 
     const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
     const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
@@ -43,7 +45,7 @@ function extractFromCloudinaryUrl(url: string) {
     const folder = afterV.slice(0, -1);
     const publicId = [...folder, fileNoExt].join("/");
 
-    return { resourceType, deliveryType, publicId, format };
+    return { resourceType, deliveryType, publicId, format, version };
   } catch {
     return null;
   }
@@ -51,8 +53,6 @@ function extractFromCloudinaryUrl(url: string) {
 
 function pickHeadersForProxy(res: Response) {
   const h = new Headers();
-
-  // Headers importantes para PDF + Range
   const keep = [
     "content-type",
     "content-length",
@@ -62,15 +62,11 @@ function pickHeadersForProxy(res: Response) {
     "last-modified",
     "cache-control",
   ];
-
   for (const k of keep) {
     const v = res.headers.get(k);
     if (v) h.set(k, v);
   }
-
-  // Evita cache raro
   h.set("Cache-Control", "no-store");
-
   return h;
 }
 
@@ -103,7 +99,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
     data: { accesos: { increment: 1 }, ultimoAcceso: new Date() },
   });
 
-  // Derivamos datos si vienen “raros”
   const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
   const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
@@ -116,27 +111,25 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
     | "upload";
 
   const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
+  const version = fromUrl?.version; // ✅ CLAVE
 
-  // 1) Generamos URL firmada (aunque luego hagamos proxy)
   const signed = cloudinarySignedUrl({
     publicId,
     resourceType,
-    deliveryType, // si tu asset está protegido, aquí es donde tiene que estar correcto
+    deliveryType,
     format,
+    version,
     expiresInSeconds: 60 * 20,
     attachment: false,
   });
 
-  // 2) Proxy con soporte Range (imprescindible)
   const range = req.headers.get("range") || undefined;
 
   const upstream = await fetch(signed.url, {
     headers: range ? { range } : undefined,
-    // next: { revalidate: 0 } // opcional
   });
 
   if (!upstream.ok && upstream.status !== 206) {
-    // Devuelve info útil
     const text = await upstream.text().catch(() => "");
     return NextResponse.json(
       { error: "Cloudinary upstream error", status: upstream.status, body: text.slice(0, 500) },
@@ -146,17 +139,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
 
   const headers = pickHeadersForProxy(upstream);
 
-  // Forzamos content-type si falta
   if (!headers.get("content-type")) {
     headers.set("content-type", doc.mime || "application/octet-stream");
   }
 
-  // Inline para visor PDF
   const safeName = (doc.nombre || "documento").replace(/"/g, "");
   headers.set("Content-Disposition", `inline; filename="${safeName}"`);
 
-  return new Response(upstream.body, {
-    status: upstream.status, // 200 o 206
-    headers,
-  });
+  return new Response(upstream.body, { status: upstream.status, headers });
 }
