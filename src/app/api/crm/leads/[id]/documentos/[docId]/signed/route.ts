@@ -1,6 +1,6 @@
+// src/app/api/crm/leads/[id]/documentos/[docId]/signed/route.ts
 export const runtime = "nodejs";
 
-import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
@@ -34,11 +34,23 @@ async function assertLeadAccess(leadId: number) {
   return { session, lead, role, tenantAdminId };
 }
 
-/**
- * ✅ URL Cloudinary estándar:
- * https://res.cloudinary.com/<cloud_name>/<resource_type>/<delivery_type>/v123/<publicId>.<ext>
- * pathname parts => [ "<cloud_name>", "raw", "authenticated", "v123", "impulso", "leads", "25", "archivo.pdf" ]
- */
+function inferFormatFromMimeOrName(mime?: string | null, name?: string | null) {
+  const m = (mime || "").toLowerCase();
+  if (m.includes("pdf")) return "pdf";
+  if (m.startsWith("image/")) return m.split("/")[1] || undefined;
+
+  const n = (name || "").toLowerCase();
+  const mExt = n.match(/\.([a-z0-9]+)$/i);
+  return mExt ? mExt[1] : undefined;
+}
+
+function normalizePublicId(input: string) {
+  return String(input || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\.[a-z0-9]+$/i, "");
+}
+
 function extractFromCloudinaryUrl(url: string) {
   try {
     const u = new URL(url);
@@ -48,7 +60,7 @@ function extractFromCloudinaryUrl(url: string) {
     const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
 
     const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
-    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : parts.slice(3);
+    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
 
     const last = afterV[afterV.length - 1] || "";
     const mExt = last.match(/^(.*)\.([a-z0-9]+)$/i);
@@ -64,77 +76,53 @@ function extractFromCloudinaryUrl(url: string) {
   }
 }
 
-function extFromName(name: string) {
-  const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
-  return m ? m[1] : null;
-}
-
-export async function GET(
-  _req: NextRequest,
-  ctx: { params: Promise<{ id: string; docId: string }> } // ✅ Next 15
-) {
+export async function GET(_req: Request, ctx: any) {
   try {
-    const { id, docId } = await ctx.params;
-
-    const leadId = parseId(id);
-    const dId = parseId(docId);
+    const leadId = parseId(ctx?.params?.id);
+    const docId = parseId(ctx?.params?.docId);
 
     if (!leadId) return NextResponse.json({ error: "ID de lead no válido" }, { status: 400 });
-    if (!dId) return NextResponse.json({ error: "ID de documento no válido" }, { status: 400 });
+    if (!docId) return NextResponse.json({ error: "ID de documento no válido" }, { status: 400 });
 
     await assertLeadAccess(leadId);
 
     const doc = await prisma.leadDocumento.findFirst({
-      where: { id: dId, leadId },
+      where: { id: docId, leadId },
       select: {
         id: true,
         nombre: true,
+        mime: true,
         url: true,
         publicId: true,
         resourceType: true,
         deliveryType: true,
-        mime: true, // ✅ importante para detectar PDF
       },
     });
 
     if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-    const fromUrl = extractFromCloudinaryUrl(doc.url || "");
+    const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-    // ✅ Si es público (upload), devolvemos la URL directa
-    if (fromUrl?.deliveryType === "upload") {
-      return NextResponse.json({
-        url: doc.url,
-        expiresAt: null,
-        nombre: doc.nombre,
-        docId: doc.id,
-        leadId,
-        fallback: "public-url",
-      });
-    }
-
-    // ✅ Para authenticated/private: firmar
-    const publicId = fromUrl?.publicId || doc.publicId;
+    // Si fuese público upload de verdad, podrías devolver doc.url,
+    // pero en tu caso casi todo es raw/authenticated → firmamos siempre.
+    const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
     if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
-    const rt = (fromUrl?.resourceType || (doc.resourceType as any) || "raw") as "raw" | "image" | "video";
-    const dt = (fromUrl?.deliveryType || (doc.deliveryType as any) || "authenticated") as
+    const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
+    const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
       | "authenticated"
       | "private"
       | "upload";
 
-    // ✅ CLAVE: si es RAW y es PDF => format="pdf" (evita 404 sin extensión)
-    const ext = extFromName(doc.nombre || "");
-    const isPdf = doc.mime === "application/pdf" || ext === "pdf";
-    const format = rt === "raw" ? (isPdf ? "pdf" : (ext || undefined)) : (fromUrl?.format || ext || undefined);
+    const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
 
     const { url, expiresAt } = cloudinarySignedUrl({
       publicId,
       resourceType: rt,
       deliveryType: dt === "upload" ? "authenticated" : dt,
+      format: rt === "raw" ? format : format,
       expiresInSeconds: 60 * 60 * 24 * 7,
       attachment: false,
-      format, // ✅
     });
 
     return NextResponse.json({ url, expiresAt, nombre: doc.nombre, docId: doc.id, leadId });

@@ -8,7 +8,7 @@ export function cloudinarySignedUrl(opts: {
   deliveryType?: "authenticated" | "private" | "upload";
   expiresInSeconds?: number;
   attachment?: boolean;
-  format?: string; // ✅ NUEVO: "pdf", "png", etc.
+  format?: string; // ✅ NUEVO (pdf, jpg, png...)
 }) {
   const {
     publicId,
@@ -27,7 +27,7 @@ export function cloudinarySignedUrl(opts: {
     expires_at: expiresAt,
     resource_type: resourceType,
     type: deliveryType,
-    ...(format ? { format } : {}), // ✅ añade extensión al final del URL
+    ...(format ? { format } : {}), // ✅ NUEVO
     ...(attachment ? { flags: "attachment" } : {}),
   });
 
