@@ -66,34 +66,31 @@ export async function POST(req: NextRequest, ctx: any) {
 
     const resourceType = guessResourceType(file.type);
 
-    // ✅ CAMBIO CLAVE: TODO público (upload)
-    const deliveryType: "upload" = "upload";
-
-    // 5) upload cloudinary (carpeta por lead)
+    // ✅ CAMBIO CLAVE: TODO público (upload/public)
     const folder = `impulso/leads/${leadId}`;
     const result = await uploadBufferToCloudinary({
       buffer,
       folder,
       filename: file.name,
-      resourceType,
+      resourceType,          // raw para pdf, image para imágenes, etc.
       deliveryType: "upload",
       accessMode: "public",
     });
 
-    // 6) token de share
+    // 4) token de share
     const shareToken = makeShareToken();
     const shareExpiraEn = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14); // 14 días
 
-    // 7) guardar en LeadDocumento
+    // 5) guardar en LeadDocumento
     const doc = await prisma.leadDocumento.create({
       data: {
         leadId,
         nombre: nombre || file.name,
 
-        // ✅ aquí ya puedes usarla para abrir porque es pública
+        // ✅ link público (abre en navegador)
         url: result.secure_url,
 
-        // ✅ seguimos guardando publicId por si quieres migrar luego
+        // guardamos por si en el futuro haces cosas avanzadas
         publicId: result.public_id,
         resourceType: result.resource_type,
         deliveryType: "upload",
