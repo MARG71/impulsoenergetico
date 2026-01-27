@@ -66,19 +66,17 @@ async function fetchCloudinaryWithFallback(opts: {
     return { r, dt, withFormat, url };
   };
 
-  const tries: Delivery[] =
-    opts.deliveryType === "upload"
-      ? ["upload", "authenticated", "private"]
-      : opts.deliveryType === "authenticated"
-      ? ["authenticated", "upload", "private"]
-      : ["private", "authenticated", "upload"];
+  // ✅ Prioridad: authenticated (porque nuestros uploads ya son así)
+  const tries: Delivery[] = ["authenticated", "private", "upload"];
 
   let last = await attempt(tries[0], true);
 
   for (const dt of tries) {
+    // 1) con format
     last = await attempt(dt, true);
     if (last.r.ok) return last;
 
+    // 2) sin format
     last = await attempt(dt, false);
     if (last.r.ok) return last;
 
@@ -127,32 +125,10 @@ export async function GET(
   if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
   const rt = ((fromUrl?.resourceType as any) || (doc.resourceType as any) || "raw") as Resource;
-  const dt = ((fromUrl?.deliveryType as any) || (doc.deliveryType as any) || "authenticated") as Delivery;
 
-  // ✅ CASO CLAVE: si es PUBLICO (upload) y tengo doc.url, lo descargo DIRECTO (sin firmas)
-  if (dt === "upload" && doc.url) {
-    const r0 = await fetch(doc.url, { cache: "no-store" });
+  // ✅ FUERZA: usamos authenticated como estándar del sistema
+  const dt: Delivery = "authenticated";
 
-    if (!r0.ok) {
-      return NextResponse.json(
-        { error: "No se pudo descargar Cloudinary (direct url)", status: r0.status },
-        { status: 502 }
-      );
-    }
-
-    const contentType = doc.mime || r0.headers.get("content-type") || "application/octet-stream";
-
-    return new Response(r0.body, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${doc.nombre || "documento"}"`,
-        "Cache-Control": "no-store",
-      },
-    });
-  }
-
-  // 🔒 Si no es upload (authenticated/private), usamos fallback firmado
   const result = await fetchCloudinaryWithFallback({
     publicId,
     resourceType: rt,
@@ -168,7 +144,6 @@ export async function GET(
         status: result.r.status,
         usedDeliveryType: result.dt,
         withFormat: result.withFormat,
-        // DEBUG temporal (quitar luego)
         debug: { publicId, rt, dt, fromUrl },
       },
       { status: 502 }

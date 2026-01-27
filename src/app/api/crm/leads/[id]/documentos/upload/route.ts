@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { uploadBufferToCloudinary } from "@/lib/cloudinary";
 import { makeShareToken } from "@/lib/share-token";
-import { getSessionOrThrow, sessionAdminId, sessionAgenteId, sessionRole } from "@/lib/auth-server";
+import { getSessionOrThrow, sessionRole } from "@/lib/auth-server";
 
 function parseId(id: unknown) {
   const n = Number(id);
@@ -20,59 +20,55 @@ function guessResourceType(mime: string): "image" | "video" | "raw" {
 }
 
 export async function POST(req: NextRequest, ctx: any) {
-  const session = await getSessionOrThrow();
-  const role = sessionRole(session);
+  try {
+    const session = await getSessionOrThrow();
+    const role = sessionRole(session);
 
-  if (!["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"].includes(String(role))) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (!["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"].includes(String(role))) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    const leadId = parseId(ctx?.params?.id);
+    if (!leadId) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+
+    const form = await req.formData();
+    const file = form.get("file") as File | null;
+    if (!file) return NextResponse.json({ error: "Falta archivo" }, { status: 400 });
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const resourceType = guessResourceType(file.type);
+
+    // ✅ SUBIDA SIEMPRE AUTHENTICATED
+    const result = await uploadBufferToCloudinary({
+      buffer,
+      folder: `impulso/leads/${leadId}`,
+      filename: file.name,
+      resourceType,
+      deliveryType: "authenticated",
+      accessMode: "authenticated",
+    });
+
+    const shareToken = makeShareToken();
+
+    const doc = await prisma.leadDocumento.create({
+      data: {
+        leadId,
+        nombre: file.name,
+        url: result.secure_url,          // ✅ guardamos url (aunque no sea pública)
+        publicId: result.public_id,      // ✅ clave
+        resourceType: result.resource_type,
+        deliveryType: "authenticated",   // ✅ coherente
+        mime: file.type || null,
+        size: result.bytes,
+        shareToken,
+        shareExpiraEn: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14), // 14 días
+      },
+    });
+
+    return NextResponse.json({ ok: true, documento: doc });
+  } catch (e: any) {
+    console.error("UPLOAD doc lead error:", e);
+    if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    return NextResponse.json({ error: "Error subiendo documento" }, { status: 500 });
   }
-
-  const leadId = parseId(ctx?.params?.id);
-  if (!leadId) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-
-  const form = await req.formData();
-  const file = form.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "Falta archivo" }, { status: 400 });
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const resourceType = guessResourceType(file.type);
-
-  const result = await uploadBufferToCloudinary({
-    buffer,
-    folder: `impulso/leads/${leadId}`,
-    filename: file.name,
-    resourceType,
-    deliveryType: "upload",
-    accessMode: "public",
-    contentType: file.type || "application/octet-stream", // ✅ CLAVE
-  });
-
-
-  const shareToken = makeShareToken();
-
-  const doc = await prisma.leadDocumento.create({
-    data: {
-      leadId,
-      nombre: file.name,
-      url: result.secure_url,          // ✅ AÑADIR ESTO
-      publicId: result.public_id,
-      resourceType: result.resource_type,
-      deliveryType: "upload",
-      mime: file.type,
-      size: result.bytes,
-      shareToken,
-      shareExpiraEn: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
-    },
-  });
-
-  console.log("CLOUDINARY RESULT", {
-    public_id: result.public_id,
-    resource_type: result.resource_type,
-    secure_url: result.secure_url,
-  });
-
-
-
-  return NextResponse.json({ ok: true, documento: doc });
 }
-
