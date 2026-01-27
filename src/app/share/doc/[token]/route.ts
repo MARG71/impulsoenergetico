@@ -13,17 +13,68 @@ function inferFormatFromMimeOrName(mime?: string | null, name?: string | null) {
 
   const n = (name || "").toLowerCase();
   const mExt = n.match(/\.([a-z0-9]+)$/i);
-  return mExt ? mExt[1] : undefined;
+  return mExt ? mExt[1].toLowerCase() : undefined;
 }
 
 function normalizePublicId(input: string) {
   return String(input || "")
     .trim()
     .replace(/^\/+/, "")
-    .replace(/\.[a-z0-9]+$/i, "");
+    .replace(/\.[a-z0-9]+$/i, ""); // quita .pdf, .png...
 }
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
+function extractFromCloudinaryUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+
+    // /<cloud>/<rt>/<type>/.../v123/<publicId>.<ext>
+    const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
+    const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
+
+    const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
+    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
+
+    const last = afterV[afterV.length - 1] || "";
+    const mExt = last.match(/^(.*)\.([a-z0-9]+)$/i);
+    const format = mExt ? mExt[2].toLowerCase() : undefined;
+
+    const fileNoExt = mExt ? mExt[1] : last;
+    const folder = afterV.slice(0, -1);
+    const publicId = [...folder, fileNoExt].join("/");
+
+    return { resourceType, deliveryType, publicId, format };
+  } catch {
+    return null;
+  }
+}
+
+function pickHeadersForProxy(res: Response) {
+  const h = new Headers();
+
+  // Headers importantes para PDF + Range
+  const keep = [
+    "content-type",
+    "content-length",
+    "accept-ranges",
+    "content-range",
+    "etag",
+    "last-modified",
+    "cache-control",
+  ];
+
+  for (const k of keep) {
+    const v = res.headers.get(k);
+    if (v) h.set(k, v);
+  }
+
+  // Evita cache raro
+  h.set("Cache-Control", "no-store");
+
+  return h;
+}
+
+export async function GET(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
   const t = String(token || "").trim();
   if (!t) return NextResponse.json({ error: "Token no válido" }, { status: 400 });
@@ -52,28 +103,60 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ token: str
     data: { accesos: { increment: 1 }, ultimoAcceso: new Date() },
   });
 
-  // ✅ CAMBIO CLAVE: si es público, no firmamos nada
-  if (doc.deliveryType === "upload") {
-    if (!doc.url) return NextResponse.json({ error: "Documento sin url" }, { status: 500 });
-    return NextResponse.redirect(doc.url, { status: 302 });
-  }
+  // Derivamos datos si vienen “raros”
+  const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-  // (legacy) si algún día vuelves a authenticated:
-  const publicId = normalizePublicId(doc.publicId || "");
-  if (!publicId) return NextResponse.json({ error: "Documento sin publicId válido" }, { status: 500 });
+  const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
+  if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
-  const resourceType = ((doc.resourceType as any) || "raw") as "raw" | "image" | "video";
-  const deliveryType = ((doc.deliveryType as any) || "authenticated") as "authenticated" | "private" | "upload";
-  const format = inferFormatFromMimeOrName(doc.mime, doc.nombre);
+  const resourceType = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
+  const deliveryType = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
+    | "authenticated"
+    | "private"
+    | "upload";
 
-  const { url } = cloudinarySignedUrl({
+  const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
+
+  // 1) Generamos URL firmada (aunque luego hagamos proxy)
+  const signed = cloudinarySignedUrl({
     publicId,
     resourceType,
-    deliveryType: deliveryType === "upload" ? "authenticated" : deliveryType,
+    deliveryType, // si tu asset está protegido, aquí es donde tiene que estar correcto
     format,
     expiresInSeconds: 60 * 20,
     attachment: false,
   });
 
-  return NextResponse.redirect(url, { status: 302 });
+  // 2) Proxy con soporte Range (imprescindible)
+  const range = req.headers.get("range") || undefined;
+
+  const upstream = await fetch(signed.url, {
+    headers: range ? { range } : undefined,
+    // next: { revalidate: 0 } // opcional
+  });
+
+  if (!upstream.ok && upstream.status !== 206) {
+    // Devuelve info útil
+    const text = await upstream.text().catch(() => "");
+    return NextResponse.json(
+      { error: "Cloudinary upstream error", status: upstream.status, body: text.slice(0, 500) },
+      { status: 502 }
+    );
+  }
+
+  const headers = pickHeadersForProxy(upstream);
+
+  // Forzamos content-type si falta
+  if (!headers.get("content-type")) {
+    headers.set("content-type", doc.mime || "application/octet-stream");
+  }
+
+  // Inline para visor PDF
+  const safeName = (doc.nombre || "documento").replace(/"/g, "");
+  headers.set("Content-Disposition", `inline; filename="${safeName}"`);
+
+  return new Response(upstream.body, {
+    status: upstream.status, // 200 o 206
+    headers,
+  });
 }
