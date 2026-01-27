@@ -231,15 +231,16 @@ export default function LeadDetalleContenido() {
   const abrirDoc = async (docId: number) => {
     await runBusy(async () => {
       try {
-        const signed = await getSignedDocUrl(docId);
-        if (!signed) throw new Error("No se pudo generar el enlace firmado");
-        window.open(signed, "_blank", "noopener,noreferrer");
+        const shareUrl = await getShareDocUrl(docId); // ✅ usa el share
+        if (!shareUrl) throw new Error("No se pudo generar el enlace público");
+        window.open(shareUrl, "_blank", "noopener,noreferrer"); // ✅ abre tu endpoint
       } catch (e: any) {
         setToast(e?.message || "No se pudo abrir el documento");
         setTimeout(() => setToast(null), 2500);
       }
     });
   };
+
 
   // ✅ Copiar enlace: COPIA EL SHARE (no el signed)
   const copiarLinkDoc = async (docId: number) => {
