@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { makeShareToken } from "@/lib/share-token";
+import { cloudinarySignedUrl } from "@/lib/cloudinary-signed";
 import { getSessionOrThrow, sessionAdminId, sessionAgenteId, sessionRole } from "@/lib/auth-server";
 
 function parseId(id: unknown) {
@@ -32,6 +32,51 @@ async function assertLeadAccess(leadId: number) {
   }
 }
 
+function inferFormatFromMimeOrName(mime?: string | null, name?: string | null) {
+  const m = (mime || "").toLowerCase();
+  if (m.includes("pdf")) return "pdf";
+  if (m.startsWith("image/")) return m.split("/")[1] || undefined;
+
+  const n = (name || "").toLowerCase();
+  const ext = n.match(/\.([a-z0-9]+)$/i)?.[1];
+  return ext || undefined;
+}
+
+function normalizePublicId(input: string) {
+  return String(input || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\.[a-z0-9]+$/i, "");
+}
+
+function extractFromCloudinaryUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+
+    const resourceType = (parts[1] || "raw") as "raw" | "image" | "video";
+    const deliveryType = (parts[2] || "upload") as "upload" | "authenticated" | "private";
+
+    const vPart = parts.find((p) => /^v\d+$/.test(p));
+    const version = vPart ? Number(vPart.slice(1)) : undefined;
+
+    const vIdx = parts.findIndex((p) => /^v\d+$/.test(p));
+    const afterV = vIdx >= 0 ? parts.slice(vIdx + 1) : [];
+
+    const last = afterV[afterV.length - 1] || "";
+    const mExt = last.match(/^(.*)\.([a-z0-9]+)$/i);
+    const format = mExt ? mExt[2].toLowerCase() : undefined;
+
+    const fileNoExt = mExt ? mExt[1] : last;
+    const folder = afterV.slice(0, -1);
+    const publicId = [...folder, fileNoExt].join("/");
+
+    return { resourceType, deliveryType, publicId, format, version };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(_req: Request, ctx: any) {
   try {
     const leadId = parseId(ctx?.params?.id);
@@ -44,51 +89,46 @@ export async function GET(_req: Request, ctx: any) {
 
     const doc = await prisma.leadDocumento.findFirst({
       where: { id: docId, leadId },
-      select: {
-        id: true,
-        nombre: true,
-        shareToken: true,
-        shareExpiraEn: true,
-      },
+      select: { id: true, nombre: true, mime: true, url: true, publicId: true, resourceType: true, deliveryType: true },
     });
 
     if (!doc) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
 
-    // ✅ Si no tiene shareToken, lo creamos
-    let shareToken = doc.shareToken;
-    let shareExpiraEn = doc.shareExpiraEn;
+    const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-    if (!shareToken) {
-      shareToken = makeShareToken();
-      shareExpiraEn = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14); // 14 días
+    const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
+      | "authenticated"
+      | "private"
+      | "upload";
 
-      await prisma.leadDocumento.update({
-        where: { id: doc.id },
-        data: { shareToken, shareExpiraEn },
-      });
+    if (dt === "upload") {
+      // público
+      return NextResponse.json({ url: doc.url, expiresAt: null, nombre: doc.nombre, docId: doc.id, leadId });
     }
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.NEXTAUTH_URL ||
-      "https://impulsoenergetico.es";
+    const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
+    if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
 
-    const shareUrl = `${baseUrl.replace(/\/$/, "")}/share/doc/${shareToken}`;
+    const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
+    const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
+    const version = fromUrl?.version;
 
-    // ✅ el CRM abre SIEMPRE shareUrl (proxy) → adiós 401 de Cloudinary
-    return NextResponse.json({
-      url: shareUrl,
-      expiresAt: shareExpiraEn ? shareExpiraEn.toISOString() : null,
-      nombre: doc.nombre,
-      docId: doc.id,
-      leadId,
-      mode: "proxy-share",
+    const { url, expiresAt } = cloudinarySignedUrl({
+      publicId,
+      resourceType: rt,
+      deliveryType: dt,
+      format,
+      version,
+      expiresInSeconds: 60 * 60, // 1h (informativo)
+      attachment: false,
     });
+
+    return NextResponse.json({ url, expiresAt, nombre: doc.nombre, docId: doc.id, leadId });
   } catch (e: any) {
     if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     if (e?.message === "FORBIDDEN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     if (e?.message === "NOT_FOUND") return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 });
     console.error("GET signed doc error:", e);
-    return NextResponse.json({ error: "Error generando link" }, { status: 500 });
+    return NextResponse.json({ error: "Error generando link firmado" }, { status: 500 });
   }
 }

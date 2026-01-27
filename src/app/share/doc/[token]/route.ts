@@ -12,15 +12,8 @@ function inferFormatFromMimeOrName(mime?: string | null, name?: string | null) {
   if (m.startsWith("image/")) return m.split("/")[1] || undefined;
 
   const n = (name || "").toLowerCase();
-  const mExt = n.match(/\.([a-z0-9]+)$/i);
-  return mExt ? mExt[1].toLowerCase() : undefined;
-}
-
-function normalizePublicId(input: string) {
-  return String(input || "")
-    .trim()
-    .replace(/^\/+/, "")
-    .replace(/\.[a-z0-9]+$/i, "");
+  const ext = n.match(/\.([a-z0-9]+)$/i)?.[1];
+  return ext || undefined;
 }
 
 function extractFromCloudinaryUrl(url: string) {
@@ -51,26 +44,17 @@ function extractFromCloudinaryUrl(url: string) {
   }
 }
 
-function pickHeadersForProxy(res: Response) {
-  const h = new Headers();
-  const keep = [
-    "content-type",
-    "content-length",
-    "accept-ranges",
-    "content-range",
-    "etag",
-    "last-modified",
-    "cache-control",
-  ];
-  for (const k of keep) {
-    const v = res.headers.get(k);
-    if (v) h.set(k, v);
-  }
-  h.set("Cache-Control", "no-store");
-  return h;
+function normalizePublicId(input: string) {
+  return String(input || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\.[a-z0-9]+$/i, ""); // quita .pdf/.jpg etc
 }
 
-export async function GET(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
+export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ token: string }> }
+) {
   const { token } = await ctx.params;
   const t = String(token || "").trim();
   if (!t) return NextResponse.json({ error: "Token no válido" }, { status: 400 });
@@ -101,50 +85,38 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
 
   const fromUrl = doc.url ? extractFromCloudinaryUrl(doc.url) : null;
 
-  const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
-  if (!publicId) return NextResponse.json({ error: "Documento sin publicId" }, { status: 500 });
-
-  const resourceType = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
-  const deliveryType = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
+  const dt = ((doc.deliveryType as any) || fromUrl?.deliveryType || "authenticated") as
     | "authenticated"
     | "private"
     | "upload";
 
+  // ✅ si es público, no firmes (y no inventes type=authenticated)
+  if (dt === "upload") {
+    if (!doc.url) return NextResponse.json({ error: "Documento sin URL" }, { status: 500 });
+    return NextResponse.redirect(doc.url, { status: 302 });
+  }
+
+  const publicId = normalizePublicId(doc.publicId || fromUrl?.publicId || "");
+  if (!publicId) return NextResponse.json({ error: "Documento sin publicId válido" }, { status: 500 });
+
+  const rt = ((doc.resourceType as any) || fromUrl?.resourceType || "raw") as "raw" | "image" | "video";
   const format = inferFormatFromMimeOrName(doc.mime, doc.nombre) || fromUrl?.format;
-  const version = fromUrl?.version; // ✅ CLAVE
+  const version = fromUrl?.version;
 
   const signed = cloudinarySignedUrl({
     publicId,
-    resourceType,
-    deliveryType,
+    resourceType: rt,
+    deliveryType: dt,
     format,
     version,
     expiresInSeconds: 60 * 20,
     attachment: false,
   });
 
-  const range = req.headers.get("range") || undefined;
-
-  const upstream = await fetch(signed.url, {
-    headers: range ? { range } : undefined,
-  });
-
-  if (!upstream.ok && upstream.status !== 206) {
-    const text = await upstream.text().catch(() => "");
-    return NextResponse.json(
-      { error: "Cloudinary upstream error", status: upstream.status, body: text.slice(0, 500) },
-      { status: 502 }
-    );
+  // Debug opcional: /share/doc/<token>?debug=1
+  if (req.nextUrl.searchParams.get("debug") === "1") {
+    return NextResponse.json({ publicId, rt, dt, format, version, signedUrl: signed.url });
   }
 
-  const headers = pickHeadersForProxy(upstream);
-
-  if (!headers.get("content-type")) {
-    headers.set("content-type", doc.mime || "application/octet-stream");
-  }
-
-  const safeName = (doc.nombre || "documento").replace(/"/g, "");
-  headers.set("Content-Disposition", `inline; filename="${safeName}"`);
-
-  return new Response(upstream.body, { status: upstream.status, headers });
+  return NextResponse.redirect(signed.url, { status: 302 });
 }
