@@ -40,23 +40,26 @@ function normalizePublicId(input: string) {
 
   // Si por error se guardó con cloudname dentro (raro, pero lo hemos visto)
   // ej: "dtyiwnllo/raw/authenticated/v1/impulso/leads/25/file"
-  // lo limpiamos:
   const cleaned = v.replace(/^([a-z0-9_-]+)\/(raw|image|video)\//i, "");
-  // si aún trae "authenticated/v123/..." lo dejamos, porque publicId NO debe tener eso
-  // solo debe ser "impulso/leads/25/file"
+
+  // publicId NO debe incluir upload/authenticated/private ni v123 ni extensión
   return cleaned
     .replace(/^(upload|authenticated|private)\//i, "")
     .replace(/^v\d+\//i, "")
     .replace(/\.[a-z0-9]+$/i, "");
 }
 
+function extFromName(name: string) {
+  const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  return m ? m[1] : null;
+}
+
 export async function GET(
   _req: NextRequest,
-  ctx: { params: Promise<{ token: string }> } // ✅ Next 15: params como Promise
+  ctx: { params: Promise<{ token: string }> } // ✅ Next 15: params Promise
 ) {
   const { token } = await ctx.params;
   const t = String(token || "").trim();
-
   if (!t) return NextResponse.json({ error: "Token no válido" }, { status: 400 });
 
   const doc = await prisma.leadDocumento.findUnique({
@@ -68,6 +71,8 @@ export async function GET(
       resourceType: true,
       deliveryType: true,
       shareExpiraEn: true,
+      nombre: true,
+      mime: true,
     },
   });
 
@@ -85,12 +90,17 @@ export async function GET(
     },
   });
 
-  // ✅ Robustez: si publicId está mal, intentar derivarlo de url
+  // ✅ Robustez: si publicId está mal, derivarlo de url
   const publicId = normalizePublicId(doc.publicId) || normalizePublicId(doc.url || "");
   if (!publicId) return NextResponse.json({ error: "Documento sin publicId válido" }, { status: 500 });
 
   const resourceType = ((doc.resourceType as any) || "raw") as "raw" | "image" | "video";
   const deliveryType = ((doc.deliveryType as any) || "authenticated") as "authenticated" | "private" | "upload";
+
+  // ✅ CLAVE: si es PDF, forzar format="pdf" para evitar 404 (URL sin .pdf)
+  const ext = extFromName(doc.nombre || "");
+  const isPdf = doc.mime === "application/pdf" || ext === "pdf";
+  const format = isPdf ? "pdf" : ext || undefined;
 
   const { url } = cloudinarySignedUrl({
     publicId,
@@ -98,8 +108,8 @@ export async function GET(
     deliveryType,
     expiresInSeconds: 60 * 20, // 20 min
     attachment: false,
+    format, // ✅
   });
 
-  // Redirección 302 al URL firmado de Cloudinary
   return NextResponse.redirect(url, { status: 302 });
 }
