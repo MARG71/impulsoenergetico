@@ -129,13 +129,19 @@ export async function GET(
   // ✅ FUERZA: usamos authenticated como estándar del sistema
   const dt: Delivery = "authenticated";
 
+  const format =
+    fromUrl?.format ||
+    (doc.mime?.includes("pdf") ? "pdf" : undefined) ||
+    (doc.nombre?.toLowerCase().endsWith(".pdf") ? "pdf" : undefined);
+
   const result = await fetchCloudinaryWithFallback({
     publicId,
     resourceType: rt,
     deliveryType: dt,
-    format: fromUrl?.format,
+    format,
     version: fromUrl?.version,
   });
+
 
   if (!result.r.ok) {
     return NextResponse.json(

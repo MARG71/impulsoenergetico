@@ -38,7 +38,6 @@ export async function POST(req: NextRequest, ctx: any) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const resourceType = guessResourceType(file.type);
 
-    // ✅ SUBIDA SIEMPRE AUTHENTICATED
     const result = await uploadBufferToCloudinary({
       buffer,
       folder: `impulso/leads/${leadId}`,
@@ -54,20 +53,20 @@ export async function POST(req: NextRequest, ctx: any) {
       data: {
         leadId,
         nombre: file.name,
-        url: result.secure_url,          // ✅ guardamos url (aunque no sea pública)
-        publicId: result.public_id,      // ✅ clave
+        url: result.secure_url,
+        publicId: result.public_id,
         resourceType: result.resource_type,
-        deliveryType: "authenticated",   // ✅ coherente
+        deliveryType: "authenticated",
         mime: file.type || null,
         size: result.bytes,
         shareToken,
-        shareExpiraEn: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14), // 14 días
+        shareExpiraEn: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
       },
     });
 
     return NextResponse.json({ ok: true, documento: doc });
   } catch (e: any) {
-    console.error("UPLOAD doc lead error:", e);
+    console.error("UPLOAD lead doc error:", e);
     if (e?.message === "NO_AUTH") return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     return NextResponse.json({ error: "Error subiendo documento" }, { status: 500 });
   }
