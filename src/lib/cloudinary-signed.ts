@@ -10,7 +10,7 @@ export function cloudinarySignedUrl(opts: {
   resourceType?: Resource;
   deliveryType?: Delivery;
   attachment?: boolean;
-  format?: string;         // "pdf", "jpg"...
+  format?: string; // "pdf", "jpg"...
   version?: number;
   expiresInSeconds?: number;
 }) {
@@ -31,7 +31,7 @@ export function cloudinarySignedUrl(opts: {
     const url = cloudinary.url(publicId, {
       secure: true,
       sign_url: false,
-      resource_type: resourceType,
+      resource_type: resourceType as any,
       type: "upload",
       ...(typeof version === "number" ? { version } : {}),
       ...(format ? { format } : {}),
@@ -41,31 +41,33 @@ export function cloudinarySignedUrl(opts: {
     return { url, expiresAt };
   }
 
-  // 🔒 Caso privado/authenticated: usar private_download_url (mucho más fiable en RAW)
-  // Cloudinary exige "format" para private_download_url -> si no viene, intentamos no romper:
+  // 🔒 Caso privado/authenticated: usar private_download_url (más fiable en RAW)
   const safeFormat = format || (resourceType === "raw" ? "pdf" : undefined);
 
-  // OJO: private_download_url requiere format, si no lo tenemos, caemos a cloudinary.url firmado
+  // Si no hay format (raro), caemos a URL firmada normal
   if (!safeFormat) {
     const url = cloudinary.url(publicId, {
       secure: true,
       sign_url: true,
-      resource_type: resourceType,
-      type: deliveryType,
+      resource_type: resourceType as any,
+      type: deliveryType as any,
       ...(typeof version === "number" ? { version } : {}),
       ...(attachment ? { flags: "attachment" } : {}),
     });
     return { url, expiresAt };
   }
 
-  const url = cloudinary.utils.private_download_url(publicId, safeFormat, {
-    resource_type: resourceType,
-    type: deliveryType,     // "authenticated" o "private"
-    secure: true,
-    expires_at: expiresAt,  // ✅ aquí sí aplica perfecto
+  // ✅ private_download_url NO acepta "secure" en typings -> lo quitamos
+  let url = cloudinary.utils.private_download_url(publicId, safeFormat, {
+    resource_type: resourceType as any,
+    type: deliveryType as any, // authenticated | private
+    expires_at: expiresAt,
     ...(typeof version === "number" ? { version } : {}),
     ...(attachment ? { attachment: true } : {}),
   });
+
+  // ✅ Forzar https por si devuelve http
+  if (typeof url === "string") url = url.replace(/^http:\/\//, "https://");
 
   return { url, expiresAt };
 }
