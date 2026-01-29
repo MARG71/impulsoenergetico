@@ -792,3 +792,82 @@ model LeadDocumento {
   @@index([leadId, creadoEn])
   @@index([adminId, creadoEn])
 }
+
+// ---------- ENUMS ----------
+enum NivelComision {
+  C1
+  C2
+  C3
+  ESPECIAL
+}
+
+enum TipoCalculoComision {
+  FIJA
+  PORC_BASE        // % sobre base imponible
+  PORC_MARGEN      // % sobre margen (si existe)
+  MIXTA            // fija + %
+}
+
+// ---------- MODELOS ----------
+model Seccion {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  slug      String   @unique
+  activa    Boolean  @default(true)
+  creadaEn  DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  subSecciones SubSeccion[]
+  reglas      ReglaComisionGlobal[]
+
+  @@index([activa])
+}
+
+model SubSeccion {
+  id        Int      @id @default(autoincrement())
+  seccionId Int
+  nombre    String
+  slug      String
+  activa    Boolean  @default(true)
+  creadaEn  DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  seccion   Seccion  @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  reglas    ReglaComisionGlobal[]
+
+  @@unique([seccionId, slug])
+  @@index([seccionId, activa])
+}
+
+model ReglaComisionGlobal {
+  id           Int      @id @default(autoincrement())
+  seccionId    Int
+  subSeccionId Int?
+  nivel        NivelComision
+
+  tipo         TipoCalculoComision
+
+  // Valores base (según tipo)
+  fijoEUR      Decimal? @db.Decimal(12,2)
+  porcentaje   Decimal? @db.Decimal(6,3) // ej: 4.500 (%)
+
+  // Acotado del pool resultante
+  minEUR       Decimal? @db.Decimal(12,2)
+  maxEUR       Decimal? @db.Decimal(12,2)
+
+  // Límites para lo que admin podrá pagar a su red (fase 1 solo guardamos)
+  minAgenteEUR        Decimal? @db.Decimal(12,2)
+  maxAgenteEUR        Decimal? @db.Decimal(12,2)
+  minLugarEspecialEUR Decimal? @db.Decimal(12,2)
+  maxLugarEspecialEUR Decimal? @db.Decimal(12,2)
+
+  activa       Boolean  @default(true)
+  creadaEn     DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  seccion      Seccion @relation(fields: [seccionId], references: [id])
+  subSeccion   SubSeccion? @relation(fields: [subSeccionId], references: [id])
+
+  @@unique([seccionId, subSeccionId, nivel])
+  @@index([seccionId, subSeccionId, activa])
+}
