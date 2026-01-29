@@ -11,7 +11,7 @@ function toDecimalOrNull(v: any) {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireRole(["PROPIETARIO"]);
+  const auth = await requireRole(["SUPERADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRole(["PROPIETARIO"]);
+  const auth = await requireRole(["SUPERADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const auth = await requireRole(["PROPIETARIO"]);
+  const auth = await requireRole(["SUPERADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();

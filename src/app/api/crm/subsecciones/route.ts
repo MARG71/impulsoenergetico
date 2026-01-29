@@ -13,7 +13,7 @@ function slugify(input: string) {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRole(["PROPIETARIO"]);
+  const auth = await requireRole(["SUPERADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const auth = await requireRole(["PROPIETARIO"]);
+  const auth = await requireRole(["SUPERADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();

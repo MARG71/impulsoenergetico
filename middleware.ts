@@ -1,5 +1,4 @@
 // src/middleware.ts
-// src/middleware.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
@@ -18,23 +17,40 @@ const PUBLIC_PREFIX = [
 // ✅ Dashboard común (cualquier rol autenticado)
 const DASHBOARD_PREFIX = ["/dashboard"];
 
-// ✅ Zona Lugar
+// ✅ Zona Lugar (tu panel de lugar)
 const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
 
-// ✅ SOLO SUPERADMIN
+// ✅ SOLO SUPERADMIN (nunca visible como "superadmin" en UI, pero aquí sí se controla)
 const SUPERADMIN_ONLY_PREFIX = [
   "/admins",
-  "/configuracion", // ✅ MUY IMPORTANTE: solo tú
+  "/configuracion", // secciones, comisiones-globales, etc.
 ];
 
-// ✅ Rutas SOLO ADMIN/SUPERADMIN
+// ✅ SOLO ADMIN/SUPERADMIN
 const ADMIN_ONLY_PREFIX = [
   "/crear-usuario",
-  "/dashboard/comisiones",
   "/lugares/fondos",
+  // si tienes rutas de ajustes internos de comisiones antiguas, déjalas aquí:
+  "/dashboard/comisiones",
 ];
 
-// ✅ CRM (ADMIN/AGENTE/SUPERADMIN) + (LUGAR solo en algunas rutas)
+// ✅ Rutas específicas de Comisiones (granular)
+const COMISIONES_ADMIN_ONLY_PREFIX = [
+  "/comisiones/admin", // planes de comisión
+];
+
+const COMISIONES_ALL_ROLES_PREFIX = [
+  "/comisiones", // panel general
+  "/comisiones/mis-comisiones",
+];
+
+// ✅ Módulos compartidos (CRM)
+const SHARED_CRM_PREFIX = [
+  "/contrataciones",
+  "/clientes",
+];
+
+// ✅ CRM base (Admin/Agente/Superadmin)
 const CRM_PREFIX = [
   "/pipeline-agentes",
   "/agentes",
@@ -44,11 +60,6 @@ const CRM_PREFIX = [
   "/productos-ganaderos",
   "/ofertas",
   "/comparador",
-
-  // ✅ NUEVAS SECCIONES CRM
-  "/comisiones",
-  "/contrataciones",
-  "/clientes",
 ];
 
 function matchesPrefix(path: string, prefixes: string[]) {
@@ -79,47 +90,60 @@ export async function middleware(req: NextRequest) {
   const isAdmin = role === "ADMIN";
   const isAgente = role === "AGENTE";
   const isLugar = role === "LUGAR";
+  // const isCliente = role === "CLIENTE"; // por si luego lo activas
 
   // ✅ 3) Dashboard (TODOS autenticados)
   if (matchesPrefix(path, DASHBOARD_PREFIX)) {
     return NextResponse.next();
   }
 
-  // ✅ 3.5) Superadmin-only
+  // ✅ 4) Superadmin-only
   if (matchesPrefix(path, SUPERADMIN_ONLY_PREFIX)) {
     if (isSuperadmin) return NextResponse.next();
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ 4) Admin-only
+  // ✅ 5) Admin-only
   if (matchesPrefix(path, ADMIN_ONLY_PREFIX)) {
     if (isSuperadmin || isAdmin) return NextResponse.next();
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ 5) Zona Lugar
+  // ✅ 6) Zona Lugar
   if (matchesPrefix(path, ZONA_LUGAR_PREFIX)) {
     if (isLugar || isSuperadmin || isAdmin || isAgente) return NextResponse.next();
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ 6) CRM
+  // ✅ 7) Comisiones admin-only (planes)
+  if (matchesPrefix(path, COMISIONES_ADMIN_ONLY_PREFIX)) {
+    if (isSuperadmin || isAdmin) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
+  }
+
+  // ✅ 8) Comisiones (panel + mis comisiones) para todos los roles CRM (incluye LUGAR)
+  if (matchesPrefix(path, COMISIONES_ALL_ROLES_PREFIX)) {
+    if (isSuperadmin || isAdmin || isAgente || isLugar) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
+  }
+
+  // ✅ 9) Contrataciones / Clientes para todos los roles CRM (incluye LUGAR)
+  if (matchesPrefix(path, SHARED_CRM_PREFIX)) {
+    if (isSuperadmin || isAdmin || isAgente || isLugar) return NextResponse.next();
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
+  }
+
+  // ✅ 10) CRM general (Admin/Agente/Superadmin)
   if (matchesPrefix(path, CRM_PREFIX)) {
-    // LUGAR solo debería ver algunas cosas (tú decides).
-    // Ahora mismo permitimos LUGAR a /comisiones, /contrataciones, /clientes y /lugares (si quieres).
     if (isSuperadmin || isAdmin || isAgente) return NextResponse.next();
 
-    if (isLugar) {
-      // Permitimos solo estas para LUGAR:
-      const LUGAR_ALLOWED = ["/comisiones", "/contrataciones", "/clientes", "/lugares"];
-      if (matchesPrefix(path, LUGAR_ALLOWED)) return NextResponse.next();
-      return NextResponse.redirect(new URL("/unauthorized", req.url));
-    }
+    // Si quieres permitir a LUGAR entrar a /lugares (lectura), lo hacemos aquí:
+    if (isLugar && matchesPrefix(path, ["/lugares"])) return NextResponse.next();
 
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ 7) Resto: autenticado = OK
+  // ✅ 11) Resto: autenticado = OK
   return NextResponse.next();
 }
 
