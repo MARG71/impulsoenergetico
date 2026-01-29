@@ -12,7 +12,7 @@ const PUBLIC_PREFIX = [
   "/bienvenida",
   "/registro",
   "/contratar",
-  "/share", // ✅ IMPORTANTÍSIMO: permite abrir links compartidos sin login
+  "/share",
 ];
 
 // ✅ Dashboard común (cualquier rol autenticado)
@@ -22,12 +22,19 @@ const DASHBOARD_PREFIX = ["/dashboard"];
 const ZONA_LUGAR_PREFIX = ["/zona-lugar"];
 
 // ✅ SOLO SUPERADMIN
-const SUPERADMIN_ONLY_PREFIX = ["/admins"];
+const SUPERADMIN_ONLY_PREFIX = [
+  "/admins",
+  "/configuracion", // ✅ MUY IMPORTANTE: solo tú
+];
 
 // ✅ Rutas SOLO ADMIN/SUPERADMIN
-const ADMIN_ONLY_PREFIX = ["/crear-usuario", "/dashboard/comisiones", "/lugares/fondos"];
+const ADMIN_ONLY_PREFIX = [
+  "/crear-usuario",
+  "/dashboard/comisiones",
+  "/lugares/fondos",
+];
 
-// ✅ CRM (ADMIN/AGENTE/SUPERADMIN)
+// ✅ CRM (ADMIN/AGENTE/SUPERADMIN) + (LUGAR solo en algunas rutas)
 const CRM_PREFIX = [
   "/pipeline-agentes",
   "/agentes",
@@ -36,8 +43,12 @@ const CRM_PREFIX = [
   "/fondos",
   "/productos-ganaderos",
   "/ofertas",
-  "/configuracion",
   "/comparador",
+
+  // ✅ NUEVAS SECCIONES CRM
+  "/comisiones",
+  "/contrataciones",
+  "/clientes",
 ];
 
 function matchesPrefix(path: string, prefixes: string[]) {
@@ -92,9 +103,19 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
-  // ✅ 6) CRM (Admin/Agente/Superadmin)
+  // ✅ 6) CRM
   if (matchesPrefix(path, CRM_PREFIX)) {
+    // LUGAR solo debería ver algunas cosas (tú decides).
+    // Ahora mismo permitimos LUGAR a /comisiones, /contrataciones, /clientes y /lugares (si quieres).
     if (isSuperadmin || isAdmin || isAgente) return NextResponse.next();
+
+    if (isLugar) {
+      // Permitimos solo estas para LUGAR:
+      const LUGAR_ALLOWED = ["/comisiones", "/contrataciones", "/clientes", "/lugares"];
+      if (matchesPrefix(path, LUGAR_ALLOWED)) return NextResponse.next();
+      return NextResponse.redirect(new URL("/unauthorized", req.url));
+    }
+
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
