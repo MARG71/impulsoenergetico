@@ -1,199 +1,183 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/authz";
-import { Prisma } from "@prisma/client";
+// src/app/api/crm/contrataciones/route.ts
+export const runtime = "nodejs";
 
-function toDec(v: any) {
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getTenantContext } from "@/lib/tenant";
+import { Prisma, EstadoContratacion, NivelComision } from "@prisma/client";
+
+const toInt = (v: any) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const toStr = (v: any) => (typeof v === "string" ? v.trim() : "");
+
+const toDec = (v: any) => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
-  if (Number.isNaN(n)) return null;
+  if (!Number.isFinite(n)) return null;
   return new Prisma.Decimal(n);
+};
+
+// ✅ convierte string -> enum real (o undefined)
+function parseEstado(v: any): EstadoContratacion | undefined {
+  const s = toStr(v);
+  if (!s) return undefined;
+  if ((Object.values(EstadoContratacion) as string[]).includes(s)) return s as EstadoContratacion;
+  return undefined;
 }
 
-export async function GET() {
-  // Roles con acceso a ver (filtraremos por rol)
-  const auth = await requireRole(["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+function parseNivel(v: any): NivelComision | undefined {
+  const s = toStr(v);
+  if (!s) return undefined;
+  if ((Object.values(NivelComision) as string[]).includes(s)) return s as NivelComision;
+  return undefined;
+}
 
-  const role = (auth.session?.user as any)?.role as string | undefined;
-  const agenteId = (auth.session?.user as any)?.agenteId as number | undefined;
-  const lugarId = (auth.session?.user as any)?.lugarId as number | undefined;
+function allowRole(role: string, allowed: string[]) {
+  return allowed.includes(role);
+}
 
-  // Base query
+export async function GET(req: NextRequest) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+
+  if (!allowRole(t.role, ["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"])) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const q = toStr(req.nextUrl.searchParams.get("q"));
+  const estadoQ = parseEstado(req.nextUrl.searchParams.get("estado"));
+  const nivelQ = parseNivel(req.nextUrl.searchParams.get("nivel"));
+
   const where: any = {};
 
-  // 🔒 filtrado seguro por rol (si no tienes agenteId/lugarId en sesión, devolvemos vacío)
-  if (role === "AGENTE") {
-    if (!agenteId) return NextResponse.json([]);
-    where.agenteId = agenteId;
-  }
-  if (role === "LUGAR") {
-    if (!lugarId) return NextResponse.json([]);
-    where.lugarId = lugarId;
+  // ✅ multi-tenant
+  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
+
+  // ✅ si es AGENTE/LUGAR, restringimos a su ámbito (para que no vean todo)
+  if (t.role === "AGENTE" && t.agenteId) where.agenteId = t.agenteId;
+  if (t.role === "LUGAR" && t.lugarId) where.lugarId = t.lugarId;
+
+  if (estadoQ) where.estado = estadoQ;
+  if (nivelQ) where.nivel = nivelQ;
+
+  if (q) {
+    where.OR = [
+      { notas: { contains: q, mode: "insensitive" } },
+      // si luego guardas nombre/email del cliente como snapshot, añádelo aquí
+    ];
   }
 
   const items = await prisma.contratacion.findMany({
     where,
-    orderBy: { creadaEn: "desc" },
+    orderBy: { id: "desc" },
+    take: 200,
     include: {
       seccion: true,
       subSeccion: true,
-      lead: true,
-      cliente: true,
-      agente: true,
-      lugar: true,
-      documentos: { orderBy: { creadoEn: "desc" } },
+      lead: { select: { id: true, nombre: true, email: true, telefono: true } },
+      cliente: { select: { id: true, nombre: true, email: true, telefono: true } },
+      agente: { select: { id: true, nombre: true } },
+      lugar: { select: { id: true, nombre: true } },
+      documentos: true,
     },
-    take: 200,
   });
 
-  return NextResponse.json(items);
+  return NextResponse.json({ ok: true, items });
 }
 
-export async function POST(req: Request) {
-  const auth = await requireRole(["SUPERADMIN", "ADMIN", "AGENTE"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(req: NextRequest) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
 
-  const role = (auth.session?.user as any)?.role as string | undefined;
-  const agenteIdSession = (auth.session?.user as any)?.agenteId as number | undefined;
-
-  const body = await req.json();
-
-  const seccionId = Number(body?.seccionId);
-  const subSeccionId = body?.subSeccionId ? Number(body.subSeccionId) : null;
-
-  if (!seccionId) return NextResponse.json({ error: "seccionId requerido" }, { status: 400 });
-
-  const payload: any = {
-    estado: body?.estado ?? "BORRADOR",
-    nivel: body?.nivel ?? "C1",
-    seccionId,
-    subSeccionId,
-    leadId: body?.leadId ? Number(body.leadId) : null,
-    clienteId: body?.clienteId ? Number(body.clienteId) : null,
-    lugarId: body?.lugarId ? Number(body.lugarId) : null,
-    notas: body?.notas ?? null,
-    baseImponible: toDec(body?.baseImponible),
-    totalFactura: toDec(body?.totalFactura),
-  };
-
-  // Si crea un AGENTE, forzamos su agenteId
-  if (role === "AGENTE") {
-    if (!agenteIdSession) return NextResponse.json({ error: "Agente sin agenteId" }, { status: 400 });
-    payload.agenteId = agenteIdSession;
-  } else {
-    payload.agenteId = body?.agenteId ? Number(body.agenteId) : null;
+  if (!allowRole(t.role, ["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"])) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
+
+  const body = await req.json().catch(() => ({}));
+
+  const seccionId = toInt(body.seccionId);
+  const subSeccionId = toInt(body.subSeccionId);
+  const leadId = toInt(body.leadId);
+  const clienteId = toInt(body.clienteId);
+
+  const agenteId = toInt(body.agenteId) ?? t.agenteId ?? null;
+  const lugarId = toInt(body.lugarId) ?? t.lugarId ?? null;
+
+  const estado = parseEstado(body.estado) ?? EstadoContratacion.BORRADOR;
+  const nivel = parseNivel(body.nivel) ?? NivelComision.C1;
+
+  const baseImponible = toDec(body.baseImponible);
+  const totalFactura = toDec(body.totalFactura);
+
+  const notas = toStr(body.notas) || null;
+
+  if (!seccionId) return NextResponse.json({ error: "Falta seccionId" }, { status: 400 });
 
   const created = await prisma.contratacion.create({
-    data: payload,
-  });
-
-  return NextResponse.json(created);
-}
-
-// PATCH: editar / cambiar estado. Al CONFIRMAR => crea/vincula Cliente desde Lead
-export async function PATCH(req: Request) {
-  const auth = await requireRole(["SUPERADMIN", "ADMIN", "AGENTE"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const role = (auth.session?.user as any)?.role as string | undefined;
-  const agenteIdSession = (auth.session?.user as any)?.agenteId as number | undefined;
-
-  const body = await req.json();
-  const id = Number(body?.id);
-  if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
-
-  const existing = await prisma.contratacion.findUnique({
-    where: { id },
-    include: { lead: true },
-  });
-  if (!existing) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
-
-  // 🔒 AGENTE solo puede tocar las suyas
-  if (role === "AGENTE") {
-    if (!agenteIdSession || existing.agenteId !== agenteIdSession) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    // AGENTE no puede CONFIRMAR/CANCELAR (solo admin/superadmin)
-    if (body?.estado === "CONFIRMADA" || body?.estado === "CANCELADA") {
-      return NextResponse.json({ error: "Solo admin puede confirmar/cancelar" }, { status: 403 });
-    }
-  }
-
-  const nextEstado = body?.estado as string | undefined;
-
-  // update normal
-  const updated = await prisma.contratacion.update({
-    where: { id },
     data: {
-      estado: nextEstado ?? undefined,
-      nivel: body?.nivel ?? undefined,
-      notas: body?.notas ?? undefined,
-      baseImponible: body?.baseImponible !== undefined ? toDec(body.baseImponible) : undefined,
-      totalFactura: body?.totalFactura !== undefined ? toDec(body.totalFactura) : undefined,
-      seccionId: body?.seccionId ? Number(body.seccionId) : undefined,
-      subSeccionId: body?.subSeccionId === null ? null : (body?.subSeccionId ? Number(body.subSeccionId) : undefined),
-      leadId: body?.leadId === null ? null : (body?.leadId ? Number(body.leadId) : undefined),
-      lugarId: body?.lugarId === null ? null : (body?.lugarId ? Number(body.lugarId) : undefined),
-      agenteId:
-        role === "AGENTE"
-          ? existing.agenteId
-          : body?.agenteId === null
-            ? null
-            : (body?.agenteId ? Number(body.agenteId) : undefined),
+      estado,
+      nivel,
+      seccionId,
+      subSeccionId: subSeccionId ?? null,
+      leadId: leadId ?? null,
+      clienteId: clienteId ?? null,
+      agenteId,
+      lugarId,
+      baseImponible,
+      totalFactura,
+      notas,
+      adminId: t.tenantAdminId ?? null,
     },
   });
 
-  // ✅ Si admin/superadmin confirma: upsert cliente desde Lead y vincular
-  if ((role === "ADMIN" || role === "SUPERADMIN") && nextEstado === "CONFIRMADA") {
-    const lead = existing.leadId
-      ? await prisma.lead.findUnique({ where: { id: existing.leadId } })
-      : null;
+  return NextResponse.json({ ok: true, item: created }, { status: 201 });
+}
 
-    // Si no hay lead, confirmamos igual pero sin cliente
-    if (!lead) {
-      const final = await prisma.contratacion.update({
-        where: { id },
-        data: { confirmadaEn: new Date() },
-      });
-      return NextResponse.json(final);
-    }
+/**
+ * ✅ PATCH en /api/crm/contrataciones
+ * Body: { id, estado?, nivel?, notas?, baseImponible?, totalFactura?, seccionId?, subSeccionId? }
+ */
+export async function PATCH(req: NextRequest) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
 
-    const email = (lead as any).email?.trim() || null;
-    const telefono = (lead as any).telefono?.trim() || null;
-    const nombre = (lead as any).nombre?.trim() || "Cliente";
-
-    // estrategia: buscar por email, si no por teléfono
-    let cliente = null as any;
-
-    if (email) cliente = await prisma.cliente.findFirst({ where: { email } });
-    if (!cliente && telefono) cliente = await prisma.cliente.findFirst({ where: { telefono } });
-
-    if (!cliente) {
-      cliente = await prisma.cliente.create({
-        data: { nombre, email, telefono },
-      });
-    } else {
-      // actualiza nombre si estaba vacío
-      if (!cliente.nombre || cliente.nombre === "Cliente") {
-        await prisma.cliente.update({
-          where: { id: cliente.id },
-          data: { nombre },
-        });
-      }
-    }
-
-    const final = await prisma.contratacion.update({
-      where: { id },
-      data: {
-        clienteId: cliente.id,
-        confirmadaEn: new Date(),
-      },
-    });
-
-    return NextResponse.json(final);
+  if (!allowRole(t.role, ["SUPERADMIN", "ADMIN"])) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  return NextResponse.json(updated);
+  const body = await req.json().catch(() => ({}));
+  const id = toInt(body.id);
+  if (!id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
+
+  const nextEstado = parseEstado(body.estado);
+  const nextNivel = parseNivel(body.nivel);
+
+  const data: any = {};
+
+  // ✅ aquí está la corrección del error: NO strings, solo enums válidos
+  if (nextEstado) data.estado = nextEstado;
+  if (nextNivel) data.nivel = nextNivel;
+
+  if (body.notas !== undefined) data.notas = toStr(body.notas) || null;
+  if (body.baseImponible !== undefined) data.baseImponible = toDec(body.baseImponible);
+  if (body.totalFactura !== undefined) data.totalFactura = toDec(body.totalFactura);
+
+  const seccionId = toInt(body.seccionId);
+  const subSeccionId = toInt(body.subSeccionId);
+  if (body.seccionId !== undefined) data.seccionId = seccionId;
+  if (body.subSeccionId !== undefined) data.subSeccionId = subSeccionId ?? null;
+
+  // ✅ multi-tenant: evitamos tocar registros fuera del tenant
+  const where: any = { id };
+  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
+
+  const updated = await prisma.contratacion.update({
+    where,
+    data,
+  });
+
+  return NextResponse.json({ ok: true, item: updated });
 }
