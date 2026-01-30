@@ -1,4 +1,5 @@
 // src/app/api/crm/contrataciones/[id]/route.ts
+// src/app/api/crm/contrataciones/[id]/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -6,104 +7,87 @@ import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 import { EstadoContratacion, NivelComision } from "@prisma/client";
 
+function jsonError(status: number, message: string) {
+  return NextResponse.json({ ok: false, error: message }, { status });
+}
+
 function toId(v: any) {
   const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function toDec(v: any) {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Number(v);
-  if (!Number.isFinite(n)) return null;
-  return n;
+function asEstado(v: any): EstadoContratacion | null {
+  if (!v) return null;
+  const s = String(v).toUpperCase();
+  return (Object.values(EstadoContratacion) as string[]).includes(s)
+    ? (s as EstadoContratacion)
+    : null;
 }
 
-function isEstado(v: any): v is EstadoContratacion {
-  return Object.values(EstadoContratacion).includes(v);
+function asNivel(v: any): NivelComision | null {
+  if (!v) return null;
+  const s = String(v).toUpperCase();
+  return (Object.values(NivelComision) as string[]).includes(s)
+    ? (s as NivelComision)
+    : null;
 }
 
-function isNivel(v: any): v is NivelComision {
-  return Object.values(NivelComision).includes(v);
+export async function GET(req: NextRequest, ctx: any) {
+  const tenant = await getTenantContext(req);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+
+  const id = toId(ctx?.params?.id);
+  if (!id) return jsonError(400, "ID inválido");
+
+  const where: any = { id };
+  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+
+  const item = await prisma.contratacion.findFirst({
+    where,
+    include: {
+      cliente: true,
+      lead: true,
+      seccion: true,
+      subSeccion: true,
+      agente: { select: { id: true, nombre: true } },
+      lugar: { select: { id: true, nombre: true } },
+      documentos: { orderBy: { id: "desc" }, take: 50 },
+    },
+  });
+
+  if (!item) return jsonError(404, "Contratación no encontrada");
+  return NextResponse.json({ ok: true, item });
 }
 
 export async function PATCH(req: NextRequest, ctx: any) {
+  const tenant = await getTenantContext(req);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+
+  const id = toId(ctx?.params?.id);
+  if (!id) return jsonError(400, "ID inválido");
+
+  const body = await req.json().catch(() => ({}));
+
+  const where: any = { id };
+  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+
+  const exists = await prisma.contratacion.findFirst({ where, select: { id: true } });
+  if (!exists) return jsonError(404, "Contratación no encontrada");
+
+  const data: any = {};
+  const est = asEstado(body?.estado);
+  if (est) data.estado = est;
+
+  const niv = asNivel(body?.nivel);
+  if (niv) data.nivel = niv;
+
+  if (typeof body?.notas === "string") data.notas = body.notas;
+
   try {
-    const id = toId(ctx?.params?.id);
-    if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-
-    const t = await getTenantContext(req);
-    if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
-
-    const { isSuperadmin, isAdmin, isAgente, isLugar, tenantAdminId, agenteId, lugarId } = t;
-
-    // Solo ADMIN/SUPERADMIN/AGENTE pueden editar (LUGAR no)
-    if (!(isSuperadmin || isAdmin || isAgente)) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
-
-    const body = await req.json();
-
-    // ✅ Seguridad: primero comprobamos que existe y está en tu scope tenant/rol
-    const whereCheck: any = { id };
-
-    if (!isSuperadmin) {
-      if (tenantAdminId) {
-        whereCheck.OR = [
-          { cliente: { adminId: tenantAdminId } },
-          { lead: { adminId: tenantAdminId } },
-        ];
-      }
-    } else {
-      if (tenantAdminId) {
-        whereCheck.OR = [
-          { cliente: { adminId: tenantAdminId } },
-          { lead: { adminId: tenantAdminId } },
-        ];
-      }
-    }
-
-    if (isAgente) whereCheck.agenteId = agenteId ?? -1;
-    if (isLugar) whereCheck.lugarId = lugarId ?? -1;
-
-    const found = await prisma.contratacion.findFirst({ where: whereCheck, select: { id: true } });
-    if (!found) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-
-    const data: any = {};
-
-    if (body?.estado !== undefined) {
-      if (!isEstado(body.estado)) return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
-      data.estado = body.estado;
-      if (body.estado === EstadoContratacion.CONFIRMADA) {
-        data.confirmadaEn = new Date();
-      }
-    }
-
-    if (body?.nivel !== undefined) {
-      if (!isNivel(body.nivel)) return NextResponse.json({ error: "Nivel inválido" }, { status: 400 });
-      data.nivel = body.nivel;
-    }
-
-    if (body?.notas !== undefined) data.notas = typeof body.notas === "string" ? body.notas : null;
-    if (body?.baseImponible !== undefined) data.baseImponible = toDec(body.baseImponible);
-    if (body?.totalFactura !== undefined) data.totalFactura = toDec(body.totalFactura);
-
-    const item = await prisma.contratacion.update({
-      where: { id },
-      data,
-      include: {
-        lead: { select: { id: true, nombre: true, email: true, telefono: true, adminId: true } },
-        cliente: true,
-        agente: { select: { id: true, nombre: true } },
-        lugar: { select: { id: true, nombre: true } },
-        seccion: true,
-        subSeccion: true,
-        documentos: { orderBy: { id: "desc" } },
-      },
-    });
-
-    return NextResponse.json({ ok: true, item });
+    const updated = await prisma.contratacion.update({ where: { id }, data });
+    return NextResponse.json({ ok: true, item: updated });
   } catch (e: any) {
     console.error("PATCH /api/crm/contrataciones/[id] error:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return jsonError(500, "Error actualizando contratación");
   }
 }

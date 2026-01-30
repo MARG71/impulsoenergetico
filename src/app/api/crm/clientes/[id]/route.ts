@@ -2,52 +2,87 @@
 // src/app/api/crm/clientes/[id]/route.ts
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-function toId(id: any) {
-  const n = Number(id);
+function jsonError(status: number, message: string) {
+  return NextResponse.json({ ok: false, error: message }, { status });
+}
+
+function toId(v: any) {
+  const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// ✅ Next 15: evita tipar el segundo arg fuerte para que no casque el build
-export async function GET(req: Request, context: any) {
-  try {
-    const ctx = await getTenantContext(req as any);
-    if (!ctx.ok) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+async function assertAccess(req: NextRequest, clienteId: number) {
+  const tenant = await getTenantContext(req);
+  if (!tenant.ok) return tenant;
 
-    const id = toId(context?.params?.id);
-    if (!id) return NextResponse.json({ ok: false, error: "ID inválido" }, { status: 400 });
+  const where: any = { id: clienteId };
+  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
 
-    const where: any = { id };
-    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
+  const exists = await prisma.cliente.findFirst({
+    where,
+    select: { id: true },
+  });
 
-    // ✅ seguridad por rol (misma lógica)
-    if (ctx.isAgente && ctx.agenteId) {
-      where.contrataciones = { some: { agenteId: ctx.agenteId } };
-    }
-    if (ctx.isLugar && ctx.lugarId) {
-      where.contrataciones = { some: { lugarId: ctx.lugarId } };
-    }
-
-    const item = await (prisma as any).cliente.findFirst({
-      where,
-      include: {
-        contrataciones: {
-          orderBy: { id: "desc" },
-          include: { seccion: true, subSeccion: true, lead: true },
-        },
-      },
-    });
-
-    if (!item) return NextResponse.json({ ok: false, error: "No encontrado" }, { status: 404 });
-    return NextResponse.json({ ok: true, item });
-  } catch (e: any) {
-    console.error("CLIENTE_ID_GET_ERROR:", e);
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? "Error interno cliente" },
-      { status: 500 }
-    );
+  if (!exists) {
+    return { ok: false as const, status: 404, error: "Cliente no encontrado" };
   }
+
+  return tenant;
+}
+
+export async function GET(req: NextRequest, ctx: any) {
+  const id = toId(ctx?.params?.id);
+  if (!id) return jsonError(400, "ID inválido");
+
+  const tenant = await assertAccess(req, id);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+
+  const where: any = { id };
+  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+
+  const item = await prisma.cliente.findFirst({
+    where,
+    include: {
+      contrataciones: { orderBy: { id: "desc" }, take: 50 },
+    },
+  });
+
+  return NextResponse.json({ ok: true, item });
+}
+
+export async function PATCH(req: NextRequest, ctx: any) {
+  const id = toId(ctx?.params?.id);
+  if (!id) return jsonError(400, "ID inválido");
+
+  const tenant = await assertAccess(req, id);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+
+  const body = await req.json().catch(() => ({}));
+
+  const data: any = {};
+  if (typeof body?.nombre === "string") data.nombre = body.nombre.trim();
+  if (typeof body?.email === "string") data.email = body.email.trim() || null;
+  if (typeof body?.telefono === "string") data.telefono = body.telefono.trim() || null;
+
+  const updated = await prisma.cliente.update({
+    where: { id },
+    data,
+  });
+
+  return NextResponse.json({ ok: true, item: updated });
+}
+
+export async function DELETE(req: NextRequest, ctx: any) {
+  const id = toId(ctx?.params?.id);
+  if (!id) return jsonError(400, "ID inválido");
+
+  const tenant = await assertAccess(req, id);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+
+  await prisma.cliente.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }
