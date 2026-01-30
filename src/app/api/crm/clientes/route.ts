@@ -5,75 +5,87 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-function str(v: any) {
-  return typeof v === "string" ? v.trim() : "";
+function qLike(q: string) {
+  return q.trim();
 }
 
 export async function GET(req: NextRequest) {
-  const t = await getTenantContext(req);
-  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+  try {
+    const ctx = await getTenantContext(req);
+    if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  if (!["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"].includes(t.role)) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    const { role, tenantAdminId, agenteId, lugarId, isSuperadmin, isAdmin, isAgente, isLugar } = ctx;
+
+    const url = new URL(req.url);
+    const q = qLike(url.searchParams.get("q") ?? "");
+    const take = Math.min(Number(url.searchParams.get("take") ?? 200) || 200, 500);
+
+    // ✅ Base where tenant
+    const where: any = {};
+
+    // SUPERADMIN:
+    // - si está en modo tenant (?adminId=) => filtra por ese adminId
+    // - si NO => ve todo (global)
+    if (!isSuperadmin) {
+      // ADMIN/AGENTE/LUGAR: siempre a su tenant
+      where.adminId = tenantAdminId ?? undefined;
+    } else {
+      if (tenantAdminId) where.adminId = tenantAdminId;
+    }
+
+    // ✅ Búsqueda simple por nombre/email/teléfono
+    if (q) {
+      where.OR = [
+        { nombre: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+        { telefono: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    // ✅ Restricción por rol (AGENTE/LUGAR)
+    // Cliente no tiene agenteId/lugarId directo, así que filtramos por relaciones existentes:
+    // - comparativas (tienen agenteId/lugarId)
+    // - contratos (tienen agenteId)
+    if (isAgente) {
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            { comparativas: { some: { agenteId: agenteId ?? -1 } } },
+            { contratos: { some: { agenteId: agenteId ?? -1 } } },
+          ],
+        },
+      ];
+    }
+
+    if (isLugar) {
+      where.AND = [
+        ...(where.AND ?? []),
+        { comparativas: { some: { lugarId: lugarId ?? -1 } } },
+      ];
+    }
+
+    // ✅ Admin: ve todo su tenant
+    // ✅ Superadmin: ve global o tenant
+    // (no hacemos nada extra)
+
+    const items = await prisma.cliente.findMany({
+      where,
+      orderBy: { id: "desc" },
+      take,
+      include: {
+        // ⚠️ si en tu schema Cliente tiene estas relaciones (como en el que pegaste), esto es correcto:
+        contratos: { orderBy: { fechaAlta: "desc" }, take: 20 },
+        comparativas: { orderBy: { fecha: "desc" }, take: 20 },
+      },
+    });
+
+    return NextResponse.json({ ok: true, items });
+  } catch (e: any) {
+    console.error("GET /api/crm/clientes error:", e);
+    return NextResponse.json(
+      { ok: false, error: "Error interno cargando clientes" },
+      { status: 500 }
+    );
   }
-
-  const q = req.nextUrl.searchParams.get("q")?.trim() || "";
-  const where: any = {};
-
-  // ✅ multi-tenant: si hay tenantAdminId filtramos
-  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
-
-  // ✅ buscador (nombre/email/telefono)
-  if (q) {
-    where.OR = [
-      { nombre: { contains: q, mode: "insensitive" } },
-      { email: { contains: q, mode: "insensitive" } },
-      { telefono: { contains: q, mode: "insensitive" } },
-    ];
-  }
-
-  const items = await prisma.cliente.findMany({
-    where,
-    // ✅ tu schema NO tiene creadoEn -> ordenamos por id
-    orderBy: { id: "desc" },
-    take: 200,
-    include: {
-      contratos: { take: 20, orderBy: { fechaAlta: "desc" } },
-      comparativas: { take: 20, orderBy: { fecha: "desc" } },
-    },
-  });
-
-  return NextResponse.json({ ok: true, items });
-}
-
-export async function POST(req: NextRequest) {
-  const t = await getTenantContext(req);
-  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
-
-  // ✅ crear clientes solo SUPERADMIN/ADMIN por ahora
-  if (!["SUPERADMIN", "ADMIN"].includes(t.role)) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-  }
-
-  const body = await req.json().catch(() => ({}));
-
-  const nombre = str(body.nombre);
-  const direccion = str(body.direccion);
-  const email = str(body.email) || null;
-  const telefono = str(body.telefono) || null;
-
-  if (!nombre) return NextResponse.json({ error: "Falta nombre" }, { status: 400 });
-
-  const created = await prisma.cliente.create({
-    data: {
-      nombre,
-      direccion: direccion || "", // tu schema lo requiere
-      email,
-      telefono,
-      // ✅ multi-tenant: asignamos adminId si estamos en tenant (admin o superadmin con adminId)
-      adminId: t.tenantAdminId ?? null,
-    },
-  });
-
-  return NextResponse.json({ ok: true, cliente: created }, { status: 201 });
 }

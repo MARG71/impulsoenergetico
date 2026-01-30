@@ -1,183 +1,154 @@
 // src/app/api/crm/contrataciones/route.ts
+// src/app/api/crm/contrataciones/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
-import { Prisma, EstadoContratacion, NivelComision } from "@prisma/client";
+import { EstadoContratacion, NivelComision } from "@prisma/client";
 
-const toInt = (v: any) => {
+function toId(v: any) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
-};
+}
 
-const toStr = (v: any) => (typeof v === "string" ? v.trim() : "");
-
-const toDec = (v: any) => {
+function toDec(v: any) {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
-  return new Prisma.Decimal(n);
-};
-
-// ✅ convierte string -> enum real (o undefined)
-function parseEstado(v: any): EstadoContratacion | undefined {
-  const s = toStr(v);
-  if (!s) return undefined;
-  if ((Object.values(EstadoContratacion) as string[]).includes(s)) return s as EstadoContratacion;
-  return undefined;
+  return n;
 }
 
-function parseNivel(v: any): NivelComision | undefined {
-  const s = toStr(v);
-  if (!s) return undefined;
-  if ((Object.values(NivelComision) as string[]).includes(s)) return s as NivelComision;
-  return undefined;
+function isEstado(v: any): v is EstadoContratacion {
+  return Object.values(EstadoContratacion).includes(v);
 }
 
-function allowRole(role: string, allowed: string[]) {
-  return allowed.includes(role);
+function isNivel(v: any): v is NivelComision {
+  return Object.values(NivelComision).includes(v);
 }
 
 export async function GET(req: NextRequest) {
-  const t = await getTenantContext(req);
-  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+  try {
+    const ctx = await getTenantContext(req);
+    if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  if (!allowRole(t.role, ["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"])) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    const { isSuperadmin, tenantAdminId, isAdmin, isAgente, isLugar, agenteId, lugarId } = ctx;
+
+    const url = new URL(req.url);
+    const take = Math.min(Number(url.searchParams.get("take") ?? 200) || 200, 500);
+    const estadoParam = url.searchParams.get("estado") ?? "";
+    const estado = isEstado(estadoParam) ? estadoParam : null;
+
+    const where: any = {};
+
+    // ✅ MULTI-TENANT:
+    // Como tu Contratacion puede no tener adminId directo (según cómo lo migraras),
+    // filtramos por:
+    // - cliente.adminId (si hay cliente)
+    // - lead.adminId (si hay lead)
+    //
+    // SUPERADMIN:
+    // - tenantAdminId => filtra
+    // - sin tenantAdminId => global
+    if (!isSuperadmin) {
+      if (tenantAdminId) {
+        where.OR = [
+          { cliente: { adminId: tenantAdminId } },
+          { lead: { adminId: tenantAdminId } },
+        ];
+      }
+    } else {
+      if (tenantAdminId) {
+        where.OR = [
+          { cliente: { adminId: tenantAdminId } },
+          { lead: { adminId: tenantAdminId } },
+        ];
+      }
+    }
+
+    if (estado) where.estado = estado;
+
+    // ✅ Restricción por rol
+    if (isAgente) where.agenteId = agenteId ?? -1;
+    if (isLugar) where.lugarId = lugarId ?? -1;
+
+    const items = await prisma.contratacion.findMany({
+      where,
+      orderBy: { id: "desc" },
+      take,
+      include: {
+        lead: { select: { id: true, nombre: true, email: true, telefono: true, adminId: true } },
+        cliente: true,
+        agente: { select: { id: true, nombre: true } },
+        lugar: { select: { id: true, nombre: true } },
+        seccion: true,
+        subSeccion: true,
+        documentos: { orderBy: { id: "desc" } },
+      },
+    });
+
+    return NextResponse.json({ ok: true, items });
+  } catch (e: any) {
+    console.error("GET /api/crm/contrataciones error:", e);
+    return NextResponse.json({ ok: false, error: "Error interno cargando contrataciones" }, { status: 500 });
   }
-
-  const q = toStr(req.nextUrl.searchParams.get("q"));
-  const estadoQ = parseEstado(req.nextUrl.searchParams.get("estado"));
-  const nivelQ = parseNivel(req.nextUrl.searchParams.get("nivel"));
-
-  const where: any = {};
-
-  // ✅ multi-tenant
-  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
-
-  // ✅ si es AGENTE/LUGAR, restringimos a su ámbito (para que no vean todo)
-  if (t.role === "AGENTE" && t.agenteId) where.agenteId = t.agenteId;
-  if (t.role === "LUGAR" && t.lugarId) where.lugarId = t.lugarId;
-
-  if (estadoQ) where.estado = estadoQ;
-  if (nivelQ) where.nivel = nivelQ;
-
-  if (q) {
-    where.OR = [
-      { notas: { contains: q, mode: "insensitive" } },
-      // si luego guardas nombre/email del cliente como snapshot, añádelo aquí
-    ];
-  }
-
-  const items = await prisma.contratacion.findMany({
-    where,
-    orderBy: { id: "desc" },
-    take: 200,
-    include: {
-      seccion: true,
-      subSeccion: true,
-      lead: { select: { id: true, nombre: true, email: true, telefono: true } },
-      cliente: { select: { id: true, nombre: true, email: true, telefono: true } },
-      agente: { select: { id: true, nombre: true } },
-      lugar: { select: { id: true, nombre: true } },
-      documentos: true,
-    },
-  });
-
-  return NextResponse.json({ ok: true, items });
 }
 
 export async function POST(req: NextRequest) {
-  const t = await getTenantContext(req);
-  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+  try {
+    const ctx = await getTenantContext(req);
+    if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  if (!allowRole(t.role, ["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"])) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-  }
+    const { isSuperadmin, isAdmin, isAgente, tenantAdminId, agenteId } = ctx;
 
-  const body = await req.json().catch(() => ({}));
+    // ✅ quién puede crear
+    if (!(isSuperadmin || isAdmin || isAgente)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
 
-  const seccionId = toInt(body.seccionId);
-  const subSeccionId = toInt(body.subSeccionId);
-  const leadId = toInt(body.leadId);
-  const clienteId = toInt(body.clienteId);
+    const body = await req.json();
 
-  const agenteId = toInt(body.agenteId) ?? t.agenteId ?? null;
-  const lugarId = toInt(body.lugarId) ?? t.lugarId ?? null;
+    const seccionId = toId(body?.seccionId);
+    if (!seccionId) return NextResponse.json({ error: "seccionId requerido" }, { status: 400 });
 
-  const estado = parseEstado(body.estado) ?? EstadoContratacion.BORRADOR;
-  const nivel = parseNivel(body.nivel) ?? NivelComision.C1;
+    const subSeccionId = toId(body?.subSeccionId);
 
-  const baseImponible = toDec(body.baseImponible);
-  const totalFactura = toDec(body.totalFactura);
-
-  const notas = toStr(body.notas) || null;
-
-  if (!seccionId) return NextResponse.json({ error: "Falta seccionId" }, { status: 400 });
-
-  const created = await prisma.contratacion.create({
-    data: {
-      estado,
-      nivel,
+    const data: any = {
       seccionId,
       subSeccionId: subSeccionId ?? null,
-      leadId: leadId ?? null,
-      clienteId: clienteId ?? null,
-      agenteId,
-      lugarId,
-      baseImponible,
-      totalFactura,
-      notas,
-      adminId: t.tenantAdminId ?? null,
-    },
-  });
 
-  return NextResponse.json({ ok: true, item: created }, { status: 201 });
-}
+      estado: isEstado(body?.estado) ? body.estado : EstadoContratacion.BORRADOR,
+      nivel: isNivel(body?.nivel) ? body.nivel : NivelComision.C1,
 
-/**
- * ✅ PATCH en /api/crm/contrataciones
- * Body: { id, estado?, nivel?, notas?, baseImponible?, totalFactura?, seccionId?, subSeccionId? }
- */
-export async function PATCH(req: NextRequest) {
-  const t = await getTenantContext(req);
-  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+      leadId: toId(body?.leadId),
+      clienteId: toId(body?.clienteId),
 
-  if (!allowRole(t.role, ["SUPERADMIN", "ADMIN"])) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      // Si crea un AGENTE, forzamos agenteId al suyo.
+      agenteId: isAgente ? (agenteId ?? null) : toId(body?.agenteId),
+      lugarId: toId(body?.lugarId),
+
+      baseImponible: body?.baseImponible !== undefined ? toDec(body.baseImponible) : null,
+      totalFactura: body?.totalFactura !== undefined ? toDec(body.totalFactura) : null,
+
+      notas: typeof body?.notas === "string" ? body.notas : null,
+    };
+
+    const item = await prisma.contratacion.create({
+      data,
+      include: {
+        lead: { select: { id: true, nombre: true, email: true, telefono: true, adminId: true } },
+        cliente: true,
+        agente: { select: { id: true, nombre: true } },
+        lugar: { select: { id: true, nombre: true } },
+        seccion: true,
+        subSeccion: true,
+        documentos: true,
+      },
+    });
+
+    return NextResponse.json({ ok: true, item });
+  } catch (e: any) {
+    console.error("POST /api/crm/contrataciones error:", e);
+    return NextResponse.json({ ok: false, error: "Error interno creando contratación" }, { status: 500 });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const id = toInt(body.id);
-  if (!id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
-
-  const nextEstado = parseEstado(body.estado);
-  const nextNivel = parseNivel(body.nivel);
-
-  const data: any = {};
-
-  // ✅ aquí está la corrección del error: NO strings, solo enums válidos
-  if (nextEstado) data.estado = nextEstado;
-  if (nextNivel) data.nivel = nextNivel;
-
-  if (body.notas !== undefined) data.notas = toStr(body.notas) || null;
-  if (body.baseImponible !== undefined) data.baseImponible = toDec(body.baseImponible);
-  if (body.totalFactura !== undefined) data.totalFactura = toDec(body.totalFactura);
-
-  const seccionId = toInt(body.seccionId);
-  const subSeccionId = toInt(body.subSeccionId);
-  if (body.seccionId !== undefined) data.seccionId = seccionId;
-  if (body.subSeccionId !== undefined) data.subSeccionId = subSeccionId ?? null;
-
-  // ✅ multi-tenant: evitamos tocar registros fuera del tenant
-  const where: any = { id };
-  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
-
-  const updated = await prisma.contratacion.update({
-    where,
-    data,
-  });
-
-  return NextResponse.json({ ok: true, item: updated });
 }
