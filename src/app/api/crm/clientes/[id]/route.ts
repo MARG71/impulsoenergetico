@@ -1,59 +1,53 @@
 // src/app/api/crm/clientes/[id]/route.ts
+// src/app/api/crm/clientes/[id]/route.ts
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-function toId(v: any) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+function toId(id: any) {
+  const n = Number(id);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export async function GET(req: NextRequest, ctx: any) {
+// ✅ Next 15: evita tipar el segundo arg fuerte para que no casque el build
+export async function GET(req: Request, context: any) {
   try {
-    const id = toId(ctx?.params?.id);
-    if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+    const ctx = await getTenantContext(req as any);
+    if (!ctx.ok) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
 
-    const t = await getTenantContext(req);
-    if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+    const id = toId(context?.params?.id);
+    if (!id) return NextResponse.json({ ok: false, error: "ID inválido" }, { status: 400 });
 
-    const { isSuperadmin, tenantAdminId, isAdmin, isAgente, isLugar, agenteId, lugarId } = t;
-
-    // ✅ Seguridad: filtramos por tenant y por rol
     const where: any = { id };
+    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
 
-    if (!isSuperadmin) {
-      where.adminId = tenantAdminId ?? undefined;
-    } else {
-      if (tenantAdminId) where.adminId = tenantAdminId;
+    // ✅ seguridad por rol (misma lógica)
+    if (ctx.isAgente && ctx.agenteId) {
+      where.contrataciones = { some: { agenteId: ctx.agenteId } };
+    }
+    if (ctx.isLugar && ctx.lugarId) {
+      where.contrataciones = { some: { lugarId: ctx.lugarId } };
     }
 
-    // ✅ Si es AGENTE/LUGAR, obligamos a que el cliente esté “relacionado” con su scope
-    if (isAgente) {
-      where.OR = [
-        { comparativas: { some: { agenteId: agenteId ?? -1 } } },
-        { contratos: { some: { agenteId: agenteId ?? -1 } } },
-      ];
-    }
-
-    if (isLugar) {
-      where.comparativas = { some: { lugarId: lugarId ?? -1 } };
-    }
-
-    const item = await prisma.cliente.findFirst({
+    const item = await (prisma as any).cliente.findFirst({
       where,
       include: {
-        contratos: { orderBy: { fechaAlta: "desc" } },
-        comparativas: { orderBy: { fecha: "desc" } },
+        contrataciones: {
+          orderBy: { id: "desc" },
+          include: { seccion: true, subSeccion: true, lead: true },
+        },
       },
     });
 
-    if (!item) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-
+    if (!item) return NextResponse.json({ ok: false, error: "No encontrado" }, { status: 404 });
     return NextResponse.json({ ok: true, item });
   } catch (e: any) {
-    console.error("GET /api/crm/clientes/[id] error:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    console.error("CLIENTE_ID_GET_ERROR:", e);
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "Error interno cliente" },
+      { status: 500 }
+    );
   }
 }

@@ -1,39 +1,42 @@
 // src/app/api/crm/clientes/route.ts
+// src/app/api/crm/clientes/route.ts
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-function qLike(q: string) {
-  return q.trim();
+function asInt(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
-    const ctx = await getTenantContext(req);
-    if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
-
-    const { role, tenantAdminId, agenteId, lugarId, isSuperadmin, isAdmin, isAgente, isLugar } = ctx;
+    // ✅ auth/tenant
+    const ctx = await getTenantContext(req as any);
+    if (!ctx.ok) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
 
     const url = new URL(req.url);
-    const q = qLike(url.searchParams.get("q") ?? "");
-    const take = Math.min(Number(url.searchParams.get("take") ?? 200) || 200, 500);
+    const q = (url.searchParams.get("q") ?? "").trim();
+    const take = asInt(url.searchParams.get("take")) ?? 200;
 
-    // ✅ Base where tenant
+    // ✅ where base (tenant)
     const where: any = {};
+    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
 
-    // SUPERADMIN:
-    // - si está en modo tenant (?adminId=) => filtra por ese adminId
-    // - si NO => ve todo (global)
-    if (!isSuperadmin) {
-      // ADMIN/AGENTE/LUGAR: siempre a su tenant
-      where.adminId = tenantAdminId ?? undefined;
-    } else {
-      if (tenantAdminId) where.adminId = tenantAdminId;
+    // ✅ filtro por rol (opcional pero recomendable)
+    // - ADMIN/SUPERADMIN: ve todo de su tenant
+    // - AGENTE: solo clientes con contrataciones del agente
+    // - LUGAR: solo clientes con contrataciones del lugar
+    if (ctx.isAgente && ctx.agenteId) {
+      where.contrataciones = { some: { agenteId: ctx.agenteId } };
+    }
+    if (ctx.isLugar && ctx.lugarId) {
+      where.contrataciones = { some: { lugarId: ctx.lugarId } };
     }
 
-    // ✅ Búsqueda simple por nombre/email/teléfono
+    // ✅ búsqueda simple (nombre/email/teléfono)
     if (q) {
       where.OR = [
         { nombre: { contains: q, mode: "insensitive" } },
@@ -42,49 +45,30 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    // ✅ Restricción por rol (AGENTE/LUGAR)
-    // Cliente no tiene agenteId/lugarId directo, así que filtramos por relaciones existentes:
-    // - comparativas (tienen agenteId/lugarId)
-    // - contratos (tienen agenteId)
-    if (isAgente) {
-      where.AND = [
-        ...(where.AND ?? []),
-        {
-          OR: [
-            { comparativas: { some: { agenteId: agenteId ?? -1 } } },
-            { contratos: { some: { agenteId: agenteId ?? -1 } } },
-          ],
-        },
-      ];
-    }
-
-    if (isLugar) {
-      where.AND = [
-        ...(where.AND ?? []),
-        { comparativas: { some: { lugarId: lugarId ?? -1 } } },
-      ];
-    }
-
-    // ✅ Admin: ve todo su tenant
-    // ✅ Superadmin: ve global o tenant
-    // (no hacemos nada extra)
-
-    const items = await prisma.cliente.findMany({
+    // ✅ IMPORTANTE:
+    // No uses creadoEn si tu modelo no lo tiene. Orden seguro: id desc.
+    const items = await (prisma as any).cliente.findMany({
       where,
       orderBy: { id: "desc" },
       take,
       include: {
-        // ⚠️ si en tu schema Cliente tiene estas relaciones (como en el que pegaste), esto es correcto:
-        contratos: { orderBy: { fechaAlta: "desc" }, take: 20 },
-        comparativas: { orderBy: { fecha: "desc" }, take: 20 },
+        // si existe en tu modelo nuevo
+        contrataciones: {
+          orderBy: { id: "desc" },
+          take: 10,
+          include: {
+            seccion: true,
+            subSeccion: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json({ ok: true, items });
+    return NextResponse.json({ ok: true, items: items ?? [] });
   } catch (e: any) {
-    console.error("GET /api/crm/clientes error:", e);
+    console.error("CLIENTES_GET_ERROR:", e);
     return NextResponse.json(
-      { ok: false, error: "Error interno cargando clientes" },
+      { ok: false, error: e?.message ?? "Error interno en clientes" },
       { status: 500 }
     );
   }
