@@ -1,100 +1,96 @@
+// src/app/api/crm/clientes/[id]/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
-function parseId(id: string) {
-  const n = Number(id);
-  return Number.isFinite(n) && n > 0 ? n : null;
+function toInt(v: unknown) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
-// ✅ GET /api/crm/clientes/:id
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const ctx = await getTenantContext(req);
-  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+// 👇 Next.js 15: params ES PROMISE
+type Ctx = { params: Promise<{ id: string }> };
 
-  const id = parseId(params.id);
-  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+export async function GET(req: NextRequest, ctx: Ctx) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
 
-  // ✅ Si quieres restringir por tenant adminId, aquí lo hacemos:
-  // - SUPERADMIN: puede ver cualquiera (o filtrar por ctx.tenantAdminId si estás en tenant mode)
-  // - ADMIN/AGENTE/LUGAR: solo su tenant
-  const tenantAdminId =
-    ctx.isSuperadmin ? ctx.tenantAdminId : ctx.tenantAdminId; // (para claridad)
+  // Permitimos ver cliente a: SUPERADMIN/ADMIN/AGENTE/LUGAR (tu menú ya lo muestra)
+  if (!["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"].includes(t.role)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
+  const { id } = await ctx.params;
+  const clienteId = toInt(id);
+  if (!clienteId) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+
+  // Multi-tenant:
+  // - SUPERADMIN puede ver global (tenantAdminId null) o tenant concreto (adminId)
+  // - ADMIN/AGENTE/LUGAR: siempre filtramos por tenantAdminId
+  const where: any = { id: clienteId };
+
+  if (t.tenantAdminId) {
+    where.adminId = t.tenantAdminId;
+  }
+
+  // Si el rol es LUGAR, opcionalmente podrías filtrar por su lugar (si quieres),
+  // pero de momento lo dejamos por tenant para no romper nada.
   const cliente = await prisma.cliente.findFirst({
-    where: {
-      id,
-      ...(tenantAdminId ? { adminId: tenantAdminId } : {}), // si tenantAdminId es null => global
-    },
+    where,
     include: {
-      comparativas: true,
-      contratos: true,
+      comparativas: {
+        orderBy: { fecha: "desc" },
+        take: 50,
+        include: { agente: true, lugar: true },
+      },
+      contratos: {
+        orderBy: { fechaAlta: "desc" },
+        take: 50,
+        include: { agente: true },
+      },
     },
   });
 
-  if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  if (!cliente) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   return NextResponse.json({ ok: true, cliente });
 }
 
-// ✅ PATCH /api/crm/clientes/:id
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const ctx = await getTenantContext(req);
-  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+// (Opcional) PATCH para editar campos básicos sin romper build
+export async function PATCH(req: NextRequest, ctx: Ctx) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
 
-  const id = parseId(params.id);
-  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-
-  const body = await req.json().catch(() => ({}));
-
-  const tenantAdminId = ctx.isSuperadmin ? ctx.tenantAdminId : ctx.tenantAdminId;
-
-  // ✅ Comprobamos que exista en el tenant antes de actualizar
-  const exists = await prisma.cliente.findFirst({
-    where: { id, ...(tenantAdminId ? { adminId: tenantAdminId } : {}) },
-    select: { id: true },
-  });
-  if (!exists) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
-
-  const data: any = {};
-  if (body.nombre !== undefined) data.nombre = String(body.nombre).trim();
-  if (body.email !== undefined) data.email = body.email ? String(body.email).trim() : null;
-  if (body.telefono !== undefined) data.telefono = body.telefono ? String(body.telefono).trim() : null;
-  if (body.direccion !== undefined) data.direccion = body.direccion ? String(body.direccion).trim() : "";
-  if (body.ocultoParaAdmin !== undefined) data.ocultoParaAdmin = Boolean(body.ocultoParaAdmin);
-
-  const updated = await prisma.cliente.update({
-    where: { id },
-    data,
-  });
-
-  return NextResponse.json({ ok: true, cliente: updated });
-}
-
-// ✅ DELETE /api/crm/clientes/:id
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const ctx = await getTenantContext(req);
-  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
-
-  // si quieres que solo SUPERADMIN/ADMIN borren, deja esto:
-  if (!(ctx.isSuperadmin || ctx.isAdmin)) {
+  if (!["SUPERADMIN", "ADMIN"].includes(t.role)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const id = parseId(params.id);
-  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  const { id } = await ctx.params;
+  const clienteId = toInt(id);
+  if (!clienteId) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
-  const tenantAdminId = ctx.isSuperadmin ? ctx.tenantAdminId : ctx.tenantAdminId;
+  const body = await req.json().catch(() => ({}));
+  const data: any = {};
 
-  const exists = await prisma.cliente.findFirst({
-    where: { id, ...(tenantAdminId ? { adminId: tenantAdminId } : {}) },
-    select: { id: true },
+  if (typeof body.nombre === "string") data.nombre = body.nombre.trim();
+  if (typeof body.direccion === "string") data.direccion = body.direccion.trim();
+  if (typeof body.email === "string") data.email = body.email.trim() || null;
+  if (typeof body.telefono === "string") data.telefono = body.telefono.trim() || null;
+
+  // ⚠️ ojo: en tu schema inicial Cliente.email es unique opcional, esto puede fallar si duplicas email
+  const where: any = { id: clienteId };
+  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
+
+  const updated = await prisma.cliente.updateMany({
+    where,
+    data,
   });
-  if (!exists) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
-  await prisma.cliente.delete({ where: { id } });
+  if (updated.count === 0) {
+    return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  }
 
   return NextResponse.json({ ok: true });
 }
