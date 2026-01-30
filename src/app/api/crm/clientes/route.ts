@@ -1,20 +1,29 @@
-import { NextResponse } from "next/server";
+// src/app/api/crm/clientes/route.ts
+export const runtime = "nodejs";
+
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/authz";
+import { getTenantContext } from "@/lib/tenant";
 
-export async function GET(req: Request) {
-  const auth = await requireRole(["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+function str(v: any) {
+  return typeof v === "string" ? v.trim() : "";
+}
 
-  const role = (auth.session?.user as any)?.role as string | undefined;
-  const agenteId = (auth.session?.user as any)?.agenteId as number | undefined;
-  const lugarId = (auth.session?.user as any)?.lugarId as number | undefined;
+export async function GET(req: NextRequest) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
 
-  const url = new URL(req.url);
-  const q = (url.searchParams.get("q") || "").trim();
+  if (!["SUPERADMIN", "ADMIN", "AGENTE", "LUGAR"].includes(t.role)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
-  // Filtrado por rol, seguro
+  const q = req.nextUrl.searchParams.get("q")?.trim() || "";
   const where: any = {};
+
+  // ✅ multi-tenant: si hay tenantAdminId filtramos
+  if (t.tenantAdminId) where.adminId = t.tenantAdminId;
+
+  // ✅ buscador (nombre/email/telefono)
   if (q) {
     where.OR = [
       { nombre: { contains: q, mode: "insensitive" } },
@@ -23,27 +32,48 @@ export async function GET(req: Request) {
     ];
   }
 
-  if (role === "AGENTE") {
-    if (!agenteId) return NextResponse.json([]);
-    where.contrataciones = { some: { agenteId } };
-  }
-  if (role === "LUGAR") {
-    if (!lugarId) return NextResponse.json([]);
-    where.contrataciones = { some: { lugarId } };
-  }
-
   const items = await prisma.cliente.findMany({
     where,
-    orderBy: { creadoEn: "desc" },
+    // ✅ tu schema NO tiene creadoEn -> ordenamos por id
+    orderBy: { id: "desc" },
     take: 200,
     include: {
-      contrataciones: {
-        orderBy: { creadaEn: "desc" },
-        take: 10,
-        include: { seccion: true, subSeccion: true },
-      },
+      contratos: { take: 20, orderBy: { fechaAlta: "desc" } },
+      comparativas: { take: 20, orderBy: { fecha: "desc" } },
     },
   });
 
-  return NextResponse.json(items);
+  return NextResponse.json({ ok: true, items });
+}
+
+export async function POST(req: NextRequest) {
+  const t = await getTenantContext(req);
+  if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+
+  // ✅ crear clientes solo SUPERADMIN/ADMIN por ahora
+  if (!["SUPERADMIN", "ADMIN"].includes(t.role)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+
+  const nombre = str(body.nombre);
+  const direccion = str(body.direccion);
+  const email = str(body.email) || null;
+  const telefono = str(body.telefono) || null;
+
+  if (!nombre) return NextResponse.json({ error: "Falta nombre" }, { status: 400 });
+
+  const created = await prisma.cliente.create({
+    data: {
+      nombre,
+      direccion: direccion || "", // tu schema lo requiere
+      email,
+      telefono,
+      // ✅ multi-tenant: asignamos adminId si estamos en tenant (admin o superadmin con adminId)
+      adminId: t.tenantAdminId ?? null,
+    },
+  });
+
+  return NextResponse.json({ ok: true, cliente: created }, { status: 201 });
 }
