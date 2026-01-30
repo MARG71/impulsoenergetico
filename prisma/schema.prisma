@@ -15,6 +15,10 @@ enum Rol {
   CLIENTE
 }
 
+// =========================
+// MODELOS EXISTENTES (tuyos)
+// =========================
+
 model Cliente {
   id              Int           @id @default(autoincrement())
   nombre          String
@@ -24,6 +28,9 @@ model Cliente {
   comparativas    Comparativa[]
   contratos       Contrato[]
   ocultoParaAdmin Boolean       @default(false)
+
+  // ✅ NUEVO: contrataciones (fase 2/3)
+  contrataciones Contratacion[]
 
   // ✅ MULTI-ADMIN (TENANT)
   adminId Int?
@@ -118,6 +125,9 @@ model Agente {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
+  // ✅ NUEVO: contrataciones
+  contrataciones Contratacion[]
+
   creadoEn        DateTime @default(now())
   ocultoParaAdmin Boolean  @default(false)
 
@@ -145,8 +155,11 @@ model Lugar {
   usuarios     Usuario[]
   overrides    ComisionOverride[]
 
-  // ✅ AÑADIDO: relación inversa para MarketingAsset (ARREGLA P1012)
+  // ✅ AÑADIDO: relación inversa para MarketingAsset
   marketingAssets MarketingAsset[]
+
+  // ✅ NUEVO: contrataciones
+  contrataciones Contratacion[]
 
   creadoEn DateTime @default(now())
 
@@ -218,6 +231,9 @@ model Usuario {
   productosGestionados    ProductoGanadero[]  @relation("AdminProductos")
   solicitudesGestionadas  SolicitudContrato[] @relation("AdminSolicitudes")
 
+  // ✅ NUEVO: contrataciones (fase 2/3)
+  contratacionesGestionadas Contratacion[] @relation("AdminContrataciones")
+
   leadActividadesCreadas     LeadActividad[] @relation("UsuarioLeadActividades")
   leadActividadesGestionadas LeadActividad[] @relation("AdminLeadActividades")
 
@@ -228,11 +244,9 @@ model Usuario {
   plantillaMensajes PlantillaMensaje[] @relation("PlantillaMensajeAdmin")
   plantillaEnvio    PlantillaEnvio[]   @relation("PlantillaEnvioUsuario")
   plantillaEnvios   PlantillaEnvio[]
-  
-  leadDocumentosCreados LeadDocumento[] @relation("LeadDocumentoCreadoPor")
+
+  leadDocumentosCreados     LeadDocumento[] @relation("LeadDocumentoCreadoPor")
   leadDocumentosGestionados LeadDocumento[] @relation("LeadDocumentoAdmin")
-
-
 
   @@index([adminId])
 }
@@ -255,20 +269,21 @@ model Lead {
   adminId Int?
   admin   Usuario? @relation("AdminLeads", fields: [adminId], references: [id])
 
-  // ✅ GESTIÓN COMERCIAL (AÑADIR)
+  // ✅ GESTIÓN COMERCIAL
   notas           String?
   proximaAccion   String?
   proximaAccionEn DateTime?
 
-  // ✅ CONVERSIÓN (para fase 2, pero lo dejamos ya preparado)
+  // ✅ CONVERSIÓN (preparado)
   comparativaId Int?
   contratoId    Int?
 
   actividades     LeadActividad[]
   plantillaEnvios PlantillaEnvio[]
+  documentos      LeadDocumento[]
 
-  documentos LeadDocumento[]
-
+  // ✅ NUEVO: contrataciones
+  contrataciones Contratacion[]
 
   @@index([adminId])
   @@index([estado, creadoEn])
@@ -319,15 +334,13 @@ model Fondo {
   creadoEn DateTime @default(now())
   activo   Boolean  @default(false)
 
-  // ✅ Cloudinary metadata (para borrar de Cloudinary y depurar)
-  publicId     String? // ej: impulso/fondos/historico/xxxx
-  resourceType String? // image | video | raw
+  publicId     String?
+  resourceType String?
   bytes        Int?
   width        Int?
   height       Int?
   format       String?
 
-  // opcional (si quieres conservarlo)
   mime              String?
   cartelesGenerados CartelGenerado[] @relation("FondoCartelesGenerados")
 }
@@ -619,8 +632,8 @@ model MarketingAsset {
   tipo         MarketingTipo
   url          String
   nombre       String?
-  publicId     String? // Cloudinary public_id
-  resourceType String? // image | video | raw
+  publicId     String?
+  resourceType String?
   mime         String?
   size         Int?
 
@@ -629,7 +642,6 @@ model MarketingAsset {
   lugarId Int
   lugar   Lugar @relation(fields: [lugarId], references: [id], onDelete: Cascade)
 
-  // Para trazabilidad multi-tenant:
   adminId  Int?
   agenteId Int?
 
@@ -672,10 +684,9 @@ model CartelGenerado {
   adminId Int?
   admin   Usuario? @relation("AdminCartelesGenerados", fields: [adminId], references: [id])
 
-  // ✅ Archivo generado (PDF / PNG)
   archivoUrl          String?
   archivoPublicId     String?
-  archivoResourceType String? // raw | image
+  archivoResourceType String?
   archivoMime         String?
   archivoBytes        Int?
   archivoFormat       String?
@@ -697,11 +708,9 @@ model LeadActividad {
   leadId Int
   lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  // quién creó la actividad (usuario logueado)
   usuarioId Int?
   usuario   Usuario? @relation("UsuarioLeadActividades", fields: [usuarioId], references: [id])
 
-  // tenant / admin propietario
   adminId Int?
   admin   Usuario? @relation("AdminLeadActividades", fields: [adminId], references: [id])
 
@@ -735,7 +744,7 @@ model PlantillaEnvio {
 
   canal    String
   etapa    String
-  variante String // "A" | "B"
+  variante String
 
   leadId Int
   lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -754,12 +763,6 @@ model PlantillaEnvio {
   @@index([etapa, variante, creadoEn])
 }
 
-enum CanalEnvioDocumento {
-  WHATSAPP
-  EMAIL
-  OTRO
-}
-
 model LeadDocumento {
   id       Int      @id @default(autoincrement())
   creadoEn DateTime @default(now())
@@ -767,22 +770,19 @@ model LeadDocumento {
   leadId Int
   lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  // archivo
   nombre       String
-  url          String?   // ✅ ahora opcional (no lo uses para compartir)
-  publicId     String    // ✅ obligatorio (vamos a firmar SIEMPRE con esto)
-  resourceType String?   // raw | image | video
-  deliveryType String?   // upload | authenticated | private
+  url          String?
+  publicId     String
+  resourceType String?
+  deliveryType String?
   mime         String?
   size         Int?
 
-  // ✅ compartir por WhatsApp sin login
-  shareToken    String?  @unique
+  shareToken    String?   @unique
   shareExpiraEn DateTime?
-  accesos       Int      @default(0)
+  accesos       Int       @default(0)
   ultimoAcceso  DateTime?
 
-  // trazabilidad
   creadoPorId Int?
   creadoPor   Usuario? @relation("LeadDocumentoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
 
@@ -793,7 +793,10 @@ model LeadDocumento {
   @@index([adminId, creadoEn])
 }
 
-// ---------- ENUMS ----------
+// =============================
+// ✅ FASE 2/3: COMISIONES + CRM
+// =============================
+
 enum NivelComision {
   C1
   C2
@@ -803,71 +806,142 @@ enum NivelComision {
 
 enum TipoCalculoComision {
   FIJA
-  PORC_BASE        // % sobre base imponible
-  PORC_MARGEN      // % sobre margen (si existe)
-  MIXTA            // fija + %
+  PORC_BASE
+  PORC_MARGEN
+  MIXTA
 }
 
-// ---------- MODELOS ----------
 model Seccion {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  slug      String   @unique
-  activa    Boolean  @default(true)
-  creadaEn  DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  nombre        String
+  slug          String   @unique
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  subSecciones SubSeccion[]
-  reglas      ReglaComisionGlobal[]
+  subSecciones  SubSeccion[]
+  reglas        ReglaComisionGlobal[]
+  contratacions Contratacion[]
 
   @@index([activa])
 }
 
 model SubSeccion {
-  id        Int      @id @default(autoincrement())
-  seccionId Int
-  nombre    String
-  slug      String
-  activa    Boolean  @default(true)
-  creadaEn  DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  seccionId     Int
+  nombre        String
+  slug          String
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  seccion   Seccion  @relation(fields: [seccionId], references: [id], onDelete: Cascade)
-  reglas    ReglaComisionGlobal[]
+  seccion       Seccion               @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  reglas        ReglaComisionGlobal[]
+  contratacions Contratacion[]
 
   @@unique([seccionId, slug])
   @@index([seccionId, activa])
 }
 
 model ReglaComisionGlobal {
-  id           Int      @id @default(autoincrement())
+  id           Int                 @id @default(autoincrement())
   seccionId    Int
   subSeccionId Int?
   nivel        NivelComision
-
   tipo         TipoCalculoComision
 
-  // Valores base (según tipo)
-  fijoEUR      Decimal? @db.Decimal(12,2)
-  porcentaje   Decimal? @db.Decimal(6,3) // ej: 4.500 (%)
+  fijoEUR    Decimal? @db.Decimal(12, 2)
+  porcentaje Decimal? @db.Decimal(6, 3)
 
-  // Acotado del pool resultante
-  minEUR       Decimal? @db.Decimal(12,2)
-  maxEUR       Decimal? @db.Decimal(12,2)
+  minEUR Decimal? @db.Decimal(12, 2)
+  maxEUR Decimal? @db.Decimal(12, 2)
 
-  // Límites para lo que admin podrá pagar a su red (fase 1 solo guardamos)
-  minAgenteEUR        Decimal? @db.Decimal(12,2)
-  maxAgenteEUR        Decimal? @db.Decimal(12,2)
-  minLugarEspecialEUR Decimal? @db.Decimal(12,2)
-  maxLugarEspecialEUR Decimal? @db.Decimal(12,2)
+  // límites opcionales para pagar a red
+  minAgenteEUR        Decimal? @db.Decimal(12, 2)
+  maxAgenteEUR        Decimal? @db.Decimal(12, 2)
+  minLugarEspecialEUR Decimal? @db.Decimal(12, 2)
+  maxLugarEspecialEUR Decimal? @db.Decimal(12, 2)
 
-  activa       Boolean  @default(true)
-  creadaEn     DateTime @default(now())
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  seccion      Seccion @relation(fields: [seccionId], references: [id])
-  subSeccion   SubSeccion? @relation(fields: [subSeccionId], references: [id])
+  seccion    Seccion     @relation(fields: [seccionId], references: [id])
+  subSeccion SubSeccion? @relation(fields: [subSeccionId], references: [id])
 
   @@unique([seccionId, subSeccionId, nivel])
   @@index([seccionId, subSeccionId, activa])
+}
+
+enum EstadoContratacion {
+  BORRADOR
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+}
+
+enum TipoDocumentoContratacion {
+  DNI
+  FACTURA
+  CONTRATO
+  OTRO
+}
+
+model Contratacion {
+  id     Int                @id @default(autoincrement())
+  estado EstadoContratacion @default(BORRADOR)
+  nivel  NivelComision      @default(C1)
+
+  seccionId    Int
+  subSeccionId Int?
+
+  leadId    Int?
+  clienteId Int?
+
+  agenteId Int?
+  lugarId  Int?
+
+  baseImponible Decimal? @db.Decimal(12, 2)
+  totalFactura  Decimal? @db.Decimal(12, 2)
+
+  notas         String?
+  creadaEn      DateTime  @default(now())
+  actualizadaEn DateTime  @updatedAt
+  confirmadaEn  DateTime?
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminContrataciones", fields: [adminId], references: [id])
+
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  agente  Agente?  @relation(fields: [agenteId], references: [id], onDelete: SetNull)
+  lugar   Lugar?   @relation(fields: [lugarId], references: [id], onDelete: SetNull)
+
+  seccion    Seccion     @relation(fields: [seccionId], references: [id])
+  subSeccion SubSeccion? @relation(fields: [subSeccionId], references: [id])
+
+  documentos ContratacionDocumento[]
+
+  @@index([adminId])
+  @@index([estado])
+  @@index([seccionId])
+  @@index([subSeccionId])
+  @@index([leadId])
+  @@index([clienteId])
+  @@index([agenteId])
+  @@index([lugarId])
+}
+
+model ContratacionDocumento {
+  id             Int                       @id @default(autoincrement())
+  contratacionId Int
+  tipo           TipoDocumentoContratacion @default(OTRO)
+  nombre         String?
+  url            String
+  creadoEn       DateTime                  @default(now())
+
+  contratacion Contratacion @relation(fields: [contratacionId], references: [id], onDelete: Cascade)
+
+  @@index([contratacionId])
 }

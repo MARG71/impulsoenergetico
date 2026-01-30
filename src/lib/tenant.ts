@@ -1,5 +1,4 @@
 // src/lib/tenant.ts
-// src/lib/tenant.ts
 import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
@@ -19,7 +18,6 @@ export type TenantOk = {
   lugarId: number | null;
   tokenAdminId: number | null;
 
-  // flags de conveniencia
   isSuperadmin: boolean;
   isAdmin: boolean;
   isAgente: boolean;
@@ -53,7 +51,9 @@ export async function getTenantContext(req: NextRequest): Promise<TenantContext>
     return { ok: false, status: 403, error: "Token sin role" };
   }
 
-  const userId = toInt((token as any).id);
+  // ✅ id puede venir como token.id o token.sub (según configuración)
+  const userId = toInt((token as any).id ?? (token as any).sub);
+
   const agenteId = toInt((token as any).agenteId);
   const lugarId = toInt((token as any).lugarId);
   const tokenAdminId = toInt((token as any).adminId);
@@ -77,7 +77,7 @@ export async function getTenantContext(req: NextRequest): Promise<TenantContext>
   return {
     ok: true,
     role,
-    userId: userId ?? -1, // mejor que 0 (0 a veces confunde en lógica)
+    userId: userId ?? -1,
     tenantAdminId,
     agenteId,
     lugarId,
