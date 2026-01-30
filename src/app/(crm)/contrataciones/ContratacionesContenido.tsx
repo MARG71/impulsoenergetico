@@ -58,22 +58,45 @@ export default function ContratacionesContenido() {
     return (sec?.subSecciones ?? []).filter((x) => x.activa);
   }, [secciones, seccionId]);
 
-  async function loadSecciones() {
-    const res = await fetch("/api/crm/secciones");
-    const json = await res.json();
-    if (!Array.isArray(json)) throw new Error(json?.error || "Error secciones");
-    setSecciones(json);
-    if (!seccionId && json.length) setSeccionId(json[0].id);
+  function normalizeItems<T>(json: any): T[] {
+    if (Array.isArray(json)) return json as T[];
+    if (json && Array.isArray(json.items)) return json.items as T[];
+    return [];
+    }
+
+    async function loadSecciones() {
+    try {
+        const res = await fetch("/api/crm/secciones", { cache: "no-store" });
+        const json = await res.json();
+
+        if (!res.ok) throw new Error(json?.error || "Error secciones");
+
+        const arr = normalizeItems<Sec>(json);
+        setSecciones(arr);
+        if (!seccionId && arr.length) setSeccionId(arr[0].id);
+    } catch (e: any) {
+        toast.error(String(e?.message || e));
+    }
   }
 
   async function loadContrataciones() {
     setLoading(true);
-    const res = await fetch("/api/crm/contrataciones");
-    const json = await res.json();
-    if (!Array.isArray(json)) throw new Error(json?.error || "Error contrataciones");
-    setItems(json);
-    setLoading(false);
+    try {
+        const res = await fetch("/api/crm/contrataciones", { cache: "no-store" });
+        const json = await res.json();
+
+        if (!res.ok) throw new Error(json?.error || "Error contrataciones");
+
+        const arr = normalizeItems<Contratacion>(json);
+        setItems(arr);
+    } catch (e: any) {
+        setItems([]);
+        toast.error(String(e?.message || e));
+    } finally {
+        setLoading(false);
+    }
   }
+
 
   useEffect(() => {
     if (status !== "loading" && session) {

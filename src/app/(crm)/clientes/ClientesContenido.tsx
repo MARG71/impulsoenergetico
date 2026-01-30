@@ -20,6 +20,13 @@ type Cliente = {
   }>;
 };
 
+function normalizeItems<T>(json: any): T[] {
+  // Soporta: { ok:true, items:[...] }  o  [...]
+  if (Array.isArray(json)) return json as T[];
+  if (json && Array.isArray(json.items)) return json.items as T[];
+  return [];
+}
+
 export default function ClientesContenido() {
   const { data: session, status } = useSession();
 
@@ -29,16 +36,30 @@ export default function ClientesContenido() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch(`/api/crm/clientes?q=${encodeURIComponent(q)}`);
-    const json = await res.json();
-    if (!Array.isArray(json)) throw new Error(json?.error || "Error clientes");
-    setItems(json);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/crm/clientes?q=${encodeURIComponent(q)}`, {
+        cache: "no-store",
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Error clientes");
+      }
+
+      const arr = normalizeItems<Cliente>(json);
+      setItems(arr);
+    } catch (e: any) {
+      setItems([]);
+      toast.error(String(e?.message || e || "Error clientes"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     if (status !== "loading" && session) {
-      load().catch((e) => toast.error(String(e?.message || e)));
+      load();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
@@ -62,7 +83,7 @@ export default function ClientesContenido() {
             onChange={(e) => setQ(e.target.value)}
           />
           <button
-            onClick={() => load().catch((e) => toast.error(String(e?.message || e)))}
+            onClick={load}
             className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
           >
             Buscar
@@ -71,14 +92,14 @@ export default function ClientesContenido() {
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/10 text-white font-extrabold">
-          Listado
-        </div>
+        <div className="px-5 py-4 border-b border-white/10 text-white font-extrabold">Listado</div>
 
         {loading ? (
           <div className="p-5 text-white/70">Cargando…</div>
         ) : items.length === 0 ? (
-          <div className="p-5 text-white/70">No hay clientes aún.</div>
+          <div className="p-5 text-white/70">
+            No hay clientes aún. <span className="text-white/50">Se crearán al confirmar contrataciones.</span>
+          </div>
         ) : (
           <div className="divide-y divide-white/10">
             {items.map((c) => (
