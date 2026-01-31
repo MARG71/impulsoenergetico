@@ -49,12 +49,13 @@ export async function GET(req: Request) {
 
       // 2) regla global activa (ajusta a tu modelo real)
       const regla = await tx.reglaComisionGlobal.findFirst({
-        where: { adminId, activa: true },
+        where: { activa: true },
         select: {
           id: true,
-          poolSobre: true,           // "BASE" | "TOTAL"
-          poolPorcentaje: true,      // p.ej 10 => 10%
-          pctAdmin: true,
+          poolSobre: true,
+          poolPorcentaje: true,
+          pctCliente: true,
+          pctLugar: true,
           pctAgente: true,
           pctLugar: true,
         },
