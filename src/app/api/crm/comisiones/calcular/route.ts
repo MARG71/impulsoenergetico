@@ -1,13 +1,8 @@
-// src/app/api/crm/comisiones/calcular/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  getSessionOrThrow,
-  sessionRole,
-  sessionAdminId,
-} from "@/lib/auth-server";
+import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
 
 function jsonError(message: string, status = 400, extra?: any) {
   return NextResponse.json(
@@ -21,29 +16,33 @@ function parseId(v: unknown) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Util: número seguro
 function toNumber(v: any, def = 0) {
+  if (v === null || v === undefined) return def;
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
 }
 
-/**
- * Calcula comisiones SIN usar adminId/pool* en ReglaComisionGlobal.
- * Se apoya en campos típicos que puedas tener en esa tabla:
- * - porcentaje (global)
- * - porcentajeAgente / agentePorcentaje
- * - porcentajeLugar / lugarPorcentaje
- * - fijoAgente / fijoLugar
- *
- * Como no tengo tu schema aquí, leo con "any" para no romper.
- */
+function toMoneyBase(contratacion: any) {
+  // Preferimos baseImponible, si no totalFactura, si no 0
+  const baseImponible = toNumber(contratacion?.baseImponible, 0);
+  if (baseImponible > 0) return baseImponible;
+
+  const totalFactura = toNumber(contratacion?.totalFactura, 0);
+  if (totalFactura > 0) return totalFactura;
+
+  // Si tu modelo tiene otros campos, puedes ampliar aquí:
+  const importeComisionable = toNumber(contratacion?.importeComisionable, 0);
+  if (importeComisionable > 0) return importeComisionable;
+
+  return 0;
+}
+
 export async function GET(req: Request) {
   try {
     const session = await getSessionOrThrow();
     const role = sessionRole(session);
     const adminId = sessionAdminId(session);
 
-    // Esto lo puede ver ADMIN/SUPERADMIN (ajústalo si quieres)
     if (!["ADMIN", "SUPERADMIN"].includes(String(role))) {
       return jsonError("No autorizado", 403);
     }
@@ -56,38 +55,28 @@ export async function GET(req: Request) {
       where: { id: contratacionId },
       include: {
         seccion: true as any,
+        agente: true as any,
+        lugar: true as any,
       } as any,
     });
 
     if (!contratacion) return jsonError("Contratación no encontrada", 404);
 
-    if ((contratacion as any).adminId && (contratacion as any).adminId !== adminId) {
-      return jsonError("No autorizado para esta contratación", 403);
+    // Scope: si contratacion tiene adminId, validar para ADMIN (SUPERADMIN ve todo)
+    if (String(role) !== "SUPERADMIN") {
+      if ((contratacion as any).adminId && (contratacion as any).adminId !== adminId) {
+        return jsonError("No autorizado para esta contratación", 403);
+      }
     }
 
-    // Base económica sobre la que calculas (ajústalo):
-    // - si tienes "importeMensual", "importeAnual", "margen", etc.
-    // Aquí intento detectar algo razonable:
-    const base =
-      toNumber((contratacion as any).importeComisionable, NaN) ||
-      toNumber((contratacion as any).importe, NaN) ||
-      toNumber((contratacion as any).ahorroEstimado, NaN) ||
-      0;
+    const base = toMoneyBase(contratacion);
 
-    // Cargar reglas globales (sin select para no depender de campos)
+    // ✅ Reglas globales SIN filtrar por adminId (porque tu schema NO lo tiene)
     const reglas = await prisma.reglaComisionGlobal.findMany({
-      where: {
-        ...(adminId ? ({ adminId } as any) : {}), // si NO existe en tu schema, Prisma lo ignorará? (ojo)
-      } as any,
       orderBy: { id: "asc" },
     });
 
-    // Si en tu schema NO existe adminId en regla, lo anterior podría fallar.
-    // Alternativa segura: volver a pedir sin where si hay error.
-    // (No puedo hacer try/catch parcial aquí sin duplicar, así que lo dejo simple.)
-    // Si te falla en runtime: dímelo y lo dejo 100% compatible con tu schema real.
-
-    // Elegir regla activa que encaje por seccion (si tienes seccionId en regla)
+    // Elegir regla por seccionId si existe
     const seccionId = toNumber((contratacion as any).seccionId, 0);
 
     let regla: any =
@@ -102,43 +91,22 @@ export async function GET(req: Request) {
         contratacionId,
         base,
         regla: null,
-        comisiones: {
-          total: 0,
-          agente: 0,
-          lugar: 0,
-          admin: 0,
-        },
+        comisiones: { total: 0, agente: 0, lugar: 0, admin: 0 },
         warning: "No hay reglas globales. Crea al menos 1 regla.",
       });
     }
 
-    // Detectar porcentajes/fijos con nombres flexibles
-    const pctGlobal =
-      toNumber(regla.porcentaje, NaN) ||
-      toNumber(regla.porcentajeGlobal, NaN) ||
-      0;
-
-    const pctAgente =
-      toNumber(regla.porcentajeAgente, NaN) ||
-      toNumber(regla.agentePorcentaje, NaN) ||
-      0;
-
-    const pctLugar =
-      toNumber(regla.porcentajeLugar, NaN) ||
-      toNumber(regla.lugarPorcentaje, NaN) ||
-      0;
+    // Campos flexibles
+    const pctGlobal = toNumber(regla.porcentaje ?? regla.porcentajeGlobal, 0);
+    const pctAgente = toNumber(regla.porcentajeAgente ?? regla.agentePorcentaje, 0);
+    const pctLugar = toNumber(regla.porcentajeLugar ?? regla.lugarPorcentaje, 0);
 
     const fijoAgente = toNumber(regla.fijoAgente, 0);
     const fijoLugar = toNumber(regla.fijoLugar, 0);
 
-    // Total global (si existe) + reparto
     const total = base * (pctGlobal / 100);
-
-    // Si no hay pctAgente/pctLugar, asigno 0 y dejo todo en admin
     const agente = base * (pctAgente / 100) + fijoAgente;
     const lugar = base * (pctLugar / 100) + fijoLugar;
-
-    // Admin = total - agente - lugar (nunca negativo)
     const admin = Math.max(0, total - agente - lugar);
 
     return NextResponse.json({
@@ -146,12 +114,8 @@ export async function GET(req: Request) {
       contratacionId,
       base,
       reglaId: regla.id ?? null,
-      comisiones: {
-        total,
-        agente,
-        lugar,
-        admin,
-      },
+      comisiones: { total, agente, lugar, admin },
+      ...(base <= 0 ? { warning: "Base = 0. Rellena baseImponible o totalFactura para calcular bien." } : {}),
     });
   } catch (e: any) {
     return jsonError("Error interno calculando comisiones", 500, {

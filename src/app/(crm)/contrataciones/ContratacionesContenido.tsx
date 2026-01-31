@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
-type Sec = { id: number; nombre: string; subSecciones: Array<{ id: number; nombre: string; activa: boolean }> };
+type Sec = {
+  id: number;
+  nombre: string;
+  subSecciones: Array<{ id: number; nombre: string; activa: boolean }>;
+};
 
 type Contratacion = {
   id: number;
@@ -17,8 +21,10 @@ type Contratacion = {
   notas: string | null;
   creadaEn: string;
   confirmadaEn: string | null;
+
   seccion?: { nombre: string };
   subSeccion?: { nombre: string } | null;
+
   cliente?: { id: number; nombre: string } | null;
   lead?: { id: number; nombre?: string; email?: string; telefono?: string } | null;
 };
@@ -62,41 +68,59 @@ export default function ContratacionesContenido() {
     if (Array.isArray(json)) return json as T[];
     if (json && Array.isArray(json.items)) return json.items as T[];
     return [];
-    }
+  }
 
-    async function loadSecciones() {
+  async function loadSecciones() {
     try {
-        const res = await fetch("/api/crm/secciones", { cache: "no-store" });
-        const json = await res.json();
+      const res = await fetch("/api/crm/secciones", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Error secciones");
 
-        if (!res.ok) throw new Error(json?.error || "Error secciones");
-
-        const arr = normalizeItems<Sec>(json);
-        setSecciones(arr);
-        if (!seccionId && arr.length) setSeccionId(arr[0].id);
+      const arr = normalizeItems<Sec>(json);
+      setSecciones(arr);
+      if (!seccionId && arr.length) setSeccionId(arr[0].id);
     } catch (e: any) {
-        toast.error(String(e?.message || e));
+      toast.error(String(e?.message || e));
     }
   }
 
   async function loadContrataciones() {
     setLoading(true);
     try {
-        const res = await fetch("/api/crm/contrataciones", { cache: "no-store" });
-        const json = await res.json();
+      const res = await fetch("/api/crm/contrataciones", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Error contrataciones");
 
-        if (!res.ok) throw new Error(json?.error || "Error contrataciones");
-
-        const arr = normalizeItems<Contratacion>(json);
-        setItems(arr);
+      const arr = normalizeItems<Contratacion>(json);
+      setItems(arr);
     } catch (e: any) {
-        setItems([]);
-        toast.error(String(e?.message || e));
+      setItems([]);
+      toast.error(String(e?.message || e));
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   }
 
+  // ✅ ÚNICO método de cambio de estado (usa /estado)
+  async function cambiarEstado(
+    contratacionId: number,
+    estado: "BORRADOR" | "PENDIENTE" | "CONFIRMADA" | "CANCELADA"
+  ) {
+    const res = await fetch(`/api/crm/contrataciones/${contratacionId}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado }),
+    });
+
+    const txt = await res.text();
+    let data: any = null;
+    try { data = JSON.parse(txt); } catch {}
+
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || `Error cambiando estado (${res.status})`);
+    }
+    return data.contratacion;
+  }
 
   useEffect(() => {
     if (status !== "loading" && session) {
@@ -113,6 +137,7 @@ export default function ContratacionesContenido() {
 
   async function crear() {
     if (!seccionId) return toast.error("Selecciona sección");
+
     const res = await fetch("/api/crm/contrataciones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,26 +152,16 @@ export default function ContratacionesContenido() {
         estado: "BORRADOR",
       }),
     });
+
     const json = await res.json();
     if (!res.ok) return toast.error(json?.error || "No se pudo crear");
+
     toast.success("Contratación creada");
     setOpen(false);
     setBaseImponible("");
     setTotalFactura("");
     setLeadId("");
     setNotas("");
-    await loadContrataciones();
-  }
-
-  async function setEstado(id: number, estado: Contratacion["estado"]) {
-    const res = await fetch("/api/crm/contrataciones", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, estado }),
-    });
-    const json = await res.json();
-    if (!res.ok) return toast.error(json?.error || "No se pudo actualizar");
-    toast.success(`Estado: ${estado}`);
     await loadContrataciones();
   }
 
@@ -161,7 +176,9 @@ export default function ContratacionesContenido() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-extrabold text-white">Contrataciones</h1>
-          <p className="text-white/70">Centro de cierres: aquí nace el historial y el cálculo de comisiones.</p>
+          <p className="text-white/70">
+            Centro de cierres: aquí nace el historial y el cálculo de comisiones.
+          </p>
         </div>
 
         <div className="flex gap-2">
@@ -317,20 +334,26 @@ export default function ContratacionesContenido() {
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="text-white font-extrabold">
-                        #{c.id} · {c.seccion?.nombre ?? "Sección"}{c.subSeccion?.nombre ? ` / ${c.subSeccion.nombre}` : ""}
+                        #{c.id} · {c.seccion?.nombre ?? "Sección"}
+                        {c.subSeccion?.nombre ? ` / ${c.subSeccion.nombre}` : ""}
                       </div>
+
                       <span className={`text-[11px] font-extrabold px-2 py-1 rounded-lg border ${pill(c.estado)}`}>
                         {c.estado}
                       </span>
+
                       <span className="text-[11px] font-extrabold px-2 py-1 rounded-lg bg-white/10 border border-white/10 text-white/80">
                         {c.nivel}
                       </span>
                     </div>
+
                     <div className="text-white/70 text-sm mt-1">
                       Base: <b className="text-white">{c.baseImponible ?? "—"}</b> · Total:{" "}
                       <b className="text-white">{c.totalFactura ?? "—"}</b>
                       {c.cliente?.nombre ? (
-                        <span className="ml-2 text-white/60">· Cliente: <b className="text-white">{c.cliente.nombre}</b></span>
+                        <span className="ml-2 text-white/60">
+                          · Cliente: <b className="text-white">{c.cliente.nombre}</b>
+                        </span>
                       ) : null}
                     </div>
                   </div>
@@ -338,7 +361,15 @@ export default function ContratacionesContenido() {
                   <div className="flex gap-2">
                     {c.estado !== "CANCELADA" && (
                       <button
-                        onClick={() => setEstado(c.id, "CANCELADA")}
+                        onClick={async () => {
+                          try {
+                            await cambiarEstado(c.id, "CANCELADA");
+                            toast.success("Cancelada");
+                            await loadContrataciones();
+                          } catch (e: any) {
+                            toast.error(String(e?.message || e));
+                          }
+                        }}
                         className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
                       >
                         Cancelar
@@ -347,7 +378,15 @@ export default function ContratacionesContenido() {
 
                     {c.estado === "BORRADOR" && (
                       <button
-                        onClick={() => setEstado(c.id, "PENDIENTE")}
+                        onClick={async () => {
+                          try {
+                            await cambiarEstado(c.id, "PENDIENTE");
+                            toast.success("Enviada (PENDIENTE)");
+                            await loadContrataciones();
+                          } catch (e: any) {
+                            toast.error(String(e?.message || e));
+                          }
+                        }}
                         className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
                       >
                         Enviar
@@ -356,7 +395,15 @@ export default function ContratacionesContenido() {
 
                     {canConfirm && c.estado === "PENDIENTE" && (
                       <button
-                        onClick={() => setEstado(c.id, "CONFIRMADA")}
+                        onClick={async () => {
+                          try {
+                            await cambiarEstado(c.id, "CONFIRMADA");
+                            toast.success("Confirmada ✅ (cliente generado/vinculado)");
+                            await loadContrataciones();
+                          } catch (e: any) {
+                            toast.error(String(e?.message || e));
+                          }
+                        }}
                         className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-[13px] font-extrabold text-slate-950 transition"
                       >
                         Confirmar
