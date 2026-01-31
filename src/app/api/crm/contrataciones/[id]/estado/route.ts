@@ -23,10 +23,7 @@ function getRole(tenant: any) {
 
 type Estado = "BORRADOR" | "PENDIENTE" | "CONFIRMADA" | "CANCELADA";
 
-export async function PATCH(
-  req: NextRequest,
-  ctx: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, ctx: any) {
   try {
     const tenant = await getTenantContext(req);
     if (!tenant.ok) return jsonError(tenant.error, tenant.status);
