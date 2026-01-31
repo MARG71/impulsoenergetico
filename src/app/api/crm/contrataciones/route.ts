@@ -1,5 +1,4 @@
 // src/app/api/crm/contrataciones/route.ts
-// src/app/api/crm/contrataciones/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -32,12 +31,20 @@ function asNivel(v: any): NivelComision | null {
     : null;
 }
 
+// Si getTenantContext te da rol, úsalo.
+// Si no, esta función no rompe nada.
+function canConfirm(tenant: any) {
+  const role = String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+  return role === "SUPERADMIN" || role === "ADMIN";
+}
+
 export async function GET(req: NextRequest) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
   const estadoQ = asEstado(req.nextUrl.searchParams.get("estado"));
   const where: any = {};
+
   if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
   if (estadoQ) where.estado = estadoQ;
 
@@ -57,6 +64,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // IMPORTANTE: tu front debe leer json.items (no un array directo)
     return NextResponse.json({ ok: true, items });
   } catch (e: any) {
     console.error("GET /api/crm/contrataciones error:", e);
@@ -82,6 +90,8 @@ export async function POST(req: NextRequest) {
     agenteId: toId(body?.agenteId),
     lugarId: toId(body?.lugarId),
     leadId: toId(body?.leadId),
+    baseImponible: body?.baseImponible ?? null,
+    totalFactura: body?.totalFactura ?? null,
   };
 
   const est = asEstado(body?.estado);
@@ -108,37 +118,108 @@ export async function PATCH(req: NextRequest) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
+  const adminId = tenant.tenantAdminId;
+  if (!adminId) return jsonError(400, "tenantAdminId no disponible");
+
   const body = await req.json().catch(() => ({}));
   const id = toId(body?.id);
   if (!id) return jsonError(400, "id es obligatorio");
 
   // 🔒 scope tenant
-  const where: any = { id };
-  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
-
-  const exists = await prisma.contratacion.findFirst({ where, select: { id: true } });
-  if (!exists) return jsonError(404, "Contratación no encontrada");
-
-  const data: any = {};
-  const est = asEstado(body?.estado);
-  if (est) data.estado = est;
-
-  const niv = asNivel(body?.nivel);
-  if (niv) data.nivel = niv;
-
-  if (typeof body?.notas === "string") data.notas = body.notas;
-
-  if (body?.baseImponible !== undefined) data.baseImponible = body.baseImponible === null ? null : body.baseImponible;
-  if (body?.totalFactura !== undefined) data.totalFactura = body.totalFactura === null ? null : body.totalFactura;
+  const whereTenant: any = { id, adminId };
 
   try {
-    const updated = await prisma.contratacion.update({
-      where: { id },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.contratacion.findFirst({
+        where: whereTenant,
+        select: {
+          id: true,
+          estado: true,
+          leadId: true,
+          clienteId: true,
+        },
+      });
+
+      if (!current) throw new Error("Contratación no encontrada");
+
+      const data: any = {};
+
+      const est = asEstado(body?.estado);
+      if (est) data.estado = est;
+
+      const niv = asNivel(body?.nivel);
+      if (niv) data.nivel = niv;
+
+      if (typeof body?.notas === "string") data.notas = body.notas;
+
+      if (body?.baseImponible !== undefined) data.baseImponible = body.baseImponible === null ? null : body.baseImponible;
+      if (body?.totalFactura !== undefined) data.totalFactura = body.totalFactura === null ? null : body.totalFactura;
+
+      // ✅ Si pasa a CONFIRMADA => crear/vincular cliente + confirmadaEn
+      if (est === "CONFIRMADA") {
+        if (!canConfirm(tenant)) {
+          throw new Error("No autorizado para confirmar");
+        }
+
+        // idempotencia: si ya confirmada, no repite
+        if (current.estado !== "CONFIRMADA") {
+          let clienteId = current.clienteId ?? null;
+
+          if (!clienteId && current.leadId) {
+            const lead = await tx.lead.findFirst({
+              where: { id: current.leadId, adminId },
+              select: { nombre: true, email: true, telefono: true },
+            });
+
+            if (!lead?.nombre) throw new Error("El lead no tiene nombre");
+
+            const email = lead.email?.trim().toLowerCase() || null;
+            const telefono = lead.telefono?.trim() || null;
+
+            const existing = await tx.cliente.findFirst({
+              where: {
+                adminId,
+                OR: [
+                  ...(email ? [{ email }] : []),
+                  ...(telefono ? [{ telefono }] : []),
+                ],
+              },
+              select: { id: true },
+            });
+
+            if (existing) {
+              clienteId = existing.id;
+              await tx.cliente.update({
+                where: { id: existing.id },
+                data: {
+                  nombre: lead.nombre,
+                  email: email ?? undefined,
+                  telefono: telefono ?? undefined,
+                },
+              });
+            } else {
+              const createdCliente = await tx.cliente.create({
+                data: { adminId, nombre: lead.nombre, email, telefono },
+                select: { id: true },
+              });
+              clienteId = createdCliente.id;
+            }
+          }
+
+          data.clienteId = clienteId ?? undefined;
+          data.confirmadaEn = new Date();
+        }
+      }
+
+      return await tx.contratacion.update({
+        where: { id },
+        data,
+      });
     });
+
     return NextResponse.json({ ok: true, item: updated });
   } catch (e: any) {
     console.error("PATCH /api/crm/contrataciones error:", e);
-    return jsonError(500, "Error actualizando contratación");
+    return jsonError(500, e?.message || "Error actualizando contratación");
   }
 }

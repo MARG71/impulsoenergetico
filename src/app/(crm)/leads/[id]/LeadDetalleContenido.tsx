@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 
 type UsuarioMini = { id: number; nombre: string | null; rol?: string | null };
 
@@ -129,7 +131,8 @@ export default function LeadDetalleContenido() {
   const [notaRapida, setNotaRapida] = useState("");
 
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
 
   const telWa = useMemo(() => normalizePhoneForWa(lead?.telefono || ""), [lead?.telefono]);
 
@@ -179,8 +182,9 @@ export default function LeadDetalleContenido() {
   const subirDocumento = async () => {
     if (!id) return;
     if (!docFile) {
-      setToast("⚠️ Selecciona un archivo");
-      setTimeout(() => setToast(null), 2000);
+        setToastMsg("Documento subido ✅");
+        setTimeout(() => setToastMsg(null), 2000);
+
       return;
     }
 
@@ -198,16 +202,17 @@ export default function LeadDetalleContenido() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || "Error subiendo documento");
 
-        setToast("Documento subido ✅");
-        setTimeout(() => setToast(null), 2000);
+        setToastMsg("Documento subido ✅");
+        setTimeout(() => setToastMsg(null), 2000);
+
 
         setDocFile(null);
         setDocNombre("");
         await cargarDocumentos();
         await cargar(); // refresca timeline (porque el upload crea actividad)
       } catch (e: any) {
-        setToast(e?.message || "No se pudo subir");
-        setTimeout(() => setToast(null), 2600);
+        setToastMsg(e?.message || "No se pudo subir");
+        setTimeout(() => setToastMsg(null), 2600);
       }
     });
   };
@@ -235,8 +240,8 @@ export default function LeadDetalleContenido() {
         if (!shareUrl) throw new Error("No se pudo generar el enlace público");
         window.open(shareUrl, "_blank", "noopener,noreferrer"); // ✅ abre tu endpoint
       } catch (e: any) {
-        setToast(e?.message || "No se pudo abrir el documento");
-        setTimeout(() => setToast(null), 2500);
+        setToastMsg(e?.message || "No se pudo abrir el documento");
+        setTimeout(() => setToastMsg(null), 2500);
       }
     });
   };
@@ -249,11 +254,11 @@ export default function LeadDetalleContenido() {
         const shareUrl = await getShareDocUrl(docId);
         if (!shareUrl) throw new Error("No se pudo generar el enlace para compartir");
         await navigator.clipboard.writeText(shareUrl);
-        setToast("Enlace para cliente copiado ✅");
-        setTimeout(() => setToast(null), 1800);
+        setToastMsg("Enlace para cliente copiado ✅");
+        setTimeout(() => setToastMsg(null), 1800);
       } catch (e: any) {
-        setToast(e?.message || "No se pudo copiar el enlace");
-        setTimeout(() => setToast(null), 2500);
+        setToastMsg(e?.message || "No se pudo copiar el enlace");
+        setTimeout(() => setToastMsg(null), 2500);
       }
     });
   };
@@ -308,14 +313,14 @@ export default function LeadDetalleContenido() {
       );
 
       if (!silentToast) {
-        setToast("Actividad registrada ✅");
-        setTimeout(() => setToast(null), 2000);
+        setToastMsg("Actividad registrada ✅");
+        setTimeout(() => setToastMsg(null), 2000);
       }
 
       if (refresh) await cargar();
     } catch (e: any) {
-      setToast(e?.message || "No se pudo registrar la actividad");
-      setTimeout(() => setToast(null), 2600);
+      setToastMsg(e?.message || "No se pudo registrar la actividad");
+      setTimeout(() => setToastMsg(null), 2600);
     }
   };
 
@@ -339,13 +344,13 @@ export default function LeadDetalleContenido() {
           15000
         );
 
-        setToast("Guardado ✅ (con actividad automática)");
-        setTimeout(() => setToast(null), 2200);
+        setToastMsg("Guardado ✅ (con actividad automática)");
+        setTimeout(() => setToastMsg(null), 2200);
 
         await cargar();
       } catch (e: any) {
-        setToast(e?.message || "No se pudo guardar");
-        setTimeout(() => setToast(null), 2600);
+        setToastMsg(e?.message || "No se pudo guardar");
+        setTimeout(() => setToastMsg(null), 2600);
       }
     });
   };
@@ -354,8 +359,8 @@ export default function LeadDetalleContenido() {
   const enviarWhatsAppDoc = async (doc: LeadDocumento) => {
     const tel = telWa;
     if (!tel) {
-      setToast("⚠️ Teléfono inválido");
-      setTimeout(() => setToast(null), 2000);
+      setToastMsg("⚠️ Teléfono inválido");
+      setTimeout(() => setToastMsg(null), 2000);
       return;
     }
 
@@ -372,14 +377,30 @@ export default function LeadDetalleContenido() {
           silentToast: true,
         });
 
-        setToast("WhatsApp preparado ✅");
-        setTimeout(() => setToast(null), 1800);
+        setToastMsg("WhatsApp preparado ✅");
+        setTimeout(() => setToastMsg(null), 1800);
       } catch (e: any) {
-        setToast(e?.message || "No se pudo preparar WhatsApp");
-        setTimeout(() => setToast(null), 2500);
+        setToastMsg(e?.message || "No se pudo preparar WhatsApp");
+        setTimeout(() => setToastMsg(null), 2500);
       }
     });
   };
+
+  async function crearContratacionDesdeLead() {
+    if (!lead?.id) return toast.error("Lead no cargado");
+
+    const res = await fetch("/api/crm/contrataciones/desde-lead", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: lead.id }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo crear la contratación");
+
+    toast.success("Contratación creada ✅");
+    router.push("/contrataciones");
+  }
 
 
 
@@ -391,8 +412,8 @@ export default function LeadDetalleContenido() {
     const etapa = estadoToEtapa(estado);
 
     if (!telWa) {
-      setToast("⚠️ El lead no tiene teléfono válido");
-      setTimeout(() => setToast(null), 2400);
+      setToastMsg("⚠️ El lead no tiene teléfono válido");
+      setTimeout(() => setToastMsg(null), 2400);
       return;
     }
 
@@ -440,11 +461,11 @@ export default function LeadDetalleContenido() {
         const url = `https://wa.me/${telWa}?text=${encodeURIComponent(textoFinal)}`;
         window.open(url, "_blank", "noopener,noreferrer");
 
-        setToast("WhatsApp preparado ✅");
-        setTimeout(() => setToast(null), 2000);
+        setToastMsg("WhatsApp preparado ✅");
+        setTimeout(() => setToastMsg(null), 2000);
       } catch (e: any) {
-        setToast(e?.message || "No se pudo preparar WhatsApp");
-        setTimeout(() => setToast(null), 2600);
+        setToastMsg(e?.message || "No se pudo preparar WhatsApp");
+        setTimeout(() => setToastMsg(null), 2600);
       }
     });
   };
@@ -473,9 +494,9 @@ export default function LeadDetalleContenido() {
   return (
     <>
       <div className="p-6 space-y-5 text-base">
-        {toast && (
+        {toastMsg && (
           <div className="fixed z-50 bottom-6 right-6 rounded-2xl bg-emerald-900/35 border border-emerald-500/40 text-emerald-100 px-4 py-3 font-semibold shadow-[0_0_25px_rgba(16,185,129,0.25)]">
-            {toast}
+            {toastMsg}
           </div>
         )}
 
@@ -531,6 +552,13 @@ export default function LeadDetalleContenido() {
               className="inline-flex px-4 py-2 rounded-full bg-slate-950 border border-slate-700 text-slate-200 text-sm font-extrabold hover:border-emerald-400 disabled:opacity-60"
             >
               ⚡ Acción
+            </button>
+
+            <button
+              onClick={() => crearContratacionDesdeLead().catch((e) => toast.error(String(e?.message || e)))}
+              className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-[13px] font-extrabold text-slate-950"
+            >
+              Crear contratación
             </button>
 
             <button
