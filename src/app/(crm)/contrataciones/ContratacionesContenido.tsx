@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type Sec = {
   id: number;
@@ -39,7 +40,15 @@ function pill(estado: string) {
   return "bg-white/10 text-white/80 border-white/10";
 }
 
+function money(v: any) {
+  if (v == null || v === "") return "—";
+  const n = typeof v === "string" ? Number(v) : Number(v);
+  if (!Number.isFinite(n)) return String(v);
+  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
+}
+
 export default function ContratacionesContenido() {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const role = (session?.user as any)?.role as string | undefined;
 
@@ -122,6 +131,19 @@ export default function ContratacionesContenido() {
     return data.contratacion;
   }
 
+  // ✅ wrapper para botones (actualiza UI + toast)
+  async function setEstado(contratacionId: number, estado: Contratacion["estado"]) {
+    try {
+      const updated = await cambiarEstado(contratacionId, estado);
+      setItems((prev) =>
+        prev.map((x) => (x.id === contratacionId ? { ...x, ...updated } : x))
+      );
+      toast.success(`Estado actualizado: ${estado}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Error");
+    }
+  }
+
   useEffect(() => {
     if (status !== "loading" && session) {
       loadSecciones().catch((e) => toast.error(String(e?.message || e)));
@@ -176,9 +198,7 @@ export default function ContratacionesContenido() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-extrabold text-white">Contrataciones</h1>
-          <p className="text-white/70">
-            Centro de cierres: aquí nace el historial y el cálculo de comisiones.
-          </p>
+          <p className="text-white/70">Centro de cierres: aquí nace el historial y el cálculo de comisiones.</p>
         </div>
 
         <div className="flex gap-2">
@@ -330,9 +350,10 @@ export default function ContratacionesContenido() {
           <div className="divide-y divide-white/10">
             {filtered.map((c) => (
               <div key={c.id} className="p-5">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                  {/* izquierda: flex-1 para que no empuje raro */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-white font-extrabold">
                         #{c.id} · {c.seccion?.nombre ?? "Sección"}
                         {c.subSeccion?.nombre ? ` / ${c.subSeccion.nombre}` : ""}
@@ -348,8 +369,8 @@ export default function ContratacionesContenido() {
                     </div>
 
                     <div className="text-white/70 text-sm mt-1">
-                      Base: <b className="text-white">{c.baseImponible ?? "—"}</b> · Total:{" "}
-                      <b className="text-white">{c.totalFactura ?? "—"}</b>
+                      Base: <b className="text-white">{money(c.baseImponible)}</b> · Total:{" "}
+                      <b className="text-white">{money(c.totalFactura)}</b>
                       {c.cliente?.nombre ? (
                         <span className="ml-2 text-white/60">
                           · Cliente: <b className="text-white">{c.cliente.nombre}</b>
@@ -358,26 +379,18 @@ export default function ContratacionesContenido() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => window.location.href = `/contrataciones/${c.id}`}
-                    className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
+                  {/* derecha: acciones alineadas */}
+                  <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 md:justify-end shrink-0">
+                    <button
+                      onClick={() => router.push(`/contrataciones/${c.id}`)}
+                      className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
                     >
-                    Ver
-                  </button>
+                      Ver
+                    </button>
 
-
-                  <div className="flex gap-2">
                     {c.estado !== "CANCELADA" && (
                       <button
-                        onClick={async () => {
-                          try {
-                            await cambiarEstado(c.id, "CANCELADA");
-                            toast.success("Cancelada");
-                            await loadContrataciones();
-                          } catch (e: any) {
-                            toast.error(String(e?.message || e));
-                          }
-                        }}
+                        onClick={() => setEstado(c.id, "CANCELADA")}
                         className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
                       >
                         Cancelar
@@ -386,15 +399,7 @@ export default function ContratacionesContenido() {
 
                     {c.estado === "BORRADOR" && (
                       <button
-                        onClick={async () => {
-                          try {
-                            await cambiarEstado(c.id, "PENDIENTE");
-                            toast.success("Enviada (PENDIENTE)");
-                            await loadContrataciones();
-                          } catch (e: any) {
-                            toast.error(String(e?.message || e));
-                          }
-                        }}
+                        onClick={() => setEstado(c.id, "PENDIENTE")}
                         className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
                       >
                         Enviar
@@ -403,15 +408,7 @@ export default function ContratacionesContenido() {
 
                     {canConfirm && c.estado === "PENDIENTE" && (
                       <button
-                        onClick={async () => {
-                          try {
-                            await cambiarEstado(c.id, "CONFIRMADA");
-                            toast.success("Confirmada ✅ (cliente generado/vinculado)");
-                            await loadContrataciones();
-                          } catch (e: any) {
-                            toast.error(String(e?.message || e));
-                          }
-                        }}
+                        onClick={() => setEstado(c.id, "CONFIRMADA")}
                         className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-[13px] font-extrabold text-slate-950 transition"
                       >
                         Confirmar

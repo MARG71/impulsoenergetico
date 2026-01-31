@@ -2,25 +2,24 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getTenantContext } from "@/lib/tenant";
+import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
 import { TipoCalculoComision } from "@prisma/client";
 
-function jsonError(status: number, message: string, extra?: any) {
-  return NextResponse.json({ ok: false, error: message, ...(extra ? { extra } : {}) }, { status });
+function jsonError(message: string, status = 400, extra?: any) {
+  return NextResponse.json(
+    { ok: false, error: message, ...(extra ? { extra } : {}) },
+    { status }
+  );
 }
 
-function toId(v: any) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? n : null;
+function toMoney2(v: any) {
+  const n = typeof v === "string" ? Number(v) : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
 }
-
-function decToNum(v: any, def = 0) {
-  if (v == null) return def;
-  if (typeof v?.toNumber === "function") return v.toNumber();
+function toNumber(v: any, def = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
 }
-
 function clamp(n: number, min?: number | null, max?: number | null) {
   let x = n;
   if (typeof min === "number") x = Math.max(min, x);
@@ -28,159 +27,179 @@ function clamp(n: number, min?: number | null, max?: number | null) {
   return x;
 }
 
-function normPctToRatio(p: number) {
-  if (!Number.isFinite(p)) return 0;
-  if (p <= 1) return p;
-  return p / 100;
-}
+async function pickRegla({
+  seccionId,
+  subSeccionId,
+  nivel,
+}: {
+  seccionId: number;
+  subSeccionId: number | null;
+  nivel: any;
+}) {
+  if (subSeccionId) {
+    const r1 = await prisma.reglaComisionGlobal.findFirst({
+      where: { seccionId, subSeccionId, nivel, activa: true },
+      orderBy: { id: "asc" },
+    });
+    if (r1) return r1;
+  }
+  const r2 = await prisma.reglaComisionGlobal.findFirst({
+    where: { seccionId, subSeccionId: null, nivel, activa: true },
+    orderBy: { id: "asc" },
+  });
+  if (r2) return r2;
 
-// ratio (0..1) -> pct (0..100) con 3 decimales
-function ratioToPctSnap(r: number) {
-  const pct = r * 100;
-  return Math.round(pct * 1000) / 1000;
+  return prisma.reglaComisionGlobal.findFirst({
+    where: { seccionId, nivel, activa: true },
+    orderBy: { id: "asc" },
+  });
 }
 
 export async function POST(req: NextRequest) {
-  const tenant = await getTenantContext(req);
-  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+  try {
+    const session = await getSessionOrThrow();
+    const role = String(sessionRole(session) ?? "").toUpperCase();
+    const adminId = sessionAdminId(session);
 
-  const role = String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
-  if (!["ADMIN", "SUPERADMIN"].includes(role)) return jsonError(403, "No autorizado");
+    if (!["ADMIN", "SUPERADMIN"].includes(role)) return jsonError("No autorizado", 403);
 
-  const body = await req.json().catch(() => ({}));
-  const contratacionId = toId(body?.contratacionId);
-  if (!contratacionId) return jsonError(400, "contratacionId requerido");
+    const body = await req.json().catch(() => ({}));
+    const contratacionId = Number(body?.contratacionId ?? 0);
+    if (!Number.isFinite(contratacionId) || contratacionId <= 0) {
+      return jsonError("contratacionId requerido");
+    }
 
-  // Scope tenant
-  const whereTenant: any = { id: contratacionId };
-  if (role !== "SUPERADMIN") {
-    if (tenant.tenantAdminId == null) return jsonError(400, "tenantAdminId no disponible");
-    whereTenant.adminId = tenant.tenantAdminId;
-  }
+    const contratacion = await prisma.contratacion.findUnique({
+      where: { id: contratacionId },
+      include: {
+        lugar: { select: { id: true, pctLugar: true, especial: true } },
+        agente: { select: { id: true, pctAgente: true } },
+      },
+    });
+    if (!contratacion) return jsonError("Contratación no encontrada", 404);
 
-  const c = await prisma.contratacion.findFirst({
-    where: whereTenant,
-    include: { lugar: true, agente: true, seccion: true, subSeccion: true },
-  });
+    // tenant check
+    if (role !== "SUPERADMIN") {
+      if ((contratacion as any).adminId && (contratacion as any).adminId !== adminId) {
+        return jsonError("No autorizado para esta contratación", 403);
+      }
+    }
 
-  if (!c) return jsonError(404, "Contratación no encontrada");
+    if (String((contratacion as any).estado) !== "CONFIRMADA") {
+      return jsonError("Solo se puede asentar una contratación CONFIRMADA", 400);
+    }
 
-  // Si quieres exigir CONFIRMADA para asentar, descomenta:
-  // if ((c as any).estado !== "CONFIRMADA") return jsonError(400, "Solo se puede asentar si está CONFIRMADA");
+    // Evitar duplicados (contratacionId es unique)
+    const existente = await prisma.asientoComision.findUnique({
+      where: { contratacionId },
+      select: { id: true },
+    });
+    if (existente) {
+      return NextResponse.json({ ok: true, asientoId: existente.id, already: true });
+    }
 
-  // Evitar duplicados
-  const existente = await prisma.asientoComision.findUnique({
-    where: { contratacionId: (c as any).id },
-    select: { id: true },
-  });
+    const base =
+      toMoney2((contratacion as any).baseImponible) ||
+      toMoney2((contratacion as any).totalFactura) ||
+      0;
 
-  if (existente) {
-    return NextResponse.json({ ok: true, already: true, asientoId: existente.id });
-  }
+    const seccionId = Number((contratacion as any).seccionId);
+    const subSeccionId = (contratacion as any).subSeccionId
+      ? Number((contratacion as any).subSeccionId)
+      : null;
 
-  // base
-  const baseImponible = decToNum((c as any).baseImponible, NaN);
-  const totalFactura = decToNum((c as any).totalFactura, NaN);
-  const base = Number.isFinite(baseImponible) ? baseImponible : (Number.isFinite(totalFactura) ? totalFactura : 0);
+    const regla = await pickRegla({
+      seccionId,
+      subSeccionId,
+      nivel: (contratacion as any).nivel,
+    });
+    if (!regla) return jsonError("No hay regla activa para esta sección/nivel", 400);
 
-  // regla
-  const reglas = await prisma.reglaComisionGlobal.findMany({
-    where: {
-      seccionId: (c as any).seccionId,
-      activa: true,
-      nivel: (c as any).nivel,
-    } as any,
-    orderBy: [{ subSeccionId: "desc" }, { id: "asc" }],
-  });
+    const fijo = toMoney2((regla as any).fijoEUR);
+    const pct = toNumber((regla as any).porcentaje, 0);
+    let total = 0;
 
-  const subSeccionId = ((c as any).subSeccionId ?? null) as number | null;
-  const regla =
-    reglas.find((r: any) => r.subSeccionId != null && r.subSeccionId === subSeccionId) ||
-    reglas.find((r: any) => r.subSeccionId == null) ||
-    null;
+    const tipo = (regla as any).tipo as TipoCalculoComision;
+    if (tipo === "FIJA") total = fijo;
+    else if (tipo === "PORC_BASE") total = base * (pct / 100);
+    else if (tipo === "PORC_MARGEN") total = base * (pct / 100);
+    else if (tipo === "MIXTA") total = fijo + base * (pct / 100);
+    else total = base * (pct / 100);
 
-  if (!regla) return jsonError(400, "No hay ReglaComisionGlobal activa para esta sección/nivel");
-
-  const tipo = (regla as any).tipo as TipoCalculoComision;
-  const fijoEUR = decToNum((regla as any).fijoEUR, 0);
-  const porcentaje = decToNum((regla as any).porcentaje, 0);
-
-  let total = 0;
-  if (tipo === "FIJA") total = fijoEUR;
-  else if (tipo === "PORC_BASE") total = base * (porcentaje / 100);
-  else if (tipo === "PORC_MARGEN") total = base * (porcentaje / 100);
-  else if (tipo === "MIXTA") total = fijoEUR + base * (porcentaje / 100);
-
-  total = clamp(total, decToNum((regla as any).minEUR, null as any), decToNum((regla as any).maxEUR, null as any));
-
-  // pct reparto
-  const defaults = await prisma.globalComisionDefaults.findUnique({ where: { id: 1 } });
-
-  const pctAgenteRaw = decToNum(
-    (c as any).agente?.pctAgente,
-    defaults ? decToNum((defaults as any).defaultPctAgente, 0) : 0
-  );
-  const pctLugarRaw = decToNum(
-    (c as any).lugar?.pctLugar,
-    defaults ? decToNum((defaults as any).defaultPctLugar, 0) : 0
-  );
-
-  const pctAgenteRatio = normPctToRatio(pctAgenteRaw);
-  const pctLugarRatio = normPctToRatio(pctLugarRaw);
-
-  let agente = total * pctAgenteRatio;
-  let lugar = total * pctLugarRatio;
-
-  agente = clamp(
-    agente,
-    decToNum((regla as any).minAgenteEUR, null as any),
-    decToNum((regla as any).maxAgenteEUR, null as any)
-  );
-
-  const esEspecial = Boolean((c as any).lugar?.especial);
-  if (esEspecial) {
-    lugar = clamp(
-      lugar,
-      decToNum((regla as any).minLugarEspecialEUR, null as any),
-      decToNum((regla as any).maxLugarEspecialEUR, null as any)
+    total = clamp(
+      total,
+      (regla as any).minEUR != null ? toMoney2((regla as any).minEUR) : null,
+      (regla as any).maxEUR != null ? toMoney2((regla as any).maxEUR) : null
     );
+
+    const defaults = await prisma.globalComisionDefaults.findUnique({ where: { id: 1 } });
+
+    const pctAgenteSnap =
+      toNumber((contratacion as any).agente?.pctAgente, NaN) ||
+      (defaults ? toNumber(defaults.defaultPctAgente, 0) : 0);
+
+    const pctLugarSnap =
+      toNumber((contratacion as any).lugar?.pctLugar, NaN) ||
+      (defaults ? toNumber(defaults.defaultPctLugar, 0) : 0);
+
+    let agenteEUR = total * (pctAgenteSnap / 100);
+    let lugarEUR = total * (pctLugarSnap / 100);
+
+    agenteEUR = clamp(
+      agenteEUR,
+      (regla as any).minAgenteEUR != null ? toMoney2((regla as any).minAgenteEUR) : null,
+      (regla as any).maxAgenteEUR != null ? toMoney2((regla as any).maxAgenteEUR) : null
+    );
+
+    const lugarEsEspecial = Boolean((contratacion as any).lugar?.especial);
+    if (lugarEsEspecial) {
+      lugarEUR = clamp(
+        lugarEUR,
+        (regla as any).minLugarEspecialEUR != null ? toMoney2((regla as any).minLugarEspecialEUR) : null,
+        (regla as any).maxLugarEspecialEUR != null ? toMoney2((regla as any).maxLugarEspecialEUR) : null
+      );
+    }
+
+    let adminEUR = total - agenteEUR - lugarEUR;
+    if (!Number.isFinite(adminEUR) || adminEUR < 0) adminEUR = 0;
+
+    const created = await prisma.asientoComision.create({
+      data: {
+        adminId: (contratacion as any).adminId ?? adminId ?? null,
+
+        contratacionId,
+        seccionId,
+        subSeccionId,
+        nivel: (contratacion as any).nivel,
+
+        reglaId: (regla as any).id ?? null,
+
+        baseEUR: base,
+        totalComision: total,
+
+        agenteEUR,
+        lugarEUR,
+        adminEUR,
+
+        pctAgenteSnap,
+        pctLugarSnap,
+
+        leadId: (contratacion as any).leadId ?? null,
+        clienteId: (contratacion as any).clienteId ?? null,
+        agenteId: (contratacion as any).agenteId ?? null,
+        lugarId: (contratacion as any).lugarId ?? null,
+
+        // estado por defecto PENDIENTE (según tu schema)
+      } as any,
+      select: { id: true },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      asientoId: created.id,
+      already: false,
+    });
+  } catch (e: any) {
+    return jsonError("Error asentando comisión", 500, { message: String(e?.message ?? e) });
   }
-
-  let admin = total - agente - lugar;
-  if (admin < 0) admin = 0;
-
-  const asiento = await prisma.asientoComision.create({
-    data: {
-      adminId: (c as any).adminId ?? tenant.tenantAdminId ?? null,
-
-      contratacionId: (c as any).id,
-
-      seccionId: (c as any).seccionId,
-      subSeccionId: (c as any).subSeccionId ?? null,
-      nivel: (c as any).nivel,
-
-      reglaId: (regla as any).id ?? null,
-
-      baseEUR: base,
-      totalComision: total,
-
-      agenteEUR: agente,
-      lugarEUR: lugar,
-      adminEUR: admin,
-
-      // Snap 0..100
-      pctAgenteSnap: ratioToPctSnap(pctAgenteRatio),
-      pctLugarSnap: ratioToPctSnap(pctLugarRatio),
-
-      leadId: (c as any).leadId ?? null,
-      clienteId: (c as any).clienteId ?? null,
-      agenteId: (c as any).agenteId ?? null,
-      lugarId: (c as any).lugarId ?? null,
-
-      // estado: PENDIENTE (por defecto)
-      notas: null,
-    } as any,
-  });
-
-  return NextResponse.json({ ok: true, asiento });
 }

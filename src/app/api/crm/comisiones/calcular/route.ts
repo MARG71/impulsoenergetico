@@ -1,25 +1,35 @@
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getTenantContext } from "@/lib/tenant";
-import { NivelComision, TipoCalculoComision } from "@prisma/client";
+import {
+  getSessionOrThrow,
+  sessionRole,
+  sessionAdminId,
+} from "@/lib/auth-server";
+import { TipoCalculoComision } from "@prisma/client";
 
-function jsonError(status: number, message: string, extra?: any) {
-  return NextResponse.json({ ok: false, error: message, ...(extra ? { extra } : {}) }, { status });
+function jsonError(message: string, status = 400, extra?: any) {
+  return NextResponse.json(
+    { ok: false, error: message, ...(extra ? { extra } : {}) },
+    { status }
+  );
 }
 
-function toId(v: any) {
+function parseId(v: unknown) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Prisma Decimal -> number seguro
-function decToNum(v: any, def = 0) {
-  if (v == null) return def;
-  if (typeof v?.toNumber === "function") return v.toNumber();
+function toNumber(v: any, def = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
+}
+
+function toMoney2(v: any) {
+  // Prisma Decimal llega como string/Decimal. Convertimos a number seguro.
+  const n = typeof v === "string" ? Number(v) : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function clamp(n: number, min?: number | null, max?: number | null) {
@@ -29,147 +39,187 @@ function clamp(n: number, min?: number | null, max?: number | null) {
   return x;
 }
 
-// pct guardado como 0.10 (10%) o 10 (10%) -> normaliza a 0..1
-function normPctToRatio(p: number) {
-  if (!Number.isFinite(p)) return 0;
-  if (p <= 1) return p;       // 0.10
-  return p / 100;             // 10 -> 0.10
-}
-
-export async function GET(req: NextRequest) {
-  const tenant = await getTenantContext(req);
-  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
-
-  const role = String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
-
-  const contratacionId = toId(req.nextUrl.searchParams.get("contratacionId"));
-  if (!contratacionId) return jsonError(400, "contratacionId requerido");
-
-  // Scope tenant
-  const whereTenant: any = { id: contratacionId };
-  if (role !== "SUPERADMIN") {
-    if (tenant.tenantAdminId == null) return jsonError(400, "tenantAdminId no disponible");
-    whereTenant.adminId = tenant.tenantAdminId;
+/**
+ * Selección de regla:
+ * 1) exacta (seccionId + subSeccionId + nivel + activa)
+ * 2) fallback a subSeccionId = null (misma seccionId + nivel)
+ * 3) fallback a cualquier activa de esa seccionId + nivel
+ */
+async function pickRegla({
+  seccionId,
+  subSeccionId,
+  nivel,
+}: {
+  seccionId: number;
+  subSeccionId: number | null;
+  nivel: any;
+}) {
+  // 1) exacta
+  if (subSeccionId) {
+    const r1 = await prisma.reglaComisionGlobal.findFirst({
+      where: { seccionId, subSeccionId, nivel, activa: true },
+      orderBy: { id: "asc" },
+    });
+    if (r1) return r1;
   }
 
-  const c = await prisma.contratacion.findFirst({
-    where: whereTenant,
-    include: {
-      seccion: true,
-      subSeccion: true,
-      lugar: true,
-      agente: true,
-    },
+  // 2) null
+  const r2 = await prisma.reglaComisionGlobal.findFirst({
+    where: { seccionId, subSeccionId: null, nivel, activa: true },
+    orderBy: { id: "asc" },
   });
+  if (r2) return r2;
 
-  if (!c) return jsonError(404, "Contratación no encontrada");
+  // 3) cualquiera activa de sección+nivel
+  const r3 = await prisma.reglaComisionGlobal.findFirst({
+    where: { seccionId, nivel, activa: true },
+    orderBy: { id: "asc" },
+  });
+  return r3;
+}
 
-  // Base comisionable: baseImponible si existe, si no totalFactura
-  const baseImponible = decToNum((c as any).baseImponible, NaN);
-  const totalFactura = decToNum((c as any).totalFactura, NaN);
-  const base = Number.isFinite(baseImponible) ? baseImponible : (Number.isFinite(totalFactura) ? totalFactura : 0);
+export async function GET(req: Request) {
+  try {
+    const session = await getSessionOrThrow();
+    const role = String(sessionRole(session) ?? "").toUpperCase();
+    const adminId = sessionAdminId(session);
 
-  const seccionId = (c as any).seccionId as number;
-  const subSeccionId = ((c as any).subSeccionId ?? null) as number | null;
-  const nivel = (c as any).nivel as NivelComision;
+    if (!["ADMIN", "SUPERADMIN"].includes(role)) {
+      return jsonError("No autorizado", 403);
+    }
 
-  // Regla activa que encaje:
-  // prioridad: subSeccionId exacta > null
-  const reglas = await prisma.reglaComisionGlobal.findMany({
-    where: {
+    const { searchParams } = new URL(req.url);
+    const contratacionId = parseId(searchParams.get("contratacionId"));
+    if (!contratacionId) return jsonError("contratacionId requerido", 400);
+
+    const contratacion = await prisma.contratacion.findUnique({
+      where: { id: contratacionId },
+      include: {
+        seccion: true,
+        lugar: { select: { id: true, pctLugar: true, especial: true } },
+        agente: { select: { id: true, pctAgente: true } },
+      },
+    });
+
+    if (!contratacion) return jsonError("Contratación no encontrada", 404);
+
+    // tenant: si no eres superadmin, debes pertenecer al adminId del registro
+    if (role !== "SUPERADMIN") {
+      if ((contratacion as any).adminId && (contratacion as any).adminId !== adminId) {
+        return jsonError("No autorizado para esta contratación", 403);
+      }
+    }
+
+    // base usada (EUR)
+    const base =
+      toMoney2((contratacion as any).baseImponible) ||
+      toMoney2((contratacion as any).totalFactura) ||
+      0;
+
+    const seccionId = Number((contratacion as any).seccionId);
+    const subSeccionId = (contratacion as any).subSeccionId
+      ? Number((contratacion as any).subSeccionId)
+      : null;
+
+    const regla = await pickRegla({
       seccionId,
-      activa: true,
-      nivel,
-    },
-    orderBy: [{ subSeccionId: "desc" }, { id: "asc" }],
-  });
+      subSeccionId,
+      nivel: (contratacion as any).nivel,
+    });
 
-  const regla =
-    reglas.find((r: any) => r.subSeccionId != null && r.subSeccionId === subSeccionId) ||
-    reglas.find((r: any) => r.subSeccionId == null) ||
-    null;
+    if (!regla) {
+      return NextResponse.json({
+        ok: true,
+        contratacionId,
+        base,
+        regla: null,
+        comisiones: { total: 0, agente: 0, lugar: 0, admin: 0 },
+        warning: "No hay reglas globales activas para esta sección/nivel.",
+      });
+    }
 
-  if (!regla) {
+    // calcular total comisión según tipo
+    const fijo = toMoney2((regla as any).fijoEUR);
+    const pct = toNumber((regla as any).porcentaje, 0); // % (ej 10 => 10%)
+    let total = 0;
+
+    const tipo = (regla as any).tipo as TipoCalculoComision;
+
+    if (tipo === "FIJA") total = fijo;
+    else if (tipo === "PORC_BASE") total = base * (pct / 100);
+    else if (tipo === "PORC_MARGEN") {
+      // si algún día añades margen, aquí lo conectaríamos.
+      total = base * (pct / 100);
+    } else if (tipo === "MIXTA") total = fijo + base * (pct / 100);
+    else total = base * (pct / 100);
+
+    // clamp total por min/max regla
+    total = clamp(
+      total,
+      (regla as any).minEUR != null ? toMoney2((regla as any).minEUR) : null,
+      (regla as any).maxEUR != null ? toMoney2((regla as any).maxEUR) : null
+    );
+
+    // defaults de reparto (si no hay pct en agente/lugar)
+    const defaults = await prisma.globalComisionDefaults.findUnique({
+      where: { id: 1 },
+    });
+
+    const pctAgenteSnap =
+      toNumber((contratacion as any).agente?.pctAgente, NaN) ||
+      (defaults ? toNumber(defaults.defaultPctAgente, 0) : 0);
+
+    const pctLugarSnap =
+      toNumber((contratacion as any).lugar?.pctLugar, NaN) ||
+      (defaults ? toNumber(defaults.defaultPctLugar, 0) : 0);
+
+    let agente = total * (pctAgenteSnap / 100);
+    let lugar = total * (pctLugarSnap / 100);
+
+    // límites opcionales para pagar a red
+    agente = clamp(
+      agente,
+      (regla as any).minAgenteEUR != null ? toMoney2((regla as any).minAgenteEUR) : null,
+      (regla as any).maxAgenteEUR != null ? toMoney2((regla as any).maxAgenteEUR) : null
+    );
+
+    const lugarEsEspecial = Boolean((contratacion as any).lugar?.especial);
+    if (lugarEsEspecial) {
+      lugar = clamp(
+        lugar,
+        (regla as any).minLugarEspecialEUR != null ? toMoney2((regla as any).minLugarEspecialEUR) : null,
+        (regla as any).maxLugarEspecialEUR != null ? toMoney2((regla as any).maxLugarEspecialEUR) : null
+      );
+    }
+
+    // admin = resto (nunca negativo)
+    let admin = total - agente - lugar;
+    if (!Number.isFinite(admin) || admin < 0) admin = 0;
+
     return NextResponse.json({
       ok: true,
       contratacionId,
       base,
-      regla: null,
-      comisiones: { total: 0, agente: 0, lugar: 0, admin: 0 },
-      warning: "No hay ReglaComisionGlobal activa para esta sección/nivel. Crea al menos 1 regla.",
+      regla: {
+        id: regla.id,
+        tipo: regla.tipo,
+        porcentaje: regla.porcentaje,
+        fijoEUR: regla.fijoEUR,
+      },
+      comisiones: {
+        total,
+        agente,
+        lugar,
+        admin,
+      },
+      reparto: {
+        pctAgenteSnap,
+        pctLugarSnap,
+      },
+    });
+  } catch (e: any) {
+    return jsonError("Error interno calculando comisiones", 500, {
+      message: String(e?.message ?? e),
     });
   }
-
-  // 1) Comisión total según regla
-  const tipo = (regla as any).tipo as TipoCalculoComision;
-  const fijoEUR = decToNum((regla as any).fijoEUR, 0);
-  const porcentaje = decToNum((regla as any).porcentaje, 0);
-
-  let total = 0;
-  if (tipo === "FIJA") total = fijoEUR;
-  else if (tipo === "PORC_BASE") total = base * (porcentaje / 100);
-  else if (tipo === "PORC_MARGEN") total = base * (porcentaje / 100); // (cuando tengas margen real, lo cambiamos)
-  else if (tipo === "MIXTA") total = fijoEUR + base * (porcentaje / 100);
-
-  // límites total
-  total = clamp(total, decToNum((regla as any).minEUR, null as any), decToNum((regla as any).maxEUR, null as any));
-
-  // 2) % reparto (agente / lugar)
-  const defaults = await prisma.globalComisionDefaults.findUnique({ where: { id: 1 } });
-
-  const pctAgenteRaw = decToNum(
-    (c as any).agente?.pctAgente,
-    defaults ? decToNum((defaults as any).defaultPctAgente, 0) : 0
-  );
-  const pctLugarRaw = decToNum(
-    (c as any).lugar?.pctLugar,
-    defaults ? decToNum((defaults as any).defaultPctLugar, 0) : 0
-  );
-
-  const pctAgenteRatio = normPctToRatio(pctAgenteRaw);
-  const pctLugarRatio = normPctToRatio(pctLugarRaw);
-
-  let agente = total * pctAgenteRatio;
-  let lugar = total * pctLugarRatio;
-
-  // límites agente
-  agente = clamp(
-    agente,
-    decToNum((regla as any).minAgenteEUR, null as any),
-    decToNum((regla as any).maxAgenteEUR, null as any)
-  );
-
-  // límites lugar especial
-  const esEspecial = Boolean((c as any).lugar?.especial);
-  if (esEspecial) {
-    lugar = clamp(
-      lugar,
-      decToNum((regla as any).minLugarEspecialEUR, null as any),
-      decToNum((regla as any).maxLugarEspecialEUR, null as any)
-    );
-  }
-
-  // admin = resto (nunca negativo)
-  let admin = total - agente - lugar;
-  if (admin < 0) admin = 0;
-
-  return NextResponse.json({
-    ok: true,
-    contratacionId,
-    base,
-    regla: {
-      id: regla.id,
-      seccionId: (regla as any).seccionId,
-      subSeccionId: (regla as any).subSeccionId ?? null,
-      nivel: (regla as any).nivel,
-      tipo: (regla as any).tipo,
-      fijoEUR,
-      porcentaje,
-    },
-    pct: {
-      agente: pctAgenteRaw, // snapshot en “formato humano” (10 o 0.10)
-      lugar: pctLugarRaw,
-    },
-    comisiones: { total, agente, lugar, admin },
-  });
 }
