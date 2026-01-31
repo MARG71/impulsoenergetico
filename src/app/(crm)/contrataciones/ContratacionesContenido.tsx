@@ -98,30 +98,44 @@ export default function ContratacionesContenido() {
   }
 
   async function loadSecciones() {
-    const res = await fetch("/api/crm/secciones", { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok || !json?.ok) throw new Error(json?.error);
-    const arr = normalizeItems<Sec>(json);
-    setSecciones(arr);
-    if (!seccionId && arr.length) setSeccionId(arr[0].id);
-  }
+    try {
+        const res = await fetch("/api/crm/secciones", { cache: "no-store" });
+        const json = await res.json().catch(() => null);
 
-  async function loadContrataciones() {
+        // si falla HTTP
+        if (!res.ok) throw new Error(json?.error || "Error cargando secciones");
+
+        // si viene { ok:false }
+        if (json && json.ok === false) throw new Error(json?.error || "Error cargando secciones");
+
+        const arr = normalizeItems<Sec>(json);
+        setSecciones(arr);
+
+        if (!seccionId && arr.length) setSeccionId(arr[0].id);
+    } catch (e: any) {
+        toast.error(String(e?.message || "Error cargando secciones"));
+    }
+    }
+
+    async function loadContrataciones() {
     setLoading(true);
     try {
-      const res = await fetch("/api/crm/contrataciones", {
-        cache: "no-store",
-      });
-      const json = await res.json();
-      if (!res.ok || !json?.ok) throw new Error(json?.error);
-      setItems(normalizeItems<Contratacion>(json));
+        const res = await fetch("/api/crm/contrataciones", { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) throw new Error(json?.error || "Error cargando contrataciones");
+        if (json && json.ok === false) throw new Error(json?.error || "Error cargando contrataciones");
+
+        const arr = normalizeItems<Contratacion>(json);
+        setItems(arr);
     } catch (e: any) {
-      toast.error(e?.message || "Error cargando");
-      setItems([]);
+        setItems([]);
+        toast.error(String(e?.message || "Error cargando contrataciones"));
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  }
+    }
+
 
   async function cambiarEstado(
     contratacionId: number,
