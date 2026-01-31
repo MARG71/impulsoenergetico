@@ -248,6 +248,10 @@ model Usuario {
   leadDocumentosCreados     LeadDocumento[] @relation("LeadDocumentoCreadoPor")
   leadDocumentosGestionados LeadDocumento[] @relation("LeadDocumentoAdmin")
 
+  asientosComisionGestionados      AsientoComision[]     @relation("AdminAsientosComision")
+  movimientosComisionGestionados   MovimientoComision[]  @relation("AdminMovimientosComision")
+  liquidacionesComisionGestionadas LiquidacionComision[] @relation("AdminLiquidacionesComision")
+
   @@index([adminId])
 }
 
@@ -923,6 +927,9 @@ model Contratacion {
 
   documentos ContratacionDocumento[]
 
+  // ✅ FASE 3: asiento de comisiones (1:1)
+  asientoComision AsientoComision?
+
   @@index([adminId])
   @@index([estado])
   @@index([seccionId])
@@ -944,4 +951,121 @@ model ContratacionDocumento {
   contratacion Contratacion @relation(fields: [contratacionId], references: [id], onDelete: Cascade)
 
   @@index([contratacionId])
+}
+
+// =============================
+// ✅ FASE 3: ASIENTOS REALES (HISTÓRICO COMISIONES)
+// =============================
+
+enum EstadoAsientoComision {
+  PENDIENTE
+  LIQUIDADO
+  ANULADO
+}
+
+enum ReceptorComisionTipo {
+  ADMIN
+  AGENTE
+  LUGAR
+}
+
+model AsientoComision {
+  id          Int       @id @default(autoincrement())
+  creadoEn    DateTime  @default(now())
+  liquidadoEn DateTime?
+
+  // ✅ tenant
+  adminId Int?
+  admin   Usuario? @relation("AdminAsientosComision", fields: [adminId], references: [id])
+
+  // ✅ referencia origen (1 asiento por contratación)
+  contratacionId Int          @unique
+  contratacion   Contratacion @relation(fields: [contratacionId], references: [id], onDelete: Cascade)
+
+  // Snapshots para auditoría
+  seccionId    Int
+  subSeccionId Int?
+  nivel        NivelComision
+
+  reglaId Int?
+  // (sin relación directa para no romper si cambias reglas; si quieres relación me lo dices)
+
+  // Base y totales (siempre en EUR)
+  baseEUR       Decimal @db.Decimal(12, 2)
+  totalComision Decimal @db.Decimal(12, 2)
+
+  agenteEUR Decimal @db.Decimal(12, 2)
+  lugarEUR  Decimal @db.Decimal(12, 2)
+  adminEUR  Decimal @db.Decimal(12, 2)
+
+  // % snapshot usados para reparto (0..100)
+  pctAgenteSnap Decimal @db.Decimal(6, 3)
+  pctLugarSnap  Decimal @db.Decimal(6, 3)
+
+  // referencias para filtros
+  leadId    Int?
+  clienteId Int?
+  agenteId  Int?
+  lugarId   Int?
+
+  estado EstadoAsientoComision @default(PENDIENTE)
+  notas  String?
+
+  movimientos MovimientoComision[]
+
+  @@index([adminId, creadoEn])
+  @@index([estado, creadoEn])
+  @@index([seccionId, subSeccionId])
+  @@index([agenteId, lugarId])
+}
+
+model MovimientoComision {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+
+  adminId Int?
+  admin   Usuario? @relation("AdminMovimientosComision", fields: [adminId], references: [id])
+
+  asientoId Int
+  asiento   AsientoComision @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+
+  receptorTipo ReceptorComisionTipo
+  receptorId   Int?
+
+  importeEUR Decimal @db.Decimal(12, 2)
+
+  liquidacionId Int?
+  liquidacion   LiquidacionComision? @relation(fields: [liquidacionId], references: [id], onDelete: SetNull)
+
+  @@index([adminId, creadoEn])
+  @@index([asientoId])
+  @@index([receptorTipo, receptorId])
+  @@index([liquidacionId])
+}
+
+enum EstadoLiquidacionComision {
+  ABIERTA
+  CERRADA
+}
+
+model LiquidacionComision {
+  id       Int      @id @default(autoincrement())
+  creadoEn DateTime @default(now())
+
+  adminId Int?
+  admin   Usuario? @relation("AdminLiquidacionesComision", fields: [adminId], references: [id])
+
+  desde DateTime
+  hasta DateTime
+
+  estado EstadoLiquidacionComision @default(ABIERTA)
+
+  totalAgenteEUR Decimal @default(0) @db.Decimal(12, 2)
+  totalLugarEUR  Decimal @default(0) @db.Decimal(12, 2)
+  totalAdminEUR  Decimal @default(0) @db.Decimal(12, 2)
+
+  movimientos MovimientoComision[]
+
+  @@index([adminId, creadoEn])
+  @@index([estado, desde, hasta])
 }

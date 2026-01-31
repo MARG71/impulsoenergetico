@@ -358,6 +358,14 @@ export default function ContratacionesContenido() {
                     </div>
                   </div>
 
+                  <button
+                    onClick={() => window.location.href = `/contrataciones/${c.id}`}
+                    className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition"
+                    >
+                    Ver
+                  </button>
+
+
                   <div className="flex gap-2">
                     {c.estado !== "CANCELADA" && (
                       <button

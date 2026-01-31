@@ -16,24 +16,27 @@ function money(n: any) {
 export default function ContratacionDetalleContenido() {
   const router = useRouter();
   const params = useParams();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   const id = useMemo(() => Number((params as any)?.id ?? 0), [params]);
   const role = String((session?.user as any)?.role ?? "").toUpperCase();
   const puedeConfirmar = role === "ADMIN" || role === "SUPERADMIN";
+  const puedeAsentar = role === "ADMIN" || role === "SUPERADMIN";
 
   const [loading, setLoading] = useState(true);
   const [item, setItem] = useState<any>(null);
+
   const [calc, setCalc] = useState<any>(null);
+  const [calcLoading, setCalcLoading] = useState(false);
+  const [asentarLoading, setAsentarLoading] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      // Si tienes /api/crm/contrataciones/[id] úsalo (mejor)
       const r = await fetch(`/api/crm/contrataciones/${id}`, { cache: "no-store" });
-      const t = await r.text();
+      const txt = await r.text();
       let j: any = null;
-      try { j = JSON.parse(t); } catch {}
+      try { j = JSON.parse(txt); } catch {}
 
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Error cargando contratación");
       setItem(j.item);
@@ -62,22 +65,53 @@ export default function ContratacionDetalleContenido() {
   }
 
   async function calcularComisiones() {
-    const res = await fetch(`/api/crm/comisiones/calcular?contratacionId=${id}`, { cache: "no-store" });
-    const txt = await res.text();
-    let data: any = null;
-    try { data = JSON.parse(txt); } catch {}
+    setCalcLoading(true);
+    try {
+      const res = await fetch(`/api/crm/comisiones/calcular?contratacionId=${id}`, { cache: "no-store" });
+      const txt = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(txt); } catch {}
 
-    if (!res.ok || !data?.ok) throw new Error(data?.error || `Error comisiones (${res.status})`);
-    setCalc(data);
-    if (data?.warning) toast.message(data.warning);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `Error comisiones (${res.status})`);
+      setCalc(data);
+      if (data?.warning) toast.message(data.warning);
+    } finally {
+      setCalcLoading(false);
+    }
+  }
+
+  async function asentarComisiones() {
+    setAsentarLoading(true);
+    try {
+      const res = await fetch(`/api/crm/comisiones/asentar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contratacionId: id }),
+      });
+      const txt = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(txt); } catch {}
+
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `Error asentar (${res.status})`);
+
+      if (data?.already) toast.success("Ya estaba asentado ✅");
+      else toast.success("Asiento creado ✅");
+    } catch (e: any) {
+      toast.error(String(e?.message || e));
+    } finally {
+      setAsentarLoading(false);
+    }
   }
 
   useEffect(() => {
+    if (status === "loading") return;
     if (!id) return;
     load().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, status]);
 
+  if (status === "loading") return <div className="p-6 text-white/80">Cargando sesión…</div>;
+  if (!session) return <div className="p-6 text-white/80">No autenticado.</div>;
   if (loading) return <div className="p-6 text-white/80">Cargando…</div>;
   if (!item) return <div className="p-6 text-white/80">No encontrada.</div>;
 
@@ -102,27 +136,29 @@ export default function ContratacionDetalleContenido() {
             Cancelar
           </button>
 
-          <button
-            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-extrabold"
-            onClick={async () => {
-              try { await cambiarEstado("PENDIENTE"); toast.success("Enviada"); }
-              catch (e: any) { toast.error(e?.message || "Error"); }
-            }}
-          >
-            Enviar
-          </button>
+          {item.estado === "BORRADOR" && (
+            <button
+              className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-extrabold"
+              onClick={async () => {
+                try { await cambiarEstado("PENDIENTE"); toast.success("Enviada"); }
+                catch (e: any) { toast.error(e?.message || "Error"); }
+              }}
+            >
+              Enviar
+            </button>
+          )}
 
-          <button
-            className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold"
-            disabled={!puedeConfirmar}
-            onClick={async () => {
-              try { await cambiarEstado("CONFIRMADA"); toast.success("Confirmada ✅"); }
-              catch (e: any) { toast.error(e?.message || "Error"); }
-            }}
-            title={!puedeConfirmar ? "Solo ADMIN/SUPERADMIN" : ""}
-          >
-            Confirmar
-          </button>
+          {puedeConfirmar && item.estado === "PENDIENTE" && (
+            <button
+              className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold"
+              onClick={async () => {
+                try { await cambiarEstado("CONFIRMADA"); toast.success("Confirmada ✅"); }
+                catch (e: any) { toast.error(e?.message || "Error"); }
+              }}
+            >
+              Confirmar
+            </button>
+          )}
         </div>
       </div>
 
@@ -153,45 +189,69 @@ export default function ContratacionDetalleContenido() {
         </div>
       </div>
 
+      {/* COMISIONES */}
       <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-center gap-2">
           <div className="text-white font-extrabold text-lg">Comisiones</div>
-          <button
-            className="ml-auto rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white"
-            onClick={async () => {
-              try { await calcularComisiones(); toast.success("Comisiones calculadas"); }
-              catch (e: any) { toast.error(e?.message || "Error"); }
-            }}
-          >
-            Calcular
-          </button>
+
+          <div className="ml-auto flex gap-2">
+            <button
+              className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white disabled:opacity-60"
+              onClick={async () => {
+                try { await calcularComisiones(); toast.success("Comisiones calculadas"); }
+                catch (e: any) { toast.error(e?.message || "Error"); }
+              }}
+              disabled={calcLoading}
+            >
+              {calcLoading ? "Calculando..." : "Calcular comisiones"}
+            </button>
+
+            {puedeAsentar && (
+              <button
+                className="rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-[13px] font-extrabold text-slate-950 disabled:opacity-60"
+                onClick={asentarComisiones}
+                disabled={asentarLoading}
+                title="Guarda un asiento real (1 por contratación)"
+              >
+                {asentarLoading ? "Asentando..." : "Asentar"}
+              </button>
+            )}
+          </div>
         </div>
 
         {!calc ? (
-          <div className="text-white/70 mt-2">Pulsa “Calcular” para ver el desglose.</div>
+          <div className="text-white/70 mt-2">Pulsa “Calcular comisiones” para ver el desglose.</div>
         ) : (
-          <div className="mt-3 grid md:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-              <div className="text-white/60 text-sm font-bold uppercase">Base usada</div>
-              <div className="text-white font-extrabold">{money(calc.base)}</div>
-            </div>
-            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-              <div className="text-white/60 text-sm font-bold uppercase">Total</div>
-              <div className="text-white font-extrabold">{money(calc.comisiones?.total)}</div>
-            </div>
-            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-              <div className="text-white/60 text-sm font-bold uppercase">Agente</div>
-              <div className="text-white font-extrabold">{money(calc.comisiones?.agente)}</div>
-            </div>
-            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-              <div className="text-white/60 text-sm font-bold uppercase">Lugar</div>
-              <div className="text-white font-extrabold">{money(calc.comisiones?.lugar)}</div>
-            </div>
+          <div className="mt-3">
+            <div className="grid md:grid-cols-4 gap-3">
+              <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Base usada</div>
+                <div className="text-white font-extrabold">{money(calc.base)}</div>
+              </div>
+              <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Total</div>
+                <div className="text-white font-extrabold">{money(calc.comisiones?.total)}</div>
+              </div>
+              <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Agente</div>
+                <div className="text-white font-extrabold">{money(calc.comisiones?.agente)}</div>
+              </div>
+              <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Lugar</div>
+                <div className="text-white font-extrabold">{money(calc.comisiones?.lugar)}</div>
+              </div>
 
-            <div className="md:col-span-4 rounded-xl bg-black/30 border border-white/10 p-3">
-              <div className="text-white/60 text-sm font-bold uppercase">Admin / Empresa</div>
-              <div className="text-white font-extrabold">{money(calc.comisiones?.admin)}</div>
-              {calc.warning ? <div className="text-orange-200 mt-2 font-bold">{calc.warning}</div> : null}
+              <div className="md:col-span-4 rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Empresa (Admin)</div>
+                <div className="text-white font-extrabold">{money(calc.comisiones?.admin)}</div>
+                {calc?.regla?.id ? (
+                  <div className="text-white/60 mt-2 text-sm">
+                    Regla: <b className="text-white">#{calc.regla.id}</b>{" "}
+                    · Tipo: <b className="text-white">{calc.regla.tipo}</b>
+                  </div>
+                ) : null}
+                {calc.warning ? <div className="text-orange-200 mt-2 font-bold">{calc.warning}</div> : null}
+              </div>
             </div>
           </div>
         )}
