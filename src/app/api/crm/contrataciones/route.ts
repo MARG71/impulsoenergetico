@@ -6,8 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 import { EstadoContratacion, NivelComision } from "@prisma/client";
 
-function jsonError(status: number, message: string) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function jsonError(status: number, message: string, extra?: any) {
+  return NextResponse.json(
+    { ok: false, error: message, ...(extra ? { extra } : {}) },
+    { status }
+  );
 }
 
 function toId(v: any) {
@@ -38,6 +41,14 @@ function getRole(tenant: any) {
 function canConfirm(tenant: any) {
   const role = getRole(tenant);
   return role === "SUPERADMIN" || role === "ADMIN";
+}
+
+function safeTrimLower(v: any): string | null {
+  return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : null;
+}
+
+function safeTrim(v: any): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
 export async function GET(req: NextRequest) {
@@ -100,7 +111,9 @@ export async function POST(req: NextRequest) {
 
   if (role === "SUPERADMIN") {
     resolvedAdminId = toId(body?.adminId);
-    if (!resolvedAdminId) return jsonError(400, "Como SUPERADMIN, debes enviar adminId para crear la contratación");
+    if (!resolvedAdminId) {
+      return jsonError(400, "Como SUPERADMIN, debes enviar adminId para crear la contratación");
+    }
   } else {
     resolvedAdminId = tenant.tenantAdminId ?? null;
     if (!resolvedAdminId) return jsonError(400, "tenantAdminId no disponible");
@@ -129,6 +142,7 @@ export async function POST(req: NextRequest) {
       data,
       include: { seccion: true, subSeccion: true, cliente: true, lead: true },
     });
+
     return NextResponse.json({ ok: true, item: created });
   } catch (e: any) {
     console.error("POST /api/crm/contrataciones error:", e);
@@ -178,11 +192,13 @@ export async function PATCH(req: NextRequest) {
 
       if (typeof body?.notas === "string") data.notas = body.notas;
 
-      if (body?.baseImponible !== undefined)
+      if (body?.baseImponible !== undefined) {
         data.baseImponible = body.baseImponible === null ? null : body.baseImponible;
+      }
 
-      if (body?.totalFactura !== undefined)
+      if (body?.totalFactura !== undefined) {
         data.totalFactura = body.totalFactura === null ? null : body.totalFactura;
+      }
 
       // ✅ Si pasa a CONFIRMADA => crear/vincular cliente + confirmadaEn
       if (est === "CONFIRMADA") {
@@ -200,10 +216,12 @@ export async function PATCH(req: NextRequest) {
               select: { nombre: true, email: true, telefono: true, direccion: true } as any,
             });
 
-            if (!lead?.nombre) throw new Error("El lead no tiene nombre");
+            const leadNombre = safeTrim((lead as any)?.nombre);
+            if (!lead || !leadNombre) throw new Error("El lead no tiene nombre");
 
-            const email = lead.email?.trim().toLowerCase() || null;
-            const telefono = lead.telefono?.trim() || null;
+            const email = safeTrimLower((lead as any)?.email);
+            const telefono = safeTrim((lead as any)?.telefono);
+            const direccion = safeTrim((lead as any)?.direccion) || "PENDIENTE";
 
             const existing = await tx.cliente.findFirst({
               where: {
@@ -221,22 +239,23 @@ export async function PATCH(req: NextRequest) {
               await tx.cliente.update({
                 where: { id: existing.id },
                 data: {
-                  nombre: lead.nombre,
-                  email: email ?? undefined,
-                  telefono: telefono ?? undefined,
-                },
+                  nombre: leadNombre,
+                  ...(email ? { email } : {}),
+                  ...(telefono ? { telefono } : {}),
+                } as any,
               });
             } else {
-              await tx.cliente.create({
+              const createdCliente = await tx.cliente.create({
                 data: {
                   ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
-                  nombre: lead.nombre,
+                  nombre: leadNombre || "Cliente",
                   email,
-                  telefono,
-                  direccion: (lead as any)?.direccion?.trim() || "PENDIENTE",
+                  telefono: telefono || "",
+                  direccion,
                 } as any,
                 select: { id: true },
-              }).then((c) => (clienteId = c.id));
+              });
+              clienteId = createdCliente.id;
             }
           }
 
