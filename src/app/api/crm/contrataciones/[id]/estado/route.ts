@@ -23,7 +23,10 @@ function getRole(tenant: any) {
 
 type Estado = "BORRADOR" | "PENDIENTE" | "CONFIRMADA" | "CANCELADA";
 
-export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: { id: string } }
+) {
   try {
     const tenant = await getTenantContext(req);
     if (!tenant.ok) return jsonError(tenant.error, tenant.status);
@@ -42,7 +45,6 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
       return jsonError("Estado no válido", 400, { estado });
     }
 
-    // Confirmar: solo ADMIN/SUPERADMIN
     if (estado === "CONFIRMADA" && !["ADMIN", "SUPERADMIN"].includes(role)) {
       return jsonError("Solo ADMIN/SUPERADMIN puede confirmar", 403);
     }
@@ -57,9 +59,7 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
 
     if (!contratacion) return jsonError("Contratación no encontrada", 404);
 
-    // ✅ Scope:
-    // - ADMIN: solo su adminId
-    // - SUPERADMIN: cualquiera
+    // ✅ Scope
     if (role !== "SUPERADMIN") {
       if (!tenantAdminId) return jsonError("tenantAdminId no disponible", 400);
       if ((contratacion as any).adminId !== tenantAdminId) {
@@ -67,8 +67,8 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
       }
     }
 
-    // Base adminId real del registro (para clientes/leads)
-    const effectiveAdminId = (contratacion as any).adminId ?? (role === "SUPERADMIN" ? null : tenantAdminId);
+    const effectiveAdminId =
+      (contratacion as any).adminId ?? (role === "SUPERADMIN" ? null : tenantAdminId);
 
     let clienteId = (contratacion as any).clienteId ?? null;
 
@@ -85,7 +85,6 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
         String((lead as any)?.lugar?.direccion ?? "").trim() ||
         "PENDIENTE";
 
-      // Buscar cliente por email/telefono dentro del adminId efectivo (si existe)
       let cliente: any = null;
 
       if (email) {
