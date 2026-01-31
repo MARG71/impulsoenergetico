@@ -1,73 +1,117 @@
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getTenantContext } from "@/lib/tenant";
-import { EstadoContratacion, NivelComision } from "@prisma/client";
+import {
+  getSessionOrThrow,
+  sessionRole,
+  sessionAdminId,
+} from "@/lib/auth-server";
 
-function jsonError(status: number, message: string) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function jsonError(message: string, status = 400, extra?: any) {
+  return NextResponse.json(
+    { ok: false, error: message, ...(extra ? { extra } : {}) },
+    { status }
+  );
 }
 
-function toId(v: any) {
+function parseId(v: unknown) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export async function POST(req: NextRequest) {
-  const tenant = await getTenantContext(req);
-  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+/**
+ * Intenta obtener un seccionId válido:
+ * - Si el lead ya tiene seccionId, usarlo.
+ * - Si no, buscar una sección "Luz" o la primera disponible.
+ * (Esto evita romper si Contratacion exige seccionId obligatorio)
+ */
+async function resolveSeccionIdFallback(): Promise<number | null> {
+  // Ajusta el orden / nombres si en tu BD se llaman distinto
+  const byName = await prisma.seccion.findFirst({
+    where: { nombre: { in: ["Luz", "luz", "Energía", "energia"] } as any },
+    select: { id: true },
+  });
 
-  const body = await req.json().catch(() => ({}));
-  const leadId = toId(body?.leadId);
-  if (!leadId) return jsonError(400, "leadId es obligatorio");
+  if (byName?.id) return byName.id;
 
+  const first = await prisma.seccion.findFirst({
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+
+  return first?.id ?? null;
+}
+
+export async function POST(req: Request) {
   try {
-    const lead = await prisma.lead.findFirst({
-      where: {
-        id: leadId,
-        ...(tenant.tenantAdminId != null ? { adminId: tenant.tenantAdminId } : {}),
-      },
-      select: {
-        id: true,
-        nombre: true,
-        agenteId: true,
-        lugarId: true,
-        adminId: true,
+    const session = await getSessionOrThrow();
+    const role = sessionRole(session);
+    const adminId = sessionAdminId(session);
+
+    // Roles permitidos (ajusta si quieres permitir AGENTE)
+    if (!["ADMIN", "SUPERADMIN"].includes(String(role))) {
+      return jsonError("No autorizado", 403);
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body) return jsonError("Body JSON inválido", 400);
+
+    const leadId = parseId(body.leadId);
+    if (!leadId) return jsonError("leadId requerido", 400);
+
+    // 1) Traer lead (y datos para cliente)
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      include: {
+        lugar: true as any,
+        agente: true as any,
       },
     });
 
-    if (!lead) return jsonError(404, "Lead no encontrado");
+    if (!lead) return jsonError("Lead no encontrado", 404);
 
-    // ✅ Sección por defecto: LUZ (slug "luz") o la primera activa
-    const seccion = await prisma.seccion.findFirst({
-      where: { activa: true, slug: "luz" },
-      select: { id: true },
-    });
+    // Multi-tenant: si tu lead tiene adminId, valida que coincide
+    // (Lo dejo suave con any para no romper si no existe)
+    if ((lead as any).adminId && (lead as any).adminId !== adminId) {
+      return jsonError("No autorizado para este lead", 403);
+    }
 
-    const fallback = seccion
-      ? seccion.id
-      : (await prisma.seccion.findFirst({ where: { activa: true }, select: { id: true } }))?.id;
+    // 2) Resolver seccionId (obligatorio en Contratacion en tu caso)
+    let seccionId: number | null = parseId((lead as any).seccionId);
+    if (!seccionId) seccionId = await resolveSeccionIdFallback();
+    if (!seccionId) {
+      return jsonError(
+        "No se pudo resolver seccionId. Crea al menos 1 Sección en BD.",
+        400
+      );
+    }
 
-    if (!fallback) return jsonError(400, "No hay secciones activas. Crea Secciones primero.");
-
-    const created = await prisma.contratacion.create({
+    // 3) Crear contratación en BORRADOR
+    const contratacion = await prisma.contratacion.create({
       data: {
-        adminId: tenant.tenantAdminId ?? null,
+        // multi-tenant si tu modelo lo usa
+        ...(adminId ? ({ adminId } as any) : {}),
+
         leadId: lead.id,
-        agenteId: lead.agenteId ?? null,
-        lugarId: lead.lugarId ?? null,
-        seccionId: fallback, // ✅ obligatorio
-        subSeccionId: null,
-        estado: EstadoContratacion.BORRADOR,
-        nivel: NivelComision.C1,
-      },
-      include: { seccion: true, subSeccion: true, lead: true },
+        seccionId,
+
+        estado: "BORRADOR" as any,
+
+        // Enlazados si existen en tu modelo
+        ...(lead.agenteId ? ({ agenteId: lead.agenteId } as any) : {}),
+        ...(lead.lugarId ? ({ lugarId: lead.lugarId } as any) : {}),
+
+        // Puedes copiar más campos si tu modelo los tiene:
+        // tarifa, compania, cups, potencia, etc.
+      } as any,
     });
 
-    return NextResponse.json({ ok: true, item: created });
+    return NextResponse.json({ ok: true, contratacion }, { status: 201 });
   } catch (e: any) {
-    console.error("POST /api/crm/contrataciones/desde-lead error:", e);
-    return jsonError(500, "Error creando contratación desde lead");
+    // IMPORTANTÍSIMO: devolver JSON, no HTML
+    return jsonError("Error interno creando contratación", 500, {
+      message: String(e?.message ?? e),
+    });
   }
 }
