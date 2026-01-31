@@ -408,11 +408,23 @@ export default function LeadDetalleContenido() {
     const res = await fetch("/api/crm/contrataciones/desde-lead", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: lead.id, seccionId }),
+      body: JSON.stringify({
+        leadId: lead.id,
+        seccionId, // asegúrate que esto es number
+      }),
     });
 
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo crear");
+    const txt = await res.text();
+    let json: any = null;
+    try { json = JSON.parse(txt); } catch {}
+
+    if (!res.ok || !json?.ok) {
+      throw new Error(json?.error || `No se pudo crear (${res.status})`);
+    }
+
+    // ✅ si todo bien, aquí tienes la contratación creada
+    const contratacion = json.item || json.contratacion;
+
 
     // 3) Te mando a contrataciones (o a detalle si lo haces)
     router.push("/contrataciones");

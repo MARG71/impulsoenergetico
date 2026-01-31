@@ -99,25 +99,57 @@ export async function POST(req: NextRequest) {
   const role = getRole(tenant);
   const body = await req.json().catch(() => ({}));
 
-  const seccionId = toId(body?.seccionId);
-  if (!seccionId) return jsonError(400, "seccionId es obligatorio");
+  // ✅ leadId (por si viene desde botón del lead)
+  const leadId = toId(body?.leadId);
 
-  const subSeccionId = toId(body?.subSeccionId);
+  // ✅ seccionId: si no viene, intentamos default "luz"
+  let seccionId = toId(body?.seccionId);
 
-  // ✅ adminId:
-  // - ADMIN: siempre su tenantAdminId
-  // - SUPERADMIN: debe venir en body.adminId (para crear para un admin concreto)
+  // ✅ adminId resuelto
   let resolvedAdminId: number | null = null;
 
+  // 1) SUPERADMIN: si viene adminId en body, ok; si no, intentar deducirlo del lead
   if (role === "SUPERADMIN") {
-    resolvedAdminId = toId(body?.adminId);
+    resolvedAdminId = toId(body?.adminId) ?? null;
+
+    if (!resolvedAdminId && leadId) {
+      const lead = await prisma.lead.findUnique({
+        where: { id: leadId },
+        select: { adminId: true },
+      });
+      resolvedAdminId = (lead?.adminId ?? null) as any;
+    }
+
     if (!resolvedAdminId) {
-      return jsonError(400, "Como SUPERADMIN, debes enviar adminId para crear la contratación");
+      return jsonError(
+        400,
+        "Como SUPERADMIN, debes enviar adminId o un leadId con adminId para crear la contratación"
+      );
     }
   } else {
+    // 2) ADMIN/otros: adminId siempre desde tenant
     resolvedAdminId = tenant.tenantAdminId ?? null;
     if (!resolvedAdminId) return jsonError(400, "tenantAdminId no disponible");
   }
+
+  // ✅ si aún no tenemos seccionId: intentamos buscar la sección 'luz' dentro del tenant
+  if (!seccionId) {
+    const luz = await prisma.seccion.findFirst({
+      where: {
+        slug: "luz",
+        activa: true,
+        ...(role === "SUPERADMIN" ? {} : { adminId: resolvedAdminId }),
+      } as any,
+      select: { id: true },
+    });
+    seccionId = luz?.id ?? null;
+  }
+
+  if (!seccionId) {
+    return jsonError(400, "seccionId es obligatorio (no existe sección 'luz' por defecto)");
+  }
+
+  const subSeccionId = toId(body?.subSeccionId);
 
   const data: any = {
     adminId: resolvedAdminId,
@@ -126,7 +158,7 @@ export async function POST(req: NextRequest) {
     notas: typeof body?.notas === "string" ? body.notas : null,
     agenteId: toId(body?.agenteId),
     lugarId: toId(body?.lugarId),
-    leadId: toId(body?.leadId),
+    leadId: leadId,
     baseImponible: body?.baseImponible ?? null,
     totalFactura: body?.totalFactura ?? null,
   };

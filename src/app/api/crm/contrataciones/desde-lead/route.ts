@@ -1,18 +1,19 @@
 // src/app/api/crm/contrataciones/desde-lead/route.ts
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
+import { EstadoContratacion, NivelComision } from "@prisma/client";
 
-function jsonError(message: string, status = 400, extra?: any) {
+function jsonError(status: number, message: string, extra?: any) {
   return NextResponse.json(
     { ok: false, error: message, ...(extra ? { extra } : {}) },
     { status }
   );
 }
 
-function parseId(v: unknown) {
+function toId(v: any) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -21,80 +22,86 @@ function getRole(tenant: any) {
   return String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
 }
 
-async function resolveSeccionIdFallback(): Promise<number | null> {
-  const byName = await prisma.seccion.findFirst({
-    where: { nombre: { in: ["Luz", "luz", "Energía", "energia"] } as any },
-    select: { id: true },
-  });
-  if (byName?.id) return byName.id;
+export async function POST(req: NextRequest) {
+  const tenant = await getTenantContext(req);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
-  const first = await prisma.seccion.findFirst({
-    select: { id: true },
-    orderBy: { id: "asc" },
-  });
-  return first?.id ?? null;
-}
+  const role = getRole(tenant);
+  const body = await req.json().catch(() => ({}));
 
-export async function POST(req: Request) {
+  const leadId = toId(body?.leadId);
+  const seccionId = toId(body?.seccionId);
+
+  if (!leadId) return jsonError(400, "leadId es obligatorio");
+  if (!seccionId) return jsonError(400, "seccionId es obligatorio");
+
   try {
-    const tenant = await getTenantContext(req as any);
-    if (!tenant.ok) return jsonError(tenant.error, tenant.status);
-
-    const role = getRole(tenant);
-
-    if (!["ADMIN", "SUPERADMIN"].includes(role)) {
-      return jsonError("No autorizado", 403);
-    }
-
-    const body = await req.json().catch(() => null);
-    if (!body) return jsonError("Body JSON inválido", 400);
-
-    const leadId = parseId(body.leadId);
-    if (!leadId) return jsonError("leadId requerido", 400);
-
+    // 1) Leer lead + adminId (muy importante para SUPERADMIN)
+    // ⚠️ OJO: en tu schema Lead NO tiene clienteId => lo quitamos.
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
-      select: { id: true, agenteId: true, lugarId: true, seccionId: true, adminId: true } as any,
+      select: {
+        id: true,
+        adminId: true,
+        agenteId: true,
+        lugarId: true,
+      },
     });
 
-    if (!lead) return jsonError("Lead no encontrado", 404);
+    if (!lead) return jsonError(404, "Lead no encontrado");
 
-    // 1) Resolver seccionId
-    let seccionId = parseId((lead as any).seccionId);
-    if (!seccionId) seccionId = await resolveSeccionIdFallback();
-    if (!seccionId) return jsonError("No hay secciones en BD (crea al menos 1)", 400);
-
-    // 2) Resolver adminId correcto (multi-tenant)
-    // - ADMIN: usar tenantAdminId
-    // - SUPERADMIN: usar lead.adminId (debe existir)
+    // 2) Resolver adminId efectivo
     let resolvedAdminId: number | null = null;
 
     if (role === "SUPERADMIN") {
-      resolvedAdminId = Number((lead as any)?.adminId ?? null) || null;
+      resolvedAdminId = lead.adminId ?? null;
       if (!resolvedAdminId) {
-        return jsonError("Este lead no tiene adminId. Asígnalo al crear el lead para poder generar contrataciones.", 400);
+        return jsonError(400, "El lead no tiene adminId (necesario para SUPERADMIN)");
       }
     } else {
       resolvedAdminId = tenant.tenantAdminId ?? null;
-      if (!resolvedAdminId) return jsonError("tenantAdminId no disponible", 400);
+      if (!resolvedAdminId) return jsonError(400, "tenantAdminId no disponible");
     }
 
-    const contratacion = await prisma.contratacion.create({
+    // 3) Seguridad tenant: si no eres SUPERADMIN, el lead debe ser de tu adminId
+    if (role !== "SUPERADMIN") {
+      const leadAdminId = lead.adminId ?? null;
+      if (leadAdminId && leadAdminId !== resolvedAdminId) {
+        return jsonError(403, "No autorizado para usar este lead");
+      }
+    }
+
+    // 4) Crear contratación en BORRADOR
+    const created = await prisma.contratacion.create({
       data: {
         adminId: resolvedAdminId,
-        leadId: lead.id,
+        estado: EstadoContratacion.BORRADOR,
+        nivel: NivelComision.C1, // default
         seccionId,
-        estado: "BORRADOR" as any,
-        ...(lead.agenteId ? ({ agenteId: lead.agenteId } as any) : {}),
-        ...(lead.lugarId ? ({ lugarId: lead.lugarId } as any) : {}),
-        nivel: "C1" as any,
-      } as any,
+        subSeccionId: null,
+        leadId: lead.id,
+        agenteId: lead.agenteId ?? null,
+        lugarId: lead.lugarId ?? null,
+
+        // clienteId se asigna al CONFIRMAR (tu lógica ya lo hace)
+        clienteId: null,
+
+        baseImponible: null,
+        totalFactura: null,
+        notas: null,
+      },
+      include: {
+        seccion: true,
+        subSeccion: true,
+        lead: true,
+        cliente: true,
+      },
     });
 
-    return NextResponse.json({ ok: true, contratacion }, { status: 201 });
+    return NextResponse.json({ ok: true, item: created });
   } catch (e: any) {
-    return jsonError("Error interno creando contratación", 500, {
-      message: String(e?.message ?? e),
-    });
+    console.error("POST /api/crm/contrataciones/desde-lead error:", e);
+    // 🔎 útil para que la UI muestre el error real
+    return jsonError(500, e?.message || "Error interno creando contratación");
   }
 }
