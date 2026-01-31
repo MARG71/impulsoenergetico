@@ -20,57 +20,49 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const leadId = toId(body?.leadId);
-  const seccionId = toId(body?.seccionId);
-  const subSeccionId = toId(body?.subSeccionId);
-
   if (!leadId) return jsonError(400, "leadId es obligatorio");
-  if (!seccionId) return jsonError(400, "seccionId es obligatorio");
 
   try {
-    // 1) Cargar lead (scoped por adminId)
-    const whereLead: any = { id: leadId };
-    if (tenant.tenantAdminId != null) whereLead.adminId = tenant.tenantAdminId;
-
     const lead = await prisma.lead.findFirst({
-      where: whereLead,
-      select: { id: true, agenteId: true, lugarId: true, adminId: true, nombre: true },
+      where: {
+        id: leadId,
+        ...(tenant.tenantAdminId != null ? { adminId: tenant.tenantAdminId } : {}),
+      },
+      select: {
+        id: true,
+        nombre: true,
+        agenteId: true,
+        lugarId: true,
+        adminId: true,
+      },
     });
 
     if (!lead) return jsonError(404, "Lead no encontrado");
 
-    // 2) Validar que la seccion existe y está activa (opcional pero recomendable)
-    const sec = await prisma.seccion.findFirst({
-      where: { id: seccionId, activa: true },
+    // ✅ Sección por defecto: LUZ (slug "luz") o la primera activa
+    const seccion = await prisma.seccion.findFirst({
+      where: { activa: true, slug: "luz" },
       select: { id: true },
     });
-    if (!sec) return jsonError(400, "Sección inválida o inactiva");
 
-    // 3) Si mandan subSeccionId, validar que pertenece a la seccion y está activa
-    if (subSeccionId) {
-      const sub = await prisma.subSeccion.findFirst({
-        where: { id: subSeccionId, seccionId, activa: true },
-        select: { id: true },
-      });
-      if (!sub) return jsonError(400, "Subsección inválida, inactiva o no pertenece a la sección");
-    }
+    const fallback = seccion
+      ? seccion.id
+      : (await prisma.seccion.findFirst({ where: { activa: true }, select: { id: true } }))?.id;
 
-    // 4) Crear contratación BORRADOR
+    if (!fallback) return jsonError(400, "No hay secciones activas. Crea Secciones primero.");
+
     const created = await prisma.contratacion.create({
       data: {
         adminId: tenant.tenantAdminId ?? null,
         leadId: lead.id,
         agenteId: lead.agenteId ?? null,
         lugarId: lead.lugarId ?? null,
-        seccionId,
-        subSeccionId: subSeccionId ?? null,
+        seccionId: fallback, // ✅ obligatorio
+        subSeccionId: null,
         estado: EstadoContratacion.BORRADOR,
-        nivel: NivelComision.C1, // puedes permitir que venga del body si quieres
+        nivel: NivelComision.C1,
       },
-      include: {
-        seccion: true,
-        subSeccion: true,
-        lead: true,
-      },
+      include: { seccion: true, subSeccion: true, lead: true },
     });
 
     return NextResponse.json({ ok: true, item: created });

@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
-import { TipoCalculoComision } from "@prisma/client";
+import { TipoCalculoComision, NivelComision } from "@prisma/client";
 
 function jsonError(status: number, message: string) {
   return NextResponse.json({ ok: false, error: message }, { status });
@@ -15,66 +15,27 @@ function toId(v: any) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function toDecimalNumber(v: any) {
-  if (v === null || v === undefined || v === "") return null;
+function decToNumber(v: any): number {
+  if (v === null || v === undefined) return 0;
   const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? n : 0;
+}
+
+// pct guardado como 0.2500 => 25%
+function pctToNumber(v: any): number {
+  const n = decToNumber(v);
+  if (n < 0) return 0;
+  if (n > 1) return n / 100; // por si algún día guardas 25 en vez de 0.25
+  return n;
 }
 
 function clamp(n: number, min?: number | null, max?: number | null) {
-  let x = n;
-  if (min !== null && min !== undefined) x = Math.max(x, Number(min));
-  if (max !== null && max !== undefined) x = Math.min(x, Number(max));
-  return x;
-}
-
-/**
- * Calcula el "pool admin" (importe de comisión) usando ReglaComisionGlobal:
- * - FIJA => fijoEUR
- * - PORC_BASE => porcentaje sobre baseImponible
- * - PORC_MARGEN => porcentaje sobre (totalFactura - baseImponible)
- * - MIXTA => fijoEUR + porcentaje sobre baseImponible (si existe)
- */
-function calcularPool(regla: any, base: number | null, total: number | null) {
-  const fijo = regla?.fijoEUR != null ? Number(regla.fijoEUR) : 0;
-  const pct = regla?.porcentaje != null ? Number(regla.porcentaje) : 0;
-
-  const baseImponible = base ?? 0;
-  const totalFactura = total ?? 0;
-  const margen = Math.max(0, totalFactura - baseImponible);
-
-  let pool = 0;
-
-  const tipo = regla?.tipo as TipoCalculoComision;
-
-  if (tipo === "FIJA") {
-    pool = fijo;
-  } else if (tipo === "PORC_BASE") {
-    pool = (pct / 100) * baseImponible;
-  } else if (tipo === "PORC_MARGEN") {
-    pool = (pct / 100) * margen;
-  } else if (tipo === "MIXTA") {
-    pool = fijo + (pct / 100) * baseImponible;
-  } else {
-    // fallback por si llega algo raro
-    pool = fijo;
-  }
-
-  pool = clamp(pool, regla?.minEUR, regla?.maxEUR);
-
-  return {
-    pool,
-    detalle: {
-      tipo,
-      fijoEUR: fijo,
-      porcentaje: pct,
-      baseImponible,
-      totalFactura,
-      margen,
-      minEUR: regla?.minEUR ?? null,
-      maxEUR: regla?.maxEUR ?? null,
-    },
-  };
+  const mi = min == null ? null : Number(min);
+  const ma = max == null ? null : Number(max);
+  let out = n;
+  if (mi != null && Number.isFinite(mi)) out = Math.max(out, mi);
+  if (ma != null && Number.isFinite(ma)) out = Math.min(out, ma);
+  return out;
 }
 
 export async function GET(req: NextRequest) {
@@ -84,75 +45,130 @@ export async function GET(req: NextRequest) {
   const contratacionId = toId(req.nextUrl.searchParams.get("contratacionId"));
   if (!contratacionId) return jsonError(400, "contratacionId es obligatorio");
 
-  // scope tenant por adminId en Contratacion (sí existe)
-  const where: any = { id: contratacionId };
-  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const c = await tx.contratacion.findFirst({
-        where,
-        select: {
-          id: true,
-          estado: true,
-          nivel: true,
-          seccionId: true,
-          subSeccionId: true,
-          baseImponible: true,
-          totalFactura: true,
-          adminId: true,
-        },
-      });
+    const whereContr: any = { id: contratacionId };
+    if (tenant.tenantAdminId != null) whereContr.adminId = tenant.tenantAdminId;
 
-      if (!c) throw new Error("Contratación no encontrada");
-
-      // La regla NO tiene adminId en tu schema, así que la seleccionamos solo por seccion/sub/nivel/activa
-      // Priorizamos: regla específica de subsección, si no hay, regla de sección (subSeccionId null)
-      const regla =
-        (await tx.reglaComisionGlobal.findFirst({
-          where: {
-            seccionId: c.seccionId,
-            subSeccionId: c.subSeccionId ?? undefined,
-            nivel: c.nivel,
-            activa: true,
-          },
-          orderBy: { id: "desc" },
-        })) ||
-        (await tx.reglaComisionGlobal.findFirst({
-          where: {
-            seccionId: c.seccionId,
-            subSeccionId: null,
-            nivel: c.nivel,
-            activa: true,
-          },
-          orderBy: { id: "desc" },
-        }));
-
-      if (!regla) {
-        return {
-          ok: false,
-          error:
-            "No hay regla activa para esa Sección/Subsección y Nivel. Crea una ReglaComisionGlobal.",
-        };
-      }
-
-      const base = c.baseImponible != null ? Number(c.baseImponible) : null;
-      const total = c.totalFactura != null ? Number(c.totalFactura) : null;
-
-      const calc = calcularPool(regla, base, total);
-
-      return {
-        ok: true,
-        contratacionId: c.id,
-        reglaId: regla.id,
-        pool: calc.pool,
-        detalle: calc.detalle,
-      };
+    const contr = await prisma.contratacion.findFirst({
+      where: whereContr,
+      select: {
+        id: true,
+        estado: true,
+        nivel: true,
+        seccionId: true,
+        subSeccionId: true,
+        baseImponible: true,
+        totalFactura: true,
+        agenteId: true,
+        lugarId: true,
+        adminId: true,
+        leadId: true,
+        clienteId: true,
+      },
     });
 
-    return NextResponse.json(result);
+    if (!contr) return jsonError(404, "Contratación no encontrada");
+
+    // ✅ Regla global (según TU schema)
+    const regla = await prisma.reglaComisionGlobal.findFirst({
+      where: {
+        seccionId: contr.seccionId,
+        subSeccionId: contr.subSeccionId ?? null,
+        nivel: contr.nivel as NivelComision,
+        activa: true,
+      },
+      select: {
+        id: true,
+        tipo: true,
+        fijoEUR: true,
+        porcentaje: true,
+        minEUR: true,
+        maxEUR: true,
+      },
+    });
+
+    if (!regla) {
+      return jsonError(
+        400,
+        "No existe ReglaComisionGlobal activa para esa sección/subsección/nivel."
+      );
+    }
+
+    const base = decToNumber(contr.baseImponible);
+    const total = decToNumber(contr.totalFactura);
+
+    // ✅ Pool admin calculado desde la regla
+    let poolAdmin = 0;
+
+    if (regla.tipo === TipoCalculoComision.FIJA) {
+      poolAdmin = decToNumber(regla.fijoEUR);
+    } else if (regla.tipo === TipoCalculoComision.PORC_BASE) {
+      const pct = decToNumber(regla.porcentaje); // aquí lo interpretamos como %
+      poolAdmin = base * (pct / 100);
+    } else if (regla.tipo === TipoCalculoComision.PORC_MARGEN) {
+      // todavía no tienes “margen” en schema de contratación => usamos BASE por ahora
+      const pct = decToNumber(regla.porcentaje);
+      poolAdmin = base * (pct / 100);
+    } else if (regla.tipo === TipoCalculoComision.MIXTA) {
+      const fijo = decToNumber(regla.fijoEUR);
+      const pct = decToNumber(regla.porcentaje);
+      poolAdmin = fijo + base * (pct / 100);
+    }
+
+    poolAdmin = clamp(poolAdmin, regla.minEUR as any, regla.maxEUR as any);
+
+    // ✅ Reparto usando porcentajes del Lugar/Agente o defaults globales
+    const defaults = await prisma.globalComisionDefaults.findUnique({
+      where: { id: 1 },
+      select: { defaultPctCliente: true, defaultPctLugar: true, defaultPctAgente: true },
+    });
+
+    const lugar = contr.lugarId
+      ? await prisma.lugar.findUnique({
+          where: { id: contr.lugarId },
+          select: { id: true, pctCliente: true, pctLugar: true, especial: true },
+        })
+      : null;
+
+    const agente = contr.agenteId
+      ? await prisma.agente.findUnique({
+          where: { id: contr.agenteId },
+          select: { id: true, pctAgente: true },
+        })
+      : null;
+
+    const pctCliente = pctToNumber(lugar?.pctCliente ?? defaults?.defaultPctCliente ?? 0);
+    const pctLugar = pctToNumber(lugar?.pctLugar ?? defaults?.defaultPctLugar ?? 0);
+    const pctAgente = pctToNumber(agente?.pctAgente ?? defaults?.defaultPctAgente ?? 0);
+
+    const importeCliente = poolAdmin * pctCliente;
+    const importeLugar = poolAdmin * pctLugar;
+    const importeAgente = poolAdmin * pctAgente;
+
+    const totalRed = importeCliente + importeLugar + importeAgente;
+    const restoAdmin = poolAdmin - totalRed;
+
+    return NextResponse.json({
+      ok: true,
+      contratacionId: contr.id,
+      reglaId: regla.id,
+      base,
+      total,
+      poolAdmin,
+      reparto: {
+        pctCliente,
+        pctLugar,
+        pctAgente,
+        importeCliente,
+        importeLugar,
+        importeAgente,
+        restoAdmin,
+      },
+      nota:
+        "Este endpoint devuelve cálculo. El guardado de asientos (histórico) lo hacemos en el siguiente paso.",
+    });
   } catch (e: any) {
     console.error("GET /api/crm/comisiones/calcular error:", e);
-    return jsonError(500, e?.message || "Error calculando comisiones");
+    return jsonError(500, "Error calculando comisiones");
   }
 }
