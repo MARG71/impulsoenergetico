@@ -31,10 +31,12 @@ function asNivel(v: any): NivelComision | null {
     : null;
 }
 
-// Si getTenantContext te da rol, úsalo.
-// Si no, esta función no rompe nada.
+function getRole(tenant: any) {
+  return String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+}
+
 function canConfirm(tenant: any) {
-  const role = String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+  const role = getRole(tenant);
   return role === "SUPERADMIN" || role === "ADMIN";
 }
 
@@ -42,10 +44,18 @@ export async function GET(req: NextRequest) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
+  const role = getRole(tenant);
+
   const estadoQ = asEstado(req.nextUrl.searchParams.get("estado"));
   const where: any = {};
 
-  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+  // ✅ SUPERADMIN: ve todo
+  // ✅ ADMIN: solo su adminId
+  if (role !== "SUPERADMIN") {
+    if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+    else return jsonError(400, "tenantAdminId no disponible");
+  }
+
   if (estadoQ) where.estado = estadoQ;
 
   try {
@@ -64,7 +74,6 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // IMPORTANTE: tu front debe leer json.items (no un array directo)
     return NextResponse.json({ ok: true, items });
   } catch (e: any) {
     console.error("GET /api/crm/contrataciones error:", e);
@@ -76,6 +85,7 @@ export async function POST(req: NextRequest) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
+  const role = getRole(tenant);
   const body = await req.json().catch(() => ({}));
 
   const seccionId = toId(body?.seccionId);
@@ -83,7 +93,21 @@ export async function POST(req: NextRequest) {
 
   const subSeccionId = toId(body?.subSeccionId);
 
+  // ✅ adminId:
+  // - ADMIN: siempre su tenantAdminId
+  // - SUPERADMIN: debe venir en body.adminId (para crear para un admin concreto)
+  let resolvedAdminId: number | null = null;
+
+  if (role === "SUPERADMIN") {
+    resolvedAdminId = toId(body?.adminId);
+    if (!resolvedAdminId) return jsonError(400, "Como SUPERADMIN, debes enviar adminId para crear la contratación");
+  } else {
+    resolvedAdminId = tenant.tenantAdminId ?? null;
+    if (!resolvedAdminId) return jsonError(400, "tenantAdminId no disponible");
+  }
+
   const data: any = {
+    adminId: resolvedAdminId,
     seccionId,
     subSeccionId: subSeccionId ?? null,
     notas: typeof body?.notas === "string" ? body.notas : null,
@@ -99,8 +123,6 @@ export async function POST(req: NextRequest) {
 
   const niv = asNivel(body?.nivel);
   if (niv) data.nivel = niv;
-
-  if (tenant.tenantAdminId != null) data.adminId = tenant.tenantAdminId;
 
   try {
     const created = await prisma.contratacion.create({
@@ -118,29 +140,33 @@ export async function PATCH(req: NextRequest) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
-  const adminId = tenant.tenantAdminId;
-  if (!adminId) return jsonError(400, "tenantAdminId no disponible");
+  const role = getRole(tenant);
+  const adminId = tenant.tenantAdminId; // puede ser null en SUPERADMIN
 
   const body = await req.json().catch(() => ({}));
   const id = toId(body?.id);
   if (!id) return jsonError(400, "id es obligatorio");
 
-  // 🔒 scope tenant
-  const whereTenant: any = { id, adminId };
+  // ✅ Scope:
+  // - ADMIN: { id, adminId }
+  // - SUPERADMIN: { id }
+  const whereTenant: any = role === "SUPERADMIN" ? { id } : { id, adminId };
+
+  if (role !== "SUPERADMIN" && !adminId) {
+    return jsonError(400, "tenantAdminId no disponible");
+  }
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.contratacion.findFirst({
         where: whereTenant,
-        select: {
-          id: true,
-          estado: true,
-          leadId: true,
-          clienteId: true,
-        },
+        select: { id: true, estado: true, leadId: true, clienteId: true, adminId: true },
       });
 
       if (!current) throw new Error("Contratación no encontrada");
+
+      // Para SUPERADMIN, operamos con el adminId real del registro
+      const effectiveAdminId = role === "SUPERADMIN" ? (current as any).adminId : adminId;
 
       const data: any = {};
 
@@ -152,23 +178,26 @@ export async function PATCH(req: NextRequest) {
 
       if (typeof body?.notas === "string") data.notas = body.notas;
 
-      if (body?.baseImponible !== undefined) data.baseImponible = body.baseImponible === null ? null : body.baseImponible;
-      if (body?.totalFactura !== undefined) data.totalFactura = body.totalFactura === null ? null : body.totalFactura;
+      if (body?.baseImponible !== undefined)
+        data.baseImponible = body.baseImponible === null ? null : body.baseImponible;
+
+      if (body?.totalFactura !== undefined)
+        data.totalFactura = body.totalFactura === null ? null : body.totalFactura;
 
       // ✅ Si pasa a CONFIRMADA => crear/vincular cliente + confirmadaEn
       if (est === "CONFIRMADA") {
-        if (!canConfirm(tenant)) {
-          throw new Error("No autorizado para confirmar");
-        }
+        if (!canConfirm(tenant)) throw new Error("No autorizado para confirmar");
 
-        // idempotencia: si ya confirmada, no repite
         if (current.estado !== "CONFIRMADA") {
           let clienteId = current.clienteId ?? null;
 
           if (!clienteId && current.leadId) {
             const lead = await tx.lead.findFirst({
-              where: { id: current.leadId, adminId },
-              select: { nombre: true, email: true, telefono: true },
+              where: {
+                id: current.leadId,
+                ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
+              } as any,
+              select: { nombre: true, email: true, telefono: true, direccion: true } as any,
             });
 
             if (!lead?.nombre) throw new Error("El lead no tiene nombre");
@@ -178,12 +207,12 @@ export async function PATCH(req: NextRequest) {
 
             const existing = await tx.cliente.findFirst({
               where: {
-                adminId,
+                ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
                 OR: [
                   ...(email ? [{ email }] : []),
                   ...(telefono ? [{ telefono }] : []),
                 ],
-              },
+              } as any,
               select: { id: true },
             });
 
@@ -198,18 +227,16 @@ export async function PATCH(req: NextRequest) {
                 },
               });
             } else {
-              const createdCliente = await tx.cliente.create({
+              await tx.cliente.create({
                 data: {
-                    adminId,
-                    nombre: lead.nombre,
-                    email,
-                    telefono,
-                    direccion: "PENDIENTE", // ✅ obligatorio en tu modelo
-                },
+                  ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
+                  nombre: lead.nombre,
+                  email,
+                  telefono,
+                  direccion: (lead as any)?.direccion?.trim() || "PENDIENTE",
+                } as any,
                 select: { id: true },
-              });
-
-              clienteId = createdCliente.id;
+              }).then((c) => (clienteId = c.id));
             }
           }
 

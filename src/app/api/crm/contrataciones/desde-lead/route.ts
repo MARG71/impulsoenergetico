@@ -1,12 +1,9 @@
+// src/app/api/crm/contrataciones/desde-lead/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  getSessionOrThrow,
-  sessionRole,
-  sessionAdminId,
-} from "@/lib/auth-server";
+import { getTenantContext } from "@/lib/tenant";
 
 function jsonError(message: string, status = 400, extra?: any) {
   return NextResponse.json(
@@ -20,37 +17,32 @@ function parseId(v: unknown) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/**
- * Intenta obtener un seccionId válido:
- * - Si el lead ya tiene seccionId, usarlo.
- * - Si no, buscar una sección "Luz" o la primera disponible.
- * (Esto evita romper si Contratacion exige seccionId obligatorio)
- */
+function getRole(tenant: any) {
+  return String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+}
+
 async function resolveSeccionIdFallback(): Promise<number | null> {
-  // Ajusta el orden / nombres si en tu BD se llaman distinto
   const byName = await prisma.seccion.findFirst({
     where: { nombre: { in: ["Luz", "luz", "Energía", "energia"] } as any },
     select: { id: true },
   });
-
   if (byName?.id) return byName.id;
 
   const first = await prisma.seccion.findFirst({
     select: { id: true },
     orderBy: { id: "asc" },
   });
-
   return first?.id ?? null;
 }
 
 export async function POST(req: Request) {
   try {
-    const session = await getSessionOrThrow();
-    const role = sessionRole(session);
-    const adminId = sessionAdminId(session);
+    const tenant = await getTenantContext(req as any);
+    if (!tenant.ok) return jsonError(tenant.error, tenant.status);
 
-    // Roles permitidos (ajusta si quieres permitir AGENTE)
-    if (!["ADMIN", "SUPERADMIN"].includes(String(role))) {
+    const role = getRole(tenant);
+
+    if (!["ADMIN", "SUPERADMIN"].includes(role)) {
       return jsonError("No autorizado", 403);
     }
 
@@ -60,56 +52,47 @@ export async function POST(req: Request) {
     const leadId = parseId(body.leadId);
     if (!leadId) return jsonError("leadId requerido", 400);
 
-    // 1) Traer lead (y datos para cliente)
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
-      include: {
-        lugar: true as any,
-        agente: true as any,
-      },
+      select: { id: true, agenteId: true, lugarId: true, seccionId: true, adminId: true } as any,
     });
 
     if (!lead) return jsonError("Lead no encontrado", 404);
 
-    // Multi-tenant: si tu lead tiene adminId, valida que coincide
-    // (Lo dejo suave con any para no romper si no existe)
-    if ((lead as any).adminId && (lead as any).adminId !== adminId) {
-      return jsonError("No autorizado para este lead", 403);
-    }
-
-    // 2) Resolver seccionId (obligatorio en Contratacion en tu caso)
-    let seccionId: number | null = parseId((lead as any).seccionId);
+    // 1) Resolver seccionId
+    let seccionId = parseId((lead as any).seccionId);
     if (!seccionId) seccionId = await resolveSeccionIdFallback();
-    if (!seccionId) {
-      return jsonError(
-        "No se pudo resolver seccionId. Crea al menos 1 Sección en BD.",
-        400
-      );
+    if (!seccionId) return jsonError("No hay secciones en BD (crea al menos 1)", 400);
+
+    // 2) Resolver adminId correcto (multi-tenant)
+    // - ADMIN: usar tenantAdminId
+    // - SUPERADMIN: usar lead.adminId (debe existir)
+    let resolvedAdminId: number | null = null;
+
+    if (role === "SUPERADMIN") {
+      resolvedAdminId = Number((lead as any)?.adminId ?? null) || null;
+      if (!resolvedAdminId) {
+        return jsonError("Este lead no tiene adminId. Asígnalo al crear el lead para poder generar contrataciones.", 400);
+      }
+    } else {
+      resolvedAdminId = tenant.tenantAdminId ?? null;
+      if (!resolvedAdminId) return jsonError("tenantAdminId no disponible", 400);
     }
 
-    // 3) Crear contratación en BORRADOR
     const contratacion = await prisma.contratacion.create({
       data: {
-        // multi-tenant si tu modelo lo usa
-        ...(adminId ? ({ adminId } as any) : {}),
-
+        adminId: resolvedAdminId,
         leadId: lead.id,
         seccionId,
-
         estado: "BORRADOR" as any,
-
-        // Enlazados si existen en tu modelo
         ...(lead.agenteId ? ({ agenteId: lead.agenteId } as any) : {}),
         ...(lead.lugarId ? ({ lugarId: lead.lugarId } as any) : {}),
-
-        // Puedes copiar más campos si tu modelo los tiene:
-        // tarifa, compania, cups, potencia, etc.
+        nivel: "C1" as any,
       } as any,
     });
 
     return NextResponse.json({ ok: true, contratacion }, { status: 201 });
   } catch (e: any) {
-    // IMPORTANTÍSIMO: devolver JSON, no HTML
     return jsonError("Error interno creando contratación", 500, {
       message: String(e?.message ?? e),
     });

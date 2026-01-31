@@ -1,5 +1,4 @@
 // src/app/api/crm/contrataciones/[id]/route.ts
-// src/app/api/crm/contrataciones/[id]/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -32,15 +31,27 @@ function asNivel(v: any): NivelComision | null {
     : null;
 }
 
+function getRole(tenant: any) {
+  return String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+}
+
 export async function GET(req: NextRequest, ctx: any) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
+
+  const role = getRole(tenant);
 
   const id = toId(ctx?.params?.id);
   if (!id) return jsonError(400, "ID inválido");
 
   const where: any = { id };
-  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+
+  // ✅ ADMIN: scope por adminId
+  // ✅ SUPERADMIN: sin filtro
+  if (role !== "SUPERADMIN") {
+    if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+    else return jsonError(400, "tenantAdminId no disponible");
+  }
 
   const item = await prisma.contratacion.findFirst({
     where,
@@ -63,13 +74,19 @@ export async function PATCH(req: NextRequest, ctx: any) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
+  const role = getRole(tenant);
+
   const id = toId(ctx?.params?.id);
   if (!id) return jsonError(400, "ID inválido");
 
   const body = await req.json().catch(() => ({}));
 
   const where: any = { id };
-  if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+
+  if (role !== "SUPERADMIN") {
+    if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
+    else return jsonError(400, "tenantAdminId no disponible");
+  }
 
   const exists = await prisma.contratacion.findFirst({ where, select: { id: true } });
   if (!exists) return jsonError(404, "Contratación no encontrada");

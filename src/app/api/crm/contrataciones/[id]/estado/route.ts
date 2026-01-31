@@ -1,12 +1,9 @@
+// src/app/api/crm/contrataciones/[id]/estado/route.ts
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  getSessionOrThrow,
-  sessionRole,
-  sessionAdminId,
-} from "@/lib/auth-server";
+import { getTenantContext } from "@/lib/tenant";
 
 function jsonError(message: string, status = 400, extra?: any) {
   return NextResponse.json(
@@ -20,19 +17,21 @@ function parseId(v: unknown) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function getRole(tenant: any) {
+  return String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+}
+
 type Estado = "BORRADOR" | "PENDIENTE" | "CONFIRMADA" | "CANCELADA";
 
-export async function PATCH(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   try {
-    const session = await getSessionOrThrow();
-    const role = sessionRole(session);
-    const adminId = sessionAdminId(session);
+    const tenant = await getTenantContext(req);
+    if (!tenant.ok) return jsonError(tenant.error, tenant.status);
 
-    const { id } = await ctx.params;
-    const contratacionId = parseId(id);
+    const role = getRole(tenant);
+    const tenantAdminId = tenant.tenantAdminId ?? null;
+
+    const contratacionId = parseId(ctx?.params?.id);
     if (!contratacionId) return jsonError("ID inválido", 400);
 
     const body = await req.json().catch(() => null);
@@ -43,32 +42,34 @@ export async function PATCH(
       return jsonError("Estado no válido", 400, { estado });
     }
 
-    // Si confirmas, solo ADMIN/SUPERADMIN
-    if (estado === "CONFIRMADA" && !["ADMIN", "SUPERADMIN"].includes(String(role))) {
+    // Confirmar: solo ADMIN/SUPERADMIN
+    if (estado === "CONFIRMADA" && !["ADMIN", "SUPERADMIN"].includes(role)) {
       return jsonError("Solo ADMIN/SUPERADMIN puede confirmar", 403);
     }
 
     const contratacion = await prisma.contratacion.findUnique({
       where: { id: contratacionId },
       include: {
-        lead: {
-          include: {
-            lugar: true as any,
-            agente: true as any,
-          },
-        } as any,
+        lead: { include: { lugar: true as any, agente: true as any } } as any,
         cliente: true as any,
       } as any,
     });
 
     if (!contratacion) return jsonError("Contratación no encontrada", 404);
 
-    // Multi-tenant: si tu contratacion tiene adminId, valida
-    if ((contratacion as any).adminId && (contratacion as any).adminId !== adminId) {
-      return jsonError("No autorizado para esta contratación", 403);
+    // ✅ Scope:
+    // - ADMIN: solo su adminId
+    // - SUPERADMIN: cualquiera
+    if (role !== "SUPERADMIN") {
+      if (!tenantAdminId) return jsonError("tenantAdminId no disponible", 400);
+      if ((contratacion as any).adminId !== tenantAdminId) {
+        return jsonError("No autorizado para esta contratación", 403);
+      }
     }
 
-    // Si se confirma -> crear/vincular cliente
+    // Base adminId real del registro (para clientes/leads)
+    const effectiveAdminId = (contratacion as any).adminId ?? (role === "SUPERADMIN" ? null : tenantAdminId);
+
     let clienteId = (contratacion as any).clienteId ?? null;
 
     if (estado === "CONFIRMADA") {
@@ -76,22 +77,21 @@ export async function PATCH(
       if (!lead) return jsonError("La contratación no tiene lead vinculado", 400);
 
       const nombre = String(lead.nombre ?? "").trim();
-      const email = String(lead.email ?? "").trim();
+      const email = String(lead.email ?? "").trim().toLowerCase();
       const telefono = String(lead.telefono ?? "").trim();
 
-      // Fallback de dirección si Cliente la requiere
       const direccionFallback =
         String((lead as any)?.direccion ?? "").trim() ||
         String((lead as any)?.lugar?.direccion ?? "").trim() ||
-        "Sin dirección";
+        "PENDIENTE";
 
-      // 1) Buscar cliente por email o teléfono (ajusta a tu lógica)
-      let cliente = null as any;
+      // Buscar cliente por email/telefono dentro del adminId efectivo (si existe)
+      let cliente: any = null;
 
       if (email) {
         cliente = await prisma.cliente.findFirst({
           where: {
-            ...(adminId ? ({ adminId } as any) : {}),
+            ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
             email,
           } as any,
         });
@@ -100,21 +100,20 @@ export async function PATCH(
       if (!cliente && telefono) {
         cliente = await prisma.cliente.findFirst({
           where: {
-            ...(adminId ? ({ adminId } as any) : {}),
+            ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
             telefono,
           } as any,
         });
       }
 
-      // 2) Crear si no existe
       if (!cliente) {
         cliente = await prisma.cliente.create({
           data: {
-            ...(adminId ? ({ adminId } as any) : {}),
+            ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
             nombre: nombre || "Cliente",
             email: email || null,
             telefono: telefono || "",
-            direccion: direccionFallback, // <- evita tu crash
+            direccion: direccionFallback,
           } as any,
         });
       }
