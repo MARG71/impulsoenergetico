@@ -199,9 +199,16 @@ export async function PATCH(req: NextRequest) {
               });
             } else {
               const createdCliente = await tx.cliente.create({
-                data: { adminId, nombre: lead.nombre, email, telefono },
+                data: {
+                    adminId,
+                    nombre: lead.nombre,
+                    email,
+                    telefono,
+                    direccion: "PENDIENTE", // ✅ obligatorio en tu modelo
+                },
                 select: { id: true },
               });
+
               clienteId = createdCliente.id;
             }
           }
