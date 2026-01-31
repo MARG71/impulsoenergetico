@@ -387,20 +387,37 @@ export default function LeadDetalleContenido() {
   };
 
   async function crearContratacionDesdeLead() {
-    if (!lead?.id) return toast.error("Lead no cargado");
+    if (!lead) throw new Error("Lead no cargado");
 
+    // 1) Coge una sección por defecto (la primera activa)
+    const secRes = await fetch("/api/crm/secciones", { cache: "no-store" });
+    const secJson = await secRes.json();
+
+    // tu endpoint de secciones puede devolver {ok:true, items:[...]} o array directo
+    const secciones = Array.isArray(secJson)
+      ? secJson
+      : Array.isArray(secJson?.items)
+        ? secJson.items
+        : [];
+
+    if (!secciones.length) throw new Error("No hay secciones activas. Crea una sección primero.");
+
+    const seccionId = Number(secciones[0].id);
+
+    // 2) Crea contratación desde lead con seccionId
     const res = await fetch("/api/crm/contrataciones/desde-lead", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: lead.id }),
+      body: JSON.stringify({ leadId: lead.id, seccionId }),
     });
 
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo crear la contratación");
+    if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo crear");
 
-    toast.success("Contratación creada ✅");
+    // 3) Te mando a contrataciones (o a detalle si lo haces)
     router.push("/contrataciones");
   }
+
 
 
 
