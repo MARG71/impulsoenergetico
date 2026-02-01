@@ -56,14 +56,19 @@ export async function GET(req: NextRequest, ctx: any) {
   const item = await prisma.contratacion.findFirst({
     where,
     include: {
-      cliente: true,
-      lead: true,
-      seccion: true,
-      subSeccion: true,
-      agente: { select: { id: true, nombre: true } },
-      lugar: { select: { id: true, nombre: true } },
-      documentos: { orderBy: { id: "desc" }, take: 50 },
+        admin: { select: { id: true, nombre: true, email: true } },
+        agente: { select: { id: true, nombre: true, email: true, telefono: true } },
+        lugar: { select: { id: true, nombre: true, direccion: true } },
+
+        cliente: { select: { id: true, nombre: true, email: true, telefono: true, direccion: true } },
+        lead: { select: { id: true, nombre: true, email: true, telefono: true } },
+
+        seccion: { select: { id: true, nombre: true, slug: true } },
+        subSeccion: { select: { id: true, nombre: true, slug: true } },
+
+        documentos: { orderBy: { id: "desc" }, take: 50 },
     },
+
   });
 
   if (!item) return jsonError(404, "Contratación no encontrada");

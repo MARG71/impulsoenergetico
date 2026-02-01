@@ -1,7 +1,10 @@
+//src/app/(crm)/contrataciones/[id]/ContratacionDetalleContenido.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -22,6 +25,11 @@ export default function ContratacionDetalleContenido() {
   const role = String((session?.user as any)?.role ?? "").toUpperCase();
   const puedeConfirmar = role === "ADMIN" || role === "SUPERADMIN";
 
+  const searchParams = useSearchParams();
+  const adminIdQs = searchParams.get("adminId");
+  const qs = adminIdQs ? `?adminId=${adminIdQs}` : "";
+
+
   const [loading, setLoading] = useState(true);
   const [item, setItem] = useState<any>(null);
 
@@ -35,7 +43,7 @@ export default function ContratacionDetalleContenido() {
   async function load() {
     setLoading(true);
     try {
-      const r = await fetch(`/api/crm/contrataciones/${id}`, { cache: "no-store" });
+      const r = await fetch(`/api/crm/contrataciones/${id}${qs}`, { cache: "no-store" });
       const txt = await r.text();
       let j: any = null;
       try { j = JSON.parse(txt); } catch {}
@@ -52,7 +60,7 @@ export default function ContratacionDetalleContenido() {
 
   async function loadAsiento() {
     try {
-      const r = await fetch(`/api/crm/comisiones/asientos?contratacionId=${id}`, { cache: "no-store" });
+      const r = await fetch(`/api/crm/comisiones/asientos?contratacionId=${id}${adminIdQs ? `&adminId=${adminIdQs}` : ""}`, { cache: "no-store" });
       const txt = await r.text();
       let j: any = null;
       try { j = JSON.parse(txt); } catch {}
@@ -64,7 +72,7 @@ export default function ContratacionDetalleContenido() {
   }
 
   async function cambiarEstado(estado: Estado) {
-    const res = await fetch(`/api/crm/contrataciones/${id}/estado`, {
+    const res = await fetch(`/api/crm/contrataciones/${id}/estado${qs}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado }),
@@ -80,7 +88,7 @@ export default function ContratacionDetalleContenido() {
   }
 
   async function calcularComisiones() {
-    const res = await fetch(`/api/crm/comisiones/calcular?contratacionId=${id}`, { cache: "no-store" });
+    const res = await fetch(`/api/crm/comisiones/calcular?contratacionId=${id}${adminIdQs ? `&adminId=${adminIdQs}` : ""}`, { cache: "no-store" });
     const txt = await res.text();
     let data: any = null;
     try { data = JSON.parse(txt); } catch {}
@@ -93,11 +101,12 @@ export default function ContratacionDetalleContenido() {
   async function asentarComision() {
     setAsentando(true);
     try {
-      const res = await fetch(`/api/crm/comisiones/asentar`, {
+      const res = await fetch(`/api/crm/comisiones/asentar${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contratacionId: id }),
       });
+
 
       const txt = await res.text();
       let data: any = null;
@@ -189,6 +198,31 @@ export default function ContratacionDetalleContenido() {
         <div className="text-white text-xl font-extrabold">
           Contratación #{item.id} — {item?.seccion?.nombre ?? "—"}
         </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Admin</div>
+                <div className="text-white font-extrabold">{item?.admin?.nombre ?? "—"}</div>
+            </div>
+
+            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Agente</div>
+                <div className="text-emerald-100 font-extrabold">{item?.agente?.nombre ?? "—"}</div>
+            </div>
+
+            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Lugar</div>
+                <div className="text-amber-100 font-extrabold">{item?.lugar?.nombre ?? "—"}</div>
+            </div>
+
+            <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+                <div className="text-white/60 text-sm font-bold uppercase">Cliente</div>
+                <div className="text-sky-100 font-extrabold">
+                {item?.cliente?.nombre ?? item?.lead?.nombre ?? "—"}
+                </div>
+            </div>
+        </div>
+
 
         <div className="text-white/70 mt-1">
           Estado: <b className="text-white">{item.estado}</b> · Nivel: <b className="text-white">{item.nivel}</b>

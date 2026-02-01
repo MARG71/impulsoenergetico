@@ -71,19 +71,27 @@ export async function GET(req: NextRequest) {
 
   try {
     const items = await prisma.contratacion.findMany({
-      where,
-      orderBy: { id: "desc" },
-      take: 200,
-      include: {
-        cliente: true,
-        lead: true,
-        seccion: true,
-        subSeccion: true,
-        agente: { select: { id: true, nombre: true } },
-        lugar: { select: { id: true, nombre: true } },
-        documentos: { orderBy: { id: "desc" }, take: 20 },
-      },
+        where,
+        orderBy: { id: "desc" },
+        take: 200,
+        include: {
+            // ✅ Nombres para mostrar “a quién pertenece”
+            admin: { select: { id: true, nombre: true, email: true } },
+            agente: { select: { id: true, nombre: true, email: true, telefono: true } },
+            lugar: { select: { id: true, nombre: true, direccion: true } },
+
+            // ✅ Cliente/Lead
+            cliente: { select: { id: true, nombre: true, email: true, telefono: true } },
+            lead: { select: { id: true, nombre: true, email: true, telefono: true } },
+
+            // ✅ Sección/Subsección (nombres)
+            seccion: { select: { id: true, nombre: true, slug: true } },
+            subSeccion: { select: { id: true, nombre: true, slug: true } },
+
+            documentos: { orderBy: { id: "desc" }, take: 20 },
+        },
     });
+
 
     return NextResponse.json({ ok: true, items });
   } catch (e: any) {

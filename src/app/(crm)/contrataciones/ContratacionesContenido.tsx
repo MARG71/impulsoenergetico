@@ -1,9 +1,12 @@
+//src/app/(crm)/contrataciones/ContratacionesContenido.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+
 
 type Sec = {
   id: number;
@@ -23,10 +26,17 @@ type Contratacion = {
   creadaEn: string;
   confirmadaEn: string | null;
 
-  seccion?: { nombre: string };
+  admin?: { id: number; nombre: string | null; email?: string | null } | null;
+  agente?: { id: number; nombre: string | null } | null;
+  lugar?: { id: number; nombre: string | null } | null;
+
+  seccion?: { nombre: string } | null;
   subSeccion?: { nombre: string } | null;
-  cliente?: { id: number; nombre: string } | null;
+
+  cliente?: { id: number; nombre: string | null } | null;
+  lead?: { id: number; nombre: string | null } | null;
 };
+
 
 const ESTADOS: Contratacion["estado"][] = [
   "BORRADOR",
@@ -65,6 +75,10 @@ export default function ContratacionesContenido() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const role = (session?.user as any)?.role as string | undefined;
+
+  const searchParams = useSearchParams();
+  const adminIdQs = searchParams.get("adminId");
+
 
   const [secciones, setSecciones] = useState<Sec[]>([]);
   const [items, setItems] = useState<Contratacion[]>([]);
@@ -281,15 +295,46 @@ export default function ContratacionesContenido() {
                     </div>
                   </div>
 
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    {c.admin?.nombre ? (
+                        <span className="px-2 py-1 rounded-lg border border-slate-600 bg-slate-950/40 text-slate-200 font-extrabold">
+                        Admin: {c.admin.nombre}
+                        </span>
+                    ) : null}
+
+                    {c.agente?.nombre ? (
+                        <span className="px-2 py-1 rounded-lg border border-emerald-400/20 bg-emerald-400/10 text-emerald-200 font-extrabold">
+                        Agente: {c.agente.nombre}
+                        </span>
+                    ) : null}
+
+                    {c.lugar?.nombre ? (
+                        <span className="px-2 py-1 rounded-lg border border-amber-400/20 bg-amber-400/10 text-amber-200 font-extrabold">
+                        Lugar: {c.lugar.nombre}
+                        </span>
+                    ) : null}
+
+                    {(c.cliente?.nombre || c.lead?.nombre) ? (
+                        <span className="px-2 py-1 rounded-lg border border-sky-400/20 bg-sky-400/10 text-sky-200 font-extrabold">
+                        Cliente: {c.cliente?.nombre ?? c.lead?.nombre}
+                        </span>
+                    ) : null}
+                  </div>
+
+
                   <div className="flex gap-2">
                     <button
-                      onClick={() =>
-                        router.push(`/contrataciones/${c.id}`)
-                      }
-                      className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-sm font-extrabold text-white"
-                    >
-                      Ver
+                        onClick={() => {
+                            const href = adminIdQs
+                            ? `/contrataciones/${c.id}?adminId=${adminIdQs}`
+                            : `/contrataciones/${c.id}`;
+                            router.push(href);
+                        }}
+                        className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-sm font-extrabold text-white"
+                        >
+                        Ver
                     </button>
+
 
                     {canConfirm && c.estado === "PENDIENTE" && (
                       <button
