@@ -131,8 +131,11 @@ export async function POST(req: Request) {
     const lugarIdNumRaw =
       typeof lugarId === "string" ? Number(lugarId) : typeof lugarId === "number" ? lugarId : null;
 
-    const agenteIdNum = agenteIdNumRaw && !Number.isNaN(agenteIdNumRaw) ? agenteIdNumRaw : undefined;
-    const lugarIdNum = lugarIdNumRaw && !Number.isNaN(lugarIdNumRaw) ? lugarIdNumRaw : undefined;
+    let agenteIdNum =
+      agenteIdNumRaw && !Number.isNaN(agenteIdNumRaw) ? agenteIdNumRaw : undefined;
+
+    let lugarIdNum =
+      lugarIdNumRaw && !Number.isNaN(lugarIdNumRaw) ? lugarIdNumRaw : undefined;
 
 
     // ✅ Resolver adminId (tenant) desde Lugar o Agente (prioridad Lugar)
