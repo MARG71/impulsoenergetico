@@ -416,8 +416,9 @@ export default function LeadDetalleContenido() {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: lead.id }),
+      body: JSON.stringify({ leadId: lead.id, seccionId }),
     });
+
 
     const txt = await res.text();
     let payload: any = null;
