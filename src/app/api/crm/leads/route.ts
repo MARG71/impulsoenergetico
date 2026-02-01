@@ -8,16 +8,25 @@ import { prisma } from "@/lib/prisma";
 
 type Role = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
-function tenantWhere(sessionUser: any) {
-  const role = sessionUser?.role as Role | undefined;
+function parseId(v: any): number | null {
+  const n = Number(v);
+  if (!n || Number.isNaN(n)) return null;
+  return n;
+}
 
-  // SUPERADMIN ve todo
+function getRole(user: any): Role | null {
+  return (user?.rol ?? user?.role ?? null) as Role | null;
+}
+
+function tenantWhere(sessionUser: any) {
+  const role = getRole(sessionUser);
+
   if (role === "SUPERADMIN") return {};
 
-  // ADMIN ve lo suyo: adminId = su propio id
-  if (role === "ADMIN") return { adminId: Number(sessionUser.id) };
+  if (role === "ADMIN") {
+    return { adminId: Number(sessionUser.id) };
+  }
 
-  // AGENTE ve lo suyo
   if (role === "AGENTE") {
     return {
       adminId: Number(sessionUser.adminId),
@@ -25,7 +34,6 @@ function tenantWhere(sessionUser: any) {
     };
   }
 
-  // LUGAR ve lo suyo
   if (role === "LUGAR") {
     return {
       adminId: Number(sessionUser.adminId),
@@ -33,8 +41,32 @@ function tenantWhere(sessionUser: any) {
     };
   }
 
-  // CLIENTE (si lo usas) -> sin acceso por defecto
   return { id: -1 };
+}
+
+async function resolverAdminIdDesdeLugarAgente(args: {
+  lugarId: number | null;
+  agenteId: number | null;
+}): Promise<number | null> {
+  const { lugarId, agenteId } = args;
+
+  if (lugarId) {
+    const lugar = await prisma.lugar.findUnique({
+      where: { id: lugarId },
+      select: { adminId: true, agenteId: true },
+    });
+    if (lugar?.adminId) return lugar.adminId;
+  }
+
+  if (agenteId) {
+    const agente = await prisma.agente.findUnique({
+      where: { id: agenteId },
+      select: { adminId: true },
+    });
+    if (agente?.adminId) return agente.adminId;
+  }
+
+  return null;
 }
 
 // GET /api/crm/leads?q=...&estado=...&take=...&skip=...
@@ -96,15 +128,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
-    const role = (session.user as any).role as Role | undefined;
+    const role = getRole(session.user);
 
-    // Permitimos crear lead manual a SUPERADMIN / ADMIN / AGENTE
     if (!(role === "SUPERADMIN" || role === "ADMIN" || role === "AGENTE")) {
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const url = new URL(req.url);
 
+    const body = await req.json().catch(() => ({}));
     const nombre = String(body.nombre || "").trim();
     const email = String(body.email || "").trim();
     const telefono = String(body.telefono || "").trim();
@@ -113,27 +145,77 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nombre obligatorio" }, { status: 400 });
     }
 
-    // En tu schema Lead.email y Lead.telefono son String (no opcionales)
-    // => guardamos "" si no vienen (pero lo ideal es pedir al menos uno).
+    // Email/teléfono en tu schema son requeridos => guardamos "" si no vienen
     const emailSafe = email || "";
     const telSafe = telefono || "";
 
-    // Resolver adminId:
-    // - SUPERADMIN puede crear con adminId explícito si quiere, si no, null
-    // - ADMIN: adminId = su id
-    // - AGENTE: adminId = su adminId
+    const lugarId = parseId(body.lugarId);
+    const agenteIdBody = parseId(body.agenteId);
+
+    // Si es AGENTE y no pasan agenteId, usamos el de sesión
+    const agenteId =
+      agenteIdBody ?? (role === "AGENTE" ? parseId((session.user as any).agenteId) : null);
+
+    // ✅ Resolver adminId SIEMPRE
     let adminId: number | null = null;
 
-    if (role === "SUPERADMIN") {
-      adminId = body.adminId ? Number(body.adminId) : null;
-    } else if (role === "ADMIN") {
-      adminId = Number((session.user as any).id);
+    if (role === "ADMIN") {
+      adminId = parseId((session.user as any).id);
     } else if (role === "AGENTE") {
-      adminId = Number((session.user as any).adminId);
+      adminId = parseId((session.user as any).adminId);
+    } else if (role === "SUPERADMIN") {
+      // tenant mode por query o body
+      const adminIdFromQuery = parseId(url.searchParams.get("adminId"));
+      const adminIdFromBody = parseId(body.adminId ?? body.tenantAdminId);
+
+      adminId = adminIdFromBody ?? adminIdFromQuery ?? null;
+
+      // si no viene adminId explícito, intentamos deducirlo desde lugar/agente
+      if (!adminId) {
+        adminId = await resolverAdminIdDesdeLugarAgente({ lugarId, agenteId });
+      }
     }
 
-    const agenteId = body.agenteId ? Number(body.agenteId) : (session.user as any).agenteId ?? null;
-    const lugarId = body.lugarId ? Number(body.lugarId) : null;
+    if (!adminId) {
+      return NextResponse.json(
+        {
+          error:
+            "No se pudo resolver adminId. Si eres SUPERADMIN, pasa ?adminId=XX o incluye adminId en el body, o indica lugarId/agenteId válidos.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Seguridad mínima: si NO eres SUPERADMIN, evita mezclar tenant con lugar/agente ajenos
+    if (role !== "SUPERADMIN") {
+      // Validar lugar si viene
+      if (lugarId) {
+        const lugar = await prisma.lugar.findUnique({
+          where: { id: lugarId },
+          select: { adminId: true },
+        });
+        if (!lugar || lugar.adminId !== adminId) {
+          return NextResponse.json(
+            { error: "lugarId no pertenece a tu tenant" },
+            { status: 403 }
+          );
+        }
+      }
+
+      // Validar agente si viene
+      if (agenteId) {
+        const agente = await prisma.agente.findUnique({
+          where: { id: agenteId },
+          select: { adminId: true },
+        });
+        if (!agente || agente.adminId !== adminId) {
+          return NextResponse.json(
+            { error: "agenteId no pertenece a tu tenant" },
+            { status: 403 }
+          );
+        }
+      }
+    }
 
     const lead = await prisma.lead.create({
       data: {
@@ -144,9 +226,9 @@ export async function POST(req: NextRequest) {
         notas: body.notas ? String(body.notas) : null,
         proximaAccion: body.proximaAccion ? String(body.proximaAccion) : null,
         proximaAccionEn: body.proximaAccionEn ? new Date(body.proximaAccionEn) : null,
-        agenteId: agenteId ? Number(agenteId) : null,
-        lugarId: lugarId ? Number(lugarId) : null,
-        adminId,
+        agenteId: agenteId ?? null,
+        lugarId: lugarId ?? null,
+        adminId, // ✅ NUNCA null
       },
     });
 

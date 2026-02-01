@@ -126,10 +126,13 @@ export async function POST(req: Request) {
 
     const emailNormalizado = email.toLowerCase();
 
-    let agenteIdNum =
-      typeof agenteId === "string" ? Number(agenteId) : agenteId ?? undefined;
-    const lugarIdNum =
-      typeof lugarId === "string" ? Number(lugarId) : lugarId ?? undefined;
+    const agenteIdNumRaw =
+      typeof agenteId === "string" ? Number(agenteId) : typeof agenteId === "number" ? agenteId : null;
+    const lugarIdNumRaw =
+      typeof lugarId === "string" ? Number(lugarId) : typeof lugarId === "number" ? lugarId : null;
+
+    const agenteIdNum = agenteIdNumRaw && !Number.isNaN(agenteIdNumRaw) ? agenteIdNumRaw : undefined;
+    const lugarIdNum = lugarIdNumRaw && !Number.isNaN(lugarIdNumRaw) ? lugarIdNumRaw : undefined;
 
 
     // ✅ Resolver adminId (tenant) desde Lugar o Agente (prioridad Lugar)

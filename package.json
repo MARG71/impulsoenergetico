@@ -9,6 +9,7 @@
     "start": "next start",
     "deploy": "git add . && git commit -m \"deploy automático\" && git push",
     "lint": "next lint",
+    "backfill:lead-admin": "ts-node scripts/backfill-leads-adminId.ts",
     "seed": "node prisma/seed.mjs"
   },
   "prisma": {

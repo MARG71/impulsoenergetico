@@ -405,14 +405,17 @@ export default function LeadDetalleContenido() {
     const seccionId = Number(secciones[0].id);
 
     // 2) Crea contratación desde lead con seccionId
-    const res = await fetch("/api/crm/contrataciones/desde-lead", {
+    const adminId = searchParams.get("adminId"); // de la URL
+    const url = adminId
+      ? `/api/crm/contrataciones/desde-lead?adminId=${adminId}`
+      : `/api/crm/contrataciones/desde-lead`;
+
+    await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leadId: lead.id,
-        seccionId, // asegúrate que esto es number
-      }),
+      body: JSON.stringify({ leadId: lead.id }),
     });
+
 
     const txt = await res.text();
     let json: any = null;
