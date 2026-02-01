@@ -155,21 +155,17 @@ export async function POST(req: Request) {
 
     // ✅ (Opcional pero recomendable) verificar que la seccion pertenece al tenant
     const seccion = await prisma.seccion.findUnique({
-      where: { id: seccionId },
-      select: { id: true, adminId: true },
+    where: { id: seccionId },
+    select: { id: true },
     });
 
     if (!seccion) {
-      return NextResponse.json({ ok: false, error: "Sección no encontrada" }, { status: 404 });
+    return NextResponse.json(
+        { ok: false, error: "Sección no encontrada" },
+        { status: 404 }
+    );
     }
 
-    // Si tu Seccion tiene adminId, evitamos que SUPERADMIN meta una sección de otro tenant
-    if ((seccion as any).adminId && (seccion as any).adminId !== adminIdFinal) {
-      return NextResponse.json(
-        { ok: false, error: "La sección no pertenece a este tenant (adminId)" },
-        { status: 403 }
-      );
-    }
 
     // Crear contratación con trazabilidad total + seccionId
     const contratacion = await prisma.contratacion.create({
