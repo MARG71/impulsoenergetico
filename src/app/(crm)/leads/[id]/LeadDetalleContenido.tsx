@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+
 import { toast } from "sonner";
 
 
@@ -99,6 +100,8 @@ function normalizePhoneForWa(raw: string) {
 export default function LeadDetalleContenido() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const id = String((params as any)?.id || "");
 
   const [lead, setLead] = useState<Lead | null>(null);
@@ -410,14 +413,28 @@ export default function LeadDetalleContenido() {
       ? `/api/crm/contrataciones/desde-lead?adminId=${adminId}`
       : `/api/crm/contrataciones/desde-lead`;
 
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadId: lead.id }),
     });
 
-
     const txt = await res.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(txt);
+    } catch {}
+
+    if (!res.ok || !json?.ok) {
+      throw new Error(json?.error || `No se pudo crear (${res.status})`);
+    }
+
+    // ✅ si todo bien, aquí tienes la contratación creada
+    const contratacionId = json.contratacionId;
+
+    // 3) Te mando a contrataciones (o a detalle si lo haces)
+    router.push("/contrataciones");
+
     let json: any = null;
     try { json = JSON.parse(txt); } catch {}
 
