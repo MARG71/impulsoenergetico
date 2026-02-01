@@ -420,20 +420,18 @@ export default function LeadDetalleContenido() {
     });
 
     const txt = await res.text();
-    let json: any = null;
+    let payload: any = null;
     try {
-      json = JSON.parse(txt);
+      payload = JSON.parse(txt);
     } catch {}
 
-    if (!res.ok || !json?.ok) {
-      throw new Error(json?.error || `No se pudo crear (${res.status})`);
+    if (!res.ok || !payload?.ok) {
+      throw new Error(payload?.error || `No se pudo crear (${res.status})`);
     }
 
-    // ✅ si todo bien, aquí tienes la contratación creada
-    const contratacionId = json.contratacionId;
-
-    // 3) Te mando a contrataciones (o a detalle si lo haces)
+    const contratacionId = payload.contratacionId;
     router.push("/contrataciones");
+
 
     let json: any = null;
     try { json = JSON.parse(txt); } catch {}
