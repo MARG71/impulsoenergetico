@@ -1,4 +1,3 @@
-// src/app/api/crm/contrataciones/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -51,47 +50,54 @@ function safeTrim(v: any): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
+/**
+ * IMPORTANTÍSIMO:
+ * - Si eres ADMIN -> tenant.tenantAdminId debe venir siempre.
+ * - Si eres SUPERADMIN en modo tenant -> idealmente getTenantContext debe meter tenantAdminId
+ *   leyendo ?adminId=XX (o tu mecanismo). Si no lo hace, te lo ajusto luego.
+ */
+
 export async function GET(req: NextRequest) {
   const tenant = await getTenantContext(req);
   if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
   const role = getRole(tenant);
-
   const estadoQ = asEstado(req.nextUrl.searchParams.get("estado"));
+
   const where: any = {};
 
-  // ✅ SUPERADMIN: ve todo
-  // ✅ ADMIN: solo su adminId
+  // ✅ ADMIN/otros: scope por adminId
+  // ✅ SUPERADMIN: ve todo (o si getTenantContext “fuerza” tenantAdminId, puedes filtrar)
   if (role !== "SUPERADMIN") {
     if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
     else return jsonError(400, "tenantAdminId no disponible");
+  } else {
+    // opcional: si estás usando “modo tenant” y getTenantContext rellena tenantAdminId,
+    // aquí puedes filtrar para ver solo ese admin en la lista:
+    // if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
   }
 
   if (estadoQ) where.estado = estadoQ;
 
   try {
     const items = await prisma.contratacion.findMany({
-        where,
-        orderBy: { id: "desc" },
-        take: 200,
-        include: {
-            // ✅ Nombres para mostrar “a quién pertenece”
-            admin: { select: { id: true, nombre: true, email: true } },
-            agente: { select: { id: true, nombre: true, email: true, telefono: true } },
-            lugar: { select: { id: true, nombre: true, direccion: true } },
+      where,
+      orderBy: { id: "desc" },
+      take: 200,
+      include: {
+        admin: { select: { id: true, nombre: true, email: true } },
+        agente: { select: { id: true, nombre: true, email: true, telefono: true } },
+        lugar: { select: { id: true, nombre: true, direccion: true } },
 
-            // ✅ Cliente/Lead
-            cliente: { select: { id: true, nombre: true, email: true, telefono: true } },
-            lead: { select: { id: true, nombre: true, email: true, telefono: true } },
+        cliente: { select: { id: true, nombre: true, email: true, telefono: true } },
+        lead: { select: { id: true, nombre: true, email: true, telefono: true } },
 
-            // ✅ Sección/Subsección (nombres)
-            seccion: { select: { id: true, nombre: true, slug: true } },
-            subSeccion: { select: { id: true, nombre: true, slug: true } },
+        seccion: { select: { id: true, nombre: true, slug: true } },
+        subSeccion: { select: { id: true, nombre: true, slug: true } },
 
-            documentos: { orderBy: { id: "desc" }, take: 20 },
-        },
+        documentos: { orderBy: { id: "desc" }, take: 20 },
+      },
     });
-
 
     return NextResponse.json({ ok: true, items });
   } catch (e: any) {
@@ -107,17 +113,14 @@ export async function POST(req: NextRequest) {
   const role = getRole(tenant);
   const body = await req.json().catch(() => ({}));
 
-  // ✅ leadId (por si viene desde botón del lead)
   const leadId = toId(body?.leadId);
-
-  // ✅ seccionId: si no viene, intentamos default "luz"
   let seccionId = toId(body?.seccionId);
 
   // ✅ adminId resuelto
   let resolvedAdminId: number | null = null;
 
-  // 1) SUPERADMIN: si viene adminId en body, ok; si no, intentar deducirlo del lead
   if (role === "SUPERADMIN") {
+    // SUPERADMIN: puede venir adminId explícito, o deducido del lead
     resolvedAdminId = toId(body?.adminId) ?? null;
 
     if (!resolvedAdminId && leadId) {
@@ -135,12 +138,12 @@ export async function POST(req: NextRequest) {
       );
     }
   } else {
-    // 2) ADMIN/otros: adminId siempre desde tenant
+    // ADMIN/otros: adminId siempre desde tenant
     resolvedAdminId = tenant.tenantAdminId ?? null;
     if (!resolvedAdminId) return jsonError(400, "tenantAdminId no disponible");
   }
 
-  // ✅ si aún no tenemos seccionId: intentamos buscar la sección 'luz' dentro del tenant
+  // ✅ si aún no tenemos seccionId: intentamos 'luz'
   if (!seccionId) {
     const luz = await prisma.seccion.findFirst({
       where: {
@@ -159,14 +162,36 @@ export async function POST(req: NextRequest) {
 
   const subSeccionId = toId(body?.subSeccionId);
 
+  // ✅ AUTOFILL agente/lugar desde lead si vienen vacíos
+  let resolvedAgenteId: number | null = toId(body?.agenteId);
+  let resolvedLugarId: number | null = toId(body?.lugarId);
+
+  if (leadId && (!resolvedAgenteId || !resolvedLugarId)) {
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { agenteId: true, lugarId: true, adminId: true },
+    });
+
+    // seguridad tenant
+    if (role !== "SUPERADMIN" && lead?.adminId && lead.adminId !== resolvedAdminId) {
+      return jsonError(403, "Lead fuera de tu tenant");
+    }
+
+    if (!resolvedAgenteId) resolvedAgenteId = (lead?.agenteId ?? null) as any;
+    if (!resolvedLugarId) resolvedLugarId = (lead?.lugarId ?? null) as any;
+  }
+
   const data: any = {
     adminId: resolvedAdminId,
     seccionId,
     subSeccionId: subSeccionId ?? null,
+
     notas: typeof body?.notas === "string" ? body.notas : null,
-    agenteId: toId(body?.agenteId),
-    lugarId: toId(body?.lugarId),
+
+    agenteId: resolvedAgenteId,
+    lugarId: resolvedLugarId,
     leadId: leadId,
+
     baseImponible: body?.baseImponible ?? null,
     totalFactura: body?.totalFactura ?? null,
   };
@@ -180,7 +205,19 @@ export async function POST(req: NextRequest) {
   try {
     const created = await prisma.contratacion.create({
       data,
-      include: { seccion: true, subSeccion: true, cliente: true, lead: true },
+      include: {
+        admin: { select: { id: true, nombre: true, email: true } },
+        agente: { select: { id: true, nombre: true, email: true, telefono: true } },
+        lugar: { select: { id: true, nombre: true, direccion: true } },
+
+        cliente: { select: { id: true, nombre: true, email: true, telefono: true } },
+        lead: { select: { id: true, nombre: true, email: true, telefono: true } },
+
+        seccion: { select: { id: true, nombre: true, slug: true } },
+        subSeccion: { select: { id: true, nombre: true, slug: true } },
+
+        documentos: { orderBy: { id: "desc" }, take: 20 },
+      },
     });
 
     return NextResponse.json({ ok: true, item: created });
@@ -201,9 +238,6 @@ export async function PATCH(req: NextRequest) {
   const id = toId(body?.id);
   if (!id) return jsonError(400, "id es obligatorio");
 
-  // ✅ Scope:
-  // - ADMIN: { id, adminId }
-  // - SUPERADMIN: { id }
   const whereTenant: any = role === "SUPERADMIN" ? { id } : { id, adminId };
 
   if (role !== "SUPERADMIN" && !adminId) {
@@ -214,12 +248,19 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.contratacion.findFirst({
         where: whereTenant,
-        select: { id: true, estado: true, leadId: true, clienteId: true, adminId: true },
+        select: {
+          id: true,
+          estado: true,
+          leadId: true,
+          clienteId: true,
+          adminId: true,
+          agenteId: true,
+          lugarId: true,
+        },
       });
 
       if (!current) throw new Error("Contratación no encontrada");
 
-      // Para SUPERADMIN, operamos con el adminId real del registro
       const effectiveAdminId = role === "SUPERADMIN" ? (current as any).adminId : adminId;
 
       const data: any = {};
@@ -240,28 +281,48 @@ export async function PATCH(req: NextRequest) {
         data.totalFactura = body.totalFactura === null ? null : body.totalFactura;
       }
 
-      // ✅ Si pasa a CONFIRMADA => crear/vincular cliente + confirmadaEn
+      // ✅ Si pasa a CONFIRMADA => crear/vincular cliente + confirmadaEn + (autofill agente/lugar)
       if (est === "CONFIRMADA") {
         if (!canConfirm(tenant)) throw new Error("No autorizado para confirmar");
 
         if (current.estado !== "CONFIRMADA") {
           let clienteId = current.clienteId ?? null;
 
-          if (!clienteId && current.leadId) {
-            const lead = await tx.lead.findFirst({
+          let leadData: any = null;
+
+          if (current.leadId) {
+            leadData = await tx.lead.findFirst({
               where: {
                 id: current.leadId,
                 ...(effectiveAdminId ? ({ adminId: effectiveAdminId } as any) : {}),
               } as any,
-              select: { nombre: true, email: true, telefono: true, direccion: true } as any,
+              select: {
+                nombre: true,
+                email: true,
+                telefono: true,
+                direccion: true,
+                agenteId: true,
+                lugarId: true,
+              } as any,
             });
+          }
 
-            const leadNombre = safeTrim((lead as any)?.nombre);
-            if (!lead || !leadNombre) throw new Error("El lead no tiene nombre");
+          // ✅ autofill agente/lugar desde lead si están vacíos
+          if (!current.agenteId && (leadData as any)?.agenteId) {
+            data.agenteId = (leadData as any).agenteId;
+          }
+          if (!current.lugarId && (leadData as any)?.lugarId) {
+            data.lugarId = (leadData as any).lugarId;
+          }
 
-            const email = safeTrimLower((lead as any)?.email);
-            const telefono = safeTrim((lead as any)?.telefono);
-            const direccion = safeTrim((lead as any)?.direccion) || "PENDIENTE";
+          // ✅ crear/vincular cliente desde lead si no existe
+          if (!clienteId && current.leadId) {
+            const leadNombre = safeTrim((leadData as any)?.nombre);
+            if (!leadData || !leadNombre) throw new Error("El lead no tiene nombre");
+
+            const email = safeTrimLower((leadData as any)?.email);
+            const telefono = safeTrim((leadData as any)?.telefono);
+            const direccion = safeTrim((leadData as any)?.direccion) || "PENDIENTE";
 
             const existing = await tx.cliente.findFirst({
               where: {

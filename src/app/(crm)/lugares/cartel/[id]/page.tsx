@@ -16,6 +16,19 @@ type Fondo = {
   creadoEn?: string;
 };
 
+const IMPULSO_LOGO_SRC =
+  "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
+
+const EMAIL = "info@impulsoenergetico.es";
+const WEB = "www.impulsoenergetico.es";
+const TELEFONO_FIJO = "692 137 048"; // fallback Impulso
+
+const agenteTelefono = useMemo(() => {
+  const t = (lugar?.agente?.telefono ?? "").trim();
+  return t || TELEFONO_FIJO;
+}, [lugar]);
+
+
 export default function CartelLugar() {
   const router = useRouter();
   const params = useParams();
@@ -25,7 +38,7 @@ export default function CartelLugar() {
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
-  // ✅ tenant solo para obtener lugar (NO para fondos globales)
+  // tenant solo para obtener lugar
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
 
@@ -47,19 +60,26 @@ export default function CartelLugar() {
   const fondoUrl = fondoActivo?.url ?? null;
 
   const [exportando, setExportando] = useState(false);
-
   const cartelRef = useRef<HTMLDivElement>(null);
 
-  // ✅ Link QR real del lugar
+  // Link QR real del lugar
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
   }, [lugar]);
 
-  // ───────────────────────────────
-  // FETCH: lugar + fondo activo
-  // ───────────────────────────────
+  const agenteNombre = useMemo(() => {
+    if (!lugar) return "—";
+    return lugar?.agente?.nombre || "Agente Impulso";
+  }, [lugar]);
+
+  const clubLogoUrl = useMemo(() => {
+    // En cartel A4 normal NO lo usamos, pero lo dejo preparado si algún día quieres “A4 especial”
+    return lugar?.especialLogoUrl ?? null;
+  }, [lugar]);
+
+  // Fetch lugar + fondo activo
   useEffect(() => {
     if (!id) return;
 
@@ -70,7 +90,6 @@ export default function CartelLugar() {
     };
 
     const fetchFondoActivo = async () => {
-      // ✅ fondo global => NO dependemos de adminId aquí
       const res = await fetch(`/api/fondos?filtro=todos`, { cache: "no-store" });
       const data = (await res.json()) as Fondo[];
 
@@ -87,7 +106,6 @@ export default function CartelLugar() {
         return;
       }
 
-      // fallback: más reciente
       if (data[0]?.url) {
         setFondoActivo(data[0]);
         setWarning(
@@ -109,22 +127,18 @@ export default function CartelLugar() {
     })();
   }, [id, adminQuery]);
 
-  // ───────────────────────────────
   // Helpers
-  // ───────────────────────────────
   const cleanupHtml2PdfOverlays = () => {
     try {
       document
         .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
         .forEach((el) => el.remove());
 
-      // algunos casos dejan iframes “fantasma”
       document.querySelectorAll("iframe").forEach((el) => {
         const src = el.getAttribute("src");
         if (!src || src === "about:blank") el.remove();
       });
 
-      // por si dejó estilos bloqueando interacción
       document.body.style.pointerEvents = "";
       document.body.style.overflow = "";
     } catch {}
@@ -165,13 +179,10 @@ export default function CartelLugar() {
     }
   };
 
-  // ───────────────────────────────
   // Imprimir
-  // ───────────────────────────────
   const imprimirCartel = async () => {
     if (!cartelRef.current || !lugar) return;
 
-    // ✅ registrar solo IMPRIMIR
     registrarHistorial("IMPRIMIR");
 
     const contenido = cartelRef.current.innerHTML;
@@ -185,37 +196,8 @@ export default function CartelLugar() {
           <style>
             @page { size: A4; margin: 0; }
             body { margin: 0; padding: 0; }
-            .cartel {
-              width: 210mm;
-              height: 297mm;
-              position: relative;
-              overflow: hidden;
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
-            }
-            .cartel img {
-              position: absolute;
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-              z-index: 0;
-            }
-            .qr-centro {
-              position: absolute;
-              width: 5cm;
-              height: 5cm;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              background: white;
-              padding: 12px;
-              border-radius: 12px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              z-index: 2;
-            }
+            .cartel { width: 210mm; height: 297mm; position: relative; overflow: hidden; }
+            img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           </style>
         </head>
         <body>
@@ -230,27 +212,19 @@ export default function CartelLugar() {
     ventana.close();
   };
 
-  // ───────────────────────────────
-  // Descargar PDF (PRO + historial + Cloudinary)
-  // ───────────────────────────────
+  // Descargar PDF (historial + Cloudinary)
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
 
     try {
       setExportando(true);
-
-      // ✅ muy importante: limpiar antes y después
       cleanupHtml2PdfOverlays();
 
-      // 1) Crear historial y obtener cartelId
       const cartelId = await registrarHistorial("DESCARGAR_PDF");
       if (!cartelId) throw new Error("No se pudo crear el registro de historial (sin ID).");
 
-      // 2) Generar PDF blob
       const html2pdf = (await import("html2pdf.js")).default;
 
-      // ⚠️ OJO: algunos builds de html2pdf fallan con outputPdf('blob').
-      // Por eso hacemos fallback.
       let pdfBlob: Blob | null = null;
 
       try {
@@ -268,16 +242,12 @@ export default function CartelLugar() {
             jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           });
 
-        // intento 1
         pdfBlob = await worker.outputPdf("blob");
       } catch (err) {
-        console.warn("outputPdf(blob) falló, probando fallback save->fetch", err);
+        console.warn("outputPdf(blob) falló, probando fallback output(blob)", err);
       }
 
-      // fallback: save() genera descarga; pero nosotros queremos blob.
-      // Solución: usar jsPDF output directamente si la lib lo permite:
       if (!pdfBlob) {
-        // intento 2: output('blob') (según versiones)
         try {
           const worker2 = html2pdf()
             .from(cartelRef.current)
@@ -290,15 +260,12 @@ export default function CartelLugar() {
           // @ts-ignore
           pdfBlob = await worker2.output("blob");
         } catch (err) {
-          console.error("Fallback output(blob) también falló", err);
+          console.error("Fallback output(blob) falló", err);
         }
       }
 
-      if (!pdfBlob) {
-        throw new Error("No se pudo generar el PDF (html2pdf falló).");
-      }
+      if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
 
-      // 3) Subir PDF a Cloudinary vía /api/uploads (resourceType raw)
       const file = new File([pdfBlob], `cartel_lugar_${lugar.id}.pdf`, {
         type: "application/pdf",
       });
@@ -312,7 +279,6 @@ export default function CartelLugar() {
       const dUp = await rUp.json().catch(() => ({}));
       if (!rUp.ok) throw new Error(dUp?.error || "Error subiendo PDF a Cloudinary");
 
-      // 4) Asociar PDF al historial
       const rPatch = await fetch(`/api/carteles/${cartelId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -327,12 +293,8 @@ export default function CartelLugar() {
       });
 
       const dPatch = await rPatch.json().catch(() => ({}));
-      if (!rPatch.ok) {
-        // ✅ Esto te ayuda a saber si está guardado o no
-        throw new Error(dPatch?.error || "No se pudo asociar el PDF al historial");
-      }
+      if (!rPatch.ok) throw new Error(dPatch?.error || "No se pudo asociar el PDF al historial");
 
-      // 5) Descargar local
       downloadBlob(pdfBlob, `cartel_lugar_${lugar.id}.pdf`);
     } catch (e: any) {
       console.error(e);
@@ -343,9 +305,7 @@ export default function CartelLugar() {
     }
   };
 
-  // ───────────────────────────────
   // UI states
-  // ───────────────────────────────
   if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
 
   if (!lugar) {
@@ -412,7 +372,7 @@ export default function CartelLugar() {
         ) : null}
       </div>
 
-      {/* ✅ CARTEL CAPTURABLE SIN OKLCH */}
+      {/* CARTEL A4 */}
       <div
         ref={cartelRef}
         style={{
@@ -425,6 +385,7 @@ export default function CartelLugar() {
           boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
         }}
       >
+        {/* Fondo */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fondoUrl}
@@ -440,24 +401,77 @@ export default function CartelLugar() {
           }}
         />
 
+        {/* ✅ BLOQUE INFERIOR (dentro del recuadro blanco del fondo) */}
         <div
           style={{
             position: "absolute",
-            width: "5cm",
-            height: "5cm",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            background: "#ffffff",
-            padding: "12px",
-            borderRadius: "12px",
+            left: "12mm",
+            right: "12mm",
+            bottom: "12mm",
+            height: "42mm",
+            zIndex: 5,
             display: "flex",
-            justifyContent: "center",
+            gap: "10mm",
             alignItems: "center",
-            zIndex: 2,
+            padding: "6mm",
+            // el fondo ya tiene el recuadro blanco,
+            // pero esto asegura legibilidad si un fondo viene sin recuadro
+            background: "rgba(255,255,255,0.00)",
           }}
         >
-          <QRCode value={qrUrl} size={160} />
+          {/* QR izquierda */}
+          <div
+            style={{
+              width: "36mm",
+              height: "36mm",
+              background: "#ffffff",
+              borderRadius: "8mm",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+            }}
+          >
+            <QRCode value={qrUrl} size={120} />
+          </div>
+
+          {/* Info derecha */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Logos */}
+            <div style={{ display: "flex", gap: "8mm", alignItems: "center" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={IMPULSO_LOGO_SRC}
+                alt="Impulso Energético"
+                crossOrigin="anonymous"
+                style={{ height: "14mm", width: "auto", objectFit: "contain" }}
+              />
+
+              {/* preparado por si algún día quieres “A4 especial” */}
+              {clubLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={clubLogoUrl}
+                  alt="Logo lugar"
+                  crossOrigin="anonymous"
+                  style={{ height: "14mm", width: "auto", objectFit: "contain" }}
+                />
+              ) : null}
+            </div>
+
+            {/* Texto */}
+            <div style={{ marginTop: "3mm", fontFamily: "Arial, sans-serif" }}>
+              <div style={{ fontSize: "12pt", fontWeight: 800, color: "#0f172a" }}>
+                {agenteNombre}
+              </div>
+              <div style={{ fontSize: "10pt", fontWeight: 700, color: "#0f172a" }}>
+                Tel: {TELEFONO_FIJO}
+              </div>
+              <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0f172a" }}>
+                {EMAIL} · {WEB}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

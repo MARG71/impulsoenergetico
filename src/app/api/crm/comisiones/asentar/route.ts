@@ -1,3 +1,4 @@
+//src/app/api/crm/comisiones/asentar/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";

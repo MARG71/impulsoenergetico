@@ -1,3 +1,4 @@
+//src/app/api/comisiones/asientos/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";

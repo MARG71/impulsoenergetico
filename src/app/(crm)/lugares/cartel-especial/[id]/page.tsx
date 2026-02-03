@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+
+const IMPULSO_LOGO_SRC =
+  "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
+
+const EMAIL = "info@impulsoenergetico.es";
+const WEB = "www.impulsoenergetico.es";
+const TELEFONO_FIJO = "692 137 048";
 
 export default function CartelEspecial() {
   const { id } = useParams() as { id: string };
@@ -31,6 +38,17 @@ export default function CartelEspecial() {
   const [cargando, setCargando] = useState(true);
   const posterRef = useRef<HTMLDivElement>(null);
 
+  const qrUrl = useMemo(() => {
+    if (!lugar) return "";
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
+  }, [lugar]);
+
+  const agenteNombre = useMemo(() => {
+    if (!lugar) return "—";
+    return lugar?.agente?.nombre || "Agente Impulso";
+  }, [lugar]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -43,25 +61,6 @@ export default function CartelEspecial() {
     })();
   }, [id, adminQuery]);
 
-  const downloadPNG = async () => {
-    if (!posterRef.current) return;
-    await registrarHistorial("DESCARGAR_PNG");
-
-    const html2canvas = (await import("html2canvas")).default;
-
-    const canvas = await html2canvas(posterRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: null,
-    });
-
-    const data = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = data;
-    a.download = `cartel_especial_${lugar?.id ?? id}.png`;
-    a.click();
-  };
-
   const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PNG") => {
     try {
       await fetch("/api/carteles", {
@@ -70,7 +69,7 @@ export default function CartelEspecial() {
         body: JSON.stringify({
           tipo: "ESPECIAL",
           accion,
-          lugarId: lugar?.id,
+          lugarId: lugar?.id ?? Number(id),
           fondoId: null,
           fondoUrlSnap: lugar?.especialCartelUrl ?? null,
           qrUrlSnap: qrUrl,
@@ -82,12 +81,55 @@ export default function CartelEspecial() {
     }
   };
 
+  const downloadPNG = async () => {
+    if (!posterRef.current) return;
+    await registrarHistorial("DESCARGAR_PNG");
 
-  const imprimir = () => window.print();
+    const html2canvas = (await import("html2canvas")).default;
 
-  registrarHistorial("IMPRIMIR");
-  window.print();
+    const canvas = await html2canvas(posterRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+    });
 
+    const data = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = data;
+    a.download = `cartel_especial_${lugar?.id ?? id}.png`;
+    a.click();
+  };
+
+  const imprimir = async () => {
+    if (!posterRef.current) return;
+    await registrarHistorial("IMPRIMIR");
+
+    const contenido = posterRef.current.innerHTML;
+    const ventana = window.open("", "", "width=800,height=1000");
+    if (!ventana) return;
+
+    ventana.document.write(`
+      <html>
+        <head>
+          <title>Imprimir Cartel Especial</title>
+          <style>
+            @page { size: A4; margin: 0; }
+            body { margin: 0; padding: 0; }
+            .cartel { width: 210mm; height: 297mm; position: relative; overflow: hidden; }
+            img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          </style>
+        </head>
+        <body>
+          <div class="cartel">${contenido}</div>
+        </body>
+      </html>
+    `);
+
+    ventana.document.close();
+    ventana.focus();
+    ventana.print();
+    ventana.close();
+  };
 
   if (cargando) return <div className="p-10 text-center">Cargando...</div>;
   if (!lugar) return <div className="p-10 text-center">Lugar no encontrado</div>;
@@ -102,10 +144,6 @@ export default function CartelEspecial() {
       </div>
     );
   }
-
-  const qrUrl = `${
-    typeof window !== "undefined" ? window.location.origin : ""
-  }/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
 
   return (
     <div className="min-h-screen bg-white p-6 flex flex-col items-center gap-6">
@@ -123,34 +161,103 @@ export default function CartelEspecial() {
         </div>
       </div>
 
+      {/* CARTEL ESPECIAL en A4 */}
       <div
         ref={posterRef}
-        className="relative border rounded-xl shadow-xl overflow-hidden"
-        style={{ width: 540, height: 675 }}
+        style={{
+          width: "210mm",
+          height: "297mm",
+          position: "relative",
+          overflow: "hidden",
+          background: "#ffffff",
+          border: "1px solid #d1d5db",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+        }}
       >
+        {/* Fondo especial */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={lugar.especialCartelUrl}
           alt="Cartel especial"
-          className="absolute inset-0 w-full h-full object-cover"
           crossOrigin="anonymous"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            zIndex: 0,
+          }}
         />
 
-        {lugar.especialLogoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={lugar.especialLogoUrl}
-            alt="logo"
-            className="absolute top-3 right-3 w-14 h-14 object-contain rounded-md"
-            crossOrigin="anonymous"
-          />
-        )}
-
+        {/* ✅ BLOQUE INFERIOR (QR + logos + datos) */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 bottom-6 bg-white p-3 rounded-xl shadow"
-          style={{ width: 160, height: 160 }}
+          style={{
+            position: "absolute",
+            left: "12mm",
+            right: "12mm",
+            bottom: "12mm",
+            height: "42mm",
+            zIndex: 5,
+            display: "flex",
+            gap: "10mm",
+            alignItems: "center",
+            padding: "6mm",
+            background: "rgba(255,255,255,0.00)",
+          }}
         >
-          <QRCode value={qrUrl} size={154} />
+          {/* QR izquierda */}
+          <div
+            style={{
+              width: "36mm",
+              height: "36mm",
+              background: "#ffffff",
+              borderRadius: "8mm",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+            }}
+          >
+            <QRCode value={qrUrl} size={120} />
+          </div>
+
+          {/* Info derecha */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", gap: "8mm", alignItems: "center" }}>
+              {/* Logo Impulso */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={IMPULSO_LOGO_SRC}
+                alt="Impulso Energético"
+                crossOrigin="anonymous"
+                style={{ height: "14mm", width: "auto", objectFit: "contain" }}
+              />
+
+              {/* Logo club si existe */}
+              {lugar.especialLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={lugar.especialLogoUrl}
+                  alt="Logo club"
+                  crossOrigin="anonymous"
+                  style={{ height: "14mm", width: "auto", objectFit: "contain" }}
+                />
+              ) : null}
+            </div>
+
+            <div style={{ marginTop: "3mm", fontFamily: "Arial, sans-serif" }}>
+              <div style={{ fontSize: "12pt", fontWeight: 800, color: "#0f172a" }}>
+                {agenteNombre}
+              </div>
+              <div style={{ fontSize: "10pt", fontWeight: 700, color: "#0f172a" }}>
+                Tel: {TELEFONO_FIJO}
+              </div>
+              <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0f172a" }}>
+                {EMAIL} · {WEB}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

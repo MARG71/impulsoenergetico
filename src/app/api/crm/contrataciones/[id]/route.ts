@@ -1,4 +1,3 @@
-// src/app/api/crm/contrataciones/[id]/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,22 +12,6 @@ function jsonError(status: number, message: string) {
 function toId(v: any) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-function asEstado(v: any): EstadoContratacion | null {
-  if (!v) return null;
-  const s = String(v).toUpperCase();
-  return (Object.values(EstadoContratacion) as string[]).includes(s)
-    ? (s as EstadoContratacion)
-    : null;
-}
-
-function asNivel(v: any): NivelComision | null {
-  if (!v) return null;
-  const s = String(v).toUpperCase();
-  return (Object.values(NivelComision) as string[]).includes(s)
-    ? (s as NivelComision)
-    : null;
 }
 
 function getRole(tenant: any) {
@@ -47,28 +30,30 @@ export async function GET(req: NextRequest, ctx: any) {
   const where: any = { id };
 
   // ✅ ADMIN: scope por adminId
-  // ✅ SUPERADMIN: sin filtro
+  // ✅ SUPERADMIN: sin filtro (o si tenantAdminId existe por modo tenant, puedes filtrar)
   if (role !== "SUPERADMIN") {
     if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
     else return jsonError(400, "tenantAdminId no disponible");
+  } else {
+    // opcional:
+    // if (tenant.tenantAdminId != null) where.adminId = tenant.tenantAdminId;
   }
 
   const item = await prisma.contratacion.findFirst({
     where,
     include: {
-        admin: { select: { id: true, nombre: true, email: true } },
-        agente: { select: { id: true, nombre: true, email: true, telefono: true } },
-        lugar: { select: { id: true, nombre: true, direccion: true } },
+      admin: { select: { id: true, nombre: true, email: true } },
+      agente: { select: { id: true, nombre: true, email: true, telefono: true } },
+      lugar: { select: { id: true, nombre: true, direccion: true } },
 
-        cliente: { select: { id: true, nombre: true, email: true, telefono: true, direccion: true } },
-        lead: { select: { id: true, nombre: true, email: true, telefono: true } },
+      cliente: { select: { id: true, nombre: true, email: true, telefono: true, direccion: true } },
+      lead: { select: { id: true, nombre: true, email: true, telefono: true } },
 
-        seccion: { select: { id: true, nombre: true, slug: true } },
-        subSeccion: { select: { id: true, nombre: true, slug: true } },
+      seccion: { select: { id: true, nombre: true, slug: true } },
+      subSeccion: { select: { id: true, nombre: true, slug: true } },
 
-        documentos: { orderBy: { id: "desc" }, take: 50 },
+      documentos: { orderBy: { id: "desc" }, take: 50 },
     },
-
   });
 
   if (!item) return jsonError(404, "Contratación no encontrada");
@@ -97,12 +82,8 @@ export async function PATCH(req: NextRequest, ctx: any) {
   if (!exists) return jsonError(404, "Contratación no encontrada");
 
   const data: any = {};
-  const est = asEstado(body?.estado);
-  if (est) data.estado = est;
-
-  const niv = asNivel(body?.nivel);
-  if (niv) data.nivel = niv;
-
+  // Este PATCH lo estás usando poco (porque el cambio de estado lo haces en /estado).
+  // Lo dejamos para notas/nivel etc si lo usas:
   if (typeof body?.notas === "string") data.notas = body.notas;
 
   try {
