@@ -19,8 +19,17 @@ type Fondo = {
 const IMPULSO_LOGO_SRC =
   "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
 
-const EMAIL = "info@impulsoenergetico.es";
-const WEB = "www.impulsoenergetico.es";
+const TELEFONO_FIJO = "692 137 048";
+
+// ✅ evita que res.json() reviente si el backend devuelve HTML o texto
+async function safeJson(res: Response) {
+  const text = await res.text();
+  try {
+    return { ok: res.ok, status: res.status, data: JSON.parse(text) };
+  } catch {
+    return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) };
+  }
+}
 
 export default function CartelLugar() {
   const router = useRouter();
@@ -46,8 +55,15 @@ export default function CartelLugar() {
   const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
+  const [fondoActivo, setFondoActivo] = useState<Fondo | null>(null);
+  const fondoUrl = fondoActivo?.url ?? null;
 
-  const TELEFONO_FIJO = "692 137 048"; // por si el agente no tiene teléfono
+  const [loading, setLoading] = useState(true);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [exportando, setExportando] = useState(false);
+  const cartelRef = useRef<HTMLDivElement>(null);
 
   const agenteTelefono = useMemo(() => {
     const t = String(lugar?.agente?.telefono ?? "").trim();
@@ -59,16 +75,6 @@ export default function CartelLugar() {
     return n || "Impulso Energético";
   }, [lugar]);
 
-
-  const [loading, setLoading] = useState(true);
-  const [warning, setWarning] = useState<string | null>(null);
-
-  const [fondoActivo, setFondoActivo] = useState<Fondo | null>(null);
-  const fondoUrl = fondoActivo?.url ?? null;
-
-  const [exportando, setExportando] = useState(false);
-  const cartelRef = useRef<HTMLDivElement>(null);
-
   // Link QR real del lugar
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
@@ -76,57 +82,76 @@ export default function CartelLugar() {
     return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
   }, [lugar]);
 
-  const clubLogoUrl = useMemo(() => {
-    // En cartel A4 normal NO lo usamos, pero lo dejo preparado si algún día quieres “A4 especial”
-    return lugar?.especialLogoUrl ?? null;
-  }, [lugar]);
-
   // Fetch lugar + fondo activo
   useEffect(() => {
     if (!id) return;
 
+    let alive = true;
+
     const fetchLugar = async () => {
       const res = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
-      const data = await res.json();
-      setLugar(data);
+      const out = await safeJson(res);
+      if (!out.ok) {
+        const msg =
+          (out.data && (out.data.error || out.data.message)) ||
+          out.raw ||
+          `Error HTTP ${out.status}`;
+        throw new Error(msg);
+      }
+      return out.data;
     };
 
     const fetchFondoActivo = async () => {
       const res = await fetch(`/api/fondos?filtro=todos`, { cache: "no-store" });
-      const data = (await res.json()) as Fondo[];
+      const out = await safeJson(res);
+      if (!out.ok) {
+        const msg =
+          (out.data && (out.data.error || out.data.message)) ||
+          out.raw ||
+          `Error HTTP ${out.status}`;
+        throw new Error(msg);
+      }
+
+      const data = out.data as Fondo[];
 
       if (!Array.isArray(data) || data.length === 0) {
-        setFondoActivo(null);
-        setWarning("No hay fondos subidos aún. Sube uno en /lugares/fondos.");
-        return;
+        return { fondo: null as Fondo | null, warn: "No hay fondos subidos aún. Sube uno en /lugares/fondos." };
       }
 
-      const activo = data.find((f) => !!f.activo);
-      if (activo?.url) {
-        setFondoActivo(activo);
-        setWarning(null);
-        return;
-      }
+      const activo = data.find((f) => !!f.activo && !!f.url);
+      if (activo) return { fondo: activo, warn: null };
 
-      if (data[0]?.url) {
-        setFondoActivo(data[0]);
-        setWarning(
-          "No hay ningún fondo marcado como activo. Mostrando el más reciente. (Activa uno en /lugares/fondos)"
-        );
-      } else {
-        setFondoActivo(null);
-        setWarning("No se pudo obtener URL de fondo.");
-      }
+      const primero = data.find((f) => !!f.url) ?? null;
+      return {
+        fondo: primero,
+        warn: primero
+          ? "No hay ningún fondo marcado como activo. Mostrando el más reciente. (Activa uno en /lugares/fondos)"
+          : "No se pudo obtener URL de fondo.",
+      };
     };
 
     (async () => {
       try {
         setLoading(true);
-        await Promise.all([fetchLugar(), fetchFondoActivo()]);
+        setError(null);
+
+        const [l, f] = await Promise.all([fetchLugar(), fetchFondoActivo()]);
+
+        if (!alive) return;
+        setLugar(l);
+        setFondoActivo(f.fondo);
+        setWarning(f.warn);
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message || "Error cargando datos del cartel");
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
+
+    return () => {
+      alive = false;
+    };
   }, [id, adminQuery]);
 
   // Helpers
@@ -244,10 +269,9 @@ export default function CartelLugar() {
             jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           });
 
+        // @ts-ignore
         pdfBlob = await worker.outputPdf("blob");
-      } catch (err) {
-        console.warn("outputPdf(blob) falló, probando fallback output(blob)", err);
-      }
+      } catch {}
 
       if (!pdfBlob) {
         try {
@@ -261,9 +285,7 @@ export default function CartelLugar() {
 
           // @ts-ignore
           pdfBlob = await worker2.output("blob");
-        } catch (err) {
-          console.error("Fallback output(blob) falló", err);
-        }
+        } catch {}
       }
 
       if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
@@ -309,6 +331,20 @@ export default function CartelLugar() {
 
   // UI states
   if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
+
+  if (error) {
+    return (
+      <div className="p-10 text-center">
+        <div className="font-extrabold text-red-700 mb-2">Error cargando el cartel</div>
+        <pre className="text-left mx-auto max-w-2xl whitespace-pre-wrap bg-red-50 border border-red-200 p-4 rounded-lg text-sm">
+          {error}
+        </pre>
+        <div className="mt-4">
+          <Button onClick={() => router.back()}>Volver</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!lugar) {
     return (
@@ -410,24 +446,24 @@ export default function CartelLugar() {
             left: "12mm",
             right: "12mm",
             bottom: "12mm",
-            height: "70mm", // 👈 aquí lo haces más grande si quieres
+            height: "62mm", // ✅ menos alto para que no corte el cartel
             background: "#ffffff",
             borderRadius: "9mm",
-            border: "2.5px solid #C9A227", // dorado
+            border: "2.5px solid #C9A227",
             boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "8mm",
-            gap: "8mm",
+            padding: "7mm",
+            gap: "7mm",
             zIndex: 5,
           }}
         >
           {/* QR */}
           <div
             style={{
-              width: "48mm",
-              height: "48mm",
+              width: "45mm",
+              height: "45mm",
               background: "#fff",
               borderRadius: "6mm",
               border: "2px solid #111827",
@@ -438,19 +474,18 @@ export default function CartelLugar() {
               flexShrink: 0,
             }}
           >
-            <QRCode value={qrUrl} size={160} />
+            <QRCode value={qrUrl} size={145} />
           </div>
 
-          {/* Centro: logos + nombre */}
+          {/* Centro: logo + nombre + línea contacto */}
           <div style={{ flex: 1, textAlign: "center" }}>
-            {/* Logo Impulso */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+              src={IMPULSO_LOGO_SRC}
               alt="Impulso Energético"
               style={{
-                height: "16mm",
-                margin: "0 auto 5mm auto",
+                height: "15mm",
+                margin: "0 auto 4mm auto",
                 objectFit: "contain",
               }}
             />
@@ -465,49 +500,23 @@ export default function CartelLugar() {
                 lineHeight: 1.2,
               }}
             >
-              {(lugar?.agente?.nombre ?? "AGENTE IMPULSO").toString()}
+              {agenteNombre}
             </div>
 
             <div
               style={{
                 marginTop: "3mm",
-                fontSize: "8.5pt",
+                fontSize: "8.3pt",
                 fontWeight: 700,
                 color: "#374151",
               }}
             >
-              {lugar?.agente?.email ?? "info@impulsoenergetico.es"} · 692 137 048 · www.impulsoenergetico.es
+              {lugar?.agente?.email ?? "info@impulsoenergetico.es"} · {agenteTelefono} · www.impulsoenergetico.es
             </div>
           </div>
 
-          {/* Derecha: logo/escudo (opcional) */}
-          <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
-            {/* Si quieres, aquí ponemos el logo del lugar especial o el escudo */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {lugar?.especialLogoUrl && (
-              <img
-                src={lugar.especialLogoUrl}
-                alt="Logo lugar"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
-              />
-            )}
-
-
-
-              alt="Logo lugar"
-              crossOrigin="anonymous"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: "4mm",
-              }}
-            
-          </div>
+          {/* ✅ DERECHA: en A4 NO PINTAMOS NADA (sin símbolo, sin escudo) */}
+          <div style={{ width: "18mm", height: "18mm", flexShrink: 0 }} />
         </div>
       </div>
 
