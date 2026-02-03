@@ -409,36 +409,36 @@ export default function CartelLugar() {
             position: "absolute",
             left: "12mm",
             right: "12mm",
-            bottom: "14mm",
-            height: "85mm", // 👈 aquí lo haces más grande si quieres
+            bottom: "12mm",
+            height: "70mm", // 👈 aquí lo haces más grande si quieres
             background: "#ffffff",
-            borderRadius: "10mm",
-            border: "3px solid #C9A227", // dorado
+            borderRadius: "9mm",
+            border: "2.5px solid #C9A227", // dorado
             boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "10mm",
-            gap: "10mm",
+            padding: "8mm",
+            gap: "8mm",
             zIndex: 5,
           }}
         >
           {/* QR */}
           <div
             style={{
-              width: "55mm",
-              height: "55mm",
+              width: "48mm",
+              height: "48mm",
               background: "#fff",
               borderRadius: "6mm",
               border: "2px solid #111827",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "4mm",
+              padding: "3mm",
               flexShrink: 0,
             }}
           >
-            <QRCode value={qrUrl} size={180} />
+            <QRCode value={qrUrl} size={160} />
           </div>
 
           {/* Centro: logos + nombre */}
@@ -449,8 +449,8 @@ export default function CartelLugar() {
               src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
               alt="Impulso Energético"
               style={{
-                height: "18mm",
-                margin: "0 auto 6mm auto",
+                height: "16mm",
+                margin: "0 auto 5mm auto",
                 objectFit: "contain",
               }}
             />
@@ -470,8 +470,8 @@ export default function CartelLugar() {
 
             <div
               style={{
-                marginTop: "4mm",
-                fontSize: "9pt",
+                marginTop: "3mm",
+                fontSize: "8.5pt",
                 fontWeight: 700,
                 color: "#374151",
               }}
@@ -484,8 +484,20 @@ export default function CartelLugar() {
           <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
             {/* Si quieres, aquí ponemos el logo del lugar especial o el escudo */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lugar?.especialLogoUrl || "/favicon.ico"}
+            {lugar?.especialLogoUrl && (
+              <img
+                src={lugar.especialLogoUrl}
+                alt="Logo lugar"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                }}
+              />
+            )}
+
+
+
               alt="Logo lugar"
               crossOrigin="anonymous"
               style={{
@@ -494,7 +506,7 @@ export default function CartelLugar() {
                 objectFit: "contain",
                 borderRadius: "4mm",
               }}
-            />
+            
           </div>
         </div>
       </div>
