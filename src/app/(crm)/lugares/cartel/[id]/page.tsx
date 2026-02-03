@@ -446,7 +446,7 @@ export default function CartelLugar() {
             left: "12mm",
             right: "12mm",
             bottom: "12mm",
-            height: "62mm", // ✅ menos alto para que no corte el cartel
+            height: "52mm", // ✅ menos alto para que no corte el cartel
             background: "#ffffff",
             borderRadius: "9mm",
             border: "2.5px solid #C9A227",
@@ -454,8 +454,8 @@ export default function CartelLugar() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "7mm",
-            gap: "7mm",
+            padding: "6mm",
+            gap: "6mm",
             zIndex: 5,
           }}
         >
@@ -506,12 +506,15 @@ export default function CartelLugar() {
             <div
               style={{
                 marginTop: "3mm",
-                fontSize: "8.3pt",
-                fontWeight: 700,
+                fontSize: "9.4pt",
+                fontWeight: 800,
                 color: "#374151",
               }}
             >
-              {lugar?.agente?.email ?? "info@impulsoenergetico.es"} · {agenteTelefono} · www.impulsoenergetico.es
+              <span style={{ fontWeight: 900 }}>
+                {lugar?.agente?.email ?? "info@impulsoenergetico.es"} · {agenteTelefono}
+              </span>
+              <span> · www.impulsoenergetico.es</span>
             </div>
           </div>
 
