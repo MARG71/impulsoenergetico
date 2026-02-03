@@ -8,103 +8,97 @@ import { useSession } from "next-auth/react";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
-const IMPULSO_LOGO_SRC =
-  "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
-
-const EMAIL = "info@impulsoenergetico.es";
+const EMAIL_FIJO = "info@impulsoenergetico.es";
 const WEB = "www.impulsoenergetico.es";
 const TELEFONO_FIJO = "692 137 048";
 
-export default function CartelEspecial() {
-  const { id } = useParams() as { id: string };
+const IMPULSO_LOGO_SRC =
+  "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
+
+export default function CartelLugarEspecial() {
   const router = useRouter();
+  const params = useParams();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
 
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
+  // tenant solo para obtener lugar
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
+
   const tenantMode =
     isSuperadmin &&
     typeof adminIdContext === "number" &&
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const adminQuery = tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+  const adminQuery =
+    tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+
+  const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const posterRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
 
+  const [exportando, setExportando] = useState(false);
+  const cartelRef = useRef<HTMLDivElement>(null);
+
+  // QR real del lugar
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
   }, [lugar]);
 
-  const agenteNombre = useMemo(() => {
-    if (!lugar) return "—";
-    return lugar?.agente?.nombre || "Agente Impulso";
+  const agenteTelefono = useMemo(() => {
+    const t = String(lugar?.agente?.telefono ?? "").trim();
+    return t || TELEFONO_FIJO;
+  }, [lugar]);
+
+  const agenteEmail = useMemo(() => {
+    const e = String(lugar?.agente?.email ?? "").trim();
+    return e || EMAIL_FIJO;
+  }, [lugar]);
+
+  // ✅ Fondo especial del lugar
+  const fondoUrl = useMemo(() => {
+    const u = String(lugar?.especialCartelUrl ?? "").trim();
+    return u || null;
+  }, [lugar]);
+
+  // ✅ Escudo/logo club SOLO en especial
+  const logoClubUrl = useMemo(() => {
+    const u = String(lugar?.especialLogoUrl ?? "").trim();
+    return u || null;
   }, [lugar]);
 
   useEffect(() => {
+    if (!id) return;
+
+    const fetchLugar = async () => {
+      const res = await fetch(`/api/lugares/${id}${adminQuery}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      setLugar(data);
+    };
+
     (async () => {
       try {
-        const r = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
-        const d = await r.json();
-        setLugar(d);
+        setLoading(true);
+        await fetchLugar();
       } finally {
-        setCargando(false);
+        setLoading(false);
       }
     })();
   }, [id, adminQuery]);
 
-  const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PNG") => {
-    try {
-      await fetch("/api/carteles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo: "ESPECIAL",
-          accion,
-          lugarId: lugar?.id ?? Number(id),
-          fondoId: null,
-          fondoUrlSnap: lugar?.especialCartelUrl ?? null,
-          qrUrlSnap: qrUrl,
-          adminId: tenantMode ? adminIdContext : null,
-        }),
-      });
-    } catch (e) {
-      console.warn("No se pudo registrar historial del cartel especial:", e);
-    }
-  };
+  const imprimirCartel = async () => {
+    if (!cartelRef.current || !lugar) return;
 
-  const downloadPNG = async () => {
-    if (!posterRef.current) return;
-    await registrarHistorial("DESCARGAR_PNG");
-
-    const html2canvas = (await import("html2canvas")).default;
-
-    const canvas = await html2canvas(posterRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
-
-    const data = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = data;
-    a.download = `cartel_especial_${lugar?.id ?? id}.png`;
-    a.click();
-  };
-
-  const imprimir = async () => {
-    if (!posterRef.current) return;
-    await registrarHistorial("IMPRIMIR");
-
-    const contenido = posterRef.current.innerHTML;
+    const contenido = cartelRef.current.innerHTML;
     const ventana = window.open("", "", "width=800,height=1000");
     if (!ventana) return;
 
@@ -131,13 +125,15 @@ export default function CartelEspecial() {
     ventana.close();
   };
 
-  if (cargando) return <div className="p-10 text-center">Cargando...</div>;
-  if (!lugar) return <div className="p-10 text-center">Lugar no encontrado</div>;
+  // (De momento solo imprimimos/visualizamos igual que A4.
+  // Si quieres también PDF + historial + cloudinary, lo copiamos 1:1 del A4 y cambiamos tipo a "ESPECIAL".)
 
-  if (!lugar.especial || !lugar.especialCartelUrl) {
+  if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
+
+  if (!lugar) {
     return (
       <div className="p-10 text-center">
-        Este lugar no tiene cartel especial guardado.
+        No se pudo cargar el lugar.
         <div className="mt-4">
           <Button onClick={() => router.back()}>Volver</Button>
         </div>
@@ -145,25 +141,49 @@ export default function CartelEspecial() {
     );
   }
 
+  if (!fondoUrl) {
+    return (
+      <div className="p-10 text-center">
+        Este lugar no tiene <b>cartel especial</b> configurado.
+        <div className="mt-3 text-sm text-gray-600">
+          Asigna <b>especialCartelUrl</b> en la edición del lugar.
+        </div>
+        <div className="mt-4">
+          <Button onClick={() => router.back()}>Volver</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const volverLugaresHref = tenantMode ? `/lugares?adminId=${adminIdContext}` : "/lugares";
+
   return (
-    <div className="min-h-screen bg-white p-6 flex flex-col items-center gap-6">
-      <div className="w-full max-w-4xl flex justify-between">
-        <Button onClick={() => router.back()} variant="secondary">
-          ⬅ Volver
-        </Button>
+    <div className="min-h-screen flex flex-col items-center bg-white p-6">
+      <div className="w-full max-w-4xl mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex gap-2">
-          <Button onClick={downloadPNG} className="bg-blue-600 text-white">
-            Descargar PNG
+          <Button
+            onClick={() => router.push(volverLugaresHref)}
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            📍 Volver a Lugares
           </Button>
-          <Button onClick={imprimir} className="bg-green-600 text-white">
-            Imprimir
+
+          <Button
+            onClick={() => router.back()}
+            className="bg-gray-200 text-black hover:bg-gray-300"
+          >
+            ⬅ Volver
           </Button>
+        </div>
+
+        <div className="text-xs md:text-sm font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-2 rounded-lg">
+          Cartel Especial (fondo del lugar + escudo)
         </div>
       </div>
 
-      {/* CARTEL ESPECIAL en A4 */}
+      {/* CARTEL A4 ESPECIAL */}
       <div
-        ref={posterRef}
+        ref={cartelRef}
         style={{
           width: "210mm",
           height: "297mm",
@@ -177,8 +197,8 @@ export default function CartelEspecial() {
         {/* Fondo especial */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={lugar.especialCartelUrl}
-          alt="Cartel especial"
+          src={fondoUrl}
+          alt="Fondo especial del cartel"
           crossOrigin="anonymous"
           style={{
             position: "absolute",
@@ -190,75 +210,113 @@ export default function CartelEspecial() {
           }}
         />
 
-        {/* ✅ BLOQUE INFERIOR (QR + logos + datos) */}
+        {/* RECUADRO BLANCO INFERIOR (MISMO QUE A4 PERFECTO) */}
         <div
           style={{
             position: "absolute",
             left: "12mm",
             right: "12mm",
             bottom: "12mm",
-            height: "42mm",
-            zIndex: 5,
+            height: "54mm",
+            background: "#ffffff",
+            borderRadius: "9mm",
+            border: "2.5px solid #C9A227",
+            boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
             display: "flex",
-            gap: "10mm",
             alignItems: "center",
+            justifyContent: "space-between",
             padding: "6mm",
-            background: "rgba(255,255,255,0.00)",
+            gap: "6mm",
+            zIndex: 5,
           }}
         >
-          {/* QR izquierda */}
+          {/* QR */}
           <div
             style={{
-              width: "36mm",
-              height: "36mm",
-              background: "#ffffff",
-              borderRadius: "8mm",
+              width: "42mm",
+              height: "42mm",
+              background: "#fff",
+              borderRadius: "6mm",
+              border: "2px solid #111827",
               display: "flex",
-              justifyContent: "center",
               alignItems: "center",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+              justifyContent: "center",
+              padding: "3mm",
+              flexShrink: 0,
             }}
           >
-            <QRCode value={qrUrl} size={120} />
+            <QRCode value={qrUrl} size={135} />
           </div>
 
-          {/* Info derecha */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", gap: "8mm", alignItems: "center" }}>
-              {/* Logo Impulso */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* Centro: logo + nombre + contacto */}
+          <div style={{ flex: 1, textAlign: "center" }}>
+            {/* Logo Impulso */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={IMPULSO_LOGO_SRC}
+              alt="Impulso Energético"
+              style={{
+                height: "16mm",
+                margin: "0 auto 4mm auto",
+                objectFit: "contain",
+              }}
+            />
+
+            <div
+              style={{
+                fontSize: "12pt",
+                fontWeight: 800,
+                letterSpacing: "0.6pt",
+                color: "#111827",
+                textTransform: "uppercase",
+                lineHeight: 1.2,
+              }}
+            >
+              {(lugar?.agente?.nombre ?? "AGENTE IMPULSO").toString()}
+            </div>
+
+            <div
+              style={{
+                marginTop: "2.5mm",
+                fontSize: "9.4pt",
+                fontWeight: 700,
+                color: "#374151",
+              }}
+            >
+              <span style={{ fontWeight: 900 }}>
+                {agenteEmail} · {agenteTelefono}
+              </span>
+              <span> · {WEB}</span>
+            </div>
+          </div>
+
+          {/* Derecha: escudo/logo club (SOLO ESPECIAL) */}
+          <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {logoClubUrl ? (
               <img
-                src={IMPULSO_LOGO_SRC}
-                alt="Impulso Energético"
+                src={logoClubUrl}
+                alt="Escudo / Logo del lugar"
                 crossOrigin="anonymous"
-                style={{ height: "14mm", width: "auto", objectFit: "contain" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                }}
               />
-
-              {/* Logo club si existe */}
-              {lugar.especialLogoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={lugar.especialLogoUrl}
-                  alt="Logo club"
-                  crossOrigin="anonymous"
-                  style={{ height: "14mm", width: "auto", objectFit: "contain" }}
-                />
-              ) : null}
-            </div>
-
-            <div style={{ marginTop: "3mm", fontFamily: "Arial, sans-serif" }}>
-              <div style={{ fontSize: "12pt", fontWeight: 800, color: "#0f172a" }}>
-                {agenteNombre}
-              </div>
-              <div style={{ fontSize: "10pt", fontWeight: 700, color: "#0f172a" }}>
-                Tel: {TELEFONO_FIJO}
-              </div>
-              <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0f172a" }}>
-                {EMAIL} · {WEB}
-              </div>
-            </div>
+            ) : null}
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 flex gap-4 justify-center flex-wrap">
+        <Button
+          onClick={imprimirCartel}
+          disabled={exportando}
+          className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+        >
+          Imprimir cartel especial
+        </Button>
       </div>
     </div>
   );
