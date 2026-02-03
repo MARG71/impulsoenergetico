@@ -21,13 +21,6 @@ const IMPULSO_LOGO_SRC =
 
 const EMAIL = "info@impulsoenergetico.es";
 const WEB = "www.impulsoenergetico.es";
-const TELEFONO_FIJO = "692 137 048"; // fallback Impulso
-
-const agenteTelefono = useMemo(() => {
-  const t = (lugar?.agente?.telefono ?? "").trim();
-  return t || TELEFONO_FIJO;
-}, [lugar]);
-
 
 export default function CartelLugar() {
   const router = useRouter();
@@ -53,6 +46,20 @@ export default function CartelLugar() {
   const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
+
+  const TELEFONO_FIJO = "692 137 048"; // por si el agente no tiene teléfono
+
+  const agenteTelefono = useMemo(() => {
+    const t = String(lugar?.agente?.telefono ?? "").trim();
+    return t || TELEFONO_FIJO;
+  }, [lugar]);
+
+  const agenteNombre = useMemo(() => {
+    const n = String(lugar?.agente?.nombre ?? "").trim();
+    return n || "Impulso Energético";
+  }, [lugar]);
+
+
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
 
@@ -67,11 +74,6 @@ export default function CartelLugar() {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return `${origin}/registro?agenteId=${lugar.agenteId}&lugarId=${lugar.id}`;
-  }, [lugar]);
-
-  const agenteNombre = useMemo(() => {
-    if (!lugar) return "—";
-    return lugar?.agente?.nombre || "Agente Impulso";
   }, [lugar]);
 
   const clubLogoUrl = useMemo(() => {
