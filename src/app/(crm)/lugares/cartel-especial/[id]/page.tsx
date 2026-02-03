@@ -98,32 +98,38 @@ export default function CartelLugarEspecial() {
   const imprimirCartel = async () => {
     if (!cartelRef.current || !lugar) return;
 
-    const contenido = cartelRef.current.innerHTML;
-    const ventana = window.open("", "", "width=800,height=1000");
+    const contenido = cartelRef.current.outerHTML; // ✅ clave: imprime el contenedor completo
+
+    const ventana = window.open("", "", "width=900,height=1000");
     if (!ventana) return;
 
+    ventana.document.open();
     ventana.document.write(`
       <html>
         <head>
           <title>Imprimir Cartel Especial</title>
           <style>
             @page { size: A4; margin: 0; }
-            body { margin: 0; padding: 0; }
-            .cartel { width: 210mm; height: 297mm; position: relative; overflow: hidden; }
+            html, body { margin: 0; padding: 0; background: #fff; }
+            * { box-sizing: border-box; }
             img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           </style>
         </head>
         <body>
-          <div class="cartel">${contenido}</div>
+          ${contenido}
+          <script>
+            window.onload = () => {
+              window.focus();
+              window.print();
+              window.close();
+            };
+          </script>
         </body>
       </html>
     `);
-
     ventana.document.close();
-    ventana.focus();
-    ventana.print();
-    ventana.close();
   };
+
 
   // (De momento solo imprimimos/visualizamos igual que A4.
   // Si quieres también PDF + historial + cloudinary, lo copiamos 1:1 del A4 y cambiamos tipo a "ESPECIAL".)
