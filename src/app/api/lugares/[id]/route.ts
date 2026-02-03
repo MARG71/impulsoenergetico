@@ -1,4 +1,3 @@
-// src/app/api/lugares/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
@@ -81,7 +80,8 @@ export async function GET(req: NextRequest, context: any) {
     where,
     include: {
       agente: {
-        select: { id: true, nombre: true, email: true },
+        // ✅ AÑADIMOS telefono
+        select: { id: true, nombre: true, email: true, telefono: true },
       },
     },
   });
@@ -194,7 +194,8 @@ export async function PUT(req: NextRequest, context: any) {
       },
       include: {
         agente: {
-          select: { id: true, nombre: true, email: true },
+          // ✅ AÑADIMOS telefono
+          select: { id: true, nombre: true, email: true, telefono: true },
         },
         _count: {
           select: {

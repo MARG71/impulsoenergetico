@@ -465,7 +465,7 @@ export default function CartelLugar() {
                 {agenteNombre}
               </div>
               <div style={{ fontSize: "10pt", fontWeight: 700, color: "#0f172a" }}>
-                Tel: {TELEFONO_FIJO}
+                Tel: {agenteTelefono}
               </div>
               <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0f172a" }}>
                 {EMAIL} · {WEB}
