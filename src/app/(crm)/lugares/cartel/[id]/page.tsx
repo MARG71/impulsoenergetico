@@ -403,76 +403,98 @@ export default function CartelLugar() {
           }}
         />
 
-        {/* ✅ BLOQUE INFERIOR (dentro del recuadro blanco del fondo) */}
+        {/* RECUADRO BLANCO INFERIOR */}
         <div
           style={{
             position: "absolute",
             left: "12mm",
             right: "12mm",
-            bottom: "12mm",
-            height: "42mm",
-            zIndex: 5,
+            bottom: "14mm",
+            height: "85mm", // 👈 aquí lo haces más grande si quieres
+            background: "#ffffff",
+            borderRadius: "10mm",
+            border: "3px solid #C9A227", // dorado
+            boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
             display: "flex",
-            gap: "10mm",
             alignItems: "center",
-            padding: "6mm",
-            // el fondo ya tiene el recuadro blanco,
-            // pero esto asegura legibilidad si un fondo viene sin recuadro
-            background: "rgba(255,255,255,0.00)",
+            justifyContent: "space-between",
+            padding: "10mm",
+            gap: "10mm",
+            zIndex: 5,
           }}
         >
-          {/* QR izquierda */}
+          {/* QR */}
           <div
             style={{
-              width: "36mm",
-              height: "36mm",
-              background: "#ffffff",
-              borderRadius: "8mm",
+              width: "55mm",
+              height: "55mm",
+              background: "#fff",
+              borderRadius: "6mm",
+              border: "2px solid #111827",
               display: "flex",
-              justifyContent: "center",
               alignItems: "center",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+              justifyContent: "center",
+              padding: "4mm",
+              flexShrink: 0,
             }}
           >
-            <QRCode value={qrUrl} size={120} />
+            <QRCode value={qrUrl} size={180} />
           </div>
 
-          {/* Info derecha */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Logos */}
-            <div style={{ display: "flex", gap: "8mm", alignItems: "center" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={IMPULSO_LOGO_SRC}
-                alt="Impulso Energético"
-                crossOrigin="anonymous"
-                style={{ height: "14mm", width: "auto", objectFit: "contain" }}
-              />
+          {/* Centro: logos + nombre */}
+          <div style={{ flex: 1, textAlign: "center" }}>
+            {/* Logo Impulso */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png"
+              alt="Impulso Energético"
+              style={{
+                height: "18mm",
+                margin: "0 auto 6mm auto",
+                objectFit: "contain",
+              }}
+            />
 
-              {/* preparado por si algún día quieres “A4 especial” */}
-              {clubLogoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={clubLogoUrl}
-                  alt="Logo lugar"
-                  crossOrigin="anonymous"
-                  style={{ height: "14mm", width: "auto", objectFit: "contain" }}
-                />
-              ) : null}
+            <div
+              style={{
+                fontSize: "12pt",
+                fontWeight: 800,
+                letterSpacing: "0.6pt",
+                color: "#111827",
+                textTransform: "uppercase",
+                lineHeight: 1.2,
+              }}
+            >
+              {(lugar?.agente?.nombre ?? "AGENTE IMPULSO").toString()}
             </div>
 
-            {/* Texto */}
-            <div style={{ marginTop: "3mm", fontFamily: "Arial, sans-serif" }}>
-              <div style={{ fontSize: "12pt", fontWeight: 800, color: "#0f172a" }}>
-                {agenteNombre}
-              </div>
-              <div style={{ fontSize: "10pt", fontWeight: 700, color: "#0f172a" }}>
-                Tel: {agenteTelefono}
-              </div>
-              <div style={{ fontSize: "9.5pt", fontWeight: 700, color: "#0f172a" }}>
-                {EMAIL} · {WEB}
-              </div>
+            <div
+              style={{
+                marginTop: "4mm",
+                fontSize: "9pt",
+                fontWeight: 700,
+                color: "#374151",
+              }}
+            >
+              {lugar?.agente?.email ?? "info@impulsoenergetico.es"} · 692 137 048 · www.impulsoenergetico.es
             </div>
+          </div>
+
+          {/* Derecha: logo/escudo (opcional) */}
+          <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
+            {/* Si quieres, aquí ponemos el logo del lugar especial o el escudo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lugar?.especialLogoUrl || "/favicon.ico"}
+              alt="Logo lugar"
+              crossOrigin="anonymous"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                borderRadius: "4mm",
+              }}
+            />
           </div>
         </div>
       </div>
