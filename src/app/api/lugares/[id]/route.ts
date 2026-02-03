@@ -82,6 +82,7 @@ export async function GET(req: NextRequest, context: any) {
       agente: {
         // ✅ AÑADIMOS telefono
         select: { id: true, nombre: true, email: true, telefono: true },
+
       },
     },
   });
@@ -196,6 +197,7 @@ export async function PUT(req: NextRequest, context: any) {
         agente: {
           // ✅ AÑADIMOS telefono
           select: { id: true, nombre: true, email: true, telefono: true },
+
         },
         _count: {
           select: {
