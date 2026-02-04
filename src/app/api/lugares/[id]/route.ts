@@ -103,7 +103,11 @@ export async function GET(req: NextRequest, context: any) {
     });
   }
 
-  return NextResponse.json(lugar);
+    return NextResponse.json({
+      __ROUTE_MARK: "APP_API_LUGARES_ID_V2",
+      ...lugar,
+    });
+  
 }
 
 // ───────────────────────────────
