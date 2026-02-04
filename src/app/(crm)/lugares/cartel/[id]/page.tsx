@@ -25,9 +25,9 @@ const TELEFONO_FIJO = "692 137 048";
 async function safeJson(res: Response) {
   const text = await res.text();
   try {
-    return { ok: res.ok, status: res.status, data: JSON.parse(text) };
+    return { ok: res.ok, status: res.status, data: JSON.parse(text) as any };
   } catch {
-    return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) };
+    return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) as any };
   }
 }
 
@@ -61,6 +61,10 @@ export default function CartelLugar() {
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // ✅ Nuevo: convertimos el fondo a dataURL para evitar CORS-tainted canvas
+  const [fondoDataUrl, setFondoDataUrl] = useState<string | null>(null);
+  const [bgReady, setBgReady] = useState(false);
 
   const [exportando, setExportando] = useState(false);
   const cartelRef = useRef<HTMLDivElement>(null);
@@ -115,7 +119,10 @@ export default function CartelLugar() {
       const data = out.data as Fondo[];
 
       if (!Array.isArray(data) || data.length === 0) {
-        return { fondo: null as Fondo | null, warn: "No hay fondos subidos aún. Sube uno en /lugares/fondos." };
+        return {
+          fondo: null as Fondo | null,
+          warn: "No hay fondos subidos aún. Sube uno en /lugares/fondos.",
+        };
       }
 
       const activo = data.find((f) => !!f.activo && !!f.url);
@@ -153,6 +160,43 @@ export default function CartelLugar() {
       alive = false;
     };
   }, [id, adminQuery]);
+
+  // ✅ Convertir fondoUrl -> dataURL (evita CORS y html2pdf falla menos)
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setBgReady(false);
+        setFondoDataUrl(null);
+
+        if (!fondoUrl) return;
+
+        const r = await fetch(
+          `/api/utils/image-dataurl?url=${encodeURIComponent(fondoUrl)}`,
+          { cache: "no-store" }
+        );
+        const d = await r.json().catch(() => ({}));
+
+        if (!alive) return;
+
+        if (!r.ok || !d?.ok || !d?.dataUrl) {
+          // fallback: dejamos fondoUrl directo (puede fallar PDF si CORS)
+          setFondoDataUrl(null);
+          return;
+        }
+
+        setFondoDataUrl(d.dataUrl);
+      } catch {
+        if (!alive) return;
+        setFondoDataUrl(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [fondoUrl]);
 
   // Helpers
   const cleanupHtml2PdfOverlays = () => {
@@ -212,7 +256,7 @@ export default function CartelLugar() {
 
     await registrarHistorial("IMPRIMIR");
 
-    const contenido = cartelRef.current.outerHTML; // ✅ CLAVE
+    const contenido = cartelRef.current.outerHTML;
 
     const ventana = window.open("", "", "width=900,height=1000");
     if (!ventana) return;
@@ -244,6 +288,12 @@ export default function CartelLugar() {
     ventana.document.close();
   };
 
+  async function waitForBgReady(timeoutMs = 5000) {
+    const start = Date.now();
+    while (!bgReady && Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  }
 
   // Descargar PDF (historial + Cloudinary)
   const descargarPDF = async () => {
@@ -253,49 +303,37 @@ export default function CartelLugar() {
       setExportando(true);
       cleanupHtml2PdfOverlays();
 
+      // ✅ Espera a que el fondo esté cargado (evita capturar “en blanco”)
+      await waitForBgReady(6000);
+
       const cartelId = await registrarHistorial("DESCARGAR_PDF");
       if (!cartelId) throw new Error("No se pudo crear el registro de historial (sin ID).");
 
       const html2pdf = (await import("html2pdf.js")).default;
 
-      let pdfBlob: Blob | null = null;
+      // @ts-ignore
+      const worker = html2pdf()
+        .from(cartelRef.current)
+        .set({
+          margin: 0,
+          filename: `cartel_lugar_${lugar.id}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2.5,
+            useCORS: false, // ✅ ya tenemos dataURL, no hace falta CORS
+            allowTaint: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        });
 
-      try {
-        const worker = html2pdf()
-          .from(cartelRef.current)
-          .set({
-            margin: 0,
-            html2canvas: {
-              scale: 3,
-              useCORS: true,
-              allowTaint: true,
-              logging: false,
-              backgroundColor: "#ffffff",
-            },
-            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          });
-
-        // @ts-ignore
-        pdfBlob = await worker.outputPdf("blob");
-      } catch {}
-
-      if (!pdfBlob) {
-        try {
-          const worker2 = html2pdf()
-            .from(cartelRef.current)
-            .set({
-              margin: 0,
-              html2canvas: { scale: 3, useCORS: true, backgroundColor: "#ffffff" },
-              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-            });
-
-          // @ts-ignore
-          pdfBlob = await worker2.output("blob");
-        } catch {}
-      }
-
+      // ✅ Esto es lo que funciona bien en navegador
+      // @ts-ignore
+      const pdfBlob: Blob = await worker.output("blob");
       if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
 
+      // ✅ subimos a Cloudinary (raw)
       const file = new File([pdfBlob], `cartel_lugar_${lugar.id}.pdf`, {
         type: "application/pdf",
       });
@@ -432,9 +470,10 @@ export default function CartelLugar() {
         {/* Fondo */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={fondoUrl}
+          src={fondoDataUrl ?? fondoUrl}
           alt="Fondo del cartel"
-          crossOrigin="anonymous"
+          onLoad={() => setBgReady(true)}
+          onError={() => setBgReady(false)}
           style={{
             position: "absolute",
             inset: 0,
@@ -452,7 +491,7 @@ export default function CartelLugar() {
             left: "12mm",
             right: "12mm",
             bottom: "12mm",
-            height: "52mm", // ✅ menos alto para que no corte el cartel
+            height: "52mm",
             background: "#ffffff",
             borderRadius: "9mm",
             border: "2.5px solid #C9A227",
@@ -524,7 +563,7 @@ export default function CartelLugar() {
             </div>
           </div>
 
-          {/* ✅ DERECHA: en A4 NO PINTAMOS NADA (sin símbolo, sin escudo) */}
+          {/* derecha vacía */}
           <div style={{ width: "18mm", height: "18mm", flexShrink: 0 }} />
         </div>
       </div>
