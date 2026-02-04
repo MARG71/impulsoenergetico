@@ -1,3 +1,4 @@
+// src/app/api/lugares/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
@@ -24,18 +25,12 @@ function buildLugarWhere(ctx: any, idNum: number) {
   const where: any = { id: idNum };
 
   if (ctx.isSuperadmin) {
-    if (ctx.tenantAdminId) {
-      where.adminId = ctx.tenantAdminId;
-    }
+    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
   } else if (ctx.isAdmin) {
-    if (!ctx.tenantAdminId) {
-      throw new Error("TENANT_INVALIDO");
-    }
+    if (!ctx.tenantAdminId) throw new Error("TENANT_INVALIDO");
     where.adminId = ctx.tenantAdminId;
   } else if (ctx.isAgente) {
-    if (!ctx.agenteId) {
-      throw new Error("AGENTE_SIN_ID");
-    }
+    if (!ctx.agenteId) throw new Error("AGENTE_SIN_ID");
     where.agenteId = ctx.agenteId;
   } else {
     throw new Error("NO_PERMITIDO");
@@ -43,6 +38,14 @@ function buildLugarWhere(ctx: any, idNum: number) {
 
   return where;
 }
+
+// ✅ Reutilizamos el mismo select en GET y PUT
+const agenteSelect = {
+  id: true,
+  nombre: true,
+  email: true,
+  telefono: true, // ✅ CLAVE para que salga en el cartel
+};
 
 // ───────────────────────────────
 // GET /api/lugares/[id]
@@ -79,11 +82,7 @@ export async function GET(req: NextRequest, context: any) {
   const lugar = await prisma.lugar.findFirst({
     where,
     include: {
-      agente: {
-        // ✅ AÑADIMOS telefono
-        select: { id: true, nombre: true, email: true, telefono: true },
-
-      },
+      agente: { select: agenteSelect },
     },
   });
 
@@ -175,7 +174,6 @@ export async function PUT(req: NextRequest, context: any) {
         qrCode: String(qrCode).trim(),
         agenteId: agenteIdNum,
 
-        // ✅ AQUÍ está la corrección importante:
         pctCliente: toPct(pctCliente),
         pctLugar: toPct(pctLugar),
 
@@ -194,11 +192,7 @@ export async function PUT(req: NextRequest, context: any) {
             : existente.especialCartelUrl,
       },
       include: {
-        agente: {
-          // ✅ AÑADIMOS telefono
-          select: { id: true, nombre: true, email: true, telefono: true },
-
-        },
+        agente: { select: agenteSelect },
         _count: {
           select: {
             comparativas: true,
