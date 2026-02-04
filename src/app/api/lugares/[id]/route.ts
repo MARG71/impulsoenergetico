@@ -1,4 +1,6 @@
 // src/app/api/lugares/[id]/route.ts
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
@@ -44,8 +46,17 @@ const agenteSelect = {
   id: true,
   nombre: true,
   email: true,
-  telefono: true, // ✅ CLAVE para que salga en el cartel
+  telefono: true, // ✅ CLAVE
 };
+
+function noStoreJson(data: any, init?: { status?: number }) {
+  const res = NextResponse.json(data, { status: init?.status ?? 200 });
+  // evita caches raras (browser / vercel edge / cdn)
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.headers.set("Pragma", "no-cache");
+  res.headers.set("Expires", "0");
+  return res;
+}
 
 // ───────────────────────────────
 // GET /api/lugares/[id]
@@ -54,29 +65,22 @@ export async function GET(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
   const ctx = await getTenantContext(req);
 
-  if (!ctx.ok) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!ctx.ok) return noStoreJson({ error: "No autorizado" }, { status: 401 });
 
   const idNum = Number(params.id);
-  if (!Number.isFinite(idNum)) {
-    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  }
+  if (!Number.isFinite(idNum)) return noStoreJson({ error: "ID inválido" }, { status: 400 });
 
   let where: any;
   try {
     where = buildLugarWhere(ctx, idNum);
   } catch (e: any) {
     if (e.message === "NO_PERMITIDO") {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "Solo SUPERADMIN, ADMIN o AGENTE pueden ver lugares" },
         { status: 403 }
       );
     }
-    return NextResponse.json(
-      { error: "Configuración de tenant inválida" },
-      { status: 400 }
-    );
+    return noStoreJson({ error: "Configuración de tenant inválida" }, { status: 400 });
   }
 
   const lugar = await prisma.lugar.findFirst({
@@ -86,28 +90,13 @@ export async function GET(req: NextRequest, context: any) {
     },
   });
 
-  if (!lugar) {
-    return NextResponse.json({ error: "Lugar no encontrado" }, { status: 404 });
-  }
+  if (!lugar) return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
 
-  // ✅ DEBUG opcional: añade ?debug=1 a la URL para inspeccionar
-  const debug = req.nextUrl.searchParams.get("debug") === "1";
-  if (debug) {
-    // Importante: esto lo verás también en logs de Vercel
-    console.log("[lugares/[id]] agente debug:", lugar?.agente);
-    return NextResponse.json({
-      ok: true,
-      lugarId: lugar.id,
-      agente: lugar.agente,
-      keysAgente: lugar.agente ? Object.keys(lugar.agente as any) : [],
-    });
-  }
-
-    return NextResponse.json({
-      __ROUTE_MARK: "APP_API_LUGARES_ID_V2",
-      ...lugar,
-    });
-  
+  // ✅ MARCA para confirmar que ESTE archivo es el que responde en producción
+  return noStoreJson({
+    __ROUTE_MARK: "APP_API_LUGARES_[id]_ROUTE_TS__V3",
+    ...lugar,
+  });
 }
 
 // ───────────────────────────────
@@ -117,21 +106,17 @@ export async function PUT(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
   const ctx = await getTenantContext(req);
 
-  if (!ctx.ok) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!ctx.ok) return noStoreJson({ error: "No autorizado" }, { status: 401 });
 
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Solo SUPERADMIN o ADMIN pueden editar lugares" },
       { status: 403 }
     );
   }
 
   const idNum = Number(params.id);
-  if (!Number.isFinite(idNum)) {
-    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  }
+  if (!Number.isFinite(idNum)) return noStoreJson({ error: "ID inválido" }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
   const {
@@ -150,37 +135,30 @@ export async function PUT(req: NextRequest, context: any) {
   } = body || {};
 
   if (!nombre || !direccion || !qrCode || !agenteId) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Nombre, dirección, QR y agente son obligatorios" },
       { status: 400 }
     );
   }
 
   const agenteIdNum = toIntOrNull(agenteId);
-  if (!agenteIdNum) {
-    return NextResponse.json({ error: "agenteId inválido" }, { status: 400 });
-  }
+  if (!agenteIdNum) return noStoreJson({ error: "agenteId inválido" }, { status: 400 });
 
   let where: any;
   try {
     where = buildLugarWhere(ctx, idNum);
   } catch (e: any) {
     if (e.message === "NO_PERMITIDO") {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "Solo SUPERADMIN o ADMIN pueden editar lugares" },
         { status: 403 }
       );
     }
-    return NextResponse.json(
-      { error: "Configuración de tenant inválida" },
-      { status: 400 }
-    );
+    return noStoreJson({ error: "Configuración de tenant inválida" }, { status: 400 });
   }
 
   const existente = await prisma.lugar.findFirst({ where });
-  if (!existente) {
-    return NextResponse.json({ error: "Lugar no encontrado" }, { status: 404 });
-  }
+  if (!existente) return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
 
   try {
     const lugar = await prisma.lugar.update({
@@ -199,9 +177,7 @@ export async function PUT(req: NextRequest, context: any) {
         especialColor: especialColor ?? existente.especialColor,
         especialMensaje: especialMensaje ?? existente.especialMensaje,
 
-        aportacionAcumulada: toNumberOr0(
-          aportacionAcumulada ?? existente.aportacionAcumulada ?? 0
-        ),
+        aportacionAcumulada: toNumberOr0(aportacionAcumulada ?? existente.aportacionAcumulada ?? 0),
 
         especialCartelUrl:
           typeof especialCartelUrl === "string" && especialCartelUrl.trim()
@@ -220,19 +196,19 @@ export async function PUT(req: NextRequest, context: any) {
       },
     });
 
-    return NextResponse.json(lugar);
+    return noStoreJson({
+      __ROUTE_MARK: "APP_API_LUGARES_[id]_ROUTE_TS__V3",
+      ...lugar,
+    });
   } catch (e: any) {
     console.error("Error actualizando lugar:", e);
     if (e.code === "P2002") {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "El código QR ya está en uso por otro lugar" },
         { status: 400 }
       );
     }
-    return NextResponse.json(
-      { error: "Error al actualizar lugar" },
-      { status: 500 }
-    );
+    return noStoreJson({ error: "Error al actualizar lugar" }, { status: 500 });
   }
 }
 
@@ -244,42 +220,33 @@ export async function DELETE(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
   const ctx = await getTenantContext(req);
 
-  if (!ctx.ok) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!ctx.ok) return noStoreJson({ error: "No autorizado" }, { status: 401 });
 
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Solo SUPERADMIN o ADMIN pueden eliminar lugares" },
       { status: 403 }
     );
   }
 
   const idNum = Number(params.id);
-  if (!Number.isFinite(idNum)) {
-    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  }
+  if (!Number.isFinite(idNum)) return noStoreJson({ error: "ID inválido" }, { status: 400 });
 
   let where: any;
   try {
     where = buildLugarWhere(ctx, idNum);
   } catch (e: any) {
     if (e.message === "NO_PERMITIDO") {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "Solo SUPERADMIN o ADMIN pueden eliminar lugares" },
         { status: 403 }
       );
     }
-    return NextResponse.json(
-      { error: "Configuración de tenant inválida" },
-      { status: 400 }
-    );
+    return noStoreJson({ error: "Configuración de tenant inválida" }, { status: 400 });
   }
 
   const existente = await prisma.lugar.findFirst({ where });
-  if (!existente) {
-    return NextResponse.json({ error: "Lugar no encontrado" }, { status: 404 });
-  }
+  if (!existente) return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
 
   try {
     await prisma.lugar.update({
@@ -287,12 +254,9 @@ export async function DELETE(req: NextRequest, context: any) {
       data: { ocultoParaAdmin: true },
     });
 
-    return NextResponse.json({ ok: true });
+    return noStoreJson({ ok: true });
   } catch (e) {
     console.error("Error eliminando lugar:", e);
-    return NextResponse.json(
-      { error: "Error al eliminar (ocultar) lugar" },
-      { status: 500 }
-    );
+    return noStoreJson({ error: "Error al eliminar (ocultar) lugar" }, { status: 500 });
   }
 }
