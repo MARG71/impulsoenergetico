@@ -169,6 +169,21 @@ export default function CompartirContenido({ id }: { id: string }) {
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [mensaje, absolutePublicLink]);
 
+    // ✅ Rutas carteles (A4) dentro del CRM (con soporte tenant)
+  const cartelA4NormalHref = useMemo(() => {
+    const lugarId = lugar?.id ? Number(lugar.id) : Number(id);
+    return withTenant(`/lugares/cartel/${lugarId}`);
+  }, [lugar, id]);
+
+  const cartelA4EspecialHref = useMemo(() => {
+    const lugarId = lugar?.id ? Number(lugar.id) : Number(id);
+    return withTenant(`/lugares/cartel-especial/${lugarId}`);
+  }, [lugar, id]);
+
+  const tieneCartelEspecial = useMemo(() => {
+    return !!(lugar?.especialCartelUrl && String(lugar.especialCartelUrl).trim());
+  }, [lugar]);
+
   const canNativeShare = useMemo(() => {
     return typeof navigator !== "undefined" && !!(navigator as any).share;
   }, []);
@@ -511,6 +526,73 @@ export default function CompartirContenido({ id }: { id: string }) {
             </div>
           </div>
         </section>
+        {/* 🖨️ CARTELES A4 (NORMAL + ESPECIAL) */}
+        {!loading && !!lugar?.id && (
+          <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-6 md:px-10 py-8 space-y-5">
+            <h2 className="text-2xl md:text-3xl font-extrabold">🖨️ Carteles imprimibles (A4)</h2>
+            <p className="text-sm text-slate-400 font-bold">
+              Desde aquí puedes abrir el cartel A4 del lugar y descargar/imprimir el PDF.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* NORMAL */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-6">
+                <div className="text-lg font-extrabold text-white">Cartel A4 (Normal)</div>
+                <div className="text-sm text-slate-400 font-bold mt-2">
+                  Usa el fondo global activo + QR del lugar.
+                </div>
+
+                <div className="mt-4 flex gap-2 flex-wrap">
+                  <Button
+                    onClick={() => window.open(cartelA4NormalHref, "_blank")}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold h-11 px-6 text-base"
+                  >
+                    Abrir cartel normal
+                  </Button>
+
+                  <Button
+                    onClick={() => router.push(cartelA4NormalHref)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-extrabold h-11 px-6 text-base"
+                  >
+                    Ver aquí
+                  </Button>
+                </div>
+              </div>
+
+              {/* ESPECIAL */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-6">
+                <div className="text-lg font-extrabold text-white">Cartel A4 (Especial)</div>
+                <div className="text-sm text-slate-400 font-bold mt-2">
+                  Fondo del lugar + escudo (requiere <span className="text-slate-200">especialCartelUrl</span>).
+                </div>
+
+                <div className="mt-4 flex gap-2 flex-wrap">
+                  <Button
+                    onClick={() => window.open(cartelA4EspecialHref, "_blank")}
+                    disabled={!tieneCartelEspecial}
+                    className="bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 font-extrabold h-11 px-6 text-base"
+                  >
+                    Abrir cartel especial
+                  </Button>
+
+                  <Button
+                    onClick={() => router.push(cartelA4EspecialHref)}
+                    disabled={!tieneCartelEspecial}
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-extrabold h-11 px-6 text-base"
+                  >
+                    Ver aquí
+                  </Button>
+                </div>
+
+                {!tieneCartelEspecial && (
+                  <div className="mt-3 text-xs text-amber-300 font-extrabold">
+                    ⚠️ Este lugar no tiene cartel especial configurado (falta especialCartelUrl).
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ✅ FASE 2 (AHORA EN COMPONENTE SEPARADO) */}
         {/* ✅ FASE 2 */}
