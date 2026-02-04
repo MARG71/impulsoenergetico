@@ -1,130 +1,207 @@
 //src/app/api/crm/subsecciones/route.ts
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/authz";
+import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
 
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+function jsonError(message: string, status = 400) {
+  return NextResponse.json({ ok: false, error: message }, { status });
 }
-
-function sessionInfo(session: any) {
-  const role = String(session?.user?.role ?? session?.user?.rol ?? "");
-  const userId = Number(session?.user?.id ?? 0);
-  const adminId = Number(session?.user?.adminId ?? 0);
-
-  const tenantAdminId =
-    role === "ADMIN" || role === "SUPERADMIN" ? (userId || null) : (adminId || null);
-
-  return { role, tenantAdminId };
+function parseId(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
-
-function normalizeHex(v: any) {
-  const s = String(v ?? "").trim();
+function normalizeHex(v: string) {
+  const s = (v || "").trim();
   if (!s) return null;
   const hex = s.startsWith("#") ? s : `#${s}`;
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : null;
 }
+function slugify(s: string) {
+  return (s || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
+async function requireAdminish() {
+  const session = await getSessionOrThrow();
+  const role = sessionRole(session);
+  if (role !== "SUPERADMIN" && role !== "ADMIN") return null;
+  const adminId = sessionAdminId(session);
+  return { session, role, adminId };
+}
+
+/**
+ * GET /api/crm/subsecciones?seccionId=1&parentId=2
+ * - parentId omitido => null (root)
+ */
+export async function GET(req: Request) {
+  const auth = await requireAdminish();
+  if (!auth) return jsonError("Unauthorized", 401);
+
+  const { searchParams } = new URL(req.url);
+  const seccionId = parseId(searchParams.get("seccionId"));
+  if (!seccionId) return jsonError("seccionId requerido", 400);
+
+  const parentRaw = searchParams.get("parentId");
+  const parentId = parentRaw ? parseId(parentRaw) : null;
+
+  // ✅ Multi-tenant: asegura que la sección pertenece al admin
+  const sec = await prisma.seccion.findFirst({
+    where: { id: seccionId, adminId: auth.adminId },
+    select: { id: true },
+  });
+  if (!sec) return jsonError("Sección no encontrada", 404);
+
+  const subs = await prisma.subSeccion.findMany({
+    where: { seccionId, parentId: parentId ?? null },
+    orderBy: [{ nombre: "asc" }],
+    select: {
+      id: true,
+      seccionId: true,
+      parentId: true,
+      nombre: true,
+      slug: true,
+      activa: true,
+      colorHex: true,
+      imagenUrl: true,
+    },
+  });
+
+  return NextResponse.json({ ok: true, items: subs });
+}
+
+/**
+ * POST { seccionId, parentId?, nombre, colorHex?, imagenUrl? }
+ */
 export async function POST(req: Request) {
-  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAdminish();
+  if (!auth) return jsonError("Unauthorized", 401);
 
-  const { tenantAdminId } = sessionInfo(auth.session);
-
-  const body = await req.json();
-  const seccionId = Number(body?.seccionId);
+  const body = await req.json().catch(() => null);
+  const seccionId = parseId(body?.seccionId);
+  const parentId = body?.parentId ? parseId(body.parentId) : null;
   const nombre = String(body?.nombre || "").trim();
-  if (!seccionId || !nombre) {
-    return NextResponse.json({ error: "seccionId y nombre son requeridos" }, { status: 400 });
-  }
+  const colorHex = normalizeHex(String(body?.colorHex || ""));
+  const imagenUrl = String(body?.imagenUrl || "").trim() || null;
 
-  // ✅ sección válida si es tuya o legacy (null)
-  if (tenantAdminId) {
-    const sec = await prisma.seccion.findFirst({
-      where: { id: seccionId, OR: [{ adminId: tenantAdminId }, { adminId: null }] } as any,
+  if (!seccionId) return jsonError("seccionId requerido");
+  if (!nombre) return jsonError("nombre requerido");
+
+  // sección del tenant
+  const sec = await prisma.seccion.findFirst({
+    where: { id: seccionId, adminId: auth.adminId },
+    select: { id: true },
+  });
+  if (!sec) return jsonError("Sección no encontrada", 404);
+
+  // si parentId viene, valida que exista y sea de esa sección
+  if (parentId) {
+    const parent = await prisma.subSeccion.findFirst({
+      where: { id: parentId, seccionId },
       select: { id: true },
     });
-    if (!sec) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (!parent) return jsonError("parentId inválido", 400);
   }
 
-  const slug = body?.slug ? String(body.slug) : slugify(nombre);
-  const colorHex = normalizeHex(body?.colorHex);
-  const imagenUrl = body?.imagenUrl ? String(body.imagenUrl).trim() : null;
+  const baseSlug = slugify(nombre);
+  const slug = baseSlug ? `${baseSlug}-${Date.now().toString(36)}` : `sub-${Date.now().toString(36)}`;
 
-  try {
-    const created = await prisma.subSeccion.create({
-      data: {
-        seccionId,
-        nombre,
-        slug,
-        activa: body?.activa ?? true,
-        ...(tenantAdminId ? { adminId: tenantAdminId } : {}),
-        ...(colorHex ? { colorHex } : {}),
-        ...(imagenUrl ? { imagenUrl } : {}),
-      } as any,
-    });
-    return NextResponse.json(created);
-  } catch {
-    return NextResponse.json({ error: "No se pudo crear (slug duplicado?)" }, { status: 400 });
-  }
+  const created = await prisma.subSeccion.create({
+    data: {
+      adminId: auth.adminId,
+      seccionId,
+      parentId: parentId ?? null,
+      nombre,
+      slug,
+      colorHex,
+      imagenUrl,
+    } as any,
+    select: {
+      id: true,
+      seccionId: true,
+      parentId: true,
+      nombre: true,
+      slug: true,
+      activa: true,
+      colorHex: true,
+      imagenUrl: true,
+    },
+  });
+
+  return NextResponse.json({ ok: true, item: created });
 }
 
+/**
+ * PATCH { id, nombre?, colorHex?, imagenUrl?, activa? }
+ */
 export async function PATCH(req: Request) {
-  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAdminish();
+  if (!auth) return jsonError("Unauthorized", 401);
 
-  const { tenantAdminId } = sessionInfo(auth.session);
+  const body = await req.json().catch(() => null);
+  const id = parseId(body?.id);
+  if (!id) return jsonError("id requerido");
 
-  const body = await req.json();
-  const id = Number(body?.id);
-  if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+  // asegura tenant
+  const found = await prisma.subSeccion.findFirst({
+    where: { id, adminId: auth.adminId },
+    select: { id: true },
+  });
+  if (!found) return jsonError("No encontrada", 404);
 
   const data: any = {};
-  if (body.nombre !== undefined) data.nombre = String(body.nombre).trim();
-  if (body.slug !== undefined) data.slug = String(body.slug).trim();
-  if (body.activa !== undefined) data.activa = Boolean(body.activa);
-  if (body.colorHex !== undefined) data.colorHex = normalizeHex(body.colorHex);
-  if (body.imagenUrl !== undefined) data.imagenUrl = String(body.imagenUrl || "").trim() || null;
+  if (body?.nombre !== undefined) data.nombre = String(body.nombre || "").trim();
+  if (body?.colorHex !== undefined) data.colorHex = normalizeHex(String(body.colorHex || "")); // null si invalida/vacio
+  if (body?.imagenUrl !== undefined) data.imagenUrl = String(body.imagenUrl || "").trim() || null;
+  if (body?.activa !== undefined) data.activa = !!body.activa;
 
-  try {
-    if (tenantAdminId) {
-      const updated = await prisma.subSeccion.updateMany({
-        where: { id, OR: [{ adminId: tenantAdminId }, { adminId: null }] } as any,
-        data: { ...data, adminId: tenantAdminId },
-      });
-      if (!updated.count) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  // si cambias nombre, no toco slug para no romper históricos
 
-      const fresh = await prisma.subSeccion.findUnique({ where: { id } });
-      return NextResponse.json(fresh);
-    }
+  const updated = await prisma.subSeccion.update({
+    where: { id },
+    data,
+    select: {
+      id: true,
+      seccionId: true,
+      parentId: true,
+      nombre: true,
+      slug: true,
+      activa: true,
+      colorHex: true,
+      imagenUrl: true,
+    },
+  });
 
-    const updated = await prisma.subSeccion.update({ where: { id }, data });
-    return NextResponse.json(updated);
-  } catch {
-    return NextResponse.json({ error: "No se pudo actualizar" }, { status: 400 });
-  }
+  return NextResponse.json({ ok: true, item: updated });
 }
 
+/**
+ * DELETE { id }
+ */
 export async function DELETE(req: Request) {
-  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
-  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAdminish();
+  if (!auth) return jsonError("Unauthorized", 401);
 
-  const body = await req.json();
-  const id = Number(body?.id);
-  if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+  const body = await req.json().catch(() => null);
+  const id = parseId(body?.id);
+  if (!id) return jsonError("id requerido");
+
+  const found = await prisma.subSeccion.findFirst({
+    where: { id, adminId: auth.adminId },
+    select: { id: true },
+  });
+  if (!found) return jsonError("No encontrada", 404);
 
   try {
     await prisma.subSeccion.delete({ where: { id } });
     return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json(
-      { error: "No se pudo eliminar. Puede estar en uso por reglas/contrataciones." },
-      { status: 400 }
-    );
+  } catch {
+    return jsonError("No se pudo eliminar. Puede estar en uso. Prueba desactivar.", 400);
   }
 }

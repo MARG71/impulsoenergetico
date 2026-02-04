@@ -1,3 +1,4 @@
+//src/app/(crm)/configuracion/secciones/SeccionesContenido.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,6 +7,7 @@ import { useRouter } from "next/navigation";
 type Sub = {
   id: number;
   seccionId: number;
+  parentId?: number | null;
   nombre: string;
   slug: string;
   activa: boolean;
@@ -20,90 +22,124 @@ type Sec = {
   activa: boolean;
   colorHex?: string | null;
   imagenUrl?: string | null;
-  subSecciones: Sub[];
 };
 
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
-
 function normalizeHex(v: string) {
   const s = (v || "").trim();
   if (!s) return "";
   const hex = s.startsWith("#") ? s : `#${s}`;
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : "";
 }
-
 function isHex(v: string) {
   return /^#[0-9a-fA-F]{6}$/.test(v);
 }
 
-// ✅ Paleta GRANDE (la tuya)
 const COLOR_PRESETS = [
-  // Verdes / Esmeraldas
   "#22c55e","#16a34a","#10b981","#059669","#34d399","#064e3b",
-  // Azules / Cian / Sky
   "#0ea5e9","#0284c7","#38bdf8","#0369a1","#06b6d4","#0891b2","#164e63",
-  // Naranjas / Ámbar / Amarillos
   "#f97316","#ea580c","#fb923c","#f59e0b","#d97706","#facc15","#ca8a04",
-  // Rojos / Rosas
   "#ef4444","#dc2626","#f43f5e","#e11d48","#fb7185","#be123c",
-  // Morados / Violetas / Fucsias
   "#a855f7","#9333ea","#7c3aed","#c026d3","#d946ef","#701a75",
-  // Índigos
   "#6366f1","#4f46e5","#4338ca","#3730a3","#312e81",
-  // Teal / Turquesas
   "#14b8a6","#0d9488","#2dd4bf","#115e59",
-  // Neutros (por si quieres algo sobrio)
   "#64748b","#475569","#334155","#1f2937","#111827",
-  // Extras “corporativos vivos”
   "#84cc16","#3b82f6","#8b5cf6","#ec4899","#f472b6","#22d3ee",
   "#a3e635","#60a5fa","#c084fc","#fda4af","#fde047","#5eead4",
 ];
+
+// --------- helpers API ----------
+async function apiJson(url: string, init?: RequestInit) {
+  const res = await fetch(url, init);
+  const json = await res.json().catch(() => ({}));
+  return { res, json };
+}
 
 export default function SeccionesContenido() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<Sec[]>([]);
+  const [secciones, setSecciones] = useState<Sec[]>([]);
 
-  // ✅ Crear sección
+  // Crear sección
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoColor, setNuevoColor] = useState("#22c55e");
   const [nuevoImg, setNuevoImg] = useState("");
 
-  // ✅ Crear subsección (por sección)
+  // Upload sección
+  const [uploadingSec, setUploadingSec] = useState(false);
+  const [uploadErrSec, setUploadErrSec] = useState<string | null>(null);
+
+  // Buscador global
+  const [qGlobal, setQGlobal] = useState("");
+
+  // ✅ navegación por sección (root -> hijos -> subhijos ...)
+  // nav[secId] = stack de {id, nombre} (breadcrumb)
+  const [nav, setNav] = useState<Record<number, Array<{ id: number; nombre: string }>>>({});
+
+  // ✅ cache de hijos por (seccionId, parentId)
+  const [subCache, setSubCache] = useState<Record<string, Sub[]>>({});
+  const [subLoading, setSubLoading] = useState<Record<string, boolean>>({});
+
+  // Crear “sub” (sirve para hijas también)
   const [subNombre, setSubNombre] = useState<Record<number, string>>({});
   const [subColor, setSubColor] = useState<Record<number, string>>({});
   const [subImg, setSubImg] = useState<Record<number, string>>({});
 
-  // ✅ Buscadores
-  const [qGlobal, setQGlobal] = useState("");
-  const [qPorSeccion, setQPorSeccion] = useState<Record<number, string>>({});
-
-  // ✅ Collapsible por sección
-  const [open, setOpen] = useState<Record<number, boolean>>({});
-
-  // ✅ Upload sección
-  const [uploadingSec, setUploadingSec] = useState(false);
-  const [uploadErrSec, setUploadErrSec] = useState<string | null>(null);
-
-  // ✅ Upload subsección (por sección)
+  // Upload sub (por sección)
   const [uploadingSub, setUploadingSub] = useState<Record<number, boolean>>({});
   const [uploadErrSub, setUploadErrSub] = useState<Record<number, string | null>>({});
 
-  async function load() {
+  // Collapsible por sección
+  const [open, setOpen] = useState<Record<number, boolean>>({});
+
+  // ✅ Edit modals (simple)
+  const [editSec, setEditSec] = useState<null | {
+    id: number;
+    nombre: string;
+    colorHex: string;
+    imagenUrl: string;
+  }>(null);
+
+  const [editSub, setEditSub] = useState<null | {
+    id: number;
+    seccionId: number;
+    nombre: string;
+    colorHex: string;
+    imagenUrl: string;
+  }>(null);
+
+  function keyFor(seccionId: number, parentId: number | null) {
+    return `${seccionId}:${parentId ?? 0}`;
+  }
+
+  async function loadSecciones() {
     setLoading(true);
     try {
-      const res = await fetch("/api/crm/secciones", { cache: "no-store" });
-      const json = await res.json();
-      setData(Array.isArray(json) ? json : []);
-      // por defecto, todo abierto si no existe estado
+      const { res, json } = await apiJson("/api/crm/secciones", { cache: "no-store" } as any);
+      const arr = Array.isArray(json) ? json : (Array.isArray(json?.items) ? json.items : []);
+      if (!res.ok) {
+        alert(json?.error || "Error cargando secciones");
+        setSecciones([]);
+        return;
+      }
+      // dejamos solo los campos que usamos
+      setSecciones(
+        arr.map((s: any) => ({
+          id: s.id,
+          nombre: s.nombre,
+          slug: s.slug,
+          activa: !!s.activa,
+          colorHex: s.colorHex ?? null,
+          imagenUrl: s.imagenUrl ?? null,
+        }))
+      );
+
       setOpen((prev) => {
         const next = { ...prev };
-        for (const s of (Array.isArray(json) ? json : [])) {
-          if (next[s.id] === undefined) next[s.id] = true;
-        }
+        for (const s of arr) if (next[s.id] === undefined) next[s.id] = true;
         return next;
       });
     } finally {
@@ -111,7 +147,40 @@ export default function SeccionesContenido() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  // carga hijos de un parent dentro de una sección
+  async function loadSubs(seccionId: number, parentId: number | null) {
+    const k = keyFor(seccionId, parentId);
+    if (subLoading[k]) return;
+
+    setSubLoading((p) => ({ ...p, [k]: true }));
+    try {
+      const qs = new URLSearchParams();
+      qs.set("seccionId", String(seccionId));
+      if (parentId) qs.set("parentId", String(parentId));
+
+      const { res, json } = await apiJson(`/api/crm/subsecciones?${qs.toString()}`, { cache: "no-store" } as any);
+      if (!res.ok || !json?.ok) {
+        alert(json?.error || "Error cargando subsecciones");
+        setSubCache((p) => ({ ...p, [k]: [] }));
+        return;
+      }
+      setSubCache((p) => ({ ...p, [k]: Array.isArray(json.items) ? json.items : [] }));
+    } finally {
+      setSubLoading((p) => ({ ...p, [k]: false }));
+    }
+  }
+
+  useEffect(() => { loadSecciones(); }, []);
+
+  // cuando abres sección por primera vez, trae root subs
+  useEffect(() => {
+    for (const s of secciones) {
+      const k = keyFor(s.id, null);
+      if (!subCache[k]) loadSubs(s.id, null);
+      setNav((prev) => (prev[s.id] ? prev : { ...prev, [s.id]: [] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secciones.length]);
 
   async function crearSeccion() {
     const nombre = nuevoNombre.trim();
@@ -120,136 +189,197 @@ export default function SeccionesContenido() {
     const colorHex = normalizeHex(nuevoColor) || null;
     const imagenUrl = nuevoImg.trim() || null;
 
-    const res = await fetch("/api/crm/secciones", {
+    const { res, json } = await apiJson("/api/crm/secciones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nombre, colorHex, imagenUrl }),
     });
 
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      alert(j?.error || "No se pudo crear la sección");
+      alert(json?.error || "No se pudo crear la sección");
       return;
     }
 
     setNuevoNombre("");
     setNuevoImg("");
     setNuevoColor("#22c55e");
-    load();
+    await loadSecciones();
   }
 
   async function toggleSeccion(id: number, activa: boolean) {
-    await fetch("/api/crm/secciones", {
+    await apiJson("/api/crm/secciones", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, activa: !activa }),
     });
-    load();
-  }
-
-  async function crearSub(seccionId: number) {
-    const nombre = (subNombre[seccionId] || "").trim();
-    if (!nombre) return;
-
-    const colorHex = normalizeHex(subColor[seccionId] || "") || null;
-    const imagenUrl = (subImg[seccionId] || "").trim() || null;
-
-    const res = await fetch("/api/crm/subsecciones", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seccionId, nombre, colorHex, imagenUrl }),
-    });
-
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      alert(j?.error || "No se pudo crear la subsección");
-      return;
-    }
-
-    setSubNombre((p) => ({ ...p, [seccionId]: "" }));
-    setSubColor((p) => ({ ...p, [seccionId]: "" }));
-    setSubImg((p) => ({ ...p, [seccionId]: "" }));
-    load();
-  }
-
-  async function toggleSub(id: number, activa: boolean) {
-    await fetch("/api/crm/subsecciones", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, activa: !activa }),
-    });
-    load();
+    loadSecciones();
   }
 
   async function eliminarSeccion(id: number) {
     const ok = confirm("¿Eliminar esta sección? (irreversible). Si está en uso, puede fallar.");
     if (!ok) return;
 
-    const res = await fetch("/api/crm/secciones", {
+    const { res, json } = await apiJson("/api/crm/secciones", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
 
-    const json = await res.json().catch(() => ({}));
     if (!res.ok) alert(json?.error || "No se pudo eliminar");
-    load();
+    loadSecciones();
   }
 
-  async function eliminarSub(id: number) {
-    const ok = confirm("¿Eliminar esta subsección? (irreversible). Si está en uso, puede fallar.");
+  async function guardarEdicionSeccion() {
+    if (!editSec) return;
+
+    const payload = {
+      id: editSec.id,
+      nombre: editSec.nombre.trim(),
+      colorHex: normalizeHex(editSec.colorHex) || null,
+      imagenUrl: editSec.imagenUrl.trim() || null,
+    };
+
+    const { res, json } = await apiJson("/api/crm/secciones", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      alert(json?.error || "No se pudo editar");
+      return;
+    }
+    setEditSec(null);
+    loadSecciones();
+  }
+
+  async function crearSub(seccionId: number) {
+    const nombre = (subNombre[seccionId] || "").trim();
+    if (!nombre) return;
+
+    const stack = nav[seccionId] || [];
+    const parentId = stack.length ? stack[stack.length - 1].id : null;
+
+    const colorHex = normalizeHex(subColor[seccionId] || "") || null;
+    const imagenUrl = (subImg[seccionId] || "").trim() || null;
+
+    const { res, json } = await apiJson("/api/crm/subsecciones", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seccionId, parentId, nombre, colorHex, imagenUrl }),
+    });
+
+    if (!res.ok || !json?.ok) {
+      alert(json?.error || "No se pudo crear");
+      return;
+    }
+
+    setSubNombre((p) => ({ ...p, [seccionId]: "" }));
+    setSubColor((p) => ({ ...p, [seccionId]: "" }));
+    setSubImg((p) => ({ ...p, [seccionId]: "" }));
+
+    // recarga hijos del parent actual
+    await loadSubs(seccionId, parentId);
+  }
+
+  async function toggleSub(id: number, activa: boolean, seccionId: number, parentId: number | null) {
+    await apiJson("/api/crm/subsecciones", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, activa: !activa }),
+    });
+    loadSubs(seccionId, parentId);
+  }
+
+  async function eliminarSub(id: number, seccionId: number, parentId: number | null) {
+    const ok = confirm("¿Eliminar esta subsección? (irreversible). Si tiene hijas, también se borrarán (cascade).");
     if (!ok) return;
 
-    const res = await fetch("/api/crm/subsecciones", {
+    const { res, json } = await apiJson("/api/crm/subsecciones", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
 
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) alert(json?.error || "No se pudo eliminar");
-    load();
+    if (!res.ok || !json?.ok) alert(json?.error || "No se pudo eliminar");
+    loadSubs(seccionId, parentId);
+  }
+
+  async function guardarEdicionSub() {
+    if (!editSub) return;
+
+    const payload = {
+      id: editSub.id,
+      nombre: editSub.nombre.trim(),
+      colorHex: normalizeHex(editSub.colorHex) || null,
+      imagenUrl: editSub.imagenUrl.trim() || null,
+    };
+
+    const { res, json } = await apiJson("/api/crm/subsecciones", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok || !json?.ok) {
+      alert(json?.error || "No se pudo editar");
+      return;
+    }
+
+    // recarga la lista donde estás
+    const seccionId = editSub.seccionId;
+    const stack = nav[seccionId] || [];
+    const parentId = stack.length ? stack[stack.length - 1].id : null;
+
+    setEditSub(null);
+    loadSubs(seccionId, parentId);
+  }
+
+  function entrarEnSub(seccionId: number, sub: Sub) {
+    setNav((prev) => {
+      const next = { ...prev };
+      const stack = next[seccionId] ? [...next[seccionId]] : [];
+      stack.push({ id: sub.id, nombre: sub.nombre });
+      next[seccionId] = stack;
+      return next;
+    });
+    // carga hijos del sub clicado
+    loadSubs(seccionId, sub.id);
+  }
+
+  function volverEnSub(seccionId: number) {
+    setNav((prev) => {
+      const next = { ...prev };
+      const stack = next[seccionId] ? [...next[seccionId]] : [];
+      stack.pop();
+      next[seccionId] = stack;
+      return next;
+    });
+
+    // recarga el nivel anterior
+    const stack = nav[seccionId] || [];
+    const newStack = stack.slice(0, -1);
+    const parentId = newStack.length ? newStack[newStack.length - 1].id : null;
+    loadSubs(seccionId, parentId);
   }
 
   const stats = useMemo(() => {
-    const activos = data.filter((s) => s.activa).length;
-    const total = data.length;
-    const totalSubs = data.reduce((acc, s) => acc + (s.subSecciones?.length || 0), 0);
-    const subsActivas = data.reduce(
-      (acc, s) => acc + (s.subSecciones?.filter((x) => x.activa)?.length || 0),
-      0
-    );
-    return { activos, total, totalSubs, subsActivas };
-  }, [data]);
+    const activos = secciones.filter((s) => s.activa).length;
+    const total = secciones.length;
+    return { activos, total };
+  }, [secciones]);
 
   const filtered = useMemo(() => {
     const q = qGlobal.trim().toLowerCase();
-    if (!q) return data;
-
-    return data
-      .map((s) => {
-        const hitSec =
-          s.nombre?.toLowerCase().includes(q) ||
-          s.slug?.toLowerCase().includes(q) ||
-          String(s.id).includes(q);
-
-        const subs = (s.subSecciones || []).filter((sub) => {
-          return (
-            sub.nombre?.toLowerCase().includes(q) ||
-            sub.slug?.toLowerCase().includes(q) ||
-            String(sub.id).includes(q)
-          );
-        });
-
-        if (hitSec) return { ...s, subSecciones: s.subSecciones || [] };
-        if (subs.length) return { ...s, subSecciones: subs };
-        return null;
-      })
-      .filter(Boolean) as Sec[];
-  }, [data, qGlobal]);
+    if (!q) return secciones;
+    return secciones.filter((s) =>
+      s.nombre.toLowerCase().includes(q) ||
+      s.slug.toLowerCase().includes(q) ||
+      String(s.id).includes(q)
+    );
+  }, [secciones, qGlobal]);
 
   return (
-    // ✅ FONDO NEGRO (sin degradado)
     <div className="min-h-screen px-6 md:px-8 py-8 text-slate-50 bg-black">
       <div className="w-full max-w-[1400px] mx-auto space-y-6">
 
@@ -258,7 +388,7 @@ export default function SeccionesContenido() {
           <div>
             <h1 className="text-3xl md:text-4xl font-extrabold">Secciones y subsecciones</h1>
             <p className="text-slate-200 font-bold mt-2">
-              Configura el catálogo de <span className="text-white">comisiones</span>. Puedes activar/desactivar sin perder histórico.
+              Configura el catálogo de <span className="text-white">comisiones</span>. Puedes crear niveles infinitos dentro de una sección.
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2 text-sm font-extrabold">
@@ -267,12 +397,6 @@ export default function SeccionesContenido() {
               </span>
               <span className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
                 Activas: <span className="text-emerald-300">{stats.activos}</span>
-              </span>
-              <span className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
-                Sub-secciones: <span className="text-white">{stats.totalSubs}</span>
-              </span>
-              <span className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
-                Sub activas: <span className="text-emerald-300">{stats.subsActivas}</span>
               </span>
             </div>
           </div>
@@ -334,7 +458,6 @@ export default function SeccionesContenido() {
                     className="mt-2 w-full h-10 rounded-2xl bg-black border border-white/10 px-3 text-slate-100 font-extrabold outline-none"
                     placeholder="#22c55e"
                   />
-
                   {!isHex(nuevoColor) ? (
                     <div className="mt-1 text-xs font-bold text-orange-200">Formato: #RRGGBB</div>
                   ) : null}
@@ -391,10 +514,6 @@ export default function SeccionesContenido() {
               {uploadErrSec ? (
                 <div className="mt-2 text-sm font-bold text-red-300">{uploadErrSec}</div>
               ) : null}
-
-              <p className="mt-2 text-xs text-slate-400 font-bold">
-                Tip: el slug se genera automático. El color y la imagen se guardan.
-              </p>
             </div>
 
             {/* Buscador global */}
@@ -405,11 +524,11 @@ export default function SeccionesContenido() {
                   value={qGlobal}
                   onChange={(e) => setQGlobal(e.target.value)}
                   className="w-full h-12 rounded-2xl bg-black border border-white/10 px-4 text-slate-100 font-extrabold outline-none placeholder:text-slate-500"
-                  placeholder="Busca por nombre, slug o ID (sección o subsección)"
+                  placeholder="Busca por nombre, slug o ID (sección)"
                 />
               </div>
               <div className="mt-2 text-xs text-slate-400 font-bold">
-                Filtra todo el listado (incluye subsecciones).
+                Filtra el listado de secciones.
               </div>
             </div>
 
@@ -424,21 +543,16 @@ export default function SeccionesContenido() {
             {filtered.map((s) => {
               const secColor = normalizeHex(s.colorHex || "") || null;
 
-              const qs = (qPorSeccion[s.id] || "").trim().toLowerCase();
-              const subs = (s.subSecciones || []).filter((sub) => {
-                if (!qs) return true;
-                return (
-                  sub.nombre?.toLowerCase().includes(qs) ||
-                  sub.slug?.toLowerCase().includes(qs) ||
-                  String(sub.id).includes(qs)
-                );
-              });
+              const stack = nav[s.id] || [];
+              const parentId = stack.length ? stack[stack.length - 1].id : null;
+              const k = keyFor(s.id, parentId);
+              const subs = subCache[k] || [];
+              const isSubLoading = !!subLoading[k];
 
               return (
                 <div
                   key={s.id}
                   className="rounded-3xl border border-white/10 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-                  // ✅ COLOR SÓLIDO (sin degradado)
                   style={{ backgroundColor: secColor ? secColor : "rgba(255,255,255,0.06)" }}
                 >
                   {/* header sección */}
@@ -466,10 +580,6 @@ export default function SeccionesContenido() {
                           #{s.id}
                         </span>
 
-                        <span className="px-3 py-1 rounded-full text-xs font-extrabold border border-black/20 bg-black/20 text-white">
-                          Subs: {s.subSecciones?.length || 0}
-                        </span>
-
                         {secColor ? (
                           <span className="px-3 py-1 rounded-full text-xs font-extrabold border border-black/20 bg-black/20 text-white">
                             🎨 {secColor}
@@ -477,35 +587,50 @@ export default function SeccionesContenido() {
                         ) : null}
                       </div>
 
-                      <div className="mt-3 flex items-center gap-2">
-                        <div className="text-xs font-extrabold text-white uppercase tracking-wide">
-                          Buscador de subsecciones
-                        </div>
-                      </div>
-
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          value={qPorSeccion[s.id] || ""}
-                          onChange={(e) => setQPorSeccion((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                          className="flex-1 h-11 rounded-2xl bg-black/30 border border-black/20 px-4 text-white font-extrabold outline-none placeholder:text-white/60"
-                          placeholder="Buscar dentro de esta sección…"
-                        />
-                        <button
-                          onClick={() => setQPorSeccion((prev) => ({ ...prev, [s.id]: "" }))}
-                          className="h-11 px-4 rounded-2xl bg-black/30 hover:bg-black/40 text-white font-extrabold border border-black/20"
-                        >
-                          Limpiar
-                        </button>
+                      {/* breadcrumbs */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-extrabold text-white/90">Ruta:</span>
+                        <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-xs font-extrabold text-white">
+                          Root
+                        </span>
+                        {stack.map((x) => (
+                          <span
+                            key={x.id}
+                            className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-xs font-extrabold text-white"
+                          >
+                            {x.nombre}
+                          </span>
+                        ))}
+                        {stack.length ? (
+                          <button
+                            onClick={() => volverEnSub(s.id)}
+                            className="h-8 px-3 rounded-xl bg-black/30 hover:bg-black/40 border border-black/20 text-white font-extrabold text-xs"
+                          >
+                            ⬅ Volver nivel
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
-                    {/* Botones derecha */}
+                    {/* botones */}
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                       <button
                         onClick={() => setOpen((p) => ({ ...p, [s.id]: !(p[s.id] ?? true) }))}
                         className="h-11 px-5 rounded-2xl font-extrabold border border-black/20 bg-black/30 text-white hover:bg-black/40"
                       >
                         {(open[s.id] ?? true) ? "⬆️ Ocultar" : "⬇️ Mostrar"}
+                      </button>
+
+                      <button
+                        onClick={() => setEditSec({
+                          id: s.id,
+                          nombre: s.nombre,
+                          colorHex: s.colorHex || "",
+                          imagenUrl: s.imagenUrl || "",
+                        })}
+                        className="h-11 px-5 rounded-2xl font-extrabold border border-black/20 bg-white/10 text-white hover:bg-white/15"
+                      >
+                        ✏️ Editar
                       </button>
 
                       <button
@@ -529,26 +654,25 @@ export default function SeccionesContenido() {
                     </div>
                   </div>
 
-                  {/* CONTENIDO COLAPSABLE */}
                   {(open[s.id] ?? true) ? (
                     <div className="px-5 md:px-6 pb-6">
 
-                      {/* crear subsección */}
+                      {/* crear sub (en el nivel actual) */}
                       <div className="rounded-2xl border border-black/20 bg-black/20 p-4">
-                        <div className="text-sm font-extrabold text-white">Añadir subsección</div>
+                        <div className="text-sm font-extrabold text-white">
+                          Crear {(stack.length ? "hija" : "subsección")} en este nivel
+                        </div>
 
                         <div className="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
-                          {/* Nombre */}
                           <input
                             value={subNombre[s.id] || ""}
                             onChange={(e) => setSubNombre((p0) => ({ ...p0, [s.id]: e.target.value }))}
                             className="md:col-span-5 h-11 rounded-2xl bg-black/30 border border-black/20 px-4 text-white font-extrabold outline-none placeholder:text-white/60"
-                            placeholder="Ej: Iberdrola, Naturgy, Vodafone..."
+                            placeholder={stack.length ? "Nombre de la hija..." : "Ej: Iberdrola, Naturgy, Vodafone..."}
                           />
 
-                          {/* Paleta color */}
                           <div className="md:col-span-3">
-                            <div className="text-xs font-extrabold text-white mb-1">-Color SubSección</div>
+                            <div className="text-xs font-extrabold text-white mb-1">-Color</div>
 
                             <div className="flex flex-wrap gap-2 max-h-[132px] overflow-auto pr-1">
                               {COLOR_PRESETS.map((c) => (
@@ -578,12 +702,11 @@ export default function SeccionesContenido() {
                             ) : null}
                           </div>
 
-                          {/* Botón añadir */}
                           <button
                             onClick={() => crearSub(s.id)}
                             className="md:col-span-4 h-11 px-6 rounded-2xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-extrabold"
                           >
-                            ➕ Añadir
+                            ➕ Crear
                           </button>
                         </div>
 
@@ -607,20 +730,13 @@ export default function SeccionesContenido() {
                                   fd.append("file", f);
                                   fd.append("folder", "impulso/subsecciones");
 
-                                  const res = await fetch("/api/crm/media/upload", {
-                                    method: "POST",
-                                    body: fd,
-                                  });
-
+                                  const res = await fetch("/api/crm/media/upload", { method: "POST", body: fd });
                                   const json = await res.json();
                                   if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo subir");
 
                                   setSubImg((prev) => ({ ...prev, [s.id]: json.url }));
                                 } catch (err: any) {
-                                  setUploadErrSub((prev) => ({
-                                    ...prev,
-                                    [s.id]: err?.message || "Error subiendo",
-                                  }));
+                                  setUploadErrSub((prev) => ({ ...prev, [s.id]: err?.message || "Error subiendo" }));
                                 } finally {
                                   setUploadingSub((prev) => ({ ...prev, [s.id]: false }));
                                   e.target.value = "";
@@ -642,83 +758,107 @@ export default function SeccionesContenido() {
                         ) : null}
                       </div>
 
-                      {/* LISTADO SUBSECCIONES EN CARRUSEL HORIZONTAL */}
-                      {subs?.length ? (
-                        <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-                          {subs.map((sub) => {
-                            const subColor = normalizeHex(sub.colorHex || "") || null;
+                      {/* listado en carrusel */}
+                      <div className="mt-4">
+                        {isSubLoading ? (
+                          <div className="text-white font-extrabold">Cargando nivel…</div>
+                        ) : subs.length ? (
+                          <div className="flex gap-3 overflow-x-auto pb-2">
+                            {subs.map((sub) => {
+                              const subColor = normalizeHex(sub.colorHex || "") || null;
 
-                            return (
-                              <div
-                                key={sub.id}
-                                className="min-w-[340px] max-w-[340px] rounded-2xl border border-black/20 p-4 flex items-start justify-between gap-3"
-                                // ✅ color sólido (sin degradado)
-                                style={{ backgroundColor: subColor ? subColor : "rgba(0,0,0,0.22)" }}
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    {sub.imagenUrl ? (
-                                      <div className="h-9 w-9 rounded-xl overflow-hidden border border-black/20 bg-black/20 shrink-0">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={sub.imagenUrl} alt={sub.nombre} className="h-full w-full object-cover" />
+                              return (
+                                <div
+                                  key={sub.id}
+                                  className="min-w-[360px] max-w-[360px] rounded-2xl border border-black/20 p-4 flex items-start justify-between gap-3"
+                                  style={{ backgroundColor: subColor ? subColor : "rgba(0,0,0,0.22)" }}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      {sub.imagenUrl ? (
+                                        <div className="h-9 w-9 rounded-xl overflow-hidden border border-black/20 bg-black/20 shrink-0">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={sub.imagenUrl} alt={sub.nombre} className="h-full w-full object-cover" />
+                                        </div>
+                                      ) : (
+                                        <div className="h-9 w-9 rounded-xl border border-black/20 bg-black/20 shrink-0" />
+                                      )}
+
+                                      <div className="text-base font-extrabold text-white break-words">
+                                        {sub.nombre}
                                       </div>
-                                    ) : (
-                                      <div className="h-9 w-9 rounded-xl border border-black/20 bg-black/20 shrink-0" />
-                                    )}
+                                    </div>
 
-                                    <div className="text-base font-extrabold text-white break-words">
-                                      {sub.nombre}
+                                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-extrabold">
+                                      <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-white">
+                                        slug: {sub.slug}
+                                      </span>
+                                      <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-white">
+                                        #{sub.id}
+                                      </span>
+                                      {subColor ? (
+                                        <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-white">
+                                          🎨 {subColor}
+                                        </span>
+                                      ) : null}
                                     </div>
                                   </div>
 
-                                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-extrabold">
-                                    <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-white">
-                                      slug: {sub.slug}
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-white">
-                                      #{sub.id}
-                                    </span>
-                                    {subColor ? (
-                                      <span className="px-2.5 py-1 rounded-full border border-black/20 bg-black/20 text-white">
-                                        🎨 {subColor}
-                                      </span>
-                                    ) : null}
+                                  <div className="flex flex-col gap-2 shrink-0">
+                                    <button
+                                      onClick={() => entrarEnSub(s.id, sub)}
+                                      className="h-10 px-4 rounded-2xl font-extrabold border border-black/20 bg-sky-500 text-slate-950 hover:bg-sky-400"
+                                      title="Entrar para ver/crear hijas"
+                                    >
+                                      ➕ Hijas
+                                    </button>
+
+                                    <button
+                                      onClick={() => setEditSub({
+                                        id: sub.id,
+                                        seccionId: s.id,
+                                        nombre: sub.nombre,
+                                        colorHex: sub.colorHex || "",
+                                        imagenUrl: sub.imagenUrl || "",
+                                      })}
+                                      className="h-10 px-4 rounded-2xl font-extrabold border border-black/20 bg-white/10 text-white hover:bg-white/15"
+                                    >
+                                      ✏️
+                                    </button>
+
+                                    <button
+                                      onClick={() => toggleSub(sub.id, sub.activa, s.id, parentId)}
+                                      className={classNames(
+                                        "h-10 px-4 rounded-2xl font-extrabold border border-black/20",
+                                        sub.activa
+                                          ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                                          : "bg-black/30 text-white hover:bg-black/40"
+                                      )}
+                                    >
+                                      {sub.activa ? "Activa" : "Inactiva"}
+                                    </button>
+
+                                    <button
+                                      onClick={() => eliminarSub(sub.id, s.id, parentId)}
+                                      className="h-10 px-4 rounded-2xl font-extrabold border border-black/20 bg-red-500/25 text-white hover:bg-red-500/35"
+                                    >
+                                      🗑️
+                                    </button>
                                   </div>
                                 </div>
-
-                                <div className="flex flex-col gap-2 shrink-0">
-                                  <button
-                                    onClick={() => toggleSub(sub.id, sub.activa)}
-                                    className={classNames(
-                                      "h-10 px-4 rounded-2xl font-extrabold border border-black/20",
-                                      sub.activa
-                                        ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
-                                        : "bg-black/30 text-white hover:bg-black/40"
-                                    )}
-                                  >
-                                    {sub.activa ? "Activa" : "Inactiva"}
-                                  </button>
-
-                                  <button
-                                    onClick={() => eliminarSub(sub.id)}
-                                    className="h-10 px-4 rounded-2xl font-extrabold border border-black/20 bg-red-500/25 text-white hover:bg-red-500/35"
-                                  >
-                                    🗑️
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="mt-4 text-sm text-white font-bold">
-                          Sin subsecciones todavía.
-                        </div>
-                      )}
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-white font-bold">
+                            No hay elementos en este nivel.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="px-5 md:px-6 pb-6 text-white font-bold">
-                      Sección colapsada. (Subs: {s.subSecciones?.length || 0})
+                      Sección colapsada.
                     </div>
                   )}
                 </div>
@@ -733,6 +873,156 @@ export default function SeccionesContenido() {
           </div>
         )}
       </div>
+
+      {/* MODAL EDIT SECCIÓN */}
+      {editSec ? (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-[720px] rounded-3xl border border-white/10 bg-black p-5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xl font-extrabold text-white">Editar sección</div>
+              <button
+                onClick={() => setEditSec(null)}
+                className="h-10 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-extrabold"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs font-extrabold text-white mb-1">Nombre</div>
+                <input
+                  value={editSec.nombre}
+                  onChange={(e) => setEditSec((p) => p ? ({ ...p, nombre: e.target.value }) : p)}
+                  className="w-full h-11 rounded-2xl bg-black border border-white/10 px-4 text-white font-extrabold outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-extrabold text-white mb-1">Color</div>
+                <div className="flex flex-wrap gap-2 max-h-[132px] overflow-auto pr-1">
+                  {COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditSec((p) => p ? ({ ...p, colorHex: c }) : p)}
+                      className={classNames("h-10 w-10 rounded-2xl border", editSec.colorHex === c ? "border-white" : "border-white/10")}
+                      style={{ backgroundColor: c }}
+                      title={c}
+                    />
+                  ))}
+                </div>
+                <input
+                  value={editSec.colorHex}
+                  onChange={(e) => setEditSec((p) => p ? ({ ...p, colorHex: e.target.value }) : p)}
+                  className="mt-2 w-full h-10 rounded-2xl bg-black border border-white/10 px-3 text-white font-extrabold outline-none"
+                  placeholder="#RRGGBB"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <div className="text-xs font-extrabold text-white mb-1">Imagen/Logo URL</div>
+              <input
+                value={editSec.imagenUrl}
+                onChange={(e) => setEditSec((p) => p ? ({ ...p, imagenUrl: e.target.value }) : p)}
+                className="w-full h-11 rounded-2xl bg-black border border-white/10 px-4 text-white font-bold outline-none"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setEditSec(null)}
+                className="h-11 px-5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-extrabold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarEdicionSeccion}
+                className="h-11 px-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* MODAL EDIT SUB */}
+      {editSub ? (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="w-full max-w-[720px] rounded-3xl border border-white/10 bg-black p-5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xl font-extrabold text-white">Editar subsección</div>
+              <button
+                onClick={() => setEditSub(null)}
+                className="h-10 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-extrabold"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs font-extrabold text-white mb-1">Nombre</div>
+                <input
+                  value={editSub.nombre}
+                  onChange={(e) => setEditSub((p) => p ? ({ ...p, nombre: e.target.value }) : p)}
+                  className="w-full h-11 rounded-2xl bg-black border border-white/10 px-4 text-white font-extrabold outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-extrabold text-white mb-1">Color</div>
+                <div className="flex flex-wrap gap-2 max-h-[132px] overflow-auto pr-1">
+                  {COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditSub((p) => p ? ({ ...p, colorHex: c }) : p)}
+                      className={classNames("h-10 w-10 rounded-2xl border", editSub.colorHex === c ? "border-white" : "border-white/10")}
+                      style={{ backgroundColor: c }}
+                      title={c}
+                    />
+                  ))}
+                </div>
+                <input
+                  value={editSub.colorHex}
+                  onChange={(e) => setEditSub((p) => p ? ({ ...p, colorHex: e.target.value }) : p)}
+                  className="mt-2 w-full h-10 rounded-2xl bg-black border border-white/10 px-3 text-white font-extrabold outline-none"
+                  placeholder="#RRGGBB"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <div className="text-xs font-extrabold text-white mb-1">Imagen/Logo URL</div>
+              <input
+                value={editSub.imagenUrl}
+                onChange={(e) => setEditSub((p) => p ? ({ ...p, imagenUrl: e.target.value }) : p)}
+                className="w-full h-11 rounded-2xl bg-black border border-white/10 px-4 text-white font-bold outline-none"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setEditSub(null)}
+                className="h-11 px-5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-extrabold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarEdicionSub}
+                className="h-11 px-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

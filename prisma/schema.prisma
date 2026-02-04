@@ -848,17 +848,27 @@ model Seccion {
 }
 
 model SubSeccion {
-  id            Int      @id @default(autoincrement())
-  seccionId     Int
-  nombre        String
-  slug          String
-  activa        Boolean  @default(true)
+  id        Int      @id @default(autoincrement())
+
+  seccionId Int
+  seccion   Seccion  @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+
+  // ✅ jerarquía infinita
+  parentId  Int?
+  parent    SubSeccion?  @relation("SubTree", fields: [parentId], references: [id], onDelete: Cascade)
+  hijos     SubSeccion[] @relation("SubTree")
+
+  nombre   String
+  slug     String
+  activa   Boolean  @default(true)
+
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  // ✅ NUEVO: look & feel
-  colorHex      String?  @db.VarChar(16)
-  imagenUrl     String?
+  // look & feel
+  colorHex  String?  @db.VarChar(16)
+  imagenUrl String?
+
   imagenPublicId     String?
   imagenResourceType String?
   imagenMime         String?
@@ -868,13 +878,13 @@ model SubSeccion {
   adminId Int?
   admin   Usuario? @relation("AdminSubSecciones", fields: [adminId], references: [id])
 
-  seccion        Seccion               @relation(fields: [seccionId], references: [id], onDelete: Cascade)
   reglas         ReglaComisionGlobal[]
   contrataciones Contratacion[]
 
   @@unique([seccionId, slug])
   @@index([seccionId, activa])
   @@index([adminId])
+  @@index([parentId])
 }
 
 model ReglaComisionGlobal {
