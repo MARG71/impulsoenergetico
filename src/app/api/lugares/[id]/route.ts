@@ -46,13 +46,15 @@ const agenteSelect = {
   id: true,
   nombre: true,
   email: true,
-  telefono: true, // ✅ CLAVE
+  telefono: true, // ✅ CLAVE: esto es lo que usa el cartel
 };
 
 function noStoreJson(data: any, init?: { status?: number }) {
   const res = NextResponse.json(data, { status: init?.status ?? 200 });
-  // evita caches raras (browser / vercel edge / cdn)
-  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate"
+  );
   res.headers.set("Pragma", "no-cache");
   res.headers.set("Expires", "0");
   return res;
@@ -68,7 +70,8 @@ export async function GET(req: NextRequest, context: any) {
   if (!ctx.ok) return noStoreJson({ error: "No autorizado" }, { status: 401 });
 
   const idNum = Number(params.id);
-  if (!Number.isFinite(idNum)) return noStoreJson({ error: "ID inválido" }, { status: 400 });
+  if (!Number.isFinite(idNum))
+    return noStoreJson({ error: "ID inválido" }, { status: 400 });
 
   let where: any;
   try {
@@ -80,7 +83,10 @@ export async function GET(req: NextRequest, context: any) {
         { status: 403 }
       );
     }
-    return noStoreJson({ error: "Configuración de tenant inválida" }, { status: 400 });
+    return noStoreJson(
+      { error: "Configuración de tenant inválida" },
+      { status: 400 }
+    );
   }
 
   const lugar = await prisma.lugar.findFirst({
@@ -92,11 +98,7 @@ export async function GET(req: NextRequest, context: any) {
 
   if (!lugar) return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
 
-  // ✅ MARCA para confirmar que ESTE archivo es el que responde en producción
-  return noStoreJson({
-    __ROUTE_MARK: "APP_API_LUGARES_[id]_ROUTE_TS__V3",
-    ...lugar,
-  });
+  return noStoreJson(lugar);
 }
 
 // ───────────────────────────────
@@ -116,7 +118,8 @@ export async function PUT(req: NextRequest, context: any) {
   }
 
   const idNum = Number(params.id);
-  if (!Number.isFinite(idNum)) return noStoreJson({ error: "ID inválido" }, { status: 400 });
+  if (!Number.isFinite(idNum))
+    return noStoreJson({ error: "ID inválido" }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
   const {
@@ -142,7 +145,8 @@ export async function PUT(req: NextRequest, context: any) {
   }
 
   const agenteIdNum = toIntOrNull(agenteId);
-  if (!agenteIdNum) return noStoreJson({ error: "agenteId inválido" }, { status: 400 });
+  if (!agenteIdNum)
+    return noStoreJson({ error: "agenteId inválido" }, { status: 400 });
 
   let where: any;
   try {
@@ -154,11 +158,15 @@ export async function PUT(req: NextRequest, context: any) {
         { status: 403 }
       );
     }
-    return noStoreJson({ error: "Configuración de tenant inválida" }, { status: 400 });
+    return noStoreJson(
+      { error: "Configuración de tenant inválida" },
+      { status: 400 }
+    );
   }
 
   const existente = await prisma.lugar.findFirst({ where });
-  if (!existente) return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
+  if (!existente)
+    return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
 
   try {
     const lugar = await prisma.lugar.update({
@@ -177,7 +185,9 @@ export async function PUT(req: NextRequest, context: any) {
         especialColor: especialColor ?? existente.especialColor,
         especialMensaje: especialMensaje ?? existente.especialMensaje,
 
-        aportacionAcumulada: toNumberOr0(aportacionAcumulada ?? existente.aportacionAcumulada ?? 0),
+        aportacionAcumulada: toNumberOr0(
+          aportacionAcumulada ?? existente.aportacionAcumulada ?? 0
+        ),
 
         especialCartelUrl:
           typeof especialCartelUrl === "string" && especialCartelUrl.trim()
@@ -196,10 +206,7 @@ export async function PUT(req: NextRequest, context: any) {
       },
     });
 
-    return noStoreJson({
-      __ROUTE_MARK: "APP_API_LUGARES_[id]_ROUTE_TS__V3",
-      ...lugar,
-    });
+    return noStoreJson(lugar);
   } catch (e: any) {
     console.error("Error actualizando lugar:", e);
     if (e.code === "P2002") {
@@ -230,7 +237,8 @@ export async function DELETE(req: NextRequest, context: any) {
   }
 
   const idNum = Number(params.id);
-  if (!Number.isFinite(idNum)) return noStoreJson({ error: "ID inválido" }, { status: 400 });
+  if (!Number.isFinite(idNum))
+    return noStoreJson({ error: "ID inválido" }, { status: 400 });
 
   let where: any;
   try {
@@ -242,11 +250,15 @@ export async function DELETE(req: NextRequest, context: any) {
         { status: 403 }
       );
     }
-    return noStoreJson({ error: "Configuración de tenant inválida" }, { status: 400 });
+    return noStoreJson(
+      { error: "Configuración de tenant inválida" },
+      { status: 400 }
+    );
   }
 
   const existente = await prisma.lugar.findFirst({ where });
-  if (!existente) return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
+  if (!existente)
+    return noStoreJson({ error: "Lugar no encontrado" }, { status: 404 });
 
   try {
     await prisma.lugar.update({
