@@ -1,3 +1,4 @@
+//src/app/(crm)/configuracion/secciones/page.tsx
 import { Suspense } from "react";
 import SeccionesContenido from "./SeccionesContenido";
 

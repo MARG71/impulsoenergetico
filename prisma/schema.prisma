@@ -252,6 +252,10 @@ model Usuario {
   movimientosComisionGestionados   MovimientoComision[]  @relation("AdminMovimientosComision")
   liquidacionesComisionGestionadas LiquidacionComision[] @relation("AdminLiquidacionesComision")
 
+  seccionesGestionadas     Seccion[]          @relation("AdminSecciones")
+  subSeccionesGestionadas  SubSeccion[]       @relation("AdminSubSecciones")
+  reglasComisionGestionadas ReglaComisionGlobal[] @relation("AdminReglasComision")
+
   @@index([adminId])
 }
 
@@ -823,11 +827,24 @@ model Seccion {
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  subSecciones  SubSeccion[]
-  reglas        ReglaComisionGlobal[]
-  contratacions Contratacion[]
+  // ✅ NUEVO: look & feel
+  colorHex      String?  @db.VarChar(16) // "#22c55e"
+  imagenUrl     String?
+  imagenPublicId     String?
+  imagenResourceType String?
+  imagenMime         String?
+  imagenBytes        Int?
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminSecciones", fields: [adminId], references: [id])
+
+  subSecciones   SubSeccion[]
+  reglas         ReglaComisionGlobal[]
+  contrataciones Contratacion[]
 
   @@index([activa])
+  @@index([adminId])
 }
 
 model SubSeccion {
@@ -839,12 +856,25 @@ model SubSeccion {
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  seccion       Seccion               @relation(fields: [seccionId], references: [id], onDelete: Cascade)
-  reglas        ReglaComisionGlobal[]
-  contratacions Contratacion[]
+  // ✅ NUEVO: look & feel
+  colorHex      String?  @db.VarChar(16)
+  imagenUrl     String?
+  imagenPublicId     String?
+  imagenResourceType String?
+  imagenMime         String?
+  imagenBytes        Int?
+
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminSubSecciones", fields: [adminId], references: [id])
+
+  seccion        Seccion               @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  reglas         ReglaComisionGlobal[]
+  contrataciones Contratacion[]
 
   @@unique([seccionId, slug])
   @@index([seccionId, activa])
+  @@index([adminId])
 }
 
 model ReglaComisionGlobal {
@@ -860,7 +890,6 @@ model ReglaComisionGlobal {
   minEUR Decimal? @db.Decimal(12, 2)
   maxEUR Decimal? @db.Decimal(12, 2)
 
-  // límites opcionales para pagar a red
   minAgenteEUR        Decimal? @db.Decimal(12, 2)
   maxAgenteEUR        Decimal? @db.Decimal(12, 2)
   minLugarEspecialEUR Decimal? @db.Decimal(12, 2)
@@ -870,12 +899,18 @@ model ReglaComisionGlobal {
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
+  // ✅ MULTI-ADMIN (TENANT)
+  adminId Int?
+  admin   Usuario? @relation("AdminReglasComision", fields: [adminId], references: [id])
+
   seccion    Seccion     @relation(fields: [seccionId], references: [id])
   subSeccion SubSeccion? @relation(fields: [subSeccionId], references: [id])
 
   @@unique([seccionId, subSeccionId, nivel])
   @@index([seccionId, subSeccionId, activa])
+  @@index([adminId])
 }
+
 
 enum EstadoContratacion {
   BORRADOR
