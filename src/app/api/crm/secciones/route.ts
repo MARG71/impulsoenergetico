@@ -126,3 +126,24 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "No se pudo actualizar" }, { status: 400 });
   }
 }
+
+export async function DELETE(req: Request) {
+  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
+  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const id = Number(body?.id);
+  if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+
+  // ⚠️ OJO: si hay contrataciones/reglas referenciando esta seccion, el delete puede fallar.
+  // Recomendación: primero desactivar si falla (o implementamos “borrado lógico”).
+  try {
+    await prisma.seccion.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return NextResponse.json(
+      { error: "No se pudo eliminar. Puede tener reglas/contrataciones asociadas. Prueba desactivar." },
+      { status: 400 }
+    );
+  }
+}
