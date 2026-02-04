@@ -274,6 +274,7 @@ export default function CartelLugarEspecial() {
   };
 
   // ✅ Descargar PDF (estable)
+  // ✅ Descargar PDF (estable + sin OKLCH)
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
 
@@ -281,12 +282,14 @@ export default function CartelLugarEspecial() {
       setExportando(true);
       cleanupHtml2PdfOverlays();
 
+      // ✅ espera a que carguen todas las imágenes + fuentes
       await waitImages(cartelRef.current);
       // @ts-ignore
       await (document as any).fonts?.ready?.catch?.(() => {});
 
       const html2pdf = (await import("html2pdf.js")).default;
 
+      // fuerza reflow
       cartelRef.current.getBoundingClientRect();
 
       // @ts-ignore
@@ -296,29 +299,31 @@ export default function CartelLugarEspecial() {
           filename: `cartel_especial_${lugar.id}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: {
-              scale: 2.5,
-              useCORS: true,
-              allowTaint: true,
-              backgroundColor: "#ffffff",
-              logging: false,
+            scale: 2.5,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: "#ffffff",
+            logging: false,
 
-              // ✅ CLAVE: evitamos que html2canvas lea Tailwind/shadcn con OKLCH
-              onclone: (doc: Document) => {
-                // Quitamos CSS global (donde vienen los oklch())
-                doc.querySelectorAll("style, link[rel='stylesheet']").forEach((n) => n.remove());
+            // ✅ CLAVE: evitamos que html2canvas lea Tailwind/shadcn con OKLCH
+            onclone: (doc: Document) => {
+              // Quitamos CSS global (donde vienen los oklch())
+              doc.querySelectorAll("style, link[rel='stylesheet']").forEach((n) => n.remove());
 
-                // Forzamos un entorno neutro
-                const html = doc.documentElement as HTMLElement;
-                const body = doc.body as HTMLBodyElement;
+              // Forzamos un entorno neutro
+              const html = doc.documentElement as HTMLElement;
+              const body = doc.body as HTMLBodyElement;
 
-                html.style.background = "#fff";
-                body.style.background = "#fff";
-                body.style.color = "#000";
+              html.style.background = "#fff";
+              body.style.background = "#fff";
+              body.style.color = "#000";
+            },
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         })
         .from(cartelRef.current);
 
+      // ✅ forma robusta
       // @ts-ignore
       const pdfBlob: Blob = await worker.toPdf().output("blob");
 
@@ -333,6 +338,7 @@ export default function CartelLugarEspecial() {
       setExportando(false);
     }
   };
+
 
   if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
 
