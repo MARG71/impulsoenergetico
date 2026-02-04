@@ -1,4 +1,6 @@
-//src/app/api/crm/subsecciones/route.ts
+// src/app/api/crm/subsecciones/route.ts
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";
@@ -19,8 +21,13 @@ function sessionInfo(session: any) {
   const userId = Number(session?.user?.id ?? 0);
   const adminId = Number(session?.user?.adminId ?? 0);
 
-  const tenantAdminId =
-    role === "ADMIN" || role === "SUPERADMIN" ? (userId || null) : (adminId || null);
+  // ✅ SUPERADMIN ve todo (sin filtro tenant)
+  // ✅ ADMIN es el tenant (adminId = userId)
+  // ✅ resto usa adminId de sesión
+  let tenantAdminId: number | null = null;
+  if (role === "SUPERADMIN") tenantAdminId = null;
+  else if (role === "ADMIN") tenantAdminId = userId || null;
+  else tenantAdminId = adminId || null;
 
   return { role, tenantAdminId };
 }
@@ -50,7 +57,6 @@ export async function GET(req: Request) {
   const seccionId = parseId(url.searchParams.get("seccionId"));
   const parentIdRaw = url.searchParams.get("parentId");
 
-  // parentId: si no viene => ROOT (null). Si viene => número
   const parentId =
     parentIdRaw === null || parentIdRaw === "" || parentIdRaw === "null"
       ? null
@@ -111,18 +117,14 @@ export async function POST(req: Request) {
       where: {
         id: parentId,
         seccionId,
-        ...(tenantAdminId
-          ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] }
-          : {}),
+        ...(tenantAdminId ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] } : {}),
       } as any,
       select: { id: true },
     });
-    if (!parent) {
-      return NextResponse.json({ error: "parentId no válido" }, { status: 400 });
-    }
+    if (!parent) return NextResponse.json({ error: "parentId no válido" }, { status: 400 });
   }
 
-  // slug único por seccionId
+  // slug único por seccionId (en el ámbito del tenant)
   const base = slugify(nombre);
   let slug = base;
   let i = 2;
@@ -186,6 +188,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // SUPERADMIN (sin filtro)
     await prisma.subSeccion.update({ where: { id }, data });
     return NextResponse.json({ ok: true });
   } catch {
@@ -201,11 +204,21 @@ export async function DELETE(req: Request) {
   const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { tenantAdminId } = sessionInfo(auth.session);
+
   const body = await req.json().catch(() => ({}));
   const id = parseId(body?.id);
   if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
   try {
+    if (tenantAdminId) {
+      const del = await prisma.subSeccion.deleteMany({
+        where: { id, OR: [{ adminId: tenantAdminId }, { adminId: null }] } as any,
+      });
+      if (!del.count) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      return NextResponse.json({ ok: true });
+    }
+
     await prisma.subSeccion.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch {

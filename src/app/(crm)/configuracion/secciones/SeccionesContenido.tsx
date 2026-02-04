@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useRef } from "react";
 
 type Sec = {
   id: number;
@@ -102,6 +103,9 @@ export default function SeccionesContenido() {
   const [editSubImg, setEditSubImg] = useState("");
   const [editSubUploading, setEditSubUploading] = useState(false);
 
+  const subsReqSeq = useRef<Record<number, number>>({});
+
+  
   async function loadSecciones() {
     setLoading(true);
     try {
@@ -109,6 +113,11 @@ export default function SeccionesContenido() {
       const json = await res.json();
       const arr: Sec[] = Array.isArray(json) ? json : [];
       setSecciones(arr);
+
+      for (const s of arr) {
+        loadSubsForWithParent(s.id, null);
+      }
+
 
       // open por defecto
       setOpen((prev) => {
@@ -270,39 +279,55 @@ export default function SeccionesContenido() {
       const current = prev[secId] || [{ id: null, nombre: "Root" }];
       const nextPath = [...current, { id: sub.id, nombre: sub.nombre }];
 
-      // 🔥 carga el nivel nuevo inmediatamente (sin esperar a useEffect)
-      queueMicrotask(() => {
-        loadSubsForWithParent(secId, sub.id);
-      });
+      // cargamos directamente ese nivel (sin depender del estado ya aplicado)
+      loadSubsForWithParent(secId, sub.id);
 
       return { ...prev, [secId]: nextPath };
     });
   }
 
+
   async function loadSubsForWithParent(secId: number, parentId: number | null) {
+    const seq = (subsReqSeq.current[secId] ?? 0) + 1;
+    subsReqSeq.current[secId] = seq;
+
     const qs = new URLSearchParams();
     qs.set("seccionId", String(secId));
     qs.set("parentId", parentId === null ? "null" : String(parentId));
 
     const res = await fetch(`/api/crm/subsecciones?${qs.toString()}`, { cache: "no-store" });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
+
+    // si llega tarde (hay una request más nueva), ignoramos
+    if (subsReqSeq.current[secId] !== seq) return;
+
     if (!res.ok || !json?.ok) return;
 
-    setSubsBySec((prev) => ({ ...prev, [secId]: json.items as Sub[] }));
+    setSubsBySec((prev) => ({ ...prev, [secId]: (json.items as Sub[]) ?? [] }));
   }
+
 
 
   function goBackLevel(secId: number) {
     setPathBySec((prev) => {
       const current = prev[secId] || [{ id: null, nombre: "Root" }];
       if (current.length <= 1) return prev;
-      return { ...prev, [secId]: current.slice(0, -1) };
+
+      const next = current.slice(0, -1);
+      const newParentId = next[next.length - 1]?.id ?? null;
+
+      loadSubsForWithParent(secId, newParentId);
+
+      return { ...prev, [secId]: next };
     });
   }
 
+
   function goToRoot(secId: number) {
+    loadSubsForWithParent(secId, null);
     setPathBySec((prev) => ({ ...prev, [secId]: [{ id: null, nombre: "Root" }] }));
   }
+
 
   const filteredSecciones = useMemo(() => {
     const q = qGlobal.trim().toLowerCase();
