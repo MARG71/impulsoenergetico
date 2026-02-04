@@ -157,7 +157,8 @@ export default function SeccionesContenido() {
   useEffect(() => {
     for (const s of secciones) loadSubsFor(s.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(pathBySec), secciones.length]);
+  }, [secciones.length]);
+
 
   async function crearSeccion() {
     const nombre = nuevoNombre.trim();
@@ -267,9 +268,29 @@ export default function SeccionesContenido() {
   function goToHijas(secId: number, sub: Sub) {
     setPathBySec((prev) => {
       const current = prev[secId] || [{ id: null, nombre: "Root" }];
-      return { ...prev, [secId]: [...current, { id: sub.id, nombre: sub.nombre }] };
+      const nextPath = [...current, { id: sub.id, nombre: sub.nombre }];
+
+      // 🔥 carga el nivel nuevo inmediatamente (sin esperar a useEffect)
+      queueMicrotask(() => {
+        loadSubsForWithParent(secId, sub.id);
+      });
+
+      return { ...prev, [secId]: nextPath };
     });
   }
+
+  async function loadSubsForWithParent(secId: number, parentId: number | null) {
+    const qs = new URLSearchParams();
+    qs.set("seccionId", String(secId));
+    qs.set("parentId", parentId === null ? "null" : String(parentId));
+
+    const res = await fetch(`/api/crm/subsecciones?${qs.toString()}`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || !json?.ok) return;
+
+    setSubsBySec((prev) => ({ ...prev, [secId]: json.items as Sub[] }));
+  }
+
 
   function goBackLevel(secId: number) {
     setPathBySec((prev) => {
