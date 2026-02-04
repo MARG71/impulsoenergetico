@@ -15,6 +15,15 @@ const TELEFONO_FIJO = "692 137 048";
 const IMPULSO_LOGO_SRC =
   "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
 
+async function safeJson(res: Response) {
+  const text = await res.text();
+  try {
+    return { ok: res.ok, status: res.status, data: JSON.parse(text) as any };
+  } catch {
+    return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) as any };
+  }
+}
+
 export default function CartelLugarEspecial() {
   const router = useRouter();
   const params = useParams();
@@ -24,7 +33,6 @@ export default function CartelLugarEspecial() {
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
-  // tenant solo para obtener lugar
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
 
@@ -34,18 +42,22 @@ export default function CartelLugarEspecial() {
     Number.isFinite(adminIdContext) &&
     adminIdContext > 0;
 
-  const adminQuery =
-    tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
+  const adminQuery = tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const id = params?.id as string | undefined;
 
   const [lugar, setLugar] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [exportando, setExportando] = useState(false);
   const cartelRef = useRef<HTMLDivElement>(null);
 
-  // QR real del lugar
+  // ✅ dataURL para evitar CORS en PDF (fondo + logo club)
+  const [fondoDataUrl, setFondoDataUrl] = useState<string | null>(null);
+  const [logoClubDataUrl, setLogoClubDataUrl] = useState<string | null>(null);
+  const [bgReady, setBgReady] = useState(false);
+
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -62,43 +74,165 @@ export default function CartelLugarEspecial() {
     return e || EMAIL_FIJO;
   }, [lugar]);
 
-  // ✅ Fondo especial del lugar
   const fondoUrl = useMemo(() => {
     const u = String(lugar?.especialCartelUrl ?? "").trim();
     return u || null;
   }, [lugar]);
 
-  // ✅ Escudo/logo club SOLO en especial
   const logoClubUrl = useMemo(() => {
     const u = String(lugar?.especialLogoUrl ?? "").trim();
     return u || null;
   }, [lugar]);
 
+  // Fetch lugar
   useEffect(() => {
     if (!id) return;
-
-    const fetchLugar = async () => {
-      const res = await fetch(`/api/lugares/${id}${adminQuery}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
-      setLugar(data);
-    };
+    let alive = true;
 
     (async () => {
       try {
         setLoading(true);
-        await fetchLugar();
+        setError(null);
+
+        const res = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
+        const out = await safeJson(res);
+        if (!out.ok) {
+          const msg =
+            (out.data && (out.data.error || out.data.message)) ||
+            out.raw ||
+            `Error HTTP ${out.status}`;
+          throw new Error(msg);
+        }
+
+        if (!alive) return;
+        setLugar(out.data);
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message || "Error cargando datos del cartel especial");
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
+
+    return () => {
+      alive = false;
+    };
   }, [id, adminQuery]);
 
+  // Convertir fondo a dataURL
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setBgReady(false);
+        setFondoDataUrl(null);
+
+        if (!fondoUrl) return;
+
+        const r = await fetch(
+          `/api/utils/image-dataurl?url=${encodeURIComponent(fondoUrl)}`,
+          { cache: "no-store" }
+        );
+        const d = await r.json().catch(() => ({}));
+        if (!alive) return;
+
+        if (r.ok && d?.ok && d?.dataUrl) setFondoDataUrl(d.dataUrl);
+      } catch {
+        if (!alive) return;
+        setFondoDataUrl(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [fondoUrl]);
+
+  // Convertir logo club a dataURL
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLogoClubDataUrl(null);
+        if (!logoClubUrl) return;
+
+        const r = await fetch(
+          `/api/utils/image-dataurl?url=${encodeURIComponent(logoClubUrl)}`,
+          { cache: "no-store" }
+        );
+        const d = await r.json().catch(() => ({}));
+        if (!alive) return;
+
+        if (r.ok && d?.ok && d?.dataUrl) setLogoClubDataUrl(d.dataUrl);
+      } catch {
+        if (!alive) return;
+        setLogoClubDataUrl(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [logoClubUrl]);
+
+  // Helpers
+  const cleanupHtml2PdfOverlays = () => {
+    try {
+      document
+        .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+        .forEach((el) => el.remove());
+
+      document.querySelectorAll("iframe").forEach((el) => {
+        const src = el.getAttribute("src");
+        if (!src || src === "about:blank") el.remove();
+      });
+
+      document.body.style.pointerEvents = "";
+      document.body.style.overflow = "";
+    } catch {}
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 800);
+  };
+
+  // ✅ PARCHE OKLCH (igual que el otro)
+  const mountPdfSafeStyles = () => {
+    const style = document.createElement("style");
+    style.setAttribute("data-pdf-safe", "1");
+    style.innerHTML = `
+      :root, * {
+        color: #111827 !important;
+        border-color: #d1d5db !important;
+        outline-color: #d1d5db !important;
+        text-decoration-color: #111827 !important;
+      }
+      body { background: #ffffff !important; }
+      [data-cartel-root="1"] { background: #ffffff !important; }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  };
+
+  async function waitForBgReady(timeoutMs = 7000) {
+    const start = Date.now();
+    while (!bgReady && Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  }
+
+  // Imprimir
   const imprimirCartel = async () => {
     if (!cartelRef.current || !lugar) return;
 
-    const contenido = cartelRef.current.outerHTML; // ✅ clave: imprime el contenedor completo
+    const contenido = cartelRef.current.outerHTML;
 
     const ventana = window.open("", "", "width=900,height=1000");
     if (!ventana) return;
@@ -130,11 +264,69 @@ export default function CartelLugarEspecial() {
     ventana.document.close();
   };
 
+  // Descargar PDF (solo local, sin historial; si luego quieres historial + cloudinary lo clonamos 1:1 del A4)
+  const descargarPDF = async () => {
+    if (!cartelRef.current || !lugar) return;
 
-  // (De momento solo imprimimos/visualizamos igual que A4.
-  // Si quieres también PDF + historial + cloudinary, lo copiamos 1:1 del A4 y cambiamos tipo a "ESPECIAL".)
+    let unmountStyles: null | (() => void) = null;
 
+    try {
+      setExportando(true);
+      cleanupHtml2PdfOverlays();
+
+      unmountStyles = mountPdfSafeStyles();
+      await waitForBgReady(7000);
+
+      const html2pdf = (await import("html2pdf.js")).default;
+
+      // @ts-ignore
+      const worker = html2pdf()
+        .from(cartelRef.current)
+        .set({
+          margin: 0,
+          filename: `cartel_especial_lugar_${lugar.id}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2.2,
+            useCORS: false,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        });
+
+      // @ts-ignore
+      const pdfBlob: Blob = await worker.output("blob");
+      if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
+
+      downloadBlob(pdfBlob, `cartel_especial_lugar_${lugar.id}.pdf`);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Error generando PDF");
+    } finally {
+      if (unmountStyles) unmountStyles();
+      cleanupHtml2PdfOverlays();
+      setExportando(false);
+    }
+  };
+
+  // UI
   if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
+
+  if (error) {
+    return (
+      <div className="p-10 text-center">
+        <div className="font-extrabold text-red-700 mb-2">Error cargando el cartel</div>
+        <pre className="text-left mx-auto max-w-2xl whitespace-pre-wrap bg-red-50 border border-red-200 p-4 rounded-lg text-sm">
+          {error}
+        </pre>
+        <div className="mt-4">
+          <Button onClick={() => router.back()}>Volver</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!lugar) {
     return (
@@ -174,10 +366,7 @@ export default function CartelLugarEspecial() {
             📍 Volver a Lugares
           </Button>
 
-          <Button
-            onClick={() => router.back()}
-            className="bg-gray-200 text-black hover:bg-gray-300"
-          >
+          <Button onClick={() => router.back()} className="bg-gray-200 text-black hover:bg-gray-300">
             ⬅ Volver
           </Button>
         </div>
@@ -190,6 +379,7 @@ export default function CartelLugarEspecial() {
       {/* CARTEL A4 ESPECIAL */}
       <div
         ref={cartelRef}
+        data-cartel-root="1"
         style={{
           width: "210mm",
           height: "297mm",
@@ -203,9 +393,10 @@ export default function CartelLugarEspecial() {
         {/* Fondo especial */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={fondoUrl}
+          src={fondoDataUrl ?? fondoUrl}
           alt="Fondo especial del cartel"
-          crossOrigin="anonymous"
+          onLoad={() => setBgReady(true)}
+          onError={() => setBgReady(false)}
           style={{
             position: "absolute",
             inset: 0,
@@ -216,7 +407,7 @@ export default function CartelLugarEspecial() {
           }}
         />
 
-        {/* RECUADRO BLANCO INFERIOR (MISMO QUE A4 PERFECTO) */}
+        {/* RECUADRO BLANCO INFERIOR */}
         <div
           style={{
             position: "absolute",
@@ -254,7 +445,7 @@ export default function CartelLugarEspecial() {
             <QRCode value={qrUrl} size={135} />
           </div>
 
-          {/* Centro: logo + nombre + contacto */}
+          {/* Centro */}
           <div style={{ flex: 1, textAlign: "center" }}>
             {/* Logo Impulso */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -296,19 +487,14 @@ export default function CartelLugarEspecial() {
             </div>
           </div>
 
-          {/* Derecha: escudo/logo club (SOLO ESPECIAL) */}
+          {/* Derecha: escudo/logo club */}
           <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {logoClubUrl ? (
               <img
-                src={logoClubUrl}
+                src={logoClubDataUrl ?? logoClubUrl}
                 alt="Escudo / Logo del lugar"
-                crossOrigin="anonymous"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
             ) : null}
           </div>
@@ -316,6 +502,14 @@ export default function CartelLugarEspecial() {
       </div>
 
       <div className="mt-6 flex gap-4 justify-center flex-wrap">
+        <Button
+          onClick={descargarPDF}
+          disabled={exportando}
+          className="bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          {exportando ? "Generando PDF..." : "Descargar cartel especial en PDF"}
+        </Button>
+
         <Button
           onClick={imprimirCartel}
           disabled={exportando}
