@@ -90,6 +90,19 @@ export async function GET(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Lugar no encontrado" }, { status: 404 });
   }
 
+  // ✅ DEBUG opcional: añade ?debug=1 a la URL para inspeccionar
+  const debug = req.nextUrl.searchParams.get("debug") === "1";
+  if (debug) {
+    // Importante: esto lo verás también en logs de Vercel
+    console.log("[lugares/[id]] agente debug:", lugar?.agente);
+    return NextResponse.json({
+      ok: true,
+      lugarId: lugar.id,
+      agente: lugar.agente,
+      keysAgente: lugar.agente ? Object.keys(lugar.agente as any) : [],
+    });
+  }
+
   return NextResponse.json(lugar);
 }
 
