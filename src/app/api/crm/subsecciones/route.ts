@@ -1,66 +1,73 @@
 //src/app/api/crm/subsecciones/route.ts
-export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
+import { requireRole } from "@/lib/authz";
 
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 }
-function parseId(v: any) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? n : null;
+
+function sessionInfo(session: any) {
+  const role = String(session?.user?.role ?? session?.user?.rol ?? "");
+  const userId = Number(session?.user?.id ?? 0);
+  const adminId = Number(session?.user?.adminId ?? 0);
+
+  const tenantAdminId =
+    role === "ADMIN" || role === "SUPERADMIN" ? (userId || null) : (adminId || null);
+
+  return { role, tenantAdminId };
 }
-function normalizeHex(v: string) {
-  const s = (v || "").trim();
+
+function normalizeHex(v: any) {
+  const s = String(v ?? "").trim();
   if (!s) return null;
   const hex = s.startsWith("#") ? s : `#${s}`;
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : null;
 }
-function slugify(s: string) {
-  return (s || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
-async function requireAdminish() {
-  const session = await getSessionOrThrow();
-  const role = sessionRole(session);
-  if (role !== "SUPERADMIN" && role !== "ADMIN") return null;
-  const adminId = sessionAdminId(session);
-  return { session, role, adminId };
+function parseId(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /**
- * GET /api/crm/subsecciones?seccionId=1&parentId=2
- * - parentId omitido => null (root)
+ * GET /api/crm/subsecciones?seccionId=1&parentId= (vacío o null => ROOT)
  */
 export async function GET(req: Request) {
-  const auth = await requireAdminish();
-  if (!auth) return jsonError("Unauthorized", 401);
+  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
+  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { searchParams } = new URL(req.url);
-  const seccionId = parseId(searchParams.get("seccionId"));
-  if (!seccionId) return jsonError("seccionId requerido", 400);
+  const { tenantAdminId } = sessionInfo(auth.session);
 
-  const parentRaw = searchParams.get("parentId");
-  const parentId = parentRaw ? parseId(parentRaw) : null;
+  const url = new URL(req.url);
+  const seccionId = parseId(url.searchParams.get("seccionId"));
+  const parentIdRaw = url.searchParams.get("parentId");
 
-  // ✅ Multi-tenant: asegura que la sección pertenece al admin
-  const sec = await prisma.seccion.findFirst({
-    where: { id: seccionId, adminId: auth.adminId },
-    select: { id: true },
-  });
-  if (!sec) return jsonError("Sección no encontrada", 404);
+  // parentId: si no viene => ROOT (null). Si viene => número
+  const parentId =
+    parentIdRaw === null || parentIdRaw === "" || parentIdRaw === "null"
+      ? null
+      : parseId(parentIdRaw);
 
-  const subs = await prisma.subSeccion.findMany({
-    where: { seccionId, parentId: parentId ?? null },
-    orderBy: [{ nombre: "asc" }],
+  if (!seccionId) return NextResponse.json({ error: "seccionId requerido" }, { status: 400 });
+
+  const whereAdmin =
+    tenantAdminId ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] } : undefined;
+
+  const items = await prisma.subSeccion.findMany({
+    where: {
+      ...(whereAdmin as any),
+      seccionId,
+      parentId,
+    } as any,
+    orderBy: [{ activa: "desc" }, { nombre: "asc" }],
     select: {
       id: true,
       seccionId: true,
@@ -70,138 +77,141 @@ export async function GET(req: Request) {
       activa: true,
       colorHex: true,
       imagenUrl: true,
+      _count: { select: { hijos: true } },
     },
   });
 
-  return NextResponse.json({ ok: true, items: subs });
+  return NextResponse.json({ ok: true, items });
 }
 
 /**
- * POST { seccionId, parentId?, nombre, colorHex?, imagenUrl? }
+ * POST /api/crm/subsecciones
+ * body: { seccionId, nombre, colorHex?, imagenUrl?, parentId? }
  */
 export async function POST(req: Request) {
-  const auth = await requireAdminish();
-  if (!auth) return jsonError("Unauthorized", 401);
+  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
+  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => null);
+  const { tenantAdminId } = sessionInfo(auth.session);
+
+  const body = await req.json().catch(() => ({}));
   const seccionId = parseId(body?.seccionId);
   const parentId = body?.parentId ? parseId(body.parentId) : null;
-  const nombre = String(body?.nombre || "").trim();
-  const colorHex = normalizeHex(String(body?.colorHex || ""));
-  const imagenUrl = String(body?.imagenUrl || "").trim() || null;
 
-  if (!seccionId) return jsonError("seccionId requerido");
-  if (!nombre) return jsonError("nombre requerido");
+  const nombre = String(body?.nombre ?? "").trim();
+  if (!seccionId) return NextResponse.json({ error: "seccionId requerido" }, { status: 400 });
+  if (!nombre) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
 
-  // sección del tenant
-  const sec = await prisma.seccion.findFirst({
-    where: { id: seccionId, adminId: auth.adminId },
-    select: { id: true },
-  });
-  if (!sec) return jsonError("Sección no encontrada", 404);
+  const colorHex = normalizeHex(body?.colorHex);
+  const imagenUrl = body?.imagenUrl ? String(body.imagenUrl).trim() : null;
 
-  // si parentId viene, valida que exista y sea de esa sección
+  // validar parent si viene
   if (parentId) {
     const parent = await prisma.subSeccion.findFirst({
-      where: { id: parentId, seccionId },
+      where: {
+        id: parentId,
+        seccionId,
+        ...(tenantAdminId
+          ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] }
+          : {}),
+      } as any,
       select: { id: true },
     });
-    if (!parent) return jsonError("parentId inválido", 400);
+    if (!parent) {
+      return NextResponse.json({ error: "parentId no válido" }, { status: 400 });
+    }
   }
 
-  const baseSlug = slugify(nombre);
-  const slug = baseSlug ? `${baseSlug}-${Date.now().toString(36)}` : `sub-${Date.now().toString(36)}`;
+  // slug único por seccionId
+  const base = slugify(nombre);
+  let slug = base;
+  let i = 2;
+
+  const whereAdmin =
+    tenantAdminId ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] } : undefined;
+
+  while (
+    await prisma.subSeccion.findFirst({
+      where: { ...(whereAdmin as any), seccionId, slug } as any,
+      select: { id: true },
+    })
+  ) {
+    slug = `${base}-${i++}`;
+  }
 
   const created = await prisma.subSeccion.create({
     data: {
-      adminId: auth.adminId,
-      seccionId,
-      parentId: parentId ?? null,
       nombre,
       slug,
-      colorHex,
-      imagenUrl,
+      seccionId,
+      parentId,
+      activa: body?.activa ?? true,
+      ...(tenantAdminId ? { adminId: tenantAdminId } : {}),
+      ...(colorHex ? { colorHex } : {}),
+      ...(imagenUrl ? { imagenUrl } : {}),
     } as any,
-    select: {
-      id: true,
-      seccionId: true,
-      parentId: true,
-      nombre: true,
-      slug: true,
-      activa: true,
-      colorHex: true,
-      imagenUrl: true,
-    },
+    select: { id: true },
   });
 
-  return NextResponse.json({ ok: true, item: created });
+  return NextResponse.json({ ok: true, id: created.id });
 }
 
 /**
- * PATCH { id, nombre?, colorHex?, imagenUrl?, activa? }
+ * PATCH /api/crm/subsecciones
+ * body: { id, nombre?, colorHex?, imagenUrl?, activa? }
  */
 export async function PATCH(req: Request) {
-  const auth = await requireAdminish();
-  if (!auth) return jsonError("Unauthorized", 401);
+  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
+  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => null);
+  const { tenantAdminId } = sessionInfo(auth.session);
+
+  const body = await req.json().catch(() => ({}));
   const id = parseId(body?.id);
-  if (!id) return jsonError("id requerido");
-
-  // asegura tenant
-  const found = await prisma.subSeccion.findFirst({
-    where: { id, adminId: auth.adminId },
-    select: { id: true },
-  });
-  if (!found) return jsonError("No encontrada", 404);
+  if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
   const data: any = {};
-  if (body?.nombre !== undefined) data.nombre = String(body.nombre || "").trim();
-  if (body?.colorHex !== undefined) data.colorHex = normalizeHex(String(body.colorHex || "")); // null si invalida/vacio
-  if (body?.imagenUrl !== undefined) data.imagenUrl = String(body.imagenUrl || "").trim() || null;
-  if (body?.activa !== undefined) data.activa = !!body.activa;
+  if (body.nombre !== undefined) data.nombre = String(body.nombre).trim();
+  if (body.activa !== undefined) data.activa = Boolean(body.activa);
+  if (body.colorHex !== undefined) data.colorHex = normalizeHex(body.colorHex);
+  if (body.imagenUrl !== undefined) data.imagenUrl = String(body.imagenUrl || "").trim() || null;
 
-  // si cambias nombre, no toco slug para no romper históricos
+  try {
+    if (tenantAdminId) {
+      const updated = await prisma.subSeccion.updateMany({
+        where: { id, OR: [{ adminId: tenantAdminId }, { adminId: null }] } as any,
+        data: { ...data, adminId: tenantAdminId },
+      });
+      if (!updated.count) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      return NextResponse.json({ ok: true });
+    }
 
-  const updated = await prisma.subSeccion.update({
-    where: { id },
-    data,
-    select: {
-      id: true,
-      seccionId: true,
-      parentId: true,
-      nombre: true,
-      slug: true,
-      activa: true,
-      colorHex: true,
-      imagenUrl: true,
-    },
-  });
-
-  return NextResponse.json({ ok: true, item: updated });
+    await prisma.subSeccion.update({ where: { id }, data });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "No se pudo actualizar" }, { status: 400 });
+  }
 }
 
 /**
- * DELETE { id }
+ * DELETE /api/crm/subsecciones
+ * - Borra rama completa (por cascade de hijos)
  */
 export async function DELETE(req: Request) {
-  const auth = await requireAdminish();
-  if (!auth) return jsonError("Unauthorized", 401);
+  const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
+  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => null);
+  const body = await req.json().catch(() => ({}));
   const id = parseId(body?.id);
-  if (!id) return jsonError("id requerido");
-
-  const found = await prisma.subSeccion.findFirst({
-    where: { id, adminId: auth.adminId },
-    select: { id: true },
-  });
-  if (!found) return jsonError("No encontrada", 404);
+  if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
   try {
     await prisma.subSeccion.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch {
-    return jsonError("No se pudo eliminar. Puede estar en uso. Prueba desactivar.", 400);
+    return NextResponse.json(
+      { error: "No se pudo eliminar. Puede estar en uso (reglas/contrataciones)." },
+      { status: 400 }
+    );
   }
 }

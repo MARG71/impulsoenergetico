@@ -36,22 +36,17 @@ export async function GET() {
 
   const { tenantAdminId } = sessionInfo(auth.session);
 
-  // ✅ Mientras haya datos viejos con adminId NULL, los mostramos también
   const where =
-    tenantAdminId
-      ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] }
-      : undefined;
+    tenantAdminId ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] } : undefined;
 
   const data = await prisma.seccion.findMany({
     where: where as any,
     orderBy: [{ activa: "desc" }, { nombre: "asc" }],
-    include: {
-      subSecciones: { orderBy: [{ activa: "desc" }, { nombre: "asc" }] },
-    },
   });
 
   return NextResponse.json(data);
 }
+
 
 export async function POST(req: Request) {
   const auth = await requireRole(["SUPERADMIN", "ADMIN"]);

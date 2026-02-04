@@ -848,33 +848,30 @@ model Seccion {
 }
 
 model SubSeccion {
-  id        Int      @id @default(autoincrement())
-
+  id        Int     @id @default(autoincrement())
   seccionId Int
-  seccion   Seccion  @relation(fields: [seccionId], references: [id], onDelete: Cascade)
+  seccion   Seccion @relation(fields: [seccionId], references: [id], onDelete: Cascade)
 
   // ✅ jerarquía infinita
-  parentId  Int?
-  parent    SubSeccion?  @relation("SubTree", fields: [parentId], references: [id], onDelete: Cascade)
-  hijos     SubSeccion[] @relation("SubTree")
+  parentId Int?
+  parent   SubSeccion?  @relation("SubTree", fields: [parentId], references: [id], onDelete: Cascade)
+  hijos    SubSeccion[] @relation("SubTree")
 
-  nombre   String
-  slug     String
-  activa   Boolean  @default(true)
-
+  nombre        String
+  slug          String
+  activa        Boolean  @default(true)
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
   // look & feel
-  colorHex  String?  @db.VarChar(16)
-  imagenUrl String?
-
-  imagenPublicId     String?
+  colorHex          String? @db.VarChar(16)
+  imagenUrl         String?
+  imagenPublicId    String?
   imagenResourceType String?
-  imagenMime         String?
-  imagenBytes        Int?
+  imagenMime        String?
+  imagenBytes       Int?
 
-  // ✅ MULTI-ADMIN (TENANT)
+  // tenant
   adminId Int?
   admin   Usuario? @relation("AdminSubSecciones", fields: [adminId], references: [id])
 
@@ -886,6 +883,7 @@ model SubSeccion {
   @@index([adminId])
   @@index([parentId])
 }
+
 
 model ReglaComisionGlobal {
   id           Int                 @id @default(autoincrement())
