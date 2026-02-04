@@ -20,7 +20,22 @@ async function safeJson(res: Response) {
   try {
     return { ok: res.ok, status: res.status, data: JSON.parse(text) as any };
   } catch {
-    return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) as any };
+    return { ok: res.ok, status: res.status, data: null as any, raw: text?.slice(0, 300) };
+  }
+}
+
+async function toDataUrlOrNull(url: string) {
+  try {
+    const r = await fetch(`/api/utils/image-dataurl?url=${encodeURIComponent(url)}`, {
+      cache: "no-store",
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d?.ok && typeof d?.dataUrl === "string" && d.dataUrl.startsWith("data:")) {
+      return d.dataUrl as string;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -53,9 +68,11 @@ export default function CartelLugarEspecial() {
   const [exportando, setExportando] = useState(false);
   const cartelRef = useRef<HTMLDivElement>(null);
 
-  // ✅ dataURL para evitar CORS en PDF (fondo + logo club)
+  // ✅ dataURL para evitar CORS en PDF
   const [fondoDataUrl, setFondoDataUrl] = useState<string | null>(null);
   const [logoClubDataUrl, setLogoClubDataUrl] = useState<string | null>(null);
+
+  // ✅ para saber que el fondo (data:) cargó
   const [bgReady, setBgReady] = useState(false);
 
   const qrUrl = useMemo(() => {
@@ -119,24 +136,18 @@ export default function CartelLugarEspecial() {
     };
   }, [id, adminQuery]);
 
-  // Convertir fondo a dataURL
+  // Pre-cargar dataURL del fondo (para pantalla + PDF)
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setBgReady(false);
         setFondoDataUrl(null);
-
         if (!fondoUrl) return;
 
-        const r = await fetch(
-          `/api/utils/image-dataurl?url=${encodeURIComponent(fondoUrl)}`,
-          { cache: "no-store" }
-        );
-        const d = await r.json().catch(() => ({}));
+        const d = await toDataUrlOrNull(fondoUrl);
         if (!alive) return;
-
-        if (r.ok && d?.ok && d?.dataUrl) setFondoDataUrl(d.dataUrl);
+        if (d) setFondoDataUrl(d);
       } catch {
         if (!alive) return;
         setFondoDataUrl(null);
@@ -148,7 +159,7 @@ export default function CartelLugarEspecial() {
     };
   }, [fondoUrl]);
 
-  // Convertir logo club a dataURL
+  // Pre-cargar dataURL del logo club (para PDF)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -156,14 +167,9 @@ export default function CartelLugarEspecial() {
         setLogoClubDataUrl(null);
         if (!logoClubUrl) return;
 
-        const r = await fetch(
-          `/api/utils/image-dataurl?url=${encodeURIComponent(logoClubUrl)}`,
-          { cache: "no-store" }
-        );
-        const d = await r.json().catch(() => ({}));
+        const d = await toDataUrlOrNull(logoClubUrl);
         if (!alive) return;
-
-        if (r.ok && d?.ok && d?.dataUrl) setLogoClubDataUrl(d.dataUrl);
+        if (d) setLogoClubDataUrl(d);
       } catch {
         if (!alive) return;
         setLogoClubDataUrl(null);
@@ -203,7 +209,7 @@ export default function CartelLugarEspecial() {
     setTimeout(() => URL.revokeObjectURL(url), 800);
   };
 
-  // ✅ PARCHE OKLCH (igual que el otro)
+  // ✅ PARCHE OKLCH para html2canvas/pdf
   const mountPdfSafeStyles = () => {
     const style = document.createElement("style");
     style.setAttribute("data-pdf-safe", "1");
@@ -264,7 +270,7 @@ export default function CartelLugarEspecial() {
     ventana.document.close();
   };
 
-  // Descargar PDF (solo local, sin historial; si luego quieres historial + cloudinary lo clonamos 1:1 del A4)
+  // ✅ Descargar PDF SIN TAINT: obliga a dataURL antes de generar
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
 
@@ -274,7 +280,38 @@ export default function CartelLugarEspecial() {
       setExportando(true);
       cleanupHtml2PdfOverlays();
 
+      // 1) Fondo SIEMPRE debe ser data:
+      if (!fondoUrl) throw new Error("Este lugar no tiene fondo especial configurado.");
+
+      let fondoSafe = fondoDataUrl;
+      if (!fondoSafe) {
+        fondoSafe = await toDataUrlOrNull(fondoUrl);
+        if (fondoSafe) setFondoDataUrl(fondoSafe);
+      }
+      if (!fondoSafe) {
+        throw new Error(
+          "No se pudo preparar el fondo para PDF (CORS). Revisa que el fondo sea una URL pública accesible."
+        );
+      }
+
+      // 2) Logo club (si existe) también debe ser data:
+      if (logoClubUrl) {
+        let logoSafe = logoClubDataUrl;
+        if (!logoSafe) {
+          logoSafe = await toDataUrlOrNull(logoClubUrl);
+          if (logoSafe) setLogoClubDataUrl(logoSafe);
+        }
+        if (!logoSafe) {
+          throw new Error(
+            "No se pudo preparar el escudo/logo para PDF (CORS). Prueba a subirlo como imagen pública o cámbialo."
+          );
+        }
+      }
+
+      // 3) Asegura render con data: antes de capturar
       unmountStyles = mountPdfSafeStyles();
+      setBgReady(false);
+      await new Promise((r) => setTimeout(r, 50));
       await waitForBgReady(7000);
 
       const html2pdf = (await import("html2pdf.js")).default;
@@ -289,7 +326,7 @@ export default function CartelLugarEspecial() {
           html2canvas: {
             scale: 2.2,
             useCORS: false,
-            allowTaint: true,
+            allowTaint: false, // ✅ IMPORTANTÍSIMO
             logging: false,
             backgroundColor: "#ffffff",
           },
@@ -390,7 +427,7 @@ export default function CartelLugarEspecial() {
           boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
         }}
       >
-        {/* Fondo especial */}
+        {/* Fondo especial (siempre intenta dataURL) */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fondoDataUrl ?? fondoUrl}
