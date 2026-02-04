@@ -43,6 +43,22 @@ const SECTION_PALETTES = [
   { ring: "ring-teal-400/40", border: "border-teal-500/40", pill: "bg-teal-500/20 text-teal-100", stripe: "bg-teal-500" },
 ];
 
+const COLOR_PRESETS = [
+  "#22c55e", // verde
+  "#0ea5e9", // azul
+  "#f97316", // naranja
+  "#a855f7", // violeta
+  "#14b8a6", // teal
+  "#e11d48", // rojo
+  "#facc15", // amarillo
+  "#64748b", // slate
+];
+
+function isHex(v: string) {
+  return /^#[0-9a-fA-F]{6}$/.test(v);
+}
+
+
 function paletteForSection(sec: Sec) {
   const idx = hashToIndex(`${sec.slug}-${sec.id}-${sec.nombre}`, SECTION_PALETTES.length);
   return SECTION_PALETTES[idx];
@@ -83,6 +99,13 @@ export default function SeccionesContenido() {
   // ✅ Buscadores
   const [qGlobal, setQGlobal] = useState("");
   const [qPorSeccion, setQPorSeccion] = useState<Record<number, string>>({});
+
+  const [uploadingSec, setUploadingSec] = useState(false);
+  const [uploadErrSec, setUploadErrSec] = useState<string | null>(null);
+  // ✅ Upload por subsección (por sección)
+  const [uploadingSub, setUploadingSub] = useState<Record<number, boolean>>({});
+  const [uploadErrSub, setUploadErrSub] = useState<Record<number, string | null>>({});
+
 
   async function load() {
     setLoading(true);
@@ -250,20 +273,35 @@ export default function SeccionesContenido() {
                   placeholder="Ej: Seguros, Solar, Aerotermia..."
                 />
 
-                <div className="md:col-span-3 flex gap-2 items-center">
+                <div className="md:col-span-3">
+                  <div className="text-xs font-extrabold text-slate-300 mb-1">-Color Sección</div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {COLOR_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNuevoColor(c)}
+                        className={classNames(
+                          "h-10 w-10 rounded-2xl border",
+                          nuevoColor === c ? "border-white" : "border-slate-700"
+                        )}
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+
                   <input
-                    type="color"
                     value={nuevoColor}
                     onChange={(e) => setNuevoColor(e.target.value)}
-                    className="h-12 w-14 rounded-xl border border-slate-700 bg-slate-950/60"
-                    title="Color de la sección"
-                  />
-                  <input
-                    value={nuevoColor}
-                    onChange={(e) => setNuevoColor(e.target.value)}
-                    className="flex-1 h-12 rounded-2xl bg-slate-950/60 border border-slate-700 px-3 text-slate-100 font-extrabold outline-none"
+                    className="mt-2 w-full h-10 rounded-2xl bg-slate-950/60 border border-slate-700 px-3 text-slate-100 font-extrabold outline-none"
                     placeholder="#22c55e"
                   />
+
+                  {!isHex(nuevoColor) ? (
+                    <div className="mt-1 text-xs font-bold text-orange-200">Formato: #RRGGBB</div>
+                  ) : null}
                 </div>
 
                 <button
@@ -274,14 +312,50 @@ export default function SeccionesContenido() {
                 </button>
               </div>
 
-              <div className="mt-2">
+              <div className="mt-2 flex flex-col md:flex-row gap-2 md:items-center">
+                <label className="inline-flex items-center gap-2 h-11 px-4 rounded-2xl bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-100 font-extrabold cursor-pointer">
+                  {uploadingSec ? "Subiendo..." : "📤 Subir logo/imagen/PDF"}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,application/pdf"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setUploadErrSec(null);
+                      setUploadingSec(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", f);
+                        fd.append("folder", "impulso/secciones");
+
+                        const res = await fetch("/api/crm/media/upload", { method: "POST", body: fd });
+                        const json = await res.json();
+                        if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo subir");
+
+                        setNuevoImg(json.url); // ✅ guardamos URL
+                      } catch (err: any) {
+                        setUploadErrSec(err?.message || "Error subiendo");
+                      } finally {
+                        setUploadingSec(false);
+                        e.target.value = ""; // reset input
+                      }
+                    }}
+                  />
+                </label>
+
                 <input
                   value={nuevoImg}
                   onChange={(e) => setNuevoImg(e.target.value)}
-                  className="w-full h-11 rounded-2xl bg-slate-950/60 border border-slate-700 px-4 text-slate-100 font-bold outline-none placeholder:text-slate-500"
-                  placeholder="(Opcional) URL de logo/imagen (Cloudinary)"
+                  className="flex-1 h-11 rounded-2xl bg-slate-950/60 border border-slate-700 px-4 text-slate-100 font-bold outline-none placeholder:text-slate-500"
+                  placeholder="URL (si ya la tienes) — se rellena sola al subir"
                 />
               </div>
+
+              {uploadErrSec ? (
+                <div className="mt-2 text-sm font-bold text-red-300">{uploadErrSec}</div>
+              ) : null}
+
 
               <p className="mt-2 text-xs text-slate-400 font-bold">
                 Tip: el slug se genera automático. El color y la imagen se guardan y se usan como fondo.
@@ -422,11 +496,10 @@ export default function SeccionesContenido() {
                   {/* crear subsección */}
                   <div className="px-5 md:px-6 pb-6">
                     <div className={classNames("rounded-2xl border p-4", "border-white/10 bg-black/15")}>
-                      <div className="text-sm font-extrabold text-slate-100">
-                        Añadir subsección
-                      </div>
+                      <div className="text-sm font-extrabold text-slate-100">Añadir subsección</div>
 
                       <div className="mt-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+                        {/* Nombre */}
                         <input
                           value={subNombre[s.id] || ""}
                           onChange={(e) => setSubNombre((p0) => ({ ...p0, [s.id]: e.target.value }))}
@@ -434,22 +507,39 @@ export default function SeccionesContenido() {
                           placeholder="Ej: Iberdrola, Naturgy, Vodafone..."
                         />
 
-                        <div className="md:col-span-3 flex gap-2 items-center">
+                        {/* Paleta color */}
+                        <div className="md:col-span-3">
+                          <div className="text-xs font-extrabold text-slate-200 mb-1">-Color SubSección</div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {COLOR_PRESETS.map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setSubColor((p0) => ({ ...p0, [s.id]: c }))}
+                                className={classNames(
+                                  "h-10 w-10 rounded-2xl border",
+                                  (subColor[s.id] || "#0ea5e9") === c ? "border-white" : "border-white/10"
+                                )}
+                                style={{ backgroundColor: c }}
+                                title={c}
+                              />
+                            ))}
+                          </div>
+
                           <input
-                            type="color"
                             value={subColor[s.id] || "#0ea5e9"}
                             onChange={(e) => setSubColor((p0) => ({ ...p0, [s.id]: e.target.value }))}
-                            className="h-11 w-14 rounded-xl border border-white/10 bg-black/20"
-                            title="Color de la subsección"
-                          />
-                          <input
-                            value={subColor[s.id] || ""}
-                            onChange={(e) => setSubColor((p0) => ({ ...p0, [s.id]: e.target.value }))}
-                            className="flex-1 h-11 rounded-2xl bg-black/20 border border-white/10 px-3 text-slate-100 font-extrabold outline-none"
+                            className="mt-2 w-full h-10 rounded-2xl bg-black/20 border border-white/10 px-3 text-slate-100 font-extrabold outline-none"
                             placeholder="#0ea5e9"
                           />
+
+                          {!isHex(subColor[s.id] || "#0ea5e9") ? (
+                            <div className="mt-1 text-xs font-bold text-orange-200">Formato: #RRGGBB</div>
+                          ) : null}
                         </div>
 
+                        {/* Botón añadir */}
                         <button
                           onClick={() => crearSub(s.id)}
                           className="md:col-span-4 h-11 px-6 rounded-2xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-extrabold"
@@ -458,15 +548,61 @@ export default function SeccionesContenido() {
                         </button>
                       </div>
 
-                      <div className="mt-2">
+                      {/* Upload + URL */}
+                      <div className="mt-2 flex flex-col md:flex-row gap-2 md:items-center">
+                        <label className="inline-flex items-center gap-2 h-11 px-4 rounded-2xl bg-slate-800/70 hover:bg-slate-700 border border-white/10 text-slate-100 font-extrabold cursor-pointer">
+                          {uploadingSub[s.id] ? "Subiendo..." : "📤 Subir logo/imagen/PDF"}
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*,application/pdf"
+                            onChange={async (e) => {
+                              const f = e.target.files?.[0];
+                              if (!f) return;
+
+                              setUploadErrSub((prev) => ({ ...prev, [s.id]: null }));
+                              setUploadingSub((prev) => ({ ...prev, [s.id]: true }));
+
+                              try {
+                                const fd = new FormData();
+                                fd.append("file", f);
+                                fd.append("folder", "impulso/subsecciones");
+
+                                const res = await fetch("/api/crm/media/upload", {
+                                  method: "POST",
+                                  body: fd,
+                                });
+
+                                const json = await res.json();
+                                if (!res.ok || !json?.ok) throw new Error(json?.error || "No se pudo subir");
+
+                                setSubImg((prev) => ({ ...prev, [s.id]: json.url }));
+                              } catch (err: any) {
+                                setUploadErrSub((prev) => ({
+                                  ...prev,
+                                  [s.id]: err?.message || "Error subiendo",
+                                }));
+                              } finally {
+                                setUploadingSub((prev) => ({ ...prev, [s.id]: false }));
+                                e.target.value = "";
+                              }
+                            }}
+                          />
+                        </label>
+
                         <input
                           value={subImg[s.id] || ""}
                           onChange={(e) => setSubImg((p0) => ({ ...p0, [s.id]: e.target.value }))}
-                          className="w-full h-11 rounded-2xl bg-black/20 border border-white/10 px-4 text-slate-100 font-bold outline-none placeholder:text-slate-300/50"
-                          placeholder="(Opcional) URL de logo/imagen (Cloudinary)"
+                          className="flex-1 h-11 rounded-2xl bg-black/20 border border-white/10 px-4 text-slate-100 font-bold outline-none placeholder:text-slate-300/50"
+                          placeholder="URL (se rellena sola al subir)"
                         />
                       </div>
+
+                      {uploadErrSub[s.id] ? (
+                        <div className="mt-2 text-sm font-bold text-red-300">{uploadErrSub[s.id]}</div>
+                      ) : null}
                     </div>
+
 
                     {/* listado subsecciones */}
                     {subs?.length ? (

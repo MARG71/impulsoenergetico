@@ -12,15 +12,15 @@ function slugify(input: string) {
     .replace(/-+/g, "-");
 }
 
-function sessionTenantAdminId(session: any) {
+function sessionInfo(session: any) {
   const role = String(session?.user?.role ?? session?.user?.rol ?? "");
-  const id = Number(session?.user?.id ?? 0);
-  const adminId = session?.user?.adminId ?? null;
+  const userId = Number(session?.user?.id ?? 0);
+  const adminId = Number(session?.user?.adminId ?? 0);
 
-  if (role === "ADMIN" || role === "SUPERADMIN") return id || null;
+  const tenantAdminId =
+    role === "ADMIN" || role === "SUPERADMIN" ? (userId || null) : (adminId || null);
 
-  const n = Number(adminId);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  return { role, tenantAdminId };
 }
 
 function normalizeHex(v: any) {
@@ -34,29 +34,25 @@ export async function POST(req: Request) {
   const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const tenantAdminId = sessionTenantAdminId(auth.session);
+  const { tenantAdminId } = sessionInfo(auth.session);
 
   const body = await req.json();
   const seccionId = Number(body?.seccionId);
   const nombre = String(body?.nombre || "").trim();
   if (!seccionId || !nombre) {
-    return NextResponse.json(
-      { error: "seccionId y nombre son requeridos" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "seccionId y nombre son requeridos" }, { status: 400 });
   }
 
-  // ✅ comprobar que la sección pertenece al tenant
+  // ✅ sección válida si es tuya o legacy (null)
   if (tenantAdminId) {
     const sec = await prisma.seccion.findFirst({
-      where: { id: seccionId, adminId: tenantAdminId } as any,
+      where: { id: seccionId, OR: [{ adminId: tenantAdminId }, { adminId: null }] } as any,
       select: { id: true },
     });
     if (!sec) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   const slug = body?.slug ? String(body.slug) : slugify(nombre);
-
   const colorHex = normalizeHex(body?.colorHex);
   const imagenUrl = body?.imagenUrl ? String(body.imagenUrl).trim() : null;
 
@@ -74,10 +70,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(created);
   } catch {
-    return NextResponse.json(
-      { error: "No se pudo crear (slug duplicado?)" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No se pudo crear (slug duplicado?)" }, { status: 400 });
   }
 }
 
@@ -85,7 +78,7 @@ export async function PATCH(req: Request) {
   const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
   if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const tenantAdminId = sessionTenantAdminId(auth.session);
+  const { tenantAdminId } = sessionInfo(auth.session);
 
   const body = await req.json();
   const id = Number(body?.id);
@@ -95,22 +88,17 @@ export async function PATCH(req: Request) {
   if (body.nombre !== undefined) data.nombre = String(body.nombre).trim();
   if (body.slug !== undefined) data.slug = String(body.slug).trim();
   if (body.activa !== undefined) data.activa = Boolean(body.activa);
-
   if (body.colorHex !== undefined) data.colorHex = normalizeHex(body.colorHex);
-  if (body.imagenUrl !== undefined) {
-    const v = String(body.imagenUrl ?? "").trim();
-    data.imagenUrl = v ? v : null;
-  }
+  if (body.imagenUrl !== undefined) data.imagenUrl = String(body.imagenUrl || "").trim() || null;
 
   try {
     if (tenantAdminId) {
       const updated = await prisma.subSeccion.updateMany({
-        where: { id, adminId: tenantAdminId } as any,
-        data,
+        where: { id, OR: [{ adminId: tenantAdminId }, { adminId: null }] } as any,
+        data: { ...data, adminId: tenantAdminId },
       });
-      if (!updated.count) {
-        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      }
+      if (!updated.count) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
       const fresh = await prisma.subSeccion.findUnique({ where: { id } });
       return NextResponse.json(fresh);
     }
