@@ -296,11 +296,24 @@ export default function CartelLugarEspecial() {
           filename: `cartel_especial_${lugar.id}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: {
-            scale: 2.5,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: "#ffffff",
-            logging: false,
+              scale: 2.5,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: "#ffffff",
+              logging: false,
+
+              // ✅ CLAVE: evitamos que html2canvas lea Tailwind/shadcn con OKLCH
+              onclone: (doc: Document) => {
+                // Quitamos CSS global (donde vienen los oklch())
+                doc.querySelectorAll("style, link[rel='stylesheet']").forEach((n) => n.remove());
+
+                // Forzamos un entorno neutro
+                const html = doc.documentElement as HTMLElement;
+                const body = doc.body as HTMLBodyElement;
+
+                html.style.background = "#fff";
+                body.style.background = "#fff";
+                body.style.color = "#000";
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         })
