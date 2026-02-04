@@ -15,27 +15,13 @@ const TELEFONO_FIJO = "692 137 048";
 const IMPULSO_LOGO_SRC =
   "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";
 
+// ✅ evita que res.json() reviente si el backend devuelve HTML o texto
 async function safeJson(res: Response) {
   const text = await res.text();
   try {
-    return { ok: res.ok, status: res.status, data: JSON.parse(text) as any };
+    return { ok: res.ok, status: res.status, data: JSON.parse(text) };
   } catch {
-    return { ok: res.ok, status: res.status, data: null as any, raw: text?.slice(0, 300) };
-  }
-}
-
-async function toDataUrlOrNull(url: string) {
-  try {
-    const r = await fetch(`/api/utils/image-dataurl?url=${encodeURIComponent(url)}`, {
-      cache: "no-store",
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok && d?.ok && typeof d?.dataUrl === "string" && d.dataUrl.startsWith("data:")) {
-      return d.dataUrl as string;
-    }
-    return null;
-  } catch {
-    return null;
+    return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) };
   }
 }
 
@@ -48,6 +34,7 @@ export default function CartelLugarEspecial() {
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
+  // tenant solo para obtener lugar
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
 
@@ -68,13 +55,12 @@ export default function CartelLugarEspecial() {
   const [exportando, setExportando] = useState(false);
   const cartelRef = useRef<HTMLDivElement>(null);
 
-  // ✅ dataURL para evitar CORS en PDF
+  // ✅ DataURL para evitar CORS/tainted canvas en PDF
   const [fondoDataUrl, setFondoDataUrl] = useState<string | null>(null);
-  const [logoClubDataUrl, setLogoClubDataUrl] = useState<string | null>(null);
-
-  // ✅ para saber que el fondo (data:) cargó
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [bgReady, setBgReady] = useState(false);
 
+  // QR real del lugar
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -91,38 +77,47 @@ export default function CartelLugarEspecial() {
     return e || EMAIL_FIJO;
   }, [lugar]);
 
+  // ✅ Fondo especial del lugar (URL)
   const fondoUrl = useMemo(() => {
     const u = String(lugar?.especialCartelUrl ?? "").trim();
     return u || null;
   }, [lugar]);
 
+  // ✅ Escudo/logo club SOLO en especial (URL)
   const logoClubUrl = useMemo(() => {
     const u = String(lugar?.especialLogoUrl ?? "").trim();
     return u || null;
   }, [lugar]);
 
-  // Fetch lugar
   useEffect(() => {
     if (!id) return;
+
     let alive = true;
+
+    const fetchLugar = async () => {
+      const res = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
+      const out = await safeJson(res);
+      if (!out.ok) {
+        const msg =
+          (out.data && (out.data.error || out.data.message)) ||
+          out.raw ||
+          `Error HTTP ${out.status}`;
+        throw new Error(msg);
+      }
+      return out.data;
+    };
 
     (async () => {
       try {
         setLoading(true);
         setError(null);
+        setBgReady(false);
+        setFondoDataUrl(null);
+        setLogoDataUrl(null);
 
-        const res = await fetch(`/api/lugares/${id}${adminQuery}`, { cache: "no-store" });
-        const out = await safeJson(res);
-        if (!out.ok) {
-          const msg =
-            (out.data && (out.data.error || out.data.message)) ||
-            out.raw ||
-            `Error HTTP ${out.status}`;
-          throw new Error(msg);
-        }
-
+        const data = await fetchLugar();
         if (!alive) return;
-        setLugar(out.data);
+        setLugar(data);
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message || "Error cargando datos del cartel especial");
@@ -136,52 +131,40 @@ export default function CartelLugarEspecial() {
     };
   }, [id, adminQuery]);
 
-  // Pre-cargar dataURL del fondo (para pantalla + PDF)
+  // ✅ Preparar fondo/escudo como DataURL para PDF
   useEffect(() => {
     let alive = true;
+
+    async function toDataUrl(url: string) {
+      const r = await fetch(`/api/utils/image-dataurl?url=${encodeURIComponent(url)}`, {
+        cache: "no-store",
+      });
+      const out = await safeJson(r);
+      if (!out.ok) throw new Error(out.data?.error || out.raw || "Error preparando imagen");
+      return out.data?.dataUrl as string;
+    }
+
     (async () => {
       try {
-        setBgReady(false);
-        setFondoDataUrl(null);
-        if (!fondoUrl) return;
-
-        const d = await toDataUrlOrNull(fondoUrl);
-        if (!alive) return;
-        if (d) setFondoDataUrl(d);
-      } catch {
-        if (!alive) return;
-        setFondoDataUrl(null);
+        if (fondoUrl) {
+          const d = await toDataUrl(fondoUrl);
+          if (alive) setFondoDataUrl(d);
+        }
+        if (logoClubUrl) {
+          const d2 = await toDataUrl(logoClubUrl);
+          if (alive) setLogoDataUrl(d2);
+        }
+      } catch (e) {
+        // si falla, no rompemos la pantalla; simplemente el PDF podría fallar
+        console.warn("No se pudo preparar fondo/escudo para PDF:", e);
       }
     })();
 
     return () => {
       alive = false;
     };
-  }, [fondoUrl]);
+  }, [fondoUrl, logoClubUrl]);
 
-  // Pre-cargar dataURL del logo club (para PDF)
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLogoClubDataUrl(null);
-        if (!logoClubUrl) return;
-
-        const d = await toDataUrlOrNull(logoClubUrl);
-        if (!alive) return;
-        if (d) setLogoClubDataUrl(d);
-      } catch {
-        if (!alive) return;
-        setLogoClubDataUrl(null);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [logoClubUrl]);
-
-  // Helpers
   const cleanupHtml2PdfOverlays = () => {
     try {
       document
@@ -209,32 +192,13 @@ export default function CartelLugarEspecial() {
     setTimeout(() => URL.revokeObjectURL(url), 800);
   };
 
-  // ✅ PARCHE OKLCH para html2canvas/pdf
-  const mountPdfSafeStyles = () => {
-    const style = document.createElement("style");
-    style.setAttribute("data-pdf-safe", "1");
-    style.innerHTML = `
-      :root, * {
-        color: #111827 !important;
-        border-color: #d1d5db !important;
-        outline-color: #d1d5db !important;
-        text-decoration-color: #111827 !important;
-      }
-      body { background: #ffffff !important; }
-      [data-cartel-root="1"] { background: #ffffff !important; }
-    `;
-    document.head.appendChild(style);
-    return () => style.remove();
-  };
-
-  async function waitForBgReady(timeoutMs = 7000) {
+  async function waitForBgReady(timeoutMs = 5000) {
     const start = Date.now();
     while (!bgReady && Date.now() - start < timeoutMs) {
       await new Promise((r) => setTimeout(r, 80));
     }
   }
 
-  // Imprimir
   const imprimirCartel = async () => {
     if (!cartelRef.current || !lugar) return;
 
@@ -270,91 +234,69 @@ export default function CartelLugarEspecial() {
     ventana.document.close();
   };
 
-  // ✅ Descargar PDF SIN TAINT: obliga a dataURL antes de generar
+  // ✅ Descargar PDF (sin CORS/tainted canvas)
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
-
-    let unmountStyles: null | (() => void) = null;
 
     try {
       setExportando(true);
       cleanupHtml2PdfOverlays();
 
-      // 1) Fondo SIEMPRE debe ser data:
-      if (!fondoUrl) throw new Error("Este lugar no tiene fondo especial configurado.");
-
-      let fondoSafe = fondoDataUrl;
-      if (!fondoSafe) {
-        fondoSafe = await toDataUrlOrNull(fondoUrl);
-        if (fondoSafe) setFondoDataUrl(fondoSafe);
-      }
-      if (!fondoSafe) {
-        throw new Error(
-          "No se pudo preparar el fondo para PDF (CORS). Revisa que el fondo sea una URL pública accesible."
-        );
-      }
-
-      // 2) Logo club (si existe) también debe ser data:
-      if (logoClubUrl) {
-        let logoSafe = logoClubDataUrl;
-        if (!logoSafe) {
-          logoSafe = await toDataUrlOrNull(logoClubUrl);
-          if (logoSafe) setLogoClubDataUrl(logoSafe);
-        }
-        if (!logoSafe) {
-          throw new Error(
-            "No se pudo preparar el escudo/logo para PDF (CORS). Prueba a subirlo como imagen pública o cámbialo."
-          );
-        }
-      }
-
-      // 3) Asegura render con data: antes de capturar
-      unmountStyles = mountPdfSafeStyles();
-      setBgReady(false);
-      await new Promise((r) => setTimeout(r, 50));
-      await waitForBgReady(7000);
+      // Asegura que el fondo ya está "listo"
+      await waitForBgReady(6000);
 
       const html2pdf = (await import("html2pdf.js")).default;
+
+      // fuerza reflow
+      cartelRef.current.getBoundingClientRect();
 
       // @ts-ignore
       const worker = html2pdf()
         .from(cartelRef.current)
         .set({
           margin: 0,
-          filename: `cartel_especial_lugar_${lugar.id}.pdf`,
+          filename: `cartel_especial_${lugar.id}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: {
-            scale: 2.2,
-            useCORS: false,
-            allowTaint: false, // ✅ IMPORTANTÍSIMO
-            logging: false,
+            scale: 2.5,
+            useCORS: true,
+            allowTaint: false,
             backgroundColor: "#ffffff",
+            logging: false,
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         });
 
-      // @ts-ignore
-      const pdfBlob: Blob = await worker.output("blob");
+      let pdfBlob: Blob | null = null;
+
+      try {
+        // @ts-ignore
+        pdfBlob = await worker.outputPdf("blob");
+      } catch {
+        try {
+          // @ts-ignore
+          pdfBlob = await worker.output("blob");
+        } catch {}
+      }
+
       if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
 
-      downloadBlob(pdfBlob, `cartel_especial_lugar_${lugar.id}.pdf`);
+      downloadBlob(pdfBlob, `cartel_especial_${lugar.id}.pdf`);
     } catch (e: any) {
       console.error(e);
-      alert(e?.message || "Error generando PDF");
+      alert(e?.message || "Error generando PDF del cartel especial");
     } finally {
-      if (unmountStyles) unmountStyles();
       cleanupHtml2PdfOverlays();
       setExportando(false);
     }
   };
 
-  // UI
   if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
 
   if (error) {
     return (
       <div className="p-10 text-center">
-        <div className="font-extrabold text-red-700 mb-2">Error cargando el cartel</div>
+        <div className="font-extrabold text-red-700 mb-2">Error cargando el cartel especial</div>
         <pre className="text-left mx-auto max-w-2xl whitespace-pre-wrap bg-red-50 border border-red-200 p-4 rounded-lg text-sm">
           {error}
         </pre>
@@ -403,7 +345,10 @@ export default function CartelLugarEspecial() {
             📍 Volver a Lugares
           </Button>
 
-          <Button onClick={() => router.back()} className="bg-gray-200 text-black hover:bg-gray-300">
+          <Button
+            onClick={() => router.back()}
+            className="bg-gray-200 text-black hover:bg-gray-300"
+          >
             ⬅ Volver
           </Button>
         </div>
@@ -416,7 +361,6 @@ export default function CartelLugarEspecial() {
       {/* CARTEL A4 ESPECIAL */}
       <div
         ref={cartelRef}
-        data-cartel-root="1"
         style={{
           width: "210mm",
           height: "297mm",
@@ -427,7 +371,7 @@ export default function CartelLugarEspecial() {
           boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
         }}
       >
-        {/* Fondo especial (siempre intenta dataURL) */}
+        {/* Fondo especial (DataURL si existe) */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fondoDataUrl ?? fondoUrl}
@@ -482,9 +426,8 @@ export default function CartelLugarEspecial() {
             <QRCode value={qrUrl} size={135} />
           </div>
 
-          {/* Centro */}
+          {/* Centro: logo + nombre + contacto */}
           <div style={{ flex: 1, textAlign: "center" }}>
-            {/* Logo Impulso */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={IMPULSO_LOGO_SRC}
@@ -524,14 +467,18 @@ export default function CartelLugarEspecial() {
             </div>
           </div>
 
-          {/* Derecha: escudo/logo club */}
+          {/* Derecha: escudo/logo club (DataURL si existe) */}
           <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {logoClubUrl ? (
               <img
-                src={logoClubDataUrl ?? logoClubUrl}
+                src={logoDataUrl ?? logoClubUrl}
                 alt="Escudo / Logo del lugar"
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                }}
               />
             ) : null}
           </div>
