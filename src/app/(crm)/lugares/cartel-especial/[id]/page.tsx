@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
+import * as QRCodeLib from "qrcode";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
 
@@ -23,6 +23,22 @@ async function safeJson(res: Response) {
   } catch {
     return { ok: res.ok, status: res.status, data: null, raw: text?.slice(0, 300) };
   }
+}
+
+async function waitImages(el: HTMLElement) {
+  const imgs = Array.from(el.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          const im = img as HTMLImageElement;
+          if (im.complete && im.naturalWidth > 0) return resolve();
+          const done = () => resolve();
+          im.addEventListener("load", done, { once: true });
+          im.addEventListener("error", done, { once: true });
+        })
+    )
+  );
 }
 
 export default function CartelLugarEspecial() {
@@ -58,7 +74,9 @@ export default function CartelLugarEspecial() {
   // ✅ DataURL para evitar CORS/tainted canvas en PDF
   const [fondoDataUrl, setFondoDataUrl] = useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
-  const [bgReady, setBgReady] = useState(false);
+
+  // ✅ QR en PNG (dataURL) para evitar SVG (react-qr-code rompe html2pdf)
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
 
   // QR real del lugar
   const qrUrl = useMemo(() => {
@@ -111,9 +129,9 @@ export default function CartelLugarEspecial() {
       try {
         setLoading(true);
         setError(null);
-        setBgReady(false);
         setFondoDataUrl(null);
         setLogoDataUrl(null);
+        setQrDataUrl("");
 
         const data = await fetchLugar();
         if (!alive) return;
@@ -130,6 +148,35 @@ export default function CartelLugarEspecial() {
       alive = false;
     };
   }, [id, adminQuery]);
+
+  // ✅ Preparar QR como PNG
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (!qrUrl) return;
+
+        // Tipado explícito para que TS no marque rojo
+        const toDataURL = (QRCodeLib as any).toDataURL as (
+          text: string,
+          opts?: any
+        ) => Promise<string>;
+
+        const png = await toDataURL(qrUrl, {
+          margin: 1,
+          width: 512,
+          errorCorrectionLevel: "M",
+        });
+
+        if (alive) setQrDataUrl(png);
+      } catch (e) {
+        console.warn("No se pudo generar QR PNG:", e);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [qrUrl]);
 
   // ✅ Preparar fondo/escudo como DataURL para PDF
   useEffect(() => {
@@ -155,7 +202,6 @@ export default function CartelLugarEspecial() {
           if (alive) setLogoDataUrl(d2);
         }
       } catch (e) {
-        // si falla, no rompemos la pantalla; simplemente el PDF podría fallar
         console.warn("No se pudo preparar fondo/escudo para PDF:", e);
       }
     })();
@@ -192,13 +238,6 @@ export default function CartelLugarEspecial() {
     setTimeout(() => URL.revokeObjectURL(url), 800);
   };
 
-  async function waitForBgReady(timeoutMs = 5000) {
-    const start = Date.now();
-    while (!bgReady && Date.now() - start < timeoutMs) {
-      await new Promise((r) => setTimeout(r, 80));
-    }
-  }
-
   const imprimirCartel = async () => {
     if (!cartelRef.current || !lugar) return;
 
@@ -234,7 +273,7 @@ export default function CartelLugarEspecial() {
     ventana.document.close();
   };
 
-  // ✅ Descargar PDF (sin CORS/tainted canvas)
+  // ✅ Descargar PDF (estable)
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
 
@@ -242,17 +281,16 @@ export default function CartelLugarEspecial() {
       setExportando(true);
       cleanupHtml2PdfOverlays();
 
-      // Asegura que el fondo ya está "listo"
-      await waitForBgReady(6000);
+      await waitImages(cartelRef.current);
+      // @ts-ignore
+      await (document as any).fonts?.ready?.catch?.(() => {});
 
       const html2pdf = (await import("html2pdf.js")).default;
 
-      // fuerza reflow
       cartelRef.current.getBoundingClientRect();
 
       // @ts-ignore
       const worker = html2pdf()
-        .from(cartelRef.current)
         .set({
           margin: 0,
           filename: `cartel_especial_${lugar.id}.pdf`,
@@ -260,24 +298,16 @@ export default function CartelLugarEspecial() {
           html2canvas: {
             scale: 2.5,
             useCORS: true,
-            allowTaint: false,
+            allowTaint: true,
             backgroundColor: "#ffffff",
             logging: false,
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        });
+        })
+        .from(cartelRef.current);
 
-      let pdfBlob: Blob | null = null;
-
-      try {
-        // @ts-ignore
-        pdfBlob = await worker.outputPdf("blob");
-      } catch {
-        try {
-          // @ts-ignore
-          pdfBlob = await worker.output("blob");
-        } catch {}
-      }
+      // @ts-ignore
+      const pdfBlob: Blob = await worker.toPdf().output("blob");
 
       if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
 
@@ -296,7 +326,9 @@ export default function CartelLugarEspecial() {
   if (error) {
     return (
       <div className="p-10 text-center">
-        <div className="font-extrabold text-red-700 mb-2">Error cargando el cartel especial</div>
+        <div className="font-extrabold text-red-700 mb-2">
+          Error cargando el cartel especial
+        </div>
         <pre className="text-left mx-auto max-w-2xl whitespace-pre-wrap bg-red-50 border border-red-200 p-4 rounded-lg text-sm">
           {error}
         </pre>
@@ -371,13 +403,11 @@ export default function CartelLugarEspecial() {
           boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
         }}
       >
-        {/* Fondo especial (DataURL si existe) */}
+        {/* Fondo especial */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fondoDataUrl ?? fondoUrl}
           alt="Fondo especial del cartel"
-          onLoad={() => setBgReady(true)}
-          onError={() => setBgReady(false)}
           style={{
             position: "absolute",
             inset: 0,
@@ -408,7 +438,7 @@ export default function CartelLugarEspecial() {
             zIndex: 5,
           }}
         >
-          {/* QR */}
+          {/* QR (PNG) */}
           <div
             style={{
               width: "42mm",
@@ -423,10 +453,19 @@ export default function CartelLugarEspecial() {
               flexShrink: 0,
             }}
           >
-            <QRCode value={qrUrl} size={135} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt="QR"
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+            ) : (
+              <div style={{ width: "100%", height: "100%", background: "#fff" }} />
+            )}
           </div>
 
-          {/* Centro: logo + nombre + contacto */}
+          {/* Centro */}
           <div style={{ flex: 1, textAlign: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -467,7 +506,7 @@ export default function CartelLugarEspecial() {
             </div>
           </div>
 
-          {/* Derecha: escudo/logo club (DataURL si existe) */}
+          {/* Escudo */}
           <div style={{ width: "28mm", height: "28mm", flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {logoClubUrl ? (

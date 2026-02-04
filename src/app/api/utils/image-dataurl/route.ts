@@ -19,7 +19,13 @@ export async function GET(req: NextRequest) {
       return jsonError("Host no permitido", 400);
     }
 
-    const r = await fetch(url, { cache: "no-store" });
+    const r = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    });
+
     if (!r.ok) return jsonError(`No se pudo descargar imagen (${r.status})`, 400);
 
     const ct = r.headers.get("content-type") || "image/jpeg";
