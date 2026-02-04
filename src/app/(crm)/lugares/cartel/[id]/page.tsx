@@ -21,7 +21,6 @@ const IMPULSO_LOGO_SRC =
 
 const TELEFONO_FIJO = "692 137 048";
 
-// ✅ evita que res.json() reviente si el backend devuelve HTML o texto
 async function safeJson(res: Response) {
   const text = await res.text();
   try {
@@ -40,7 +39,6 @@ export default function CartelLugar() {
   const role = ((session?.user as any)?.role ?? null) as Rol | null;
   const isSuperadmin = role === "SUPERADMIN";
 
-  // tenant solo para obtener lugar
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
 
@@ -62,7 +60,7 @@ export default function CartelLugar() {
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Nuevo: convertimos el fondo a dataURL para evitar CORS-tainted canvas
+  // ✅ Fondo convertido a dataURL (evita CORS y evita canvas tainted)
   const [fondoDataUrl, setFondoDataUrl] = useState<string | null>(null);
   const [bgReady, setBgReady] = useState(false);
 
@@ -79,7 +77,6 @@ export default function CartelLugar() {
     return n || "Impulso Energético";
   }, [lugar]);
 
-  // Link QR real del lugar
   const qrUrl = useMemo(() => {
     if (!lugar) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -89,7 +86,6 @@ export default function CartelLugar() {
   // Fetch lugar + fondo activo
   useEffect(() => {
     if (!id) return;
-
     let alive = true;
 
     const fetchLugar = async () => {
@@ -141,6 +137,8 @@ export default function CartelLugar() {
       try {
         setLoading(true);
         setError(null);
+        setBgReady(false);
+        setFondoDataUrl(null);
 
         const [l, f] = await Promise.all([fetchLugar(), fetchFondoActivo()]);
 
@@ -161,10 +159,9 @@ export default function CartelLugar() {
     };
   }, [id, adminQuery]);
 
-  // ✅ Convertir fondoUrl -> dataURL (evita CORS y html2pdf falla menos)
+  // ✅ Convertir fondoUrl -> dataURL
   useEffect(() => {
     let alive = true;
-
     (async () => {
       try {
         setBgReady(false);
@@ -177,16 +174,13 @@ export default function CartelLugar() {
           { cache: "no-store" }
         );
         const d = await r.json().catch(() => ({}));
-
         if (!alive) return;
 
-        if (!r.ok || !d?.ok || !d?.dataUrl) {
-          // fallback: dejamos fondoUrl directo (puede fallar PDF si CORS)
-          setFondoDataUrl(null);
-          return;
+        if (r.ok && d?.ok && d?.dataUrl) {
+          setFondoDataUrl(d.dataUrl);
+        } else {
+          setFondoDataUrl(null); // fallback
         }
-
-        setFondoDataUrl(d.dataUrl);
       } catch {
         if (!alive) return;
         setFondoDataUrl(null);
@@ -226,6 +220,36 @@ export default function CartelLugar() {
     setTimeout(() => URL.revokeObjectURL(url), 800);
   };
 
+  // ✅ PARCHE OKLCH: inyecta CSS temporal compatible con html2canvas
+  const mountPdfSafeStyles = () => {
+    const style = document.createElement("style");
+    style.setAttribute("data-pdf-safe", "1");
+    style.innerHTML = `
+      /* html2canvas no soporta oklch() -> neutralizamos variables modernas */
+      :root, * {
+        color: #111827 !important;
+        border-color: #d1d5db !important;
+        outline-color: #d1d5db !important;
+        text-decoration-color: #111827 !important;
+      }
+      /* Evita que pillen fondos raros del tema */
+      body { background: #ffffff !important; }
+      /* Asegura que el cartel tenga fondo blanco */
+      [data-cartel-root="1"] { background: #ffffff !important; }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      style.remove();
+    };
+  };
+
+  async function waitForBgReady(timeoutMs = 6000) {
+    const start = Date.now();
+    while (!bgReady && Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  }
+
   const registrarHistorial = async (accion: "IMPRIMIR" | "DESCARGAR_PDF") => {
     try {
       const r = await fetch("/api/carteles", {
@@ -250,7 +274,6 @@ export default function CartelLugar() {
     }
   };
 
-  // Imprimir
   const imprimirCartel = async () => {
     if (!cartelRef.current || !lugar) return;
 
@@ -288,23 +311,20 @@ export default function CartelLugar() {
     ventana.document.close();
   };
 
-  async function waitForBgReady(timeoutMs = 5000) {
-    const start = Date.now();
-    while (!bgReady && Date.now() - start < timeoutMs) {
-      await new Promise((r) => setTimeout(r, 80));
-    }
-  }
-
-  // Descargar PDF (historial + Cloudinary)
   const descargarPDF = async () => {
     if (!cartelRef.current || !lugar) return;
+
+    let unmountStyles: null | (() => void) = null;
 
     try {
       setExportando(true);
       cleanupHtml2PdfOverlays();
 
-      // ✅ Espera a que el fondo esté cargado (evita capturar “en blanco”)
-      await waitForBgReady(6000);
+      // ✅ aplica parche OKLCH antes de renderizar
+      unmountStyles = mountPdfSafeStyles();
+
+      // ✅ espera al fondo
+      await waitForBgReady(7000);
 
       const cartelId = await registrarHistorial("DESCARGAR_PDF");
       if (!cartelId) throw new Error("No se pudo crear el registro de historial (sin ID).");
@@ -319,8 +339,8 @@ export default function CartelLugar() {
           filename: `cartel_lugar_${lugar.id}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: {
-            scale: 2.5,
-            useCORS: false, // ✅ ya tenemos dataURL, no hace falta CORS
+            scale: 2.2,
+            useCORS: false,
             allowTaint: true,
             logging: false,
             backgroundColor: "#ffffff",
@@ -328,7 +348,7 @@ export default function CartelLugar() {
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         });
 
-      // ✅ Esto es lo que funciona bien en navegador
+      // ✅ output("blob") es el método más estable en navegador
       // @ts-ignore
       const pdfBlob: Blob = await worker.output("blob");
       if (!pdfBlob) throw new Error("No se pudo generar el PDF (html2pdf falló).");
@@ -368,12 +388,13 @@ export default function CartelLugar() {
       console.error(e);
       alert(e?.message || "Error generando/subiendo PDF");
     } finally {
+      if (unmountStyles) unmountStyles();
       cleanupHtml2PdfOverlays();
       setExportando(false);
     }
   };
 
-  // UI states
+  // UI
   if (loading) return <div className="p-10 text-center">Cargando cartel...</div>;
 
   if (error) {
@@ -432,10 +453,7 @@ export default function CartelLugar() {
             📍 Volver a Lugares
           </Button>
 
-          <Button
-            onClick={() => router.back()}
-            className="bg-gray-200 text-black hover:bg-gray-300"
-          >
+          <Button onClick={() => router.back()} className="bg-gray-200 text-black hover:bg-gray-300">
             ⬅ Volver
           </Button>
 
@@ -457,6 +475,7 @@ export default function CartelLugar() {
       {/* CARTEL A4 */}
       <div
         ref={cartelRef}
+        data-cartel-root="1"
         style={{
           width: "210mm",
           height: "297mm",
@@ -522,17 +541,13 @@ export default function CartelLugar() {
             <QRCode value={qrUrl} size={145} />
           </div>
 
-          {/* Centro: logo + nombre + línea contacto */}
+          {/* Centro */}
           <div style={{ flex: 1, textAlign: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={IMPULSO_LOGO_SRC}
               alt="Impulso Energético"
-              style={{
-                height: "15mm",
-                margin: "0 auto 4mm auto",
-                objectFit: "contain",
-              }}
+              style={{ height: "15mm", margin: "0 auto 4mm auto", objectFit: "contain" }}
             />
 
             <div
@@ -548,14 +563,7 @@ export default function CartelLugar() {
               {agenteNombre}
             </div>
 
-            <div
-              style={{
-                marginTop: "3mm",
-                fontSize: "9.4pt",
-                fontWeight: 800,
-                color: "#374151",
-              }}
-            >
+            <div style={{ marginTop: "3mm", fontSize: "9.4pt", fontWeight: 800, color: "#374151" }}>
               <span style={{ fontWeight: 900 }}>
                 {lugar?.agente?.email ?? "info@impulsoenergetico.es"} · {agenteTelefono}
               </span>
@@ -563,7 +571,6 @@ export default function CartelLugar() {
             </div>
           </div>
 
-          {/* derecha vacía */}
           <div style={{ width: "18mm", height: "18mm", flexShrink: 0 }} />
         </div>
       </div>
