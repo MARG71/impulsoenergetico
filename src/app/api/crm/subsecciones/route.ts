@@ -46,6 +46,7 @@ function parseId(v: any) {
 
 /**
  * GET /api/crm/subsecciones?seccionId=1&parentId= (vacío o null => ROOT)
+ * Devuelve hijosCount filtrado por tenant (NO usa _count.hijos porque engaña)
  */
 export async function GET(req: Request) {
   const auth = await requireRole(["SUPERADMIN", "ADMIN"]);
@@ -67,6 +68,7 @@ export async function GET(req: Request) {
   const whereAdmin =
     tenantAdminId ? { OR: [{ adminId: tenantAdminId }, { adminId: null }] } : undefined;
 
+  // 1) Traemos las subsecciones del nivel actual (filtradas por tenant)
   const items = await prisma.subSeccion.findMany({
     where: {
       ...(whereAdmin as any),
@@ -83,12 +85,37 @@ export async function GET(req: Request) {
       activa: true,
       colorHex: true,
       imagenUrl: true,
-      _count: { select: { hijos: true } },
     },
   });
 
-  return NextResponse.json({ ok: true, items });
+  // 2) Calculamos hijosCount FILTRADO por tenant (para no engañar)
+  const ids = items.map((x) => x.id);
+  let hijosCountByParent: Record<number, number> = {};
+
+  if (ids.length) {
+    const grouped = await prisma.subSeccion.groupBy({
+      by: ["parentId"],
+      where: {
+        ...(whereAdmin as any),
+        seccionId,
+        parentId: { in: ids },
+      } as any,
+      _count: { _all: true },
+    });
+
+    for (const g of grouped) {
+      if (g.parentId != null) hijosCountByParent[g.parentId] = g._count._all;
+    }
+  }
+
+  const itemsWithCount = items.map((it) => ({
+    ...it,
+    hijosCount: hijosCountByParent[it.id] ?? 0,
+  }));
+
+  return NextResponse.json({ ok: true, items: itemsWithCount });
 }
+
 
 /**
  * POST /api/crm/subsecciones

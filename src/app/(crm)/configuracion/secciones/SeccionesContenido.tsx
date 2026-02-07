@@ -23,8 +23,9 @@ type Sub = {
   activa: boolean;
   colorHex?: string | null;
   imagenUrl?: string | null;
-  _count?: { hijos: number };
+  hijosCount?: number; // ✅ nuevo
 };
+
 
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
@@ -775,7 +776,7 @@ export default function SeccionesContenido() {
                         <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
                           {subs.map((sub) => {
                             const subColor = normalizeHex(sub.colorHex || "") || null;
-                            const hijos = sub._count?.hijos ?? 0;
+                            const hijos = sub.hijosCount ?? 0;
 
                             return (
                               <div
@@ -815,11 +816,18 @@ export default function SeccionesContenido() {
 
                                   <div className="mt-3 flex gap-2 flex-wrap">
                                     <button
-                                      onClick={() => goToHijas(s.id, sub)}
-                                      className="h-10 px-4 rounded-2xl font-extrabold border border-black/20 bg-sky-500/25 text-white hover:bg-sky-500/35"
+                                      onClick={() => hijos ? goToHijas(s.id, sub) : null}
+                                      disabled={!hijos}
+                                      className={classNames(
+                                        "h-10 px-4 rounded-2xl font-extrabold border border-black/20",
+                                        hijos
+                                          ? "bg-sky-500/25 text-white hover:bg-sky-500/35"
+                                          : "bg-black/30 text-white/50 cursor-not-allowed"
+                                      )}
                                     >
                                       ➕ Hijas ({hijos})
                                     </button>
+
 
                                     <button
                                       onClick={() => openEditSub(s.id, sub)}
