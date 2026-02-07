@@ -816,18 +816,11 @@ export default function SeccionesContenido() {
 
                                   <div className="mt-3 flex gap-2 flex-wrap">
                                     <button
-                                      onClick={() => hijos ? goToHijas(s.id, sub) : null}
-                                      disabled={!hijos}
-                                      className={classNames(
-                                        "h-10 px-4 rounded-2xl font-extrabold border border-black/20",
-                                        hijos
-                                          ? "bg-sky-500/25 text-white hover:bg-sky-500/35"
-                                          : "bg-black/30 text-white/50 cursor-not-allowed"
-                                      )}
+                                      onClick={() => goToHijas(s.id, sub)} // ✅ siempre permite entrar
+                                      className="h-10 px-4 rounded-2xl font-extrabold border border-black/20 bg-sky-500/25 text-white hover:bg-sky-500/35"
                                     >
                                       ➕ Hijas ({hijos})
                                     </button>
-
 
                                     <button
                                       onClick={() => openEditSub(s.id, sub)}
