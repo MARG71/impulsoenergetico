@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
+import { useSearchParams } from "next/navigation";
+
 
 type Sec = {
   id: number;
@@ -106,11 +108,15 @@ export default function SeccionesContenido() {
 
   const subsReqSeq = useRef<Record<number, number>>({});
 
+  const sp = useSearchParams();
+  const adminIdQs = sp.get("adminId");
+  const qsTenant = adminIdQs ? `?adminId=${adminIdQs}` : "";
+
   
   async function loadSecciones() {
     setLoading(true);
     try {
-      const res = await fetch("/api/crm/secciones", { cache: "no-store" });
+      const res = await fetch("/api/crm/secciones${qsTenant}", { cache: "no-store" });
       const json = await res.json();
       const arr: Sec[] = Array.isArray(json) ? json : [];
       setSecciones(arr);
@@ -149,6 +155,8 @@ export default function SeccionesContenido() {
     const qs = new URLSearchParams();
     qs.set("seccionId", String(secId));
     qs.set("parentId", parentId === null ? "null" : String(parentId));
+    if (adminIdQs) qs.set("adminId", adminIdQs);
+
 
     const res = await fetch(`/api/crm/subsecciones?${qs.toString()}`, { cache: "no-store" });
     const json = await res.json();
@@ -177,7 +185,7 @@ export default function SeccionesContenido() {
     const colorHex = normalizeHex(nuevoColor) || null;
     const imagenUrl = nuevoImg.trim() || null;
 
-    const res = await fetch("/api/crm/secciones", {
+    const res = await fetch("/api/crm/secciones${qsTenant}", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nombre, colorHex, imagenUrl }),
@@ -196,7 +204,7 @@ export default function SeccionesContenido() {
   }
 
   async function toggleSeccion(id: number, activa: boolean) {
-    await fetch("/api/crm/secciones", {
+    await fetch("/api/crm/secciones${qsTenant}", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, activa: !activa }),
@@ -208,7 +216,7 @@ export default function SeccionesContenido() {
     const ok = confirm("¿Eliminar esta sección? (irreversible). Si está en uso, puede fallar.");
     if (!ok) return;
 
-    const res = await fetch("/api/crm/secciones", {
+    const res = await fetch("/api/crm/secciones${qsTenant}", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -358,7 +366,7 @@ export default function SeccionesContenido() {
     const colorHex = editSecColor ? normalizeHex(editSecColor) : "";
     if (editSecColor && !colorHex) return alert("Color inválido (#RRGGBB)");
 
-    const res = await fetch("/api/crm/secciones", {
+    const res = await fetch("/api/crm/secciones${qsTenant}", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -430,13 +438,14 @@ export default function SeccionesContenido() {
 
           <div className="flex gap-2 flex-wrap justify-end">
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push(adminIdQs ? `/dashboard?adminId=${adminIdQs}` : "/dashboard")}
+
               className="h-11 px-5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-100 font-extrabold border border-white/10"
             >
               🧭 Dashboard
             </button>
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push(adminIdQs ? `/comisiones?adminId=${adminIdQs}` : "/comisiones")}
               className="h-11 px-5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-100 font-extrabold border border-white/10"
             >
               ← Volver

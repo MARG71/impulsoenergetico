@@ -1,7 +1,11 @@
+//src/app/(crm)/comisiones/ComisionesContenido.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { withTenant } from "@/lib/tenant-url";
+
 
 function Card({ title, desc, href, tag }: { title: string; desc: string; href: string; tag?: string }) {
   return (
@@ -22,6 +26,9 @@ function Card({ title, desc, href, tag }: { title: string; desc: string; href: s
 export default function ComisionesContenido() {
   const { data: session, status } = useSession();
   const role = (session?.user as any)?.role as string | undefined;
+  const sp = useSearchParams();
+  const adminIdQs = sp.get("adminId");
+
 
   if (status === "loading") return <div className="p-6 text-white/80">Cargando…</div>;
   if (!session || !role) return <div className="p-6 text-white/80">No autenticado.</div>;
@@ -40,27 +47,31 @@ export default function ComisionesContenido() {
           <Card
             title="Secciones y subsecciones"
             desc="Crea y edita secciones/subsecciones cuando quieras."
-            href="/configuracion/secciones"
+            href={withTenant("/configuracion/secciones", adminIdQs)}
             tag="Global"
           />
+
           <Card
             title="Comisiones globales"
             desc="Define C1/C2/C3/ESPECIAL por sección/subsección (fijo, %, min/max, límites)."
-            href="/configuracion/comisiones-globales"
+            href={withTenant("/configuracion/comisiones-globales", adminIdQs)}
             tag="Global"
           />
+
           <Card
             title="Contrataciones"
             desc="Centro de cierres para calcular comisiones y adjuntar documentación."
-            href="/contrataciones"
+            href={withTenant("/contrataciones", adminIdQs)}
             tag="Centro"
           />
+
           <Card
             title="Clientes"
             desc="Historial de compras/contrataciones por cliente (se activa al cerrar)."
-            href="/clientes"
+            href={withTenant("/clientes", adminIdQs)}
             tag="Historial"
           />
+
         </div>
       )}
 

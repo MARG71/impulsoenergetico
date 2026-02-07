@@ -1,8 +1,11 @@
+//src/app/(crm)/ClientesContenido.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
+
 
 type Cliente = {
   id: number;
@@ -33,12 +36,19 @@ export default function ClientesContenido() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const sp = useSearchParams();
+  const adminIdQs = sp.get("adminId");
+
 
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/crm/clientes?q=${encodeURIComponent(q)}`, {
-        cache: "no-store",
+      const qs = new URLSearchParams();
+      qs.set("q", q);
+      if (adminIdQs) qs.set("adminId", adminIdQs);
+
+      const res = await fetch(`/api/crm/clientes?${qs.toString()}`, { cache: "no-store"
+
       });
 
       const json = await res.json();

@@ -113,7 +113,9 @@ export default function ContratacionesContenido() {
 
   async function loadSecciones() {
     try {
-        const res = await fetch("/api/crm/secciones", { cache: "no-store" });
+        const url = adminIdQs ? `/api/crm/secciones?adminId=${adminIdQs}` : "/api/crm/secciones";
+        const res = await fetch(url, { cache: "no-store" });
+
         const json = await res.json().catch(() => null);
 
         // si falla HTTP
@@ -134,7 +136,9 @@ export default function ContratacionesContenido() {
     async function loadContrataciones() {
     setLoading(true);
     try {
-        const res = await fetch("/api/crm/contrataciones", { cache: "no-store" });
+        const url = adminIdQs ? `/api/crm/contrataciones?adminId=${adminIdQs}` : "/api/crm/contrataciones";
+        const res = await fetch(url, { cache: "no-store" });
+
         const json = await res.json().catch(() => null);
 
         if (!res.ok) throw new Error(json?.error || "Error cargando contrataciones");
@@ -156,11 +160,14 @@ export default function ContratacionesContenido() {
     estado: Contratacion["estado"]
   ) {
     const res = await fetch(
-      `/api/crm/contrataciones/${contratacionId}/estado`,
+      adminIdQs
+        ? `/api/crm/contrataciones/${contratacionId}/estado?adminId=${adminIdQs}`
+        : `/api/crm/contrataciones/${contratacionId}/estado`,
+
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado }),
+        body: JSON.stringify({ estado, ...(adminIdQs ? { adminId: Number(adminIdQs) } : {}) }),
       }
     );
 
@@ -183,7 +190,9 @@ export default function ContratacionesContenido() {
   async function crear() {
     if (!seccionId) return toast.error("Selecciona sección");
 
-    const res = await fetch("/api/crm/contrataciones", {
+    const url = adminIdQs ? `/api/crm/contrataciones?adminId=${adminIdQs}` : "/api/crm/contrataciones";
+    const res = await fetch(url, {
+
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -195,7 +204,9 @@ export default function ContratacionesContenido() {
         leadId: leadId ? Number(leadId) : null,
         notas: notas || null,
         estado: "BORRADOR",
+        ...(adminIdQs ? { adminId: Number(adminIdQs) } : {}),
       }),
+
     });
 
     const json = await res.json();
