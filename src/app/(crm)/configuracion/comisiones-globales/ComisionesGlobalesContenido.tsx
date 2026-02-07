@@ -7,12 +7,28 @@ import { toast } from "sonner";
 
 type Nivel = "C1" | "C2" | "C3" | "ESPECIAL";
 const NIVELES: Nivel[] = ["C1", "C2", "C3", "ESPECIAL"];
-
 type Tipo = "FIJA" | "PORC_BASE" | "PORC_MARGEN" | "MIXTA";
 
 function toNum(v: any, def = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
+}
+
+function pickArrayFromApi(j: any) {
+  // soporta: {ok:true, items:[]}, {ok:true, secciones:[]}, {items:[]}, {secciones:[]}, []
+  if (!j) return [];
+  if (Array.isArray(j)) return j;
+  if (Array.isArray(j.items)) return j.items;
+  if (Array.isArray(j.secciones)) return j.secciones;
+  if (Array.isArray(j.data)) return j.data;
+  return [];
+}
+
+function isOkResponse(rOk: boolean, j: any) {
+  // soporta APIs que no devuelven "ok"
+  if (!rOk) return false;
+  if (j && typeof j === "object" && "ok" in j) return Boolean(j.ok);
+  return true;
 }
 
 export default function ComisionesGlobalesContenido() {
@@ -22,87 +38,132 @@ export default function ComisionesGlobalesContenido() {
 
   const [secciones, setSecciones] = useState<any[]>([]);
   const [subsecciones, setSubsecciones] = useState<any[]>([]);
-
   const [seccionId, setSeccionId] = useState<number | null>(null);
   const [subSeccionId, setSubSeccionId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [reglas, setReglas] = useState<Record<string, any>>({}); // por nivel
+  const [reglas, setReglas] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
 
-  // --- cargar secciones
-  async function loadSecciones() {
-    const r = await fetch(`/api/crm/secciones${qs}`, { cache: "no-store" });
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j?.ok) throw new Error(j?.error || "Error cargando secciones");
-    const items = Array.isArray(j.items) ? j.items : [];
-    setSecciones(items);
-
-    // autoselect primera si no hay
-    if (!seccionId && items[0]?.id) {
-      setSeccionId(Number(items[0].id));
+  async function safeJson(res: Response) {
+    const txt = await res.text();
+    try {
+      return { json: JSON.parse(txt), text: txt };
+    } catch {
+      return { json: null, text: txt };
     }
   }
 
-  // --- cargar subsecciones (si no tienes endpoint, intentamos desde secciones si vienen incluidas)
+  // --- cargar secciones
+  async function loadSecciones() {
+    const url = `/api/crm/secciones${qs}`;
+    const r = await fetch(url, { cache: "no-store" });
+    const { json: j, text } = await safeJson(r);
+
+    if (!isOkResponse(r.ok, j)) {
+      const errMsg =
+        (j?.error as string) ||
+        `No se pudieron cargar secciones (${r.status}).`;
+
+      // Caso típico SUPERADMIN sin adminId:
+      if (
+        String(errMsg).toLowerCase().includes("tenantadminid") ||
+        String(errMsg).toLowerCase().includes("adminid") ||
+        r.status === 400
+      ) {
+        throw new Error(
+          `Como SUPERADMIN necesitas entrar en modo tenant: abre esta pantalla con ?adminId=XX.\n\nEjemplo:\n/configuracion/comisiones-globales?adminId=1\n\n(El ID lo sacas de la pantalla “Admins”).\n\nDetalle: ${errMsg}`
+        );
+      }
+
+      throw new Error(`${errMsg}\n\nRespuesta: ${String(text).slice(0, 200)}…`);
+    }
+
+    const items = pickArrayFromApi(j);
+    setSecciones(items);
+
+    // autoselect primera
+    if (!seccionId && items[0]?.id) setSeccionId(Number(items[0].id));
+  }
+
+  // --- cargar subsecciones
   async function loadSubsecciones(seccionIdLocal: number) {
-    // 1) si las secciones traen subsecciones incluidas
+    // 1) si vienen embebidas
     const sec = secciones.find((s) => Number(s.id) === Number(seccionIdLocal));
     if (sec?.subsecciones && Array.isArray(sec.subsecciones)) {
       setSubsecciones(sec.subsecciones);
       return;
     }
 
-    // 2) si existe /api/crm/subsecciones
-    const r = await fetch(`/api/crm/subsecciones?seccionId=${seccionIdLocal}${adminIdQs ? `&adminId=${adminIdQs}` : ""}`, {
-      cache: "no-store",
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok || !j?.ok) {
-      // si no existe, dejamos vacío y solo “general”
+    // 2) si existe endpoint
+    try {
+      const r = await fetch(
+        `/api/crm/subsecciones?seccionId=${seccionIdLocal}${
+          adminIdQs ? `&adminId=${adminIdQs}` : ""
+        }`,
+        { cache: "no-store" }
+      );
+      const { json: j } = await safeJson(r);
+      if (!isOkResponse(r.ok, j)) {
+        setSubsecciones([]);
+        return;
+      }
+      const items = pickArrayFromApi(j);
+      setSubsecciones(items);
+    } catch {
       setSubsecciones([]);
-      return;
     }
-    setSubsecciones(Array.isArray(j.items) ? j.items : []);
   }
 
-  // --- cargar reglas globales para seccion/subseccion seleccionada
   async function loadReglas() {
     if (!seccionId) return;
     setLoading(true);
     try {
-      const url = `/api/crm/comisiones-globales?seccionId=${seccionId}&subSeccionId=${subSeccionId ?? "null"}${adminIdQs ? `&adminId=${adminIdQs}` : ""}`;
+      const url = `/api/crm/comisiones-globales?seccionId=${seccionId}&subSeccionId=${
+        subSeccionId ?? "null"
+      }${adminIdQs ? `&adminId=${adminIdQs}` : ""}`;
+
       const r = await fetch(url, { cache: "no-store" });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j?.ok) throw new Error(j?.error || "Error cargando reglas");
+      const { json: j, text } = await safeJson(r);
+
+      if (!isOkResponse(r.ok, j)) {
+        throw new Error(
+          (j?.error as string) ||
+            `Error cargando reglas (${r.status}). Respuesta: ${String(text).slice(
+              0,
+              200
+            )}…`
+        );
+      }
 
       const byNivel: Record<string, any> = {};
       for (const n of NIVELES) {
-        byNivel[n] = j?.byNivel?.[n] || {
-          nivel: n,
-          activa: true,
-          tipo: "PORC_BASE" as Tipo,
-          porcentaje: 0,
-          fijoEUR: 0,
-          minEUR: null,
-          maxEUR: null,
-          minAgenteEUR: null,
-          maxAgenteEUR: null,
-          minLugarEspecialEUR: null,
-          maxLugarEspecialEUR: null,
-        };
+        byNivel[n] =
+          j?.byNivel?.[n] ||
+          {
+            nivel: n,
+            activa: true,
+            tipo: "PORC_BASE" as Tipo,
+            porcentaje: 0,
+            fijoEUR: 0,
+            minEUR: null,
+            maxEUR: null,
+            minAgenteEUR: null,
+            maxAgenteEUR: null,
+            minLugarEspecialEUR: null,
+            maxLugarEspecialEUR: null,
+          };
       }
       setReglas(byNivel);
     } catch (e: any) {
-      toast.error(e?.message || "Error");
+      toast.error(String(e?.message || e));
       setReglas({});
     } finally {
       setLoading(false);
     }
   }
 
-  // --- guardar una regla (por nivel)
   async function saveNivel(nivel: Nivel) {
     if (!seccionId) return;
     setSaving((p) => ({ ...p, [nivel]: true }));
@@ -112,7 +173,6 @@ export default function ComisionesGlobalesContenido() {
         subSeccionId,
         nivel,
         regla: reglas[nivel],
-        // solo si SUPERADMIN tenant mode:
         ...(adminIdQs ? { adminId: Number(adminIdQs) } : {}),
       };
 
@@ -121,19 +181,27 @@ export default function ComisionesGlobalesContenido() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j?.ok) throw new Error(j?.error || "Error guardando");
+
+      const { json: j, text } = await safeJson(r);
+      if (!isOkResponse(r.ok, j)) {
+        throw new Error(
+          (j?.error as string) ||
+            `Error guardando (${r.status}). Respuesta: ${String(text).slice(
+              0,
+              200
+            )}…`
+        );
+      }
 
       toast.success(`Guardado ${nivel} ✅`);
       await loadReglas();
     } catch (e: any) {
-      toast.error(e?.message || "Error");
+      toast.error(String(e?.message || e));
     } finally {
       setSaving((p) => ({ ...p, [nivel]: false }));
     }
   }
 
-  // --- crear faltantes
   async function crearFaltantes() {
     if (!seccionId) return;
     setCreating(true);
@@ -147,31 +215,38 @@ export default function ComisionesGlobalesContenido() {
           ...(adminIdQs ? { adminId: Number(adminIdQs) } : {}),
         }),
       });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j?.ok) throw new Error(j?.error || "Error creando faltantes");
+
+      const { json: j, text } = await safeJson(r);
+      if (!isOkResponse(r.ok, j)) {
+        throw new Error(
+          (j?.error as string) ||
+            `Error creando faltantes (${r.status}). Respuesta: ${String(text).slice(
+              0,
+              200
+            )}…`
+        );
+      }
 
       toast.success(`Reglas faltantes creadas ✅ (${j?.created ?? 0})`);
       await loadReglas();
     } catch (e: any) {
-      toast.error(e?.message || "Error");
+      toast.error(String(e?.message || e));
     } finally {
       setCreating(false);
     }
   }
 
-  // init
   useEffect(() => {
     (async () => {
       try {
         await loadSecciones();
       } catch (e: any) {
-        toast.error(e?.message || "Error");
+        toast.error(String(e?.message || e));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [adminIdQs]);
 
-  // cuando cambia seccionId → cargar subsecciones y reglas
   useEffect(() => {
     if (!seccionId) return;
     (async () => {
@@ -181,7 +256,6 @@ export default function ComisionesGlobalesContenido() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seccionId]);
 
-  // cuando cambia seccion/sub → cargar reglas
   useEffect(() => {
     if (!seccionId) return;
     loadReglas();
@@ -202,7 +276,6 @@ export default function ComisionesGlobalesContenido() {
         </div>
       </div>
 
-      {/* filtros */}
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
@@ -226,7 +299,7 @@ export default function ComisionesGlobalesContenido() {
           <div>
             <div className="text-white/60 text-xs font-bold uppercase mb-1">Subsección</div>
             <select
-              className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-D3 text-white font-bold"
               value={subSeccionId ?? "null"}
               onChange={(e) => setSubSeccionId(e.target.value === "null" ? null : Number(e.target.value))}
             >
@@ -254,7 +327,6 @@ export default function ComisionesGlobalesContenido() {
         </div>
       </div>
 
-      {/* niveles */}
       <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="text-white font-extrabold text-lg mb-2">Niveles</div>
         <div className="text-white/60 text-sm mb-3">
@@ -312,7 +384,7 @@ export default function ComisionesGlobalesContenido() {
                         <option value="PORC_BASE">% sobre base</option>
                         <option value="FIJA">Fija</option>
                         <option value="MIXTA">Mixta</option>
-                        <option value="PORC_MARGEN">% margen (igual que base por ahora)</option>
+                        <option value="PORC_MARGEN">% margen (por ahora igual que base)</option>
                       </select>
                     </div>
 
@@ -382,12 +454,6 @@ export default function ComisionesGlobalesContenido() {
                         inputMode="decimal"
                         placeholder="(vacío = sin máximo)"
                       />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <div className="text-white/40 text-xs">
-                        * Los límites agente/lugar especiales los aplicaremos en fase 2.2 si quieres dejarlos en UI también.
-                      </div>
                     </div>
                   </div>
                 </div>
