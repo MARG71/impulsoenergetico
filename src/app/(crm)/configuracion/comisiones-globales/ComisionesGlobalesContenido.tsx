@@ -2,463 +2,394 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-type Sub = { id: number; seccionId: number; nombre: string; slug: string; activa: boolean };
-type Sec = { id: number; nombre: string; slug: string; activa: boolean; subSecciones: Sub[] };
+type Nivel = "C1" | "C2" | "C3" | "ESPECIAL";
+const NIVELES: Nivel[] = ["C1", "C2", "C3", "ESPECIAL"];
 
-type Regla = {
-  id: number;
-  seccionId: number;
-  subSeccionId: number | null;
-  nivel: "C1" | "C2" | "C3" | "ESPECIAL";
-  tipo: "FIJA" | "PORC_BASE" | "PORC_MARGEN" | "MIXTA";
-  fijoEUR: string | null;
-  porcentaje: string | null;
-  minEUR: string | null;
-  maxEUR: string | null;
-  minAgenteEUR: string | null;
-  maxAgenteEUR: string | null;
-  minLugarEspecialEUR: string | null;
-  maxLugarEspecialEUR: string | null;
-  activa: boolean;
-};
+type Tipo = "FIJA" | "PORC_BASE" | "PORC_MARGEN" | "MIXTA";
 
-const NIVELES: Regla["nivel"][] = ["C1", "C2", "C3", "ESPECIAL"];
-const TIPOS: Regla["tipo"][] = ["FIJA", "PORC_BASE", "PORC_MARGEN", "MIXTA"];
-
-function moneyInput(v: any) {
-  if (v === null || v === undefined) return "";
-  return String(v);
-}
-
-function parseNullableNumber(input: string) {
-  const s = String(input ?? "").trim();
-  if (s === "") return null;
-  const n = Number(s);
-  if (Number.isNaN(n)) return null;
-  return n;
+function toNum(v: any, def = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
 }
 
 export default function ComisionesGlobalesContenido() {
-  const { data: session, status } = useSession();
-  const role = (session?.user as any)?.role as string | undefined;
+  const sp = useSearchParams();
+  const adminIdQs = sp.get("adminId"); // SUPERADMIN tenant mode
+  const qs = adminIdQs ? `?adminId=${adminIdQs}` : "";
+
+  const [secciones, setSecciones] = useState<any[]>([]);
+  const [subsecciones, setSubsecciones] = useState<any[]>([]);
+
+  const [seccionId, setSeccionId] = useState<number | null>(null);
+  const [subSeccionId, setSubSeccionId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [secciones, setSecciones] = useState<Sec[]>([]);
-  const [seccionId, setSeccionId] = useState<number | null>(null);
-  const [subSeccionId, setSubSeccionId] = useState<number | "null">("null");
-
-  const [reglas, setReglas] = useState<Record<string, Regla | null>>({});
+  const [reglas, setReglas] = useState<Record<string, any>>({}); // por nivel
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [creating, setCreating] = useState(false);
 
-  const subsActivas = useMemo(() => {
-    const sec = secciones.find((s) => s.id === seccionId);
-    return sec?.subSecciones?.filter((x) => x.activa) ?? [];
-  }, [secciones, seccionId]);
-
-  function key(nivel: Regla["nivel"]) {
-    return `${seccionId ?? "x"}:${subSeccionId}:${nivel}`;
-  }
-
+  // --- cargar secciones
   async function loadSecciones() {
-    const res = await fetch("/api/crm/secciones");
-    const json = await res.json();
-    if (!Array.isArray(json)) throw new Error(json?.error || "Error cargando secciones");
-    setSecciones(json);
-    if (!seccionId && json.length) setSeccionId(json[0].id);
+    const r = await fetch(`/api/crm/secciones${qs}`, { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) throw new Error(j?.error || "Error cargando secciones");
+    const items = Array.isArray(j.items) ? j.items : [];
+    setSecciones(items);
+
+    // autoselect primera si no hay
+    if (!seccionId && items[0]?.id) {
+      setSeccionId(Number(items[0].id));
+    }
   }
 
+  // --- cargar subsecciones (si no tienes endpoint, intentamos desde secciones si vienen incluidas)
+  async function loadSubsecciones(seccionIdLocal: number) {
+    // 1) si las secciones traen subsecciones incluidas
+    const sec = secciones.find((s) => Number(s.id) === Number(seccionIdLocal));
+    if (sec?.subsecciones && Array.isArray(sec.subsecciones)) {
+      setSubsecciones(sec.subsecciones);
+      return;
+    }
+
+    // 2) si existe /api/crm/subsecciones
+    const r = await fetch(`/api/crm/subsecciones?seccionId=${seccionIdLocal}${adminIdQs ? `&adminId=${adminIdQs}` : ""}`, {
+      cache: "no-store",
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) {
+      // si no existe, dejamos vacío y solo “general”
+      setSubsecciones([]);
+      return;
+    }
+    setSubsecciones(Array.isArray(j.items) ? j.items : []);
+  }
+
+  // --- cargar reglas globales para seccion/subseccion seleccionada
   async function loadReglas() {
     if (!seccionId) return;
     setLoading(true);
-    const qs = new URLSearchParams();
-    qs.set("seccionId", String(seccionId));
-    qs.set("subSeccionId", subSeccionId === "null" ? "null" : String(subSeccionId));
+    try {
+      const url = `/api/crm/comisiones-globales?seccionId=${seccionId}&subSeccionId=${subSeccionId ?? "null"}${adminIdQs ? `&adminId=${adminIdQs}` : ""}`;
+      const r = await fetch(url, { cache: "no-store" });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Error cargando reglas");
 
-    const res = await fetch(`/api/crm/comisiones-globales?${qs.toString()}`);
-    const json = await res.json();
-    const map: Record<string, Regla | null> = {};
-
-    // inicializa a null para que salgan filas aunque no existan
-    for (const n of NIVELES) map[key(n)] = null;
-
-    if (Array.isArray(json)) {
-      for (const r of json as Regla[]) {
-        const k = `${r.seccionId}:${r.subSeccionId === null ? "null" : r.subSeccionId}:${r.nivel}`;
-        map[k] = r;
-      }
-    }
-
-    setReglas(map);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    if (status !== "loading" && session) {
-      loadSecciones().catch((e) => toast.error(String(e?.message || e)));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  useEffect(() => {
-    loadReglas().catch((e) => toast.error(String(e?.message || e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seccionId, subSeccionId]);
-
-  async function seedFaltantes() {
-    if (!seccionId) return;
-    const res = await fetch("/api/crm/comisiones-globales/seed", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        seccionId,
-        subSeccionId: subSeccionId === "null" ? null : subSeccionId,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      toast.error(json?.error || "No se pudieron crear reglas");
-      return;
-    }
-    toast.success(`Reglas creadas/aseguradas. Insertadas: ${json.inserted}`);
-    loadReglas();
-  }
-
-  function updateLocal(nivel: Regla["nivel"], patch: Partial<Regla>) {
-    const k = key(nivel);
-    setReglas((prev) => {
-      const existing = prev[k];
-      const base: Regla =
-        existing ??
-        ({
-          id: -1, // -1 = no existe aún en BD
-          seccionId: seccionId!,
-          subSeccionId: subSeccionId === "null" ? null : (subSeccionId as number),
-          nivel,
-          tipo: "PORC_BASE",
-          fijoEUR: null,
-          porcentaje: null,
+      const byNivel: Record<string, any> = {};
+      for (const n of NIVELES) {
+        byNivel[n] = j?.byNivel?.[n] || {
+          nivel: n,
+          activa: true,
+          tipo: "PORC_BASE" as Tipo,
+          porcentaje: 0,
+          fijoEUR: 0,
           minEUR: null,
           maxEUR: null,
           minAgenteEUR: null,
           maxAgenteEUR: null,
           minLugarEspecialEUR: null,
           maxLugarEspecialEUR: null,
-          activa: true,
-        } as Regla);
-
-      return { ...prev, [k]: { ...base, ...patch } };
-    });
+        };
+      }
+      setReglas(byNivel);
+    } catch (e: any) {
+      toast.error(e?.message || "Error");
+      setReglas({});
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function saveRow(nivel: Regla["nivel"]) {
-    const k = key(nivel);
-    const row = reglas[k];
-    if (!row || !seccionId) return;
+  // --- guardar una regla (por nivel)
+  async function saveNivel(nivel: Nivel) {
+    if (!seccionId) return;
+    setSaving((p) => ({ ...p, [nivel]: true }));
+    try {
+      const payload = {
+        seccionId,
+        subSeccionId,
+        nivel,
+        regla: reglas[nivel],
+        // solo si SUPERADMIN tenant mode:
+        ...(adminIdQs ? { adminId: Number(adminIdQs) } : {}),
+      };
 
-    setSaving((p) => ({ ...p, [k]: true }));
+      const r = await fetch(`/api/crm/comisiones-globales${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Error guardando");
 
-    // si no existe en BD, obligamos a seed primero
-    if (row.id === -1) {
-      toast.message("Creando regla…");
-      await seedFaltantes();
+      toast.success(`Guardado ${nivel} ✅`);
       await loadReglas();
-      setSaving((p) => ({ ...p, [k]: false }));
-      return;
+    } catch (e: any) {
+      toast.error(e?.message || "Error");
+    } finally {
+      setSaving((p) => ({ ...p, [nivel]: false }));
     }
+  }
 
-    const payload = {
-      id: row.id,
-      tipo: row.tipo,
-      activa: row.activa,
-      fijoEUR: parseNullableNumber(row.fijoEUR ?? ""),
-      porcentaje: parseNullableNumber(row.porcentaje ?? ""),
-      minEUR: parseNullableNumber(row.minEUR ?? ""),
-      maxEUR: parseNullableNumber(row.maxEUR ?? ""),
-      minAgenteEUR: parseNullableNumber(row.minAgenteEUR ?? ""),
-      maxAgenteEUR: parseNullableNumber(row.maxAgenteEUR ?? ""),
-      minLugarEspecialEUR: parseNullableNumber(row.minLugarEspecialEUR ?? ""),
-      maxLugarEspecialEUR: parseNullableNumber(row.maxLugarEspecialEUR ?? ""),
-    };
+  // --- crear faltantes
+  async function crearFaltantes() {
+    if (!seccionId) return;
+    setCreating(true);
+    try {
+      const r = await fetch(`/api/crm/comisiones-globales/faltantes${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          seccionId,
+          subSeccionId,
+          ...(adminIdQs ? { adminId: Number(adminIdQs) } : {}),
+        }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Error creando faltantes");
 
-    const res = await fetch("/api/crm/comisiones-globales", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await res.json();
-    setSaving((p) => ({ ...p, [k]: false }));
-
-    if (!res.ok) {
-      toast.error(json?.error || "No se pudo guardar");
-      return;
+      toast.success(`Reglas faltantes creadas ✅ (${j?.created ?? 0})`);
+      await loadReglas();
+    } catch (e: any) {
+      toast.error(e?.message || "Error");
+    } finally {
+      setCreating(false);
     }
+  }
 
-    toast.success(`Guardado ${nivel}`);
+  // init
+  useEffect(() => {
+    (async () => {
+      try {
+        await loadSecciones();
+      } catch (e: any) {
+        toast.error(e?.message || "Error");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // cuando cambia seccionId → cargar subsecciones y reglas
+  useEffect(() => {
+    if (!seccionId) return;
+    (async () => {
+      await loadSubsecciones(seccionId);
+      setSubSeccionId(null);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seccionId]);
+
+  // cuando cambia seccion/sub → cargar reglas
+  useEffect(() => {
+    if (!seccionId) return;
     loadReglas();
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seccionId, subSeccionId, adminIdQs]);
 
-  if (status === "loading") return <div className="p-6 text-white/80">Cargando…</div>;
-  if (!session) return <div className="p-6 text-white/80">No autenticado.</div>;
-
-  if (role !== "SUPERADMIN") {
-    return (
-      <div className="p-6">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <div className="text-white font-extrabold">Acceso no permitido</div>
-          <p className="text-white/70 text-sm mt-2">Solo SUPERADMIN puede gestionar comisiones globales.</p>
-          <Link href="/comisiones" className="inline-block mt-4 text-emerald-300 font-extrabold">
-            ← Volver a Comisiones
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const seccionActual = secciones.find((s) => s.id === seccionId);
+  const tituloSeccion = useMemo(() => {
+    const s = secciones.find((x) => Number(x.id) === Number(seccionId));
+    return s?.nombre ?? "—";
+  }, [secciones, seccionId]);
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-white">Comisiones globales</h1>
-        <p className="text-white/70">
-          Define C1/C2/C3/ESPECIAL por sección/subsección. Tipos: fija, % base, % margen, mixta. Con min/max y límites.
-        </p>
+      <div className="mb-4">
+        <div className="text-white text-2xl font-extrabold">Comisiones globales</div>
+        <div className="text-white/70 text-sm">
+          Define C1/C2/C3/ESPECIAL por sección/subsección. Tipos: fija, % base, mixta. Con mínimos/máximos.
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 mb-5">
-        <div className="grid md:grid-cols-3 gap-3">
+      {/* filtros */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
-            <label className="text-[12px] font-extrabold text-white/70 uppercase tracking-wider">Sección</label>
+            <div className="text-white/60 text-xs font-bold uppercase mb-1">Sección</div>
             <select
-              className="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
               value={seccionId ?? ""}
-              onChange={(e) => {
-                setSeccionId(Number(e.target.value));
-                setSubSeccionId("null");
-              }}
+              onChange={(e) => setSeccionId(e.target.value ? Number(e.target.value) : null)}
             >
-              {secciones
-                .filter((s) => s.activa)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
+              {secciones.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
             </select>
+            <div className="text-white/60 text-xs mt-2">
+              Sección actual: <b className="text-white">{tituloSeccion}</b>
+            </div>
           </div>
 
           <div>
-            <label className="text-[12px] font-extrabold text-white/70 uppercase tracking-wider">Subsección</label>
+            <div className="text-white/60 text-xs font-bold uppercase mb-1">Subsección</div>
             <select
-              className="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-              value={subSeccionId}
-              onChange={(e) => setSubSeccionId(e.target.value === "null" ? "null" : Number(e.target.value))}
+              className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+              value={subSeccionId ?? "null"}
+              onChange={(e) => setSubSeccionId(e.target.value === "null" ? null : Number(e.target.value))}
             >
               <option value="null">— Sin subsección (general)</option>
-              {subsActivas.map((ss) => (
+              {subsecciones.map((ss) => (
                 <option key={ss.id} value={ss.id}>
                   {ss.nombre}
                 </option>
               ))}
             </select>
+            <div className="text-white/60 text-xs mt-2">
+              Sub: <b className="text-white">{subSeccionId ? "seleccionada" : "general"}</b>
+            </div>
           </div>
 
-          <div className="flex items-end gap-2">
+          <div className="flex md:justify-end">
             <button
-              onClick={seedFaltantes}
-              className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-[13px] font-extrabold text-slate-950 transition"
+              onClick={crearFaltantes}
+              disabled={creating || !seccionId}
+              className="w-full md:w-auto rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 px-4 py-2 font-extrabold text-slate-950"
             >
-              Crear reglas faltantes
+              {creating ? "Creando…" : "Crear reglas faltantes"}
             </button>
           </div>
         </div>
-
-        <div className="mt-3 text-sm text-white/70">
-          Sección actual: <span className="font-extrabold text-white">{seccionActual?.nombre ?? "—"}</span>
-          {subSeccionId !== "null" ? (
-            <span className="ml-2 text-white/60">
-              · subsección:{" "}
-              <span className="font-extrabold text-white">
-                {subsActivas.find((x) => x.id === subSeccionId)?.nombre ?? "—"}
-              </span>
-            </span>
-          ) : (
-            <span className="ml-2 text-white/60">· general</span>
-          )}
-        </div>
       </div>
 
-      {/* Tabla */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/10">
-          <div className="text-white font-extrabold">Niveles</div>
-          <div className="text-white/60 text-sm">Edita y guarda por nivel. Si falta una regla, usa “Crear reglas faltantes”.</div>
+      {/* niveles */}
+      <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="text-white font-extrabold text-lg mb-2">Niveles</div>
+        <div className="text-white/60 text-sm mb-3">
+          Edita y guarda por nivel. Si falta una regla, usa “Crear reglas faltantes”.
         </div>
 
         {loading ? (
-          <div className="p-5 text-white/70">Cargando reglas…</div>
+          <div className="text-white/70">Cargando reglas…</div>
         ) : (
-          <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {NIVELES.map((nivel) => {
-              const k = key(nivel);
-              const row = reglas[k];
-
-              // Si no existe, dejamos la fila editable (id -1)
-              const display = row ?? ({
-                id: -1,
-                seccionId: seccionId!,
-                subSeccionId: subSeccionId === "null" ? null : (subSeccionId as number),
-                nivel,
-                tipo: "PORC_BASE",
-                fijoEUR: "",
-                porcentaje: "",
-                minEUR: "",
-                maxEUR: "",
-                minAgenteEUR: "",
-                maxAgenteEUR: "",
-                minLugarEspecialEUR: "",
-                maxLugarEspecialEUR: "",
-                activa: true,
-              } as any as Regla);
-
+              const r = reglas[nivel] || {};
               return (
-                <div key={nivel} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="text-white font-extrabold text-lg">{nivel}</div>
-                      <span className="text-[11px] font-extrabold px-2 py-1 rounded-lg bg-white/10 border border-white/10 text-white/80">
-                        {display.id === -1 ? "No creada" : `ID ${display.id}`}
-                      </span>
-                      <button
-                        onClick={() => updateLocal(nivel, { activa: !display.activa })}
-                        className={`text-[12px] font-extrabold px-2 py-1 rounded-lg border transition ${
-                          display.activa
-                            ? "bg-emerald-400/15 text-emerald-200 border-emerald-400/20"
-                            : "bg-white/5 text-white/70 border-white/10"
-                        }`}
-                      >
-                        {display.activa ? "Activa" : "Inactiva"}
-                      </button>
-                    </div>
+                <div key={nivel} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="text-white font-extrabold text-lg">{nivel}</div>
+                    <div className="ml-auto flex items-center gap-2">
+                      <label className="text-white/70 text-sm font-bold flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(r.activa ?? true)}
+                          onChange={(e) =>
+                            setReglas((p) => ({
+                              ...p,
+                              [nivel]: { ...(p[nivel] || {}), activa: e.target.checked },
+                            }))
+                          }
+                        />
+                        Activa
+                      </label>
 
-                    <div className="flex gap-2">
                       <button
-                        onClick={() => saveRow(nivel)}
-                        disabled={!!saving[k]}
-                        className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-[13px] font-extrabold text-white transition disabled:opacity-60"
+                        onClick={() => saveNivel(nivel)}
+                        disabled={Boolean(saving[nivel])}
+                        className="rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
                       >
-                        {saving[k] ? "Guardando…" : "Guardar"}
+                        {saving[nivel] ? "Guardando…" : "Guardar"}
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-extrabold text-white/70 uppercase">Tipo</label>
+                      <div className="text-white/60 text-xs font-bold uppercase mb-1">Tipo</div>
                       <select
-                        className="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                        value={display.tipo}
-                        onChange={(e) => updateLocal(nivel, { tipo: e.target.value as any })}
+                        className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+                        value={String(r.tipo ?? "PORC_BASE")}
+                        onChange={(e) =>
+                          setReglas((p) => ({
+                            ...p,
+                            [nivel]: { ...(p[nivel] || {}), tipo: e.target.value as Tipo },
+                          }))
+                        }
                       >
-                        {TIPOS.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
+                        <option value="PORC_BASE">% sobre base</option>
+                        <option value="FIJA">Fija</option>
+                        <option value="MIXTA">Mixta</option>
+                        <option value="PORC_MARGEN">% margen (igual que base por ahora)</option>
                       </select>
-                      <div className="text-[11px] text-white/50 mt-1">
-                        FIJA = € · PORC_BASE = % base · PORC_MARGEN = % margen · MIXTA = € + %
-                      </div>
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-extrabold text-white/70 uppercase">Fijo (€)</label>
+                      <div className="text-white/60 text-xs font-bold uppercase mb-1">% (si aplica)</div>
                       <input
-                        className="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                        value={moneyInput(display.fijoEUR)}
-                        onChange={(e) => updateLocal(nivel, { fijoEUR: e.target.value })}
-                        placeholder="Ej: 25"
+                        className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+                        value={r.porcentaje ?? 0}
+                        onChange={(e) =>
+                          setReglas((p) => ({
+                            ...p,
+                            [nivel]: { ...(p[nivel] || {}), porcentaje: toNum(e.target.value, 0) },
+                          }))
+                        }
+                        inputMode="decimal"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-extrabold text-white/70 uppercase">% (ej 4.5)</label>
+                      <div className="text-white/60 text-xs font-bold uppercase mb-1">Fijo € (si aplica)</div>
                       <input
-                        className="mt-1 w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                        value={moneyInput(display.porcentaje)}
-                        onChange={(e) => updateLocal(nivel, { porcentaje: e.target.value })}
-                        placeholder="Ej: 4.5"
+                        className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+                        value={r.fijoEUR ?? 0}
+                        onChange={(e) =>
+                          setReglas((p) => ({
+                            ...p,
+                            [nivel]: { ...(p[nivel] || {}), fijoEUR: toNum(e.target.value, 0) },
+                          }))
+                        }
+                        inputMode="decimal"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-extrabold text-white/70 uppercase">Min/Max (€)</label>
-                      <div className="mt-1 grid grid-cols-2 gap-2">
-                        <input
-                          className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                          value={moneyInput(display.minEUR)}
-                          onChange={(e) => updateLocal(nivel, { minEUR: e.target.value })}
-                          placeholder="Min"
-                        />
-                        <input
-                          className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                          value={moneyInput(display.maxEUR)}
-                          onChange={(e) => updateLocal(nivel, { maxEUR: e.target.value })}
-                          placeholder="Max"
-                        />
+                      <div className="text-white/60 text-xs font-bold uppercase mb-1">Min € (total)</div>
+                      <input
+                        className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+                        value={r.minEUR ?? ""}
+                        onChange={(e) =>
+                          setReglas((p) => ({
+                            ...p,
+                            [nivel]: {
+                              ...(p[nivel] || {}),
+                              minEUR: e.target.value === "" ? null : toNum(e.target.value, 0),
+                            },
+                          }))
+                        }
+                        inputMode="decimal"
+                        placeholder="(vacío = sin mínimo)"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-white/60 text-xs font-bold uppercase mb-1">Max € (total)</div>
+                      <input
+                        className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
+                        value={r.maxEUR ?? ""}
+                        onChange={(e) =>
+                          setReglas((p) => ({
+                            ...p,
+                            [nivel]: {
+                              ...(p[nivel] || {}),
+                              maxEUR: e.target.value === "" ? null : toNum(e.target.value, 0),
+                            },
+                          }))
+                        }
+                        inputMode="decimal"
+                        placeholder="(vacío = sin máximo)"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <div className="text-white/40 text-xs">
+                        * Los límites agente/lugar especiales los aplicaremos en fase 2.2 si quieres dejarlos en UI también.
                       </div>
                     </div>
                   </div>
-
-                  <div className="mt-4 grid md:grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-white font-extrabold text-sm mb-2">Límites Agente (€)</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                          value={moneyInput(display.minAgenteEUR)}
-                          onChange={(e) => updateLocal(nivel, { minAgenteEUR: e.target.value })}
-                          placeholder="Min"
-                        />
-                        <input
-                          className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                          value={moneyInput(display.maxAgenteEUR)}
-                          onChange={(e) => updateLocal(nivel, { maxAgenteEUR: e.target.value })}
-                          placeholder="Max"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-white font-extrabold text-sm mb-2">Límites Lugar especial (€)</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                          value={moneyInput(display.minLugarEspecialEUR)}
-                          onChange={(e) => updateLocal(nivel, { minLugarEspecialEUR: e.target.value })}
-                          placeholder="Min"
-                        />
-                        <input
-                          className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-2 text-white font-bold"
-                          value={moneyInput(display.maxLugarEspecialEUR)}
-                          onChange={(e) => updateLocal(nivel, { maxLugarEspecialEUR: e.target.value })}
-                          placeholder="Max"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {display.id === -1 && (
-                    <div className="mt-3 text-[12px] text-white/60">
-                      Esta regla aún no existe. Pulsa <b>Crear reglas faltantes</b> y luego guarda.
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -466,10 +397,13 @@ export default function ComisionesGlobalesContenido() {
         )}
       </div>
 
-      <div className="mt-6">
-        <Link href="/comisiones" className="text-emerald-300 font-extrabold">
+      <div className="mt-4">
+        <button
+          onClick={() => history.back()}
+          className="text-emerald-300 hover:text-emerald-200 font-bold"
+        >
           ← Volver a Comisiones
-        </Link>
+        </button>
       </div>
     </div>
   );
