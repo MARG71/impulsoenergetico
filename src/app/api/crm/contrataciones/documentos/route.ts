@@ -1,3 +1,4 @@
+// src/app/api/crm/contrataciones/documentos/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";

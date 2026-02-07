@@ -1,4 +1,3 @@
-// src/app/api/crm/contrataciones/[id]/estado/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -56,7 +55,7 @@ export async function PATCH(req: NextRequest, ctx: any) {
 
     if (!contratacion) return jsonError("Contratación no encontrada", 404);
 
-    // ✅ Scope
+    // Scope
     if (role !== "SUPERADMIN") {
       if (!tenantAdminId) return jsonError("tenantAdminId no disponible", 400);
       if ((contratacion as any).adminId !== tenantAdminId) {
@@ -69,6 +68,7 @@ export async function PATCH(req: NextRequest, ctx: any) {
 
     let clienteId = (contratacion as any).clienteId ?? null;
 
+    // Crear/vincular cliente al confirmar
     if (estado === "CONFIRMADA") {
       const lead = (contratacion as any).lead;
       if (!lead) return jsonError("La contratación no tiene lead vinculado", 400);
@@ -122,13 +122,33 @@ export async function PATCH(req: NextRequest, ctx: any) {
       data: {
         estado: estado as any,
         ...(estado === "CONFIRMADA"
-          ? {
-              confirmadaEn: new Date(),
-              ...(clienteId ? ({ clienteId } as any) : {}),
-            }
+          ? { confirmadaEn: new Date(), ...(clienteId ? ({ clienteId } as any) : {}) }
           : {}),
       } as any,
     });
+
+    // ✅ AUTO-ASIENTO al confirmar
+    if (estado === "CONFIRMADA") {
+      const origin = new URL(req.url).origin;
+
+      const res = await fetch(`${origin}/api/crm/comisiones/asentar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          cookie: req.headers.get("cookie") ?? "",
+        },
+        body: JSON.stringify({ contratacionId }),
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        return NextResponse.json({
+          ok: true,
+          contratacion: updated,
+          warning: json?.error || "Confirmada, pero no se pudo asentar la comisión",
+        });
+      }
+    }
 
     return NextResponse.json({ ok: true, contratacion: updated });
   } catch (e: any) {

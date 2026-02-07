@@ -1,3 +1,4 @@
+//src/app/(crm)/comisiones-globales/page.tsx
 import { Suspense } from "react";
 import ComisionesGlobalesContenido from "./ComisionesGlobalesContenido";
 

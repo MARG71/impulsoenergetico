@@ -1,5 +1,5 @@
 // src/app/api/crm/contrataciones/desde-lead/route.ts
-// src/app/api/crm/contrataciones/desde-lead/route.ts
+
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";

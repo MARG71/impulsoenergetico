@@ -1,44 +1,82 @@
-//src/app/api/comisiones/asientos/route.ts
+//src/app/api/crm/comisiones/asientos/route.ts
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionOrThrow, sessionRole, sessionAdminId } from "@/lib/auth-server";
+import { getTenantContext } from "@/lib/tenant";
 
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function jsonError(status: number, message: string, extra?: any) {
+  return NextResponse.json({ ok: false, error: message, ...(extra ? { extra } : {}) }, { status });
 }
 
-function parseId(v: unknown) {
+function toId(v: any) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export async function GET(req: Request) {
-  try {
-    const session = await getSessionOrThrow();
-    const role = String(sessionRole(session) ?? "").toUpperCase();
-    const adminId = sessionAdminId(session);
+function getRole(tenant: any) {
+  return String((tenant as any)?.role || (tenant as any)?.tenantRole || "").toUpperCase();
+}
 
-    if (!["ADMIN", "SUPERADMIN"].includes(role)) return jsonError("No autorizado", 403);
+export async function GET(req: NextRequest) {
+  const tenant = await getTenantContext(req);
+  if (!tenant.ok) return jsonError(tenant.status, tenant.error);
 
-    const { searchParams } = new URL(req.url);
-    const contratacionId = parseId(searchParams.get("contratacionId"));
-    if (!contratacionId) return jsonError("contratacionId requerido", 400);
+  const role = getRole(tenant);
+  const tenantAdminId = tenant.tenantAdminId ?? null;
 
-    const asiento = await prisma.asientoComision.findUnique({
-      where: { contratacionId } as any,
-    });
+  if (!["SUPERADMIN", "ADMIN"].includes(role)) return jsonError(403, "No autorizado");
 
-    if (!asiento) return NextResponse.json({ ok: true, asiento: null });
+  const url = new URL(req.url);
 
-    if (role !== "SUPERADMIN") {
-      if (!adminId) return jsonError("tenantAdminId no disponible", 400);
-      if ((asiento as any).adminId !== adminId) return jsonError("No autorizado", 403);
-    }
+  const q = String(url.searchParams.get("q") ?? "").trim();
+  const estado = String(url.searchParams.get("estado") ?? "").trim().toUpperCase();
+  const agenteId = toId(url.searchParams.get("agenteId"));
+  const lugarId = toId(url.searchParams.get("lugarId"));
+  const seccionId = toId(url.searchParams.get("seccionId"));
 
-    return NextResponse.json({ ok: true, asiento });
-  } catch (e: any) {
-    return jsonError(String(e?.message ?? e), 500);
+  const where: any = {};
+
+  if (role !== "SUPERADMIN") {
+    if (!tenantAdminId) return jsonError(400, "tenantAdminId no disponible");
+    where.adminId = tenantAdminId;
+  } else {
+    // si quieres modo tenant, puedes filtrar por tenantAdminId si viene:
+    // if (tenantAdminId) where.adminId = tenantAdminId;
   }
+
+  if (estado && ["PENDIENTE", "LIQUIDADO", "ANULADO"].includes(estado)) where.estado = estado;
+
+  if (agenteId) where.agenteId = agenteId;
+  if (lugarId) where.lugarId = lugarId;
+  if (seccionId) where.seccionId = seccionId;
+
+  // búsqueda simple (por id, nombre agente/lugar/cliente/lead)
+  if (q) {
+    const idQ = toId(q);
+    where.OR = [
+      ...(idQ ? [{ id: idQ }, { contratacionId: idQ }] : []),
+      { agente: { is: { nombre: { contains: q, mode: "insensitive" } } } },
+      { lugar: { is: { nombre: { contains: q, mode: "insensitive" } } } },
+      { cliente: { is: { nombre: { contains: q, mode: "insensitive" } } } },
+      { lead: { is: { nombre: { contains: q, mode: "insensitive" } } } },
+    ];
+  }
+
+  const items = await prisma.asientoComision.findMany({
+    where,
+    orderBy: { id: "desc" },
+    take: 300,
+    include: {
+      contratacion: { select: { id: true, estado: true, creadaEn: true, confirmadaEn: true } },
+      agente: { select: { id: true, nombre: true } },
+      lugar: { select: { id: true, nombre: true, especial: true } },
+      cliente: { select: { id: true, nombre: true } },
+      lead: { select: { id: true, nombre: true } },
+      seccion: { select: { id: true, nombre: true, slug: true } },
+      subSeccion: { select: { id: true, nombre: true, slug: true } },
+    } as any,
+  });
+
+  return NextResponse.json({ ok: true, items });
 }

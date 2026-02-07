@@ -1,3 +1,4 @@
+//src/app/(crm)/comisiones-globales/ComisionesGlobalesContenido.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

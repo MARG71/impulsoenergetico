@@ -1,3 +1,4 @@
+//src/app/api/crm/reglas-comision-global/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";

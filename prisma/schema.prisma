@@ -1051,6 +1051,11 @@ model AsientoComision {
   agenteId  Int?
   lugarId   Int?
 
+  anuladoEn         DateTime?
+  anuladoPorUserId  Int?
+  anuladoMotivo     String?
+
+
   estado EstadoAsientoComision @default(PENDIENTE)
   notas  String?
 
