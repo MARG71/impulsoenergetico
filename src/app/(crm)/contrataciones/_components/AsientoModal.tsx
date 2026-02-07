@@ -1,6 +1,9 @@
+//src/app/(crm)/contrataciones/_components/AsientoModal.tsx
+// src/app/(crm)/contrataciones/_components/AsientoModal.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 type Asiento = any;
@@ -23,6 +26,11 @@ export default function AsientoModal({
   onClose: () => void;
   onAnulado?: () => void;
 }) {
+  const sp = useSearchParams();
+  const adminIdQs = sp.get("adminId");
+  const adminQuery = adminIdQs ? `&adminId=${adminIdQs}` : "";
+  const adminBody = adminIdQs ? { adminId: Number(adminIdQs) } : {};
+
   const [loading, setLoading] = useState(false);
   const [asiento, setAsiento] = useState<Asiento | null>(null);
   const [movs, setMovs] = useState<Movimiento[]>([]);
@@ -32,7 +40,7 @@ export default function AsientoModal({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/crm/comisiones/asientos/por-contratacion?contratacionId=${contratacionId}`,
+        `/api/crm/comisiones/asientos/por-contratacion?contratacionId=${contratacionId}${adminQuery}`,
         { cache: "no-store" }
       );
       const json = await res.json().catch(() => null);
@@ -51,16 +59,16 @@ export default function AsientoModal({
   useEffect(() => {
     if (open) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, adminIdQs]);
 
   async function anular() {
     if (!asiento?.id) return;
     if (!motivo.trim()) return toast.error("Escribe un motivo de anulación");
 
-    const res = await fetch("/api/crm/comisiones/asientos/anular", {
+    const res = await fetch(`/api/crm/comisiones/asientos/anular${adminIdQs ? `?adminId=${adminIdQs}` : ""}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ asientoId: asiento.id, motivo: motivo.trim() }),
+      body: JSON.stringify({ asientoId: asiento.id, motivo: motivo.trim(), ...adminBody }),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok || json?.ok === false) return toast.error(json?.error || "No se pudo anular");
@@ -107,24 +115,12 @@ export default function AsientoModal({
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div className="text-white/80">
-                    Base: <b className="text-white">{money(asiento.baseEUR)}</b>
-                  </div>
-                  <div className="text-white/80">
-                    Total comisión: <b className="text-white">{money(asiento.totalComision)}</b>
-                  </div>
-                  <div className="text-white/80">
-                    Agente: <b className="text-emerald-200">{money(asiento.agenteEUR)}</b>
-                  </div>
-                  <div className="text-white/80">
-                    Lugar: <b className="text-amber-200">{money(asiento.lugarEUR)}</b>
-                  </div>
-                  <div className="text-white/80">
-                    Admin: <b className="text-sky-200">{money(asiento.adminEUR)}</b>
-                  </div>
-                  <div className="text-white/50">
-                    Creado: {new Date(asiento.creadoEn).toLocaleString("es-ES")}
-                  </div>
+                  <div className="text-white/80">Base: <b className="text-white">{money(asiento.baseEUR)}</b></div>
+                  <div className="text-white/80">Total comisión: <b className="text-white">{money(asiento.totalComision)}</b></div>
+                  <div className="text-white/80">Agente: <b className="text-emerald-200">{money(asiento.agenteEUR)}</b></div>
+                  <div className="text-white/80">Lugar: <b className="text-amber-200">{money(asiento.lugarEUR)}</b></div>
+                  <div className="text-white/80">Admin: <b className="text-sky-200">{money(asiento.adminEUR)}</b></div>
+                  <div className="text-white/50">Creado: {new Date(asiento.creadoEn).toLocaleString("es-ES")}</div>
                 </div>
               </div>
 
