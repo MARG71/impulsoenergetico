@@ -5,6 +5,14 @@ import { getTenantContext } from "@/lib/tenant";
 import { hash } from "bcryptjs";
 import { sendAccessEmail } from "@/lib/sendAccessEmail";
 
+type Nivel = "C1" | "C2" | "C3" | "ESPECIAL";
+
+function normalizeNivel(v: any): Nivel {
+  const s = String(v ?? "C1").toUpperCase();
+  if (s === "C2" || s === "C3" || s === "ESPECIAL") return s;
+  return "C1";
+}
+
 // =======================
 // GET /api/agentes
 // =======================
@@ -19,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   const includeOcultos = url.searchParams.get("includeOcultos") === "1";
 
-  // ✅ NUEVO: adminId por query para SUPERADMIN global
+  // adminId por query (solo útil para SUPERADMIN global)
   const adminIdQuery = url.searchParams.get("adminId");
   const adminIdFromQuery = adminIdQuery ? Number(adminIdQuery) : null;
 
@@ -35,16 +43,15 @@ export async function GET(req: NextRequest) {
     }
     where.adminId = tenantAdminId;
   } else {
-    // SUPERADMIN:
+    // SUPERADMIN
     if (tenantAdminId) {
-      // modo tenant (?adminId=...) -> filtra por ese tenant
+      // modo tenant
       where.adminId = tenantAdminId;
     } else {
-      // modo global -> si viene ?adminId=XX filtramos
+      // modo global
       if (adminIdFromQuery && Number.isFinite(adminIdFromQuery)) {
         where.adminId = adminIdFromQuery;
       }
-      // si no viene, devuelve todos (lo dejamos permitido)
     }
   }
 
@@ -63,7 +70,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(agentes);
 }
-
 
 // =======================
 // POST /api/agentes
@@ -90,6 +96,7 @@ export async function POST(req: NextRequest) {
     pctAgente,
     ocultoParaAdmin,
     adminSeleccionado,
+    nivelComisionDefault,
   } = body || {};
 
   if (!nombre || !email) {
@@ -105,31 +112,25 @@ export async function POST(req: NextRequest) {
   let adminId: number | null = null;
 
   if (ctx.isSuperadmin) {
-    // 1) SUPERADMIN: intenta con adminSeleccionado (del selector o de la query)
     if (adminSeleccionado) {
       const parsed = Number(adminSeleccionado);
-      if (Number.isFinite(parsed)) {
-        adminId = parsed;
-      }
+      if (Number.isFinite(parsed)) adminId = parsed;
     }
 
-    // 2) Si no hay adminSeleccionado, usa tenantAdminId (modo /dashboard?adminId=XXX)
     if (!adminId && ctx.tenantAdminId) {
       adminId = ctx.tenantAdminId;
     }
 
-    // 3) Si sigue sin admin, error
     if (!adminId) {
       return NextResponse.json(
         {
           error:
-            "Debes seleccionar un administrador para este agente o entrar en el dashboard de un tenant (/dashboard?adminId=XXX).",
+            "Debes seleccionar un administrador para este agente o entrar en un tenant (/dashboard?adminId=XXX).",
         },
         { status: 400 }
       );
     }
   } else if (ctx.isAdmin) {
-    // ADMIN: siempre su propio id como adminId del tenant
     if (!ctx.tenantAdminId) {
       return NextResponse.json(
         { error: "Config de tenant inválida (falta adminId)" },
@@ -139,7 +140,6 @@ export async function POST(req: NextRequest) {
     adminId = ctx.tenantAdminId;
   }
 
-  // Seguridad extra
   if (!adminId) {
     return NextResponse.json(
       { error: "No se ha podido determinar el administrador del agente." },
@@ -147,9 +147,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ─────────────────────────────
-  // Crear usuario + agente
-  // ─────────────────────────────
+  const nivel = normalizeNivel(nivelComisionDefault);
 
   // Contraseña temporal
   const plainPassword = Math.random().toString(36).slice(-10);
@@ -163,12 +161,12 @@ export async function POST(req: NextRequest) {
         email,
         password: passwordHash,
         rol: "AGENTE",
-        nivelComisionDefault: body.nivelComisionDefault ?? "C1",
-        adminId, // tenant dueño
+        adminId,
+        nivelComisionDefault: nivel,
       },
     });
 
-    // 2) Crear agente vinculado
+    // 2) Crear agente vinculado (y guardar el nivel EN AGENTE)
     const agente = await prisma.agente.create({
       data: {
         nombre,
@@ -177,19 +175,16 @@ export async function POST(req: NextRequest) {
         pctAgente: pctAgente ?? null,
         ocultoParaAdmin: Boolean(ocultoParaAdmin) || false,
         adminId,
+        nivelComisionDefault: nivel,
         usuarios: { connect: { id: usuario.id } },
       },
       include: {
-        _count: {
-          select: { lugares: true, leads: true, comparativas: true },
-        },
-        admin: {
-          select: { id: true, nombre: true, email: true },
-        },
+        _count: { select: { lugares: true, leads: true, comparativas: true } },
+        admin: { select: { id: true, nombre: true, email: true } },
       },
     });
 
-    // 3) Enviar email de acceso (no bloqueamos si falla)
+    // 3) Enviar email (no bloquea)
     sendAccessEmail({
       to: email,
       nombre,

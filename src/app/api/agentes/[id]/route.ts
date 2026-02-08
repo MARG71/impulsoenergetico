@@ -1,27 +1,28 @@
 // src/app/api/agentes/[id]/route.ts
-// src/app/api/agentes/[id]/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
+
+type Nivel = "C1" | "C2" | "C3" | "ESPECIAL";
+
+function normalizeNivel(v: any): Nivel | null {
+  if (v === undefined || v === null || v === "") return null;
+  const s = String(v).toUpperCase();
+  if (s === "C1" || s === "C2" || s === "C3" || s === "ESPECIAL") return s;
+  return null;
+}
 
 function buildAgenteWhere(ctx: any, idNum: number) {
   const where: any = { id: idNum };
 
   if (ctx.isSuperadmin) {
-    // SUPERADMIN:
-    // - Si viene en modo tenant, filtra por ese adminId
-    // - Si no, puede ver/editar cualquier agente
-    if (ctx.tenantAdminId) {
-      where.adminId = ctx.tenantAdminId;
-    }
+    if (ctx.tenantAdminId) where.adminId = ctx.tenantAdminId;
   } else if (ctx.isAdmin) {
-    // ADMIN: solo sus agentes (su tenantAdminId)
     if (!ctx.tenantAdminId) {
       throw new Error("Config de tenant inválida para ADMIN (sin tenantAdminId)");
     }
     where.adminId = ctx.tenantAdminId;
   } else {
-    // Otros roles no deberían llegar aquí
     throw new Error("NO_PERMITIDO");
   }
 
@@ -35,16 +36,14 @@ export async function GET(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
 
   const ctx = await getTenantContext(req);
-  if (!ctx.ok) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const idNum = Number(params.id);
   if (!Number.isFinite(idNum)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  let where;
+  let where: any;
   try {
     where = buildAgenteWhere(ctx, idNum);
   } catch (e: any) {
@@ -54,29 +53,14 @@ export async function GET(req: NextRequest, context: any) {
         { status: 403 }
       );
     }
-    return NextResponse.json(
-      { error: "Config de tenant inválida" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Config de tenant inválida" }, { status: 400 });
   }
 
   const agente = await prisma.agente.findFirst({
     where,
     include: {
-      _count: {
-        select: {
-          lugares: true,
-          leads: true,
-          comparativas: true,
-        },
-      },
-      admin: {
-        select: {
-          id: true,
-          nombre: true,
-          email: true,
-        },
-      },
+      _count: { select: { lugares: true, leads: true, comparativas: true } },
+      admin: { select: { id: true, nombre: true, email: true } },
     },
   });
 
@@ -94,11 +78,8 @@ export async function PUT(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
 
   const ctx = await getTenantContext(req);
-  if (!ctx.ok) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  // Solo SUPERADMIN o ADMIN
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
     return NextResponse.json(
       { error: "Solo SUPERADMIN o ADMIN pueden editar agentes" },
@@ -119,15 +100,7 @@ export async function PUT(req: NextRequest, context: any) {
     pctAgente,
     ocultoParaAdmin,
     nivelComisionDefault,
-  }: {
-    nombre?: string;
-    email?: string;
-    telefono?: string | null;
-    pctAgente?: number | null;
-    ocultoParaAdmin?: boolean;
-    nivelComisionDefault?: "C1" | "C2" | "C3" | "ESPECIAL";
   } = body || {};
-
 
   if (!nombre || !email) {
     return NextResponse.json(
@@ -136,7 +109,7 @@ export async function PUT(req: NextRequest, context: any) {
     );
   }
 
-  let where;
+  let where: any;
   try {
     where = buildAgenteWhere(ctx, idNum);
   } catch (e: any) {
@@ -146,31 +119,22 @@ export async function PUT(req: NextRequest, context: any) {
         { status: 403 }
       );
     }
-    return NextResponse.json(
-      { error: "Config de tenant inválida" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Config de tenant inválida" }, { status: 400 });
   }
 
   const agenteExistente = await prisma.agente.findFirst({
     where,
-    include: {
-      usuarios: true,
-      admin: {
-        select: {
-          id: true,
-          nombre: true,
-          email: true,
-        },
-      },
-    },
+    include: { usuarios: true },
   });
 
   if (!agenteExistente) {
     return NextResponse.json({ error: "Agente no encontrado" }, { status: 404 });
   }
 
+  const nivel = normalizeNivel(nivelComisionDefault);
+
   try {
+    // 1) Actualizar agente (incluye el nivel EN AGENTE)
     const agenteActualizado = await prisma.agente.update({
       where: { id: agenteExistente.id },
       data: {
@@ -182,40 +146,25 @@ export async function PUT(req: NextRequest, context: any) {
           typeof ocultoParaAdmin === "boolean"
             ? ocultoParaAdmin
             : agenteExistente.ocultoParaAdmin,
+        ...(nivel ? { nivelComisionDefault: nivel } : {}),
       },
       include: {
-        _count: {
-          select: {
-            lugares: true,
-            leads: true,
-            comparativas: true,
-          },
-        },
-        admin: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-          },
-        },
+        _count: { select: { lugares: true, leads: true, comparativas: true } },
+        admin: { select: { id: true, nombre: true, email: true } },
       },
     });
 
-    // Sincronizar datos básicos en los usuarios vinculados al agente
-    // Sincronizar datos básicos + nivel comisión en los usuarios vinculados al agente
+    // 2) Sincronizar usuarios vinculados (nombre/email y nivel si viene)
     if (agenteExistente.usuarios.length > 0) {
       await prisma.usuario.updateMany({
         where: { agenteId: agenteExistente.id },
         data: {
           nombre,
           email,
-          ...(nivelComisionDefault
-            ? { nivelComisionDefault }
-            : {}),
+          ...(nivel ? { nivelComisionDefault: nivel } : {}),
         },
       });
     }
-
 
     return NextResponse.json(agenteActualizado);
   } catch (e: any) {
@@ -226,10 +175,7 @@ export async function PUT(req: NextRequest, context: any) {
         { status: 400 }
       );
     }
-    return NextResponse.json(
-      { error: "Error actualizando agente" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error actualizando agente" }, { status: 500 });
   }
 }
 
@@ -240,11 +186,8 @@ export async function DELETE(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
 
   const ctx = await getTenantContext(req);
-  if (!ctx.ok) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!ctx.ok) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  // Solo SUPERADMIN o ADMIN
   if (!ctx.isSuperadmin && !ctx.isAdmin) {
     return NextResponse.json(
       { error: "Solo SUPERADMIN o ADMIN pueden eliminar agentes" },
@@ -257,7 +200,7 @@ export async function DELETE(req: NextRequest, context: any) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  let where;
+  let where: any;
   try {
     where = buildAgenteWhere(ctx, idNum);
   } catch (e: any) {
@@ -267,10 +210,7 @@ export async function DELETE(req: NextRequest, context: any) {
         { status: 403 }
       );
     }
-    return NextResponse.json(
-      { error: "Config de tenant inválida" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Config de tenant inválida" }, { status: 400 });
   }
 
   const agenteExistente = await prisma.agente.findFirst({ where });
@@ -279,12 +219,9 @@ export async function DELETE(req: NextRequest, context: any) {
   }
 
   try {
-    // Soft delete: lo marcamos oculto para que no aparezca en listados normales
     await prisma.agente.update({
       where: { id: agenteExistente.id },
-      data: {
-        ocultoParaAdmin: true,
-      },
+      data: { ocultoParaAdmin: true },
     });
 
     return NextResponse.json({ ok: true });
