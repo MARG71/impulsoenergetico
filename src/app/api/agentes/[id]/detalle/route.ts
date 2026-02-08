@@ -1,3 +1,4 @@
+//src/app/api/agentes/[id]/detalle/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";

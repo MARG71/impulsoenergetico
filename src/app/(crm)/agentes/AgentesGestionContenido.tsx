@@ -1,3 +1,4 @@
+//src/app/(crm)/agentes/AgentesGestionContenido.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+type NivelComision = "C1" | "C2" | "C3" | "ESPECIAL";
 
 type AdminInfo = {
   id: number;
@@ -22,6 +24,10 @@ type Agente = {
   email: string;
   telefono?: string | null;
   pctAgente?: string | number | null;
+
+  // ✅ NUEVO
+  nivelComisionDefault?: NivelComision | null;
+
   creadoEn?: string;
   ocultoParaAdmin?: boolean;
   admin?: AdminInfo | null;
@@ -31,6 +37,8 @@ type Agente = {
     comparativas?: number;
   };
 };
+
+const NIVELES: NivelComision[] = ["C1", "C2", "C3", "ESPECIAL"];
 
 const fmtPct = (v: any) =>
   v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`;
@@ -54,6 +62,17 @@ function normalizarTexto(texto: string) {
   return texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+function badgeNivel(nivel?: string | null) {
+  const n = String(nivel ?? "C1");
+  if (n === "ESPECIAL")
+    return "bg-fuchsia-500/20 text-fuchsia-200 border-fuchsia-400/40";
+  if (n === "C3")
+    return "bg-sky-500/20 text-sky-200 border-sky-400/40";
+  if (n === "C2")
+    return "bg-amber-500/20 text-amber-200 border-amber-400/40";
+  return "bg-emerald-500/20 text-emerald-200 border-emerald-400/40";
+}
+
 export default function AgentesGestionContenido() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -64,7 +83,6 @@ export default function AgentesGestionContenido() {
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
-  // Vista: activos vs ocultos
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
 
   // Campos formulario nuevo agente
@@ -73,6 +91,9 @@ export default function AgentesGestionContenido() {
   const [nuevoTelefono, setNuevoTelefono] = useState("");
   const [nuevoPctAgente, setNuevoPctAgente] = useState("");
   const [nuevoOculto, setNuevoOculto] = useState(false);
+
+  // ✅ NUEVO: nivel comisión por defecto
+  const [nuevoNivel, setNuevoNivel] = useState<NivelComision>("C1");
 
   // Select de admins (solo SUPERADMIN)
   const [adminsDisponibles, setAdminsDisponibles] = useState<AdminInfo[]>([]);
@@ -106,9 +127,7 @@ export default function AgentesGestionContenido() {
     return null;
   }, [isAdmin, isSuperadmin, adminIdFromQuery, session]);
 
-  // ─────────────────────
-  // Cargar agentes (activos + ocultos)
-  // ─────────────────────
+  // Cargar agentes
   useEffect(() => {
     if (status === "loading") return;
 
@@ -128,7 +147,6 @@ export default function AgentesGestionContenido() {
       try {
         const params = new URLSearchParams();
         if (adminIdFromQuery) params.set("adminId", adminIdFromQuery);
-        // 👇 Incluimos ocultos para poder gestionarlos
         params.set("includeOcultos", "1");
 
         const res = await fetch(`/api/agentes?${params.toString()}`);
@@ -149,9 +167,7 @@ export default function AgentesGestionContenido() {
     cargar();
   }, [session, status, isSuperadmin, isAdmin, adminIdFromQuery]);
 
-  // ─────────────────────
   // Cargar lista de admins (solo SUPERADMIN)
-  // ─────────────────────
   useEffect(() => {
     if (!isSuperadmin) return;
 
@@ -180,7 +196,6 @@ export default function AgentesGestionContenido() {
     })();
   }, [isSuperadmin]);
 
-  // Si eres SUPERADMIN y vienes con ?adminId=XXX, preseleccionamos ese admin
   useEffect(() => {
     if (
       isSuperadmin &&
@@ -191,15 +206,10 @@ export default function AgentesGestionContenido() {
       const existe = adminsDisponibles.some(
         (a) => String(a.id) === adminIdFromQuery
       );
-      if (existe) {
-        setAdminSeleccionado(adminIdFromQuery);
-      }
+      if (existe) setAdminSeleccionado(adminIdFromQuery);
     }
   }, [isSuperadmin, adminIdFromQuery, adminSeleccionado, adminsDisponibles]);
 
-  // ─────────────────────
-  // Activos vs Ocultos
-  // ─────────────────────
   const agentesActivos = useMemo(
     () => agentes.filter((a) => !a.ocultoParaAdmin),
     [agentes]
@@ -210,12 +220,8 @@ export default function AgentesGestionContenido() {
     [agentes]
   );
 
-  // Lista base según la pestaña
   const listaBase = mostrarOcultos ? agentesOcultos : agentesActivos;
 
-  // ─────────────────────
-  // Filtrado de la tabla (sobre la lista base)
-  // ─────────────────────
   const agentesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda);
     return listaBase.filter((a) => {
@@ -225,22 +231,19 @@ export default function AgentesGestionContenido() {
         a.email,
         a.telefono ?? "",
         a.pctAgente ?? "",
+        a.nivelComisionDefault ?? "",
         a._count?.lugares ?? "",
         a._count?.leads ?? "",
         a._count?.comparativas ?? "",
       ];
       const camposAdmin =
-        isSuperadmin && a.admin
-          ? [a.admin.id, a.admin.nombre, a.admin.email]
-          : [];
+        isSuperadmin && a.admin ? [a.admin.id, a.admin.nombre, a.admin.email] : [];
       const texto = normalizarTexto(camposBase.concat(camposAdmin).join(" "));
       return texto.includes(q);
     });
   }, [listaBase, busqueda, isSuperadmin]);
 
-  // ─────────────────────
   // Crear agente
-  // ─────────────────────
   const handleCrearAgente = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -249,7 +252,6 @@ export default function AgentesGestionContenido() {
       return;
     }
 
-    // SUPERADMIN: debe tener o adminSeleccionado o adminIdFromQuery
     if (isSuperadmin && !adminSeleccionado && !adminIdFromQuery) {
       toast.error(
         "Selecciona un administrador en el desplegable o entra en el dashboard de un tenant para crear agentes."
@@ -267,7 +269,10 @@ export default function AgentesGestionContenido() {
           telefono: nuevoTelefono || null,
           pctAgente: toPct(nuevoPctAgente),
           ocultoParaAdmin: nuevoOculto,
-          // Para SUPERADMIN pasamos el admin elegido o el de la query.
+
+          // ✅ NUEVO
+          nivelComisionDefault: nuevoNivel,
+
           adminSeleccionado: isSuperadmin
             ? adminSeleccionado || adminIdFromQuery
             : undefined,
@@ -281,17 +286,15 @@ export default function AgentesGestionContenido() {
         return;
       }
 
-      toast.success(
-        "Agente creado correctamente. Se ha enviado un email con sus credenciales."
-      );
+      toast.success("Agente creado correctamente. Se ha enviado un email con sus credenciales.");
 
       setNuevoNombre("");
       setNuevoEmail("");
       setNuevoTelefono("");
       setNuevoPctAgente("");
       setNuevoOculto(false);
+      setNuevoNivel("C1");
 
-      // Añadimos el nuevo agente a la lista (respeta si viene como oculto o no)
       setAgentes((prev) => [json, ...prev]);
     } catch (e) {
       console.error(e);
@@ -299,9 +302,6 @@ export default function AgentesGestionContenido() {
     }
   };
 
-  // ─────────────────────
-  // Eliminar (ocultar) agente
-  // ─────────────────────
   const handleEliminarAgente = async (id: number) => {
     if (!confirm("¿Seguro que quieres dar de baja / ocultar este agente?")) return;
     try {
@@ -316,11 +316,8 @@ export default function AgentesGestionContenido() {
       }
 
       toast.success("Agente ocultado (baja registrada)");
-      // Lo marcamos como oculto, no lo quitamos de la lista global
       setAgentes((prev) =>
-        prev.map((a) =>
-          a.id === id ? { ...a, ocultoParaAdmin: true } : a
-        )
+        prev.map((a) => (a.id === id ? { ...a, ocultoParaAdmin: true } : a))
       );
     } catch (e) {
       console.error(e);
@@ -328,9 +325,6 @@ export default function AgentesGestionContenido() {
     }
   };
 
-  // ─────────────────────
-  // Reactivar agente oculto
-  // ─────────────────────
   const handleReactivarAgente = async (agente: Agente) => {
     try {
       const res = await fetch(`/api/agentes/${agente.id}${adminQuery}`, {
@@ -340,9 +334,11 @@ export default function AgentesGestionContenido() {
           nombre: agente.nombre,
           email: agente.email,
           telefono: agente.telefono ?? null,
-          pctAgente:
-            agente.pctAgente != null ? Number(agente.pctAgente) : null,
+          pctAgente: agente.pctAgente != null ? Number(agente.pctAgente) : null,
           ocultoParaAdmin: false,
+
+          // ✅ mantenemos el nivel actual
+          nivelComisionDefault: agente.nivelComisionDefault ?? "C1",
         }),
       });
 
@@ -359,7 +355,6 @@ export default function AgentesGestionContenido() {
           a.id === agente.id ? { ...a, ocultoParaAdmin: false } : a
         )
       );
-      // Opcional: al reactivar, volvemos a la pestaña de activos
       setMostrarOcultos(false);
     } catch (e) {
       console.error(e);
@@ -367,9 +362,6 @@ export default function AgentesGestionContenido() {
     }
   };
 
-  // ─────────────────────
-  // Navegación
-  // ─────────────────────
   const irADetalle = (id: number) => {
     const base = `/agentes/${id}/detalle`;
     router.push(adminIdFromQuery ? `${base}?adminId=${adminIdFromQuery}` : base);
@@ -380,9 +372,6 @@ export default function AgentesGestionContenido() {
     router.push(adminIdFromQuery ? `${base}?adminId=${adminIdFromQuery}` : base);
   };
 
-  // ─────────────────────
-  // Render
-  // ─────────────────────
   if (error) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
@@ -404,7 +393,6 @@ export default function AgentesGestionContenido() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 px-8 py-10 text-slate-50">
-      {/* Contenedor ancho */}
       <div className="w-full max-w-[1700px] mx-auto space-y-8">
         {/* CABECERA */}
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
@@ -450,9 +438,7 @@ export default function AgentesGestionContenido() {
               </div>
               <span className="text-slate-400 font-semibold">
                 Total registrados:{" "}
-                <span className="font-bold text-emerald-300">
-                  {agentes.length}
-                </span>
+                <span className="font-bold text-emerald-300">{agentes.length}</span>
               </span>
               <Input
                 placeholder="Buscar por cualquier campo (nombre, email, teléfono, admin…) "
@@ -469,7 +455,6 @@ export default function AgentesGestionContenido() {
           <h2 className="text-xl font-bold mb-4">Crear nuevo agente</h2>
 
           <form onSubmit={handleCrearAgente} className="space-y-4">
-            {/* Selector de admin SOLO SUPERADMIN */}
             {isSuperadmin && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -493,20 +478,16 @@ export default function AgentesGestionContenido() {
                     ))}
                   </select>
                   <p className="mt-1 text-[11px] text-slate-400">
-                    Si dejas esta opción sin elegir y estás en un dashboard de
-                    tenant, se usará el admin de ese tenant. Si no, deberás
-                    seleccionar un administrador.
+                    Si dejas esta opción sin elegir y estás en un dashboard de tenant, se usará el admin de ese tenant.
+                    Si no, deberás seleccionar un administrador.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Campos principales */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
               <div>
-                <Label className="text-xs text-slate-300 font-semibold">
-                  Nombre
-                </Label>
+                <Label className="text-xs text-slate-300 font-semibold">Nombre</Label>
                 <Input
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
                   value={nuevoNombre}
@@ -514,10 +495,9 @@ export default function AgentesGestionContenido() {
                   required
                 />
               </div>
+
               <div>
-                <Label className="text-xs text-slate-300 font-semibold">
-                  Email
-                </Label>
+                <Label className="text-xs text-slate-300 font-semibold">Email</Label>
                 <Input
                   type="email"
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
@@ -526,20 +506,18 @@ export default function AgentesGestionContenido() {
                   required
                 />
               </div>
+
               <div>
-                <Label className="text-xs text-slate-300 font-semibold">
-                  Teléfono
-                </Label>
+                <Label className="text-xs text-slate-300 font-semibold">Teléfono</Label>
                 <Input
                   className="mt-1 bg-slate-900 border-slate-700 text-slate-100 font-medium"
                   value={nuevoTelefono}
                   onChange={(e) => setNuevoTelefono(e.target.value)}
                 />
               </div>
+
               <div>
-                <Label className="text-xs text-slate-300 font-semibold">
-                  % Agente
-                </Label>
+                <Label className="text-xs text-slate-300 font-semibold">% Agente</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -548,6 +526,20 @@ export default function AgentesGestionContenido() {
                   value={nuevoPctAgente}
                   onChange={(e) => setNuevoPctAgente(e.target.value)}
                 />
+              </div>
+
+              {/* ✅ NUEVO: combo nivel */}
+              <div>
+                <Label className="text-xs text-slate-300 font-semibold">Nivel comisión</Label>
+                <select
+                  className="mt-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 w-full text-sm font-semibold"
+                  value={nuevoNivel}
+                  onChange={(e) => setNuevoNivel(e.target.value as NivelComision)}
+                >
+                  {NIVELES.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -560,10 +552,7 @@ export default function AgentesGestionContenido() {
                   checked={nuevoOculto}
                   onChange={(e) => setNuevoOculto(e.target.checked)}
                 />
-                <Label
-                  htmlFor="oculto"
-                  className="text-xs text-slate-300 font-semibold"
-                >
+                <Label htmlFor="oculto" className="text-xs text-slate-300 font-semibold">
                   Marcar como oculto para el admin
                 </Label>
               </div>
@@ -576,16 +565,14 @@ export default function AgentesGestionContenido() {
                   Crear agente
                 </Button>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  Al crear el agente se genera un usuario y se envía un email
-                  con sus credenciales de acceso. El agente quedará asignado al
-                  administrador indicado arriba (o al tenant actual).
+                  Al crear el agente se genera un usuario y se envía un email con sus credenciales.
                 </p>
               </div>
             </div>
           </form>
         </section>
 
-        {/* LISTADO DE AGENTES */}
+        {/* LISTADO */}
         <section className="rounded-3xl bg-slate-950/80 border border-slate-800 px-8 py-6">
           <h2 className="text-xl font-bold mb-4">
             {mostrarOcultos ? "Agentes ocultos / baja" : "Listado de agentes activos"}
@@ -593,9 +580,7 @@ export default function AgentesGestionContenido() {
 
           {agentesFiltrados.length === 0 ? (
             <div className="rounded-2xl bg-slate-900/40 border border-slate-800 px-6 py-10 text-center text-slate-400 font-medium">
-              {mostrarOcultos
-                ? "No hay agentes ocultos en este tenant."
-                : "No hay agentes activos registrados aún."}
+              {mostrarOcultos ? "No hay agentes ocultos en este tenant." : "No hay agentes activos registrados aún."}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
@@ -603,36 +588,20 @@ export default function AgentesGestionContenido() {
                 <thead className="bg-slate-900/80 text-slate-300">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold">ID</th>
-                    {isSuperadmin && (
-                      <th className="px-4 py-3 text-left font-semibold">
-                        Admin
-                      </th>
-                    )}
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Nombre
-                    </th>
+                    {isSuperadmin && <th className="px-4 py-3 text-left font-semibold">Admin</th>}
+                    <th className="px-4 py-3 text-left font-semibold">Nombre</th>
                     <th className="px-4 py-3 text-left font-semibold">Email</th>
-                    <th className="px-4 py-3 text-left font-semibold hidden md:table-cell">
-                      Teléfono
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      % Agente
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">
-                      Lugares
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">
-                      Leads
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">
-                      Comparativas
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold hidden xl:table-cell">
-                      Creado
-                    </th>
-                    <th className="px-4 py-3 text-right font-semibold">
-                      Acciones
-                    </th>
+                    <th className="px-4 py-3 text-left font-semibold hidden md:table-cell">Teléfono</th>
+                    <th className="px-4 py-3 text-left font-semibold">% Agente</th>
+
+                    {/* ✅ NUEVO */}
+                    <th className="px-4 py-3 text-left font-semibold">Nivel</th>
+
+                    <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">Lugares</th>
+                    <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">Leads</th>
+                    <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">Comparativas</th>
+                    <th className="px-4 py-3 text-left font-semibold hidden xl:table-cell">Creado</th>
+                    <th className="px-4 py-3 text-right font-semibold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -646,22 +615,20 @@ export default function AgentesGestionContenido() {
                       <td className="px-4 py-3 font-mono text-xs md:text-sm text-slate-400 font-semibold">
                         #{a.id}
                       </td>
+
                       {isSuperadmin && (
                         <td className="px-4 py-3 text-xs md:text-sm text-slate-200">
                           {a.admin ? (
                             <div className="flex flex-col">
-                              <span className="font-semibold">
-                                {a.admin.nombre}
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                {a.admin.email}
-                              </span>
+                              <span className="font-semibold">{a.admin.nombre}</span>
+                              <span className="text-[11px] text-slate-400">{a.admin.email}</span>
                             </div>
                           ) : (
                             "—"
                           )}
                         </td>
                       )}
+
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-50 flex items-center gap-2">
                           {a.nombre}
@@ -672,17 +639,30 @@ export default function AgentesGestionContenido() {
                           )}
                         </div>
                       </td>
+
                       <td className="px-4 py-3">
-                        <div className="text-xs md:text-sm text-slate-300 font-medium">
-                          {a.email}
-                        </div>
+                        <div className="text-xs md:text-sm text-slate-300 font-medium">{a.email}</div>
                       </td>
+
                       <td className="px-4 py-3 text-xs md:text-sm text-slate-300 hidden md:table-cell">
                         {a.telefono || "—"}
                       </td>
+
                       <td className="px-4 py-3 text-xs md:text-sm text-emerald-300 font-semibold">
                         {fmtPct(a.pctAgente)}
                       </td>
+
+                      {/* ✅ NUEVO */}
+                      <td className="px-4 py-3">
+                        <span
+                          className={`text-[11px] px-2 py-1 rounded-full border font-extrabold ${badgeNivel(
+                            a.nivelComisionDefault ?? "C1"
+                          )}`}
+                        >
+                          {a.nivelComisionDefault ?? "C1"}
+                        </span>
+                      </td>
+
                       <td className="px-4 py-3 text-xs md:text-sm hidden lg:table-cell">
                         {a._count?.lugares ?? "—"}
                       </td>
@@ -695,6 +675,7 @@ export default function AgentesGestionContenido() {
                       <td className="px-4 py-3 text-[11px] md:text-xs text-slate-400 hidden xl:table-cell">
                         {fmtDate(a.creadoEn)}
                       </td>
+
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <Button

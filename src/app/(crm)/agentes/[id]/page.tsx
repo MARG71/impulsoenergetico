@@ -1,8 +1,7 @@
 // src/app/(crm)/agentes/ID/page.tsx
-// src/app/(crm)/agentes/[id]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+type NivelComision = "C1" | "C2" | "C3" | "ESPECIAL";
 
 type AdminInfo = {
   id: number;
@@ -24,6 +24,20 @@ const toPct = (v: string) => {
   return n > 1 ? n / 100 : n;
 };
 
+function pickNivelComisionFromAgente(json: any): NivelComision {
+  // Intentamos leer el nivel de varios sitios posibles para no romper
+  const candidates = [
+    json?.nivelComisionDefault,
+    json?.usuario?.nivelComisionDefault,
+    Array.isArray(json?.usuarios) ? json?.usuarios?.[0]?.nivelComisionDefault : undefined,
+  ];
+
+  const v = candidates.find((x) => typeof x === "string" && x.length > 0);
+  if (v === "C1" || v === "C2" || v === "C3" || v === "ESPECIAL") return v;
+
+  return "C1";
+}
+
 export default function EditarAgentePage() {
   const router = useRouter();
   const params = useParams() as { id: string };
@@ -33,11 +47,16 @@ export default function EditarAgentePage() {
   const { id } = params;
   const adminIdFromQuery = searchParams.get("adminId");
 
+  const qs = useMemo(() => (adminIdFromQuery ? `?adminId=${adminIdFromQuery}` : ""), [adminIdFromQuery]);
+
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [pctAgente, setPctAgente] = useState("");
   const [ocultoParaAdmin, setOcultoParaAdmin] = useState(false);
+
+  // ✅ NUEVO: nivel comisión por defecto del agente (C1/C2/C3/ESPECIAL)
+  const [nivelComisionDefault, setNivelComisionDefault] = useState<NivelComision>("C1");
 
   const [adminAsignado, setAdminAsignado] = useState<AdminInfo | null>(null);
 
@@ -73,7 +92,6 @@ export default function EditarAgentePage() {
 
     const cargar = async () => {
       try {
-        const qs = adminIdFromQuery ? `?adminId=${adminIdFromQuery}` : "";
         const res = await fetch(`/api/agentes/${id}${qs}`);
         const json = await res.json().catch(() => ({}));
 
@@ -86,11 +104,12 @@ export default function EditarAgentePage() {
         setNombre(json.nombre || "");
         setEmail(json.email || "");
         setTelefono(json.telefono || "");
-        setPctAgente(
-          json.pctAgente != null ? String(Number(json.pctAgente) * 100) : ""
-        );
+        setPctAgente(json.pctAgente != null ? String(Number(json.pctAgente) * 100) : "");
         setOcultoParaAdmin(!!json.ocultoParaAdmin);
         setAdminAsignado(json.admin || null);
+
+        // ✅ NUEVO
+        setNivelComisionDefault(pickNivelComisionFromAgente(json));
       } catch (e) {
         console.error(e);
         setError("Error de conexión al cargar agente");
@@ -100,7 +119,7 @@ export default function EditarAgentePage() {
     };
 
     cargar();
-  }, [id, status, session, isSuperadmin, isAdmin, adminIdFromQuery]);
+  }, [id, status, session, isSuperadmin, isAdmin, qs]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +130,6 @@ export default function EditarAgentePage() {
     }
 
     try {
-      const qs = adminIdFromQuery ? `?adminId=${adminIdFromQuery}` : "";
       const res = await fetch(`/api/agentes/${id}${qs}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -121,8 +139,9 @@ export default function EditarAgentePage() {
           telefono: telefono || null,
           pctAgente: toPct(pctAgente),
           ocultoParaAdmin,
-          // NOTA: de momento NO cambiamos adminId aquí,
-          // solo mostramos la info del admin asignado.
+
+          // ✅ NUEVO: lo enviamos para que backend lo guarde (en Usuario o en Agente, según tu implementación)
+          nivelComisionDefault,
         }),
       });
 
@@ -134,7 +153,6 @@ export default function EditarAgentePage() {
       }
 
       toast.success("Agente actualizado correctamente");
-      // Nos quedamos en la misma página, por si quieres seguir editando
     } catch (e) {
       console.error(e);
       toast.error("Error de conexión al actualizar agente");
@@ -143,26 +161,17 @@ export default function EditarAgentePage() {
 
   const volverAAgentes = () => {
     const base = "/agentes";
-    if (adminIdFromQuery) {
-      router.push(`${base}?adminId=${adminIdFromQuery}`);
-    } else {
-      router.push(base);
-    }
+    router.push(adminIdFromQuery ? `${base}?adminId=${adminIdFromQuery}` : base);
   };
 
   const irADashboard = () => {
     const base = "/dashboard";
-    if (adminIdFromQuery) {
-      router.push(`${base}?adminId=${adminIdFromQuery}`);
-    } else {
-      router.push(base);
-    }
+    router.push(adminIdFromQuery ? `${base}?adminId=${adminIdFromQuery}` : base);
   };
 
   // ────────────────────────────────────
   // Render
   // ────────────────────────────────────
-
   if (error) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
@@ -189,18 +198,13 @@ export default function EditarAgentePage() {
         <header className="rounded-3xl border border-slate-800 bg-gradient-to-r from-emerald-500/20 via-sky-500/15 to-fuchsia-500/20 p-[1px] shadow-[0_0_40px_rgba(0,0,0,0.55)]">
           <div className="rounded-3xl bg-slate-950/95 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-extrabold text-white mb-1">
-                Editar agente
-              </h1>
+              <h1 className="text-4xl font-extrabold text-white mb-1">Editar agente</h1>
               <p className="text-sm md:text-base text-slate-300 max-w-2xl font-medium">
-                Actualiza los datos básicos del agente y su visibilidad en el
-                CRM.
+                Actualiza los datos básicos del agente, su visibilidad y el nivel de comisión por defecto.
               </p>
               <p className="text-xs text-slate-500 mt-2">
                 ID agente:{" "}
-                <span className="font-mono font-semibold text-slate-300">
-                  #{id}
-                </span>
+                <span className="font-mono font-semibold text-slate-300">#{id}</span>
               </p>
             </div>
 
@@ -235,27 +239,18 @@ export default function EditarAgentePage() {
               <input
                 type="text"
                 disabled
-                value={
-                  adminAsignado
-                    ? `${adminAsignado.nombre} (${adminAsignado.email})`
-                    : "—"
-                }
+                value={adminAsignado ? `${adminAsignado.nombre} (${adminAsignado.email})` : "—"}
                 className="w-full sm:max-w-lg bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
               />
               {isSuperadmin && (
                 <p className="text-[11px] text-slate-500 max-w-sm">
-                  (Solo lectura por ahora. Si quieres que un agente cambie de
-                  administrador/tenant, lo preparamos en un flujo específico
-                  para no romper datos de leads, lugares y comparativas.)
+                  (Solo lectura por ahora. Si quieres mover un agente de tenant lo hacemos en un flujo seguro.)
                 </p>
               )}
             </div>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6"
-          >
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
                 <Label className="text-slate-200">Nombre</Label>
@@ -286,15 +281,10 @@ export default function EditarAgentePage() {
                   checked={ocultoParaAdmin}
                   onChange={(e) => setOcultoParaAdmin(e.target.checked)}
                 />
-                <Label
-                  htmlFor="oculto"
-                  className="text-xs md:text-sm text-slate-300"
-                >
+                <Label htmlFor="oculto" className="text-xs md:text-sm text-slate-300">
                   Marcar agente como{" "}
                   <span className="font-semibold">oculto para el administrador</span>{" "}
-                  <span className="text-slate-500">
-                    (no aparecerá en los listados normales).
-                  </span>
+                  <span className="text-slate-500">(no aparecerá en los listados normales).</span>
                 </Label>
               </div>
             </div>
@@ -312,9 +302,7 @@ export default function EditarAgentePage() {
               </div>
 
               <div>
-                <Label className="text-slate-200">
-                  % Agente (sobre comisión)
-                </Label>
+                <Label className="text-slate-200">% Agente (sobre comisión)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -324,8 +312,25 @@ export default function EditarAgentePage() {
                   onChange={(e) => setPctAgente(e.target.value)}
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Si pones <strong>15</strong>, se guardará como{" "}
-                  <strong>0.15</strong> en base de datos.
+                  Si pones <strong>15</strong>, se guardará como <strong>0.15</strong> en base de datos.
+                </p>
+              </div>
+
+              {/* ✅ NUEVO: NIVEL COMISIÓN */}
+              <div>
+                <Label className="text-slate-200">Nivel comisión por defecto</Label>
+                <select
+                  className="mt-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 w-full text-sm"
+                  value={nivelComisionDefault}
+                  onChange={(e) => setNivelComisionDefault(e.target.value as NivelComision)}
+                >
+                  <option value="C1">C1</option>
+                  <option value="C2">C2</option>
+                  <option value="C3">C3</option>
+                  <option value="ESPECIAL">ESPECIAL</option>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Este nivel se usa como base para reglas y cálculo de comisiones (si no hay override).
                 </p>
               </div>
 

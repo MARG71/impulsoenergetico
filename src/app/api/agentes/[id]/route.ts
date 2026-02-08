@@ -118,13 +118,16 @@ export async function PUT(req: NextRequest, context: any) {
     telefono,
     pctAgente,
     ocultoParaAdmin,
+    nivelComisionDefault,
   }: {
     nombre?: string;
     email?: string;
     telefono?: string | null;
     pctAgente?: number | null;
     ocultoParaAdmin?: boolean;
+    nivelComisionDefault?: "C1" | "C2" | "C3" | "ESPECIAL";
   } = body || {};
+
 
   if (!nombre || !email) {
     return NextResponse.json(
@@ -199,17 +202,20 @@ export async function PUT(req: NextRequest, context: any) {
     });
 
     // Sincronizar datos básicos en los usuarios vinculados al agente
+    // Sincronizar datos básicos + nivel comisión en los usuarios vinculados al agente
     if (agenteExistente.usuarios.length > 0) {
       await prisma.usuario.updateMany({
-        where: {
-          agenteId: agenteExistente.id,
-        },
+        where: { agenteId: agenteExistente.id },
         data: {
           nombre,
           email,
+          ...(nivelComisionDefault
+            ? { nivelComisionDefault }
+            : {}),
         },
       });
     }
+
 
     return NextResponse.json(agenteActualizado);
   } catch (e: any) {

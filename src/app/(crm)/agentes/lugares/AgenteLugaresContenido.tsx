@@ -1,3 +1,4 @@
+//src/app/(crm)/agentes/lugares/AgenteLugaresContenido.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

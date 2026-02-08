@@ -117,6 +117,9 @@ model Agente {
 
   pctAgente Decimal? @db.Decimal(5, 4)
 
+  // ✅ NUEVO: nivel de comisión por defecto para contrataciones
+  nivelComisionDefault NivelComision @default(C1)
+
   contratos    Contrato[]
   lugares      Lugar[]
   comparativas Comparativa[]
@@ -124,19 +127,17 @@ model Agente {
   leads        Lead[]
   usuarios     Usuario[]
   overrides    ComisionOverride[]
-
-  // ✅ NUEVO: contrataciones
   contrataciones Contratacion[]
 
   creadoEn        DateTime @default(now())
   ocultoParaAdmin Boolean  @default(false)
 
-  // ✅ MULTI-ADMIN (TENANT)
   adminId Int?
   admin   Usuario? @relation("AdminAgentes", fields: [adminId], references: [id])
 
   @@index([adminId])
 }
+
 
 model Lugar {
   id        Int    @id @default(autoincrement())

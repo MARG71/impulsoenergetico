@@ -1,3 +1,4 @@
+//src/app/api/agentes/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
@@ -162,6 +163,7 @@ export async function POST(req: NextRequest) {
         email,
         password: passwordHash,
         rol: "AGENTE",
+        nivelComisionDefault: body.nivelComisionDefault ?? "C1",
         adminId, // tenant dueño
       },
     });
