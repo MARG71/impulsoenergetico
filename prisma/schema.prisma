@@ -257,6 +257,8 @@ model Usuario {
   subSeccionesGestionadas  SubSeccion[]       @relation("AdminSubSecciones")
   reglasComisionGestionadas ReglaComisionGlobal[] @relation("AdminReglasComision")
 
+  nivelComisionDefault NivelComision @default(C1)
+
   @@index([adminId])
 }
 
