@@ -19,6 +19,14 @@ type KpisLugar = {
   ahorroTotal: number;
   comisionTotal: number;
 };
+type NivelComision = "C1" | "C2" | "C3" | "ESPECIAL";
+
+function normalizeNivel(v: any): NivelComision {
+  const s = String(v ?? "C1").toUpperCase();
+  if (s === "C2" || s === "C3" || s === "ESPECIAL") return s as NivelComision;
+  return "C1";
+}
+
 
 const eur = (n: any) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(
