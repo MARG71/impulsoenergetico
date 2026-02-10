@@ -86,21 +86,66 @@ export async function POST(req: Request) {
     const seccionId = toNumber((contratacion as any).seccionId, 0);
     const subSeccionId = (contratacion as any).subSeccionId ?? null;
     const nivel = String((contratacion as any).nivel ?? "C1");
+    const tenantRulesAdminId = (contratacion as any).adminId ?? null;
+
 
     // Regla (exacta o general)
+    // 1) regla exacta TENANT
     const reglaExacta = await prisma.reglaComisionGlobal.findFirst({
-      where: { seccionId, subSeccionId, nivel: nivel as any, activa: true } as any,
+      where: {
+        adminId: tenantRulesAdminId,
+        seccionId,
+        subSeccionId,
+        nivel: nivel as any,
+        activa: true,
+      } as any,
       orderBy: { id: "asc" },
     });
 
+    // 2) regla general TENANT (subSeccion null)
     const reglaGeneral = !reglaExacta
       ? await prisma.reglaComisionGlobal.findFirst({
-          where: { seccionId, subSeccionId: null, nivel: nivel as any, activa: true } as any,
+          where: {
+            adminId: tenantRulesAdminId,
+            seccionId,
+            subSeccionId: null,
+            nivel: nivel as any,
+            activa: true,
+          } as any,
           orderBy: { id: "asc" },
         })
       : null;
 
-    const regla = (reglaExacta || reglaGeneral) as any;
+    // 3) fallback GLOBAL (adminId=null), si quieres permitirlo
+    const reglaGlobalFallback =
+      !reglaExacta && !reglaGeneral
+        ? await prisma.reglaComisionGlobal.findFirst({
+            where: {
+              adminId: null,
+              seccionId,
+              subSeccionId: subSeccionId,
+              nivel: nivel as any,
+              activa: true,
+            } as any,
+            orderBy: { id: "asc" },
+          })
+        : null;
+
+    const reglaGlobalFallback2 =
+      !reglaExacta && !reglaGeneral && !reglaGlobalFallback
+        ? await prisma.reglaComisionGlobal.findFirst({
+            where: {
+              adminId: null,
+              seccionId,
+              subSeccionId: null,
+              nivel: nivel as any,
+              activa: true,
+            } as any,
+            orderBy: { id: "asc" },
+          })
+        : null;
+
+    const regla = (reglaExacta || reglaGeneral || reglaGlobalFallback || reglaGlobalFallback2) as any;
 
     if (!regla) {
       return jsonError(

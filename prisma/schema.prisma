@@ -148,9 +148,8 @@ model Lugar {
 
   pctCliente Decimal? @db.Decimal(5, 4)
   pctLugar   Decimal? @db.Decimal(5, 4)
-
-  // ✅ NUEVO: nivel de comisión por defecto para contrataciones (LUGAR)
   nivelComisionDefault NivelComision @default(C1)
+
 
   agente       Agente             @relation(fields: [agenteId], references: [id])
   comparativas Comparativa[]
@@ -913,17 +912,20 @@ model ReglaComisionGlobal {
   creadaEn      DateTime @default(now())
   actualizadaEn DateTime @updatedAt
 
-  // ✅ MULTI-ADMIN (TENANT)
   adminId Int?
   admin   Usuario? @relation("AdminReglasComision", fields: [adminId], references: [id])
 
   seccion    Seccion     @relation(fields: [seccionId], references: [id])
   subSeccion SubSeccion? @relation(fields: [subSeccionId], references: [id])
 
-  @@unique([seccionId, subSeccionId, nivel])
+  // ✅ QUITAR ESTA LINEA:
+  // @@unique([adminId, seccionId, subSeccionId, nivel])
+
   @@index([seccionId, subSeccionId, activa])
   @@index([adminId])
+  @@index([adminId, seccionId, subSeccionId, nivel])
 }
+
 
 
 enum EstadoContratacion {

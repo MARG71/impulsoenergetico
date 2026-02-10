@@ -28,7 +28,6 @@ function toNumber(v: any, def = 0) {
 }
 
 function toMoney2(v: any) {
-  // Prisma Decimal llega como string/Decimal. Convertimos a number seguro.
   const n = typeof v === "string" ? Number(v) : Number(v ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
@@ -40,43 +39,64 @@ function clamp(n: number, min?: number | null, max?: number | null) {
   return x;
 }
 
-/**
- * Selección de regla:
- * 1) exacta (seccionId + subSeccionId + nivel + activa)
- * 2) fallback a subSeccionId = null (misma seccionId + nivel)
- * 3) fallback a cualquier activa de esa seccionId + nivel
- */
 async function pickRegla({
+  adminId,
   seccionId,
   subSeccionId,
   nivel,
 }: {
+  adminId: number | null;
   seccionId: number;
   subSeccionId: number | null;
   nivel: any;
 }) {
-  // 1) exacta
+  // 1) exacta tenant
   if (subSeccionId) {
     const r1 = await prisma.reglaComisionGlobal.findFirst({
-      where: { seccionId, subSeccionId, nivel, activa: true },
+      where: { adminId, seccionId, subSeccionId, nivel, activa: true },
       orderBy: { id: "asc" },
     });
     if (r1) return r1;
   }
 
-  // 2) null
+  // 2) general tenant
   const r2 = await prisma.reglaComisionGlobal.findFirst({
-    where: { seccionId, subSeccionId: null, nivel, activa: true },
+    where: { adminId, seccionId, subSeccionId: null, nivel, activa: true },
     orderBy: { id: "asc" },
   });
   if (r2) return r2;
 
-  // 3) cualquiera activa de sección+nivel
+  // 3) cualquiera tenant
   const r3 = await prisma.reglaComisionGlobal.findFirst({
-    where: { seccionId, nivel, activa: true },
+    where: { adminId, seccionId, nivel, activa: true },
     orderBy: { id: "asc" },
   });
-  return r3;
+  if (r3) return r3;
+
+  // 4) fallback global (adminId=null)
+  if (adminId !== null) {
+    if (subSeccionId) {
+      const g1 = await prisma.reglaComisionGlobal.findFirst({
+        where: { adminId: null, seccionId, subSeccionId, nivel, activa: true },
+        orderBy: { id: "asc" },
+      });
+      if (g1) return g1;
+    }
+
+    const g2 = await prisma.reglaComisionGlobal.findFirst({
+      where: { adminId: null, seccionId, subSeccionId: null, nivel, activa: true },
+      orderBy: { id: "asc" },
+    });
+    if (g2) return g2;
+
+    const g3 = await prisma.reglaComisionGlobal.findFirst({
+      where: { adminId: null, seccionId, nivel, activa: true },
+      orderBy: { id: "asc" },
+    });
+    return g3;
+  }
+
+  return null;
 }
 
 export async function GET(req: Request) {
@@ -122,7 +142,10 @@ export async function GET(req: Request) {
       ? Number((contratacion as any).subSeccionId)
       : null;
 
+    const tenantRulesAdminId = (contratacion as any).adminId ?? null;
+
     const regla = await pickRegla({
+      adminId: tenantRulesAdminId,
       seccionId,
       subSeccionId,
       nivel: (contratacion as any).nivel,
@@ -135,49 +158,43 @@ export async function GET(req: Request) {
         base,
         regla: null,
         comisiones: { total: 0, agente: 0, lugar: 0, admin: 0 },
-        warning: "No hay reglas globales activas para esta sección/nivel.",
+        warning: "No hay reglas activas para esta sección/nivel (ni tenant ni global).",
       });
     }
 
-    // calcular total comisión según tipo
     const fijo = toMoney2((regla as any).fijoEUR);
-    const pct = toNumber((regla as any).porcentaje, 0); // % (ej 10 => 10%)
+    const pct = toNumber((regla as any).porcentaje, 0);
     let total = 0;
 
     const tipo = (regla as any).tipo as TipoCalculoComision;
 
     if (tipo === "FIJA") total = fijo;
     else if (tipo === "PORC_BASE") total = base * (pct / 100);
-    else if (tipo === "PORC_MARGEN") {
-      // si algún día añades margen, aquí lo conectaríamos.
-      total = base * (pct / 100);
-    } else if (tipo === "MIXTA") total = fijo + base * (pct / 100);
+    else if (tipo === "PORC_MARGEN") total = base * (pct / 100);
+    else if (tipo === "MIXTA") total = fijo + base * (pct / 100);
     else total = base * (pct / 100);
 
-    // clamp total por min/max regla
     total = clamp(
       total,
       (regla as any).minEUR != null ? toMoney2((regla as any).minEUR) : null,
       (regla as any).maxEUR != null ? toMoney2((regla as any).maxEUR) : null
     );
 
-    // defaults de reparto (si no hay pct en agente/lugar)
     const defaults = await prisma.globalComisionDefaults.findUnique({
       where: { id: 1 },
     });
 
     const pctAgenteSnap =
       toNumber((contratacion as any).agente?.pctAgente, NaN) ||
-      (defaults ? toNumber(defaults.defaultPctAgente, 0) : 0);
+      (defaults ? toNumber((defaults as any).defaultPctAgente, 0) : 0);
 
     const pctLugarSnap =
       toNumber((contratacion as any).lugar?.pctLugar, NaN) ||
-      (defaults ? toNumber(defaults.defaultPctLugar, 0) : 0);
+      (defaults ? toNumber((defaults as any).defaultPctLugar, 0) : 0);
 
     let agente = total * (pctAgenteSnap / 100);
     let lugar = total * (pctLugarSnap / 100);
 
-    // límites opcionales para pagar a red
     agente = clamp(
       agente,
       (regla as any).minAgenteEUR != null ? toMoney2((regla as any).minAgenteEUR) : null,
@@ -193,7 +210,6 @@ export async function GET(req: Request) {
       );
     }
 
-    // admin = resto (nunca negativo)
     let admin = total - agente - lugar;
     if (!Number.isFinite(admin) || admin < 0) admin = 0;
 
@@ -202,21 +218,14 @@ export async function GET(req: Request) {
       contratacionId,
       base,
       regla: {
-        id: regla.id,
-        tipo: regla.tipo,
-        porcentaje: regla.porcentaje,
-        fijoEUR: regla.fijoEUR,
+        id: (regla as any).id,
+        tipo: (regla as any).tipo,
+        porcentaje: (regla as any).porcentaje,
+        fijoEUR: (regla as any).fijoEUR,
+        adminId: (regla as any).adminId ?? null,
       },
-      comisiones: {
-        total,
-        agente,
-        lugar,
-        admin,
-      },
-      reparto: {
-        pctAgenteSnap,
-        pctLugarSnap,
-      },
+      comisiones: { total, agente, lugar, admin },
+      reparto: { pctAgenteSnap, pctLugarSnap },
     });
   } catch (e: any) {
     return jsonError("Error interno calculando comisiones", 500, {
