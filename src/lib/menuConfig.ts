@@ -25,6 +25,7 @@ export const MENU_BY_ROLE: Record<Role, MenuItem[]> = {
 
     // ✅ NUEVAS (después de Leads)
     { group: "GESTION", label: "Comisiones", href: "/comisiones", icon: "💶" },
+    { group: "GESTION", label: "Reglas comisión", href: "/comisiones/reglas", icon: "⚙️" },
     { group: "GESTION", label: "Contrataciones", href: "/contrataciones", icon: "📝" },
     { group: "GESTION", label: "Clientes", href: "/clientes", icon: "🧑‍💼" },
 
@@ -53,6 +54,7 @@ export const MENU_BY_ROLE: Record<Role, MenuItem[]> = {
 
     // ✅ NUEVAS (después de Leads)
     { group: "GESTION", label: "Comisiones", href: "/comisiones", icon: "💶" },
+    { group: "GESTION", label: "Reglas comisión", href: "/comisiones/reglas", icon: "⚙️" },
     { group: "GESTION", label: "Contrataciones", href: "/contrataciones", icon: "📝" },
     { group: "GESTION", label: "Clientes", href: "/clientes", icon: "🧑‍💼" },
 
