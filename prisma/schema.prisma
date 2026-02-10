@@ -149,6 +149,9 @@ model Lugar {
   pctCliente Decimal? @db.Decimal(5, 4)
   pctLugar   Decimal? @db.Decimal(5, 4)
 
+  // ✅ NUEVO: nivel de comisión por defecto para contrataciones (LUGAR)
+  nivelComisionDefault NivelComision @default(C1)
+
   agente       Agente             @relation(fields: [agenteId], references: [id])
   comparativas Comparativa[]
   qrs          QR[]

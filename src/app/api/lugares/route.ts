@@ -20,6 +20,15 @@ function toIntOrNull(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const NIVELES_VALIDOS = ["C1", "C2", "C3", "ESPECIAL"] as const;
+type NivelComisionStr = (typeof NIVELES_VALIDOS)[number];
+
+function normalizeNivelComision(input: any, fallback: NivelComisionStr): NivelComisionStr {
+  const v = String(input ?? "").toUpperCase().trim();
+  return (NIVELES_VALIDOS as readonly string[]).includes(v) ? (v as NivelComisionStr) : fallback;
+}
+
+
 /**
  * GET /api/lugares
  */
@@ -141,6 +150,7 @@ export async function POST(req: NextRequest) {
     aportacionAcumulada,
     especialCartelUrl,
     adminSeleccionado, // 👈 SUPERADMIN global
+    nivelComisionDefault,
   } = body || {};
 
   if (!nombre || !direccion || !qrCode || !agenteId) {
@@ -233,14 +243,19 @@ export async function POST(req: NextRequest) {
         especialCartelUrl:
           especial && especialCartelUrl ? String(especialCartelUrl) : null,
 
-        adminId, // ✅ SIEMPRE guardamos adminId ya resuelto
+        // ✅ NUEVO
+        nivelComisionDefault: normalizeNivelComision(
+          nivelComisionDefault,
+          especial ? "ESPECIAL" : "C1"
+        ),
+
+        adminId,
       },
       include: {
-        agente: {
-          select: { id: true, nombre: true, email: true, telefono: true },
-        },
+        agente: { select: { id: true, nombre: true, email: true, telefono: true } },
       },
     });
+
 
     return NextResponse.json(nuevoLugar, { status: 201 });
   } catch (e: any) {

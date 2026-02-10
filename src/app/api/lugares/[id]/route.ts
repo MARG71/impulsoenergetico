@@ -59,6 +59,15 @@ const agenteSelect = {
   telefono: true,
 };
 
+const NIVELES_VALIDOS = ["C1", "C2", "C3", "ESPECIAL"] as const;
+type NivelComisionStr = (typeof NIVELES_VALIDOS)[number];
+
+function normalizeNivelComision(input: any, fallback: NivelComisionStr): NivelComisionStr {
+  const v = String(input ?? "").toUpperCase().trim();
+  return (NIVELES_VALIDOS as readonly string[]).includes(v) ? (v as NivelComisionStr) : fallback;
+}
+
+
 // GET /api/lugares/[id]
 export async function GET(req: NextRequest, context: any) {
   const { params } = context as { params: { id: string } };
@@ -130,6 +139,8 @@ export async function PUT(req: NextRequest, context: any) {
     especialMensaje,
     aportacionAcumulada,
     especialCartelUrl,
+    nivelComisionDefault,
+
   } = body || {};
 
   if (!nombre || !direccion || !qrCode || !agenteId) {

@@ -1,3 +1,4 @@
+//src/app/(crm)/lugares/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +17,22 @@ const toNumberOr = (v: any, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
+
+/**
+ * Normaliza porcentajes:
+ * - "15" => 0.15
+ * - "0.15" => 0.15
+ * - ""/null => null
+ */
+function normalizePct(input: any): number | null {
+  if (input === null || input === undefined) return null;
+  const s = String(input).trim().replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 0) return n; // permite 0 o negativos si algún día lo necesitas
+  return n > 1 ? n / 100 : n;
+}
 
 type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 type Lugar = any;
@@ -36,6 +53,8 @@ export default function RegistrarLugar() {
   const isAdmin = role === "ADMIN";
   const isAgente = role === "AGENTE";
 
+  const canSelectFondo = isAdmin || isSuperadmin;
+
   // ✅ tenant sólo para SUPERADMIN con ?adminId=
   const adminIdParam = searchParams?.get("adminId");
   const adminIdContext = adminIdParam ? Number(adminIdParam) : null;
@@ -55,9 +74,8 @@ export default function RegistrarLugar() {
     return `${href}${hasQuery ? "&" : "?"}adminId=${adminIdContext}`;
   };
 
-  // ✅ helper de Landing (preparado para futuras mejoras: copiar, QR, etc.)
-  const landingUrlFor = (l: any) =>
-    `/registro?agenteId=${l.agenteId}&lugarId=${l.id}`;
+  // ✅ helper de Landing
+  const landingUrlFor = (l: any) => `/registro?agenteId=${l.agenteId}&lugarId=${l.id}`;
 
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [adminSeleccionado, setAdminSeleccionado] = useState<string>("");
@@ -219,7 +237,7 @@ export default function RegistrarLugar() {
     });
   }, [lugares, busqueda]);
 
-  // ---- Subida de ficheros (se queda para alta) ----
+  // ---- Subida de ficheros (alta) ----
   async function subirFichero(file: File, folder: string): Promise<string | null> {
     try {
       const form = new FormData();
@@ -261,6 +279,11 @@ export default function RegistrarLugar() {
       return;
     }
 
+    if (!nuevo.agenteId) {
+      alert("Selecciona un agente.");
+      return;
+    }
+
     let especialLogoUrl = nuevo.especialLogoUrl;
     if (nuevo.especial && nuevo.logoFile) {
       const up = await subirFichero(nuevo.logoFile, "logos-lugares");
@@ -277,9 +300,9 @@ export default function RegistrarLugar() {
       nombre: nuevo.nombre.trim(),
       direccion: nuevo.direccion.trim(),
       qrCode: nuevo.qrCode.trim(),
-      agenteId: nuevo.agenteId,
-      pctCliente: nuevo.pctCliente,
-      pctLugar: nuevo.pctLugar,
+      agenteId: Number(nuevo.agenteId),
+      pctCliente: normalizePct(nuevo.pctCliente),
+      pctLugar: normalizePct(nuevo.pctLugar),
       especial: nuevo.especial,
       especialLogoUrl,
       especialColor: nuevo.especialColor,
@@ -288,7 +311,7 @@ export default function RegistrarLugar() {
     };
 
     if (isSuperadmin && !tenantMode && adminSeleccionado) {
-      body.adminSeleccionado = adminSeleccionado;
+      body.adminSeleccionado = Number(adminSeleccionado);
     }
 
     if (especialCartelUrl && especialCartelUrl.trim()) {
@@ -546,9 +569,7 @@ export default function RegistrarLugar() {
                   required
                   disabled={isAgente}
                 >
-                  <option value="">
-                    {isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}
-                  </option>
+                  <option value="">{isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}</option>
                   {agentes.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.nombre}
@@ -591,9 +612,7 @@ export default function RegistrarLugar() {
                     className="mt-2 text-xs text-slate-200 font-semibold"
                   />
                   {nuevo.logoFile && (
-                    <p className="text-[11px] text-emerald-300 mt-1 font-bold">
-                      Se subirá al guardar
-                    </p>
+                    <p className="text-[11px] text-emerald-300 mt-1 font-bold">Se subirá al guardar</p>
                   )}
                 </div>
 
@@ -610,9 +629,7 @@ export default function RegistrarLugar() {
                     className="mt-2 text-xs text-slate-200 font-semibold"
                   />
                   {nuevo.cartelFile && (
-                    <p className="text-[11px] text-emerald-300 mt-1 font-bold">
-                      Se subirá al guardar
-                    </p>
+                    <p className="text-[11px] text-emerald-300 mt-1 font-bold">Se subirá al guardar</p>
                   )}
                 </div>
 
@@ -640,9 +657,7 @@ export default function RegistrarLugar() {
                   <Input
                     inputMode="numeric"
                     value={nuevo.aportacionAcumulada}
-                    onChange={(e) =>
-                      setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))
-                    }
+                    onChange={(e) => setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))}
                     placeholder="0"
                     className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   />
@@ -677,8 +692,8 @@ export default function RegistrarLugar() {
             <h2 className="text-xl font-extrabold">Lugares registrados</h2>
             <div className="text-sm text-slate-300 font-semibold">
               Mostrando:{" "}
-              <span className="font-extrabold text-slate-100">{lugaresFiltrados.length}</span>{" "}
-              / {lugares.length}
+              <span className="font-extrabold text-slate-100">{lugaresFiltrados.length}</span> /{" "}
+              {lugares.length}
             </div>
           </div>
 
@@ -692,6 +707,7 @@ export default function RegistrarLugar() {
                   <th className="px-3 py-3 text-left">Agente</th>
                   <th className="px-3 py-3 text-left">% Cliente</th>
                   <th className="px-3 py-3 text-left">% Lugar</th>
+                  <th className="px-3 py-3 text-left">Nivel</th>
                   <th className="px-3 py-3 text-left">Estado</th>
                   <th className="px-3 py-3 text-right">Acciones</th>
                 </tr>
@@ -702,23 +718,16 @@ export default function RegistrarLugar() {
                   const especial = !!l.especial;
 
                   return (
-                    <tr
-                      key={l.id}
-                      className="border-t border-slate-800/70 hover:bg-slate-900/70"
-                    >
+                    <tr key={l.id} className="border-t border-slate-800/70 hover:bg-slate-900/70">
                       <td className="px-3 py-4 font-mono text-xs md:text-sm text-slate-400 font-extrabold">
                         #{l.id}
                       </td>
 
                       <td className="px-3 py-4">
-                        <div className="text-slate-50 font-extrabold leading-tight">
-                          {l.nombre}
-                        </div>
+                        <div className="text-slate-50 font-extrabold leading-tight">{l.nombre}</div>
                         <div className="text-[11px] text-slate-400 mt-1 font-semibold">
                           QR:{" "}
-                          <span className="font-mono">
-                            {String(l.qrCode || "").slice(0, 10)}…
-                          </span>
+                          <span className="font-mono">{String(l.qrCode || "").slice(0, 10)}…</span>
                         </div>
                       </td>
 
@@ -727,19 +736,14 @@ export default function RegistrarLugar() {
                       <td className="px-3 py-4 text-slate-200">
                         <div className="font-extrabold">{l.agente?.nombre || "—"}</div>
                         {l.agente?.email && (
-                          <div className="text-[11px] text-slate-400 font-semibold">
-                            {l.agente.email}
-                          </div>
+                          <div className="text-[11px] text-slate-400 font-semibold">{l.agente.email}</div>
                         )}
                       </td>
 
-                      <td className="px-3 py-4 text-emerald-300 font-extrabold">
-                        {fmtPct(l.pctCliente)}
-                      </td>
-                      <td className="px-3 py-4 text-emerald-300 font-extrabold">
-                        {fmtPct(l.pctLugar)}
-                      </td>
+                      <td className="px-3 py-4 text-emerald-300 font-extrabold">{fmtPct(l.pctCliente)}</td>
+                      <td className="px-3 py-4 text-emerald-300 font-extrabold">{fmtPct(l.pctLugar)}</td>
 
+                      {/* NIVEL */}
                       <td className="px-3 py-4">
                         <span
                           className={classNames(
@@ -753,10 +757,24 @@ export default function RegistrarLugar() {
                         </span>
                       </td>
 
+                      {/* ESTADO */}
+                      <td className="px-3 py-4">
+                        <span
+                          className={classNames(
+                            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold border",
+                            l.activo === false
+                              ? "bg-red-500/10 text-red-200 border-red-500/30"
+                              : "bg-emerald-500/10 text-emerald-200 border-emerald-500/30"
+                          )}
+                        >
+                          {l.activo === false ? "⛔ Inactivo" : "✅ Activo"}
+                        </span>
+                      </td>
+
+                      {/* ACCIONES */}
                       <td className="px-3 py-4">
                         <div className="flex justify-end">
                           <div className="grid grid-cols-2 gap-2 w-[360px]">
-
                             {(isAdmin || isSuperadmin) && (
                               <Button
                                 className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold h-9"
@@ -785,7 +803,9 @@ export default function RegistrarLugar() {
 
                             <Button
                               className="bg-slate-200 hover:bg-slate-300 text-slate-950 font-extrabold h-9"
-                              onClick={() => router.push(withTenant(`/lugares/${l.id}/historial-carteles`))}
+                              onClick={() =>
+                                router.push(withTenant(`/lugares/${l.id}/historial-carteles`))
+                              }
                               size="sm"
                             >
                               📜 Historial
@@ -814,7 +834,6 @@ export default function RegistrarLugar() {
                               🔗 Marketing
                             </Button>
 
-
                             {(isAdmin || isSuperadmin) ? (
                               <Button
                                 className="bg-red-600 hover:bg-red-700 text-white font-extrabold h-9"
@@ -836,7 +855,7 @@ export default function RegistrarLugar() {
                 {lugaresFiltrados.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-10 text-center text-slate-400 text-sm font-semibold"
                     >
                       No hay lugares para los filtros actuales.
@@ -851,7 +870,7 @@ export default function RegistrarLugar() {
           <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
             <h3 className="text-lg font-extrabold mb-3">🎨 Fondo global actual para carteles</h3>
 
-            {isAdmin ? (
+            {canSelectFondo ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {fondos.map((f) => (
@@ -865,13 +884,7 @@ export default function RegistrarLugar() {
                       )}
                       title="Seleccionar como fondo global"
                     >
-                      <Image
-                        src={f.url}
-                        alt={f.nombre}
-                        width={500}
-                        height={260}
-                        className="w-full h-44 object-cover"
-                      />
+                      <Image src={f.url} alt={f.nombre} width={500} height={260} className="w-full h-44 object-cover" />
                       <div className="bg-slate-950/80 py-2 px-3">
                         <div className="font-extrabold text-slate-100 text-sm">{f.nombre}</div>
                         {f.activo && (

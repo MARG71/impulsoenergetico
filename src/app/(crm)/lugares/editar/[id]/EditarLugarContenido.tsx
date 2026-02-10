@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import QRCode from "react-qr-code";
@@ -68,7 +68,6 @@ export default function EditarLugarContenido({ id }: { id: string }) {
     isSuperadmin && tenantMode && adminIdContext ? `?adminId=${adminIdContext}` : "";
 
   const [agentes, setAgentes] = useState<any[]>([]);
-
   const [edit, setEdit] = useState<Lugar | null>(null);
   const [editTab, setEditTab] = useState<"basico" | "qr" | "especial">("basico");
 
@@ -238,14 +237,14 @@ export default function EditarLugarContenido({ id }: { id: string }) {
     }
 
     alert("✅ Lugar actualizado");
-    router.push(`/lugares${adminQuery}`); // vuelve al listado respetando tenant
+    router.push(`/lugares${adminQuery}`);
   };
 
   if (!edit) {
     return <div className="p-6 text-slate-200">Cargando lugar…</div>;
   }
 
-  // ✅ ID único para el checkbox (evita colisiones si algún día reusas componente)
+  // ✅ ID único para el checkbox
   const idEspecial = `edit-especial-${edit.id}`;
 
   return (
@@ -474,7 +473,10 @@ export default function EditarLugarContenido({ id }: { id: string }) {
                   type="button"
                   className="mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold h-10 px-4"
                   onClick={() =>
-                    window.open(`/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`, "_blank")
+                    window.open(
+                      `/registro?agenteId=${edit.agenteId}&lugarId=${edit.id}`,
+                      "_blank"
+                    )
                   }
                 >
                   Abrir Landing
@@ -489,7 +491,6 @@ export default function EditarLugarContenido({ id }: { id: string }) {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <h3 className="text-sm font-extrabold text-emerald-100">Lugar especial</h3>
 
-              {/* ✅ FIX: id único + label htmlFor correcto */}
               <label htmlFor={idEspecial} className="flex items-center gap-2 text-sm text-slate-100 font-extrabold">
                 <input
                   id={idEspecial}
@@ -524,13 +525,10 @@ export default function EditarLugarContenido({ id }: { id: string }) {
                       {logoPreview || edit.especialLogoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                        src={(logoPreview || edit.especialLogoUrl) as string}
-                        alt="logo"
-                        className="w-full h-full object-contain p-2"
+                          src={(logoPreview || edit.especialLogoUrl) as string}
+                          alt="logo"
+                          className="w-full h-full object-contain p-2"
                         />
-
-                        
-
                       ) : (
                         <div className="text-xs text-slate-500 font-semibold">Sin logo</div>
                       )}
