@@ -1,8 +1,14 @@
 import { Suspense } from "react";
 import EditarLugarContenido from "./EditarLugarContenido";
 
-export default function Page(props: { params: { id: string } }) {
-  const { id } = props.params;
+type Params = { id: string };
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<Params>;
+}) {
+  const { id } = await params;
 
   return (
     <Suspense fallback={<div className="p-6 text-slate-200">Cargando…</div>}>
