@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
+import { NivelComision } from "@prisma/client";
 
 // Helpers
 function toPct(value: any): number | null {
@@ -17,17 +18,21 @@ function toPct(value: any): number | null {
 
 function toIntOrNull(v: any): number | null {
   const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 const NIVELES_VALIDOS = ["C1", "C2", "C3", "ESPECIAL"] as const;
-type NivelComisionStr = (typeof NIVELES_VALIDOS)[number];
 
-function normalizeNivelComision(input: any, fallback: NivelComisionStr): NivelComisionStr {
+function normalizeNivelComision(
+  input: any,
+  fallback: NivelComision
+): NivelComision {
   const v = String(input ?? "").toUpperCase().trim();
-  return (NIVELES_VALIDOS as readonly string[]).includes(v) ? (v as NivelComisionStr) : fallback;
+  if ((NIVELES_VALIDOS as readonly string[]).includes(v)) {
+    return v as NivelComision;
+  }
+  return fallback;
 }
-
 
 /**
  * GET /api/lugares
@@ -62,7 +67,6 @@ export async function GET(req: NextRequest) {
   }
 
   if (isSuperadmin) {
-    // Global o por tenant
     if (tenantAdminId) where.adminId = tenantAdminId;
   } else if (isAdmin) {
     if (!tenantAdminId) {
@@ -111,13 +115,6 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/lugares
- *
- * SUPERADMIN:
- *  - si está en modo tenant (?adminId=...), usa ctx.tenantAdminId
- *  - si NO está en modo tenant, usa body.adminSeleccionado
- *
- * ADMIN: crea siempre para su tenant (ctx.tenantAdminId)
- * AGENTE (si lo permites): crea siempre para su tenant (ctx.tenantAdminId)
  */
 export async function POST(req: NextRequest) {
   const ctx = await getTenantContext(req);
@@ -165,10 +162,8 @@ export async function POST(req: NextRequest) {
 
   if (isSuperadmin) {
     if (tenantAdminId) {
-      // SUPERADMIN en modo tenant
       adminId = tenantAdminId;
     } else {
-      // SUPERADMIN global: requiere adminSeleccionado
       const adminSelNum = toIntOrNull(adminSeleccionado);
       if (!adminSelNum) {
         return NextResponse.json(
@@ -182,10 +177,8 @@ export async function POST(req: NextRequest) {
       adminId = adminSelNum;
     }
   } else if (isAdmin) {
-    // ADMIN: su tenant
     adminId = tenantAdminId ?? toIntOrNull(userId) ?? null;
   } else if (isAgente) {
-    // AGENTE: su tenant (dueño del agente)
     adminId = tenantAdminId ?? null;
   }
 
@@ -197,8 +190,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 2) Validar agenteId
-  const agenteIdNum = Number(agenteId);
-  if (!Number.isFinite(agenteIdNum) || agenteIdNum <= 0) {
+  const agenteIdNum = toIntOrNull(agenteId);
+  if (!agenteIdNum) {
     return NextResponse.json({ error: "agenteId inválido" }, { status: 400 });
   }
 
@@ -243,10 +236,10 @@ export async function POST(req: NextRequest) {
         especialCartelUrl:
           especial && especialCartelUrl ? String(especialCartelUrl) : null,
 
-        // ✅ NUEVO
+        // ✅ NIVEL DEFAULT (clave)
         nivelComisionDefault: normalizeNivelComision(
           nivelComisionDefault,
-          especial ? "ESPECIAL" : "C1"
+          especial ? NivelComision.ESPECIAL : NivelComision.C1
         ),
 
         adminId,
@@ -255,7 +248,6 @@ export async function POST(req: NextRequest) {
         agente: { select: { id: true, nombre: true, email: true, telefono: true } },
       },
     });
-
 
     return NextResponse.json(nuevoLugar, { status: 201 });
   } catch (e: any) {
