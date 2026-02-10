@@ -1,3 +1,4 @@
+//src/app/(crm)/lugares/editar/[id]/EditarLugarContenido.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -215,6 +216,7 @@ export default function EditarLugarContenido({ id }: { id: string }) {
       pctCliente: edit.pctCliente,
       pctLugar: edit.pctLugar,
       nivelComisionDefault: normalizeNivel(edit.nivelComisionDefault ?? "C1"),
+
       especial: !!edit.especial,
       especialLogoUrl,
       especialColor: edit.especialColor,
