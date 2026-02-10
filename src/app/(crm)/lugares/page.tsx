@@ -1,7 +1,7 @@
 //src/app/(crm)/lugares/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import QRCode from "react-qr-code";
@@ -11,36 +11,27 @@ import { Input } from "@/components/ui/input";
 import { useSession } from "next-auth/react";
 
 // --------- Helpers ----------
-const fmtPct = (v: any) => (v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`);
+const fmtPct = (v: any) => (v == null || v === "" ? "—" : `${(Number(v) * 100).toFixed(1)}%`);
 
 const toNumberOr = (v: any, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
 
-/**
- * Normaliza porcentajes:
- * - "15" => 0.15
- * - "0.15" => 0.15
- * - ""/null => null
- */
-function normalizePct(input: any): number | null {
-  if (input === null || input === undefined) return null;
-  const s = String(input).trim().replace(",", ".");
-  if (!s) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n)) return null;
-  if (n <= 0) return n; // permite 0 o negativos si algún día lo necesitas
-  return n > 1 ? n / 100 : n;
-}
-
 type Fondo = { id: number; nombre: string; url: string; activo?: boolean };
 type Lugar = any;
 type Admin = { id: number; nombre: string; email: string };
 type Rol = "SUPERADMIN" | "ADMIN" | "AGENTE" | "LUGAR" | "CLIENTE";
+type NivelComision = "C1" | "C2" | "C3" | "ESPECIAL";
 
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
+}
+
+function normalizeNivel(v: any): NivelComision {
+  const s = String(v ?? "C1").toUpperCase();
+  if (s === "C2" || s === "C3" || s === "ESPECIAL") return s;
+  return "C1";
 }
 
 export default function RegistrarLugar() {
@@ -52,8 +43,6 @@ export default function RegistrarLugar() {
   const isSuperadmin = role === "SUPERADMIN";
   const isAdmin = role === "ADMIN";
   const isAgente = role === "AGENTE";
-
-  const canSelectFondo = isAdmin || isSuperadmin;
 
   // ✅ tenant sólo para SUPERADMIN con ?adminId=
   const adminIdParam = searchParams?.get("adminId");
@@ -73,9 +62,6 @@ export default function RegistrarLugar() {
     const hasQuery = href.includes("?");
     return `${href}${hasQuery ? "&" : "?"}adminId=${adminIdContext}`;
   };
-
-  // ✅ helper de Landing
-  const landingUrlFor = (l: any) => `/registro?agenteId=${l.agenteId}&lugarId=${l.id}`;
 
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [adminSeleccionado, setAdminSeleccionado] = useState<string>("");
@@ -103,6 +89,10 @@ export default function RegistrarLugar() {
     agenteId: "",
     pctCliente: "",
     pctLugar: "",
+
+    // ✅ NUEVO: nivel comisión por defecto (del Lugar)
+    nivelComisionDefault: "C1" as NivelComision,
+
     especial: false,
     especialColor: "#FF7A3B",
     especialMensaje: "",
@@ -223,7 +213,6 @@ export default function RegistrarLugar() {
     const q = busqueda.trim().toLowerCase();
     if (!q) return lugares;
     return lugares.filter((l: any) => {
-      const estado = l.especial ? "especial" : "normal";
       const txt = [
         `#${l.id}`,
         l.nombre ?? "",
@@ -231,13 +220,14 @@ export default function RegistrarLugar() {
         l.agente?.nombre ?? "",
         fmtPct(l.pctCliente),
         fmtPct(l.pctLugar),
-        estado,
+        String(l.nivelComisionDefault ?? ""),
+        l.especial ? "especial" : "normal",
       ].join(" ");
       return txt.toLowerCase().includes(q);
     });
   }, [lugares, busqueda]);
 
-  // ---- Subida de ficheros (alta) ----
+  // ---- Subida de ficheros (se queda para alta) ----
   async function subirFichero(file: File, folder: string): Promise<string | null> {
     try {
       const form = new FormData();
@@ -279,11 +269,6 @@ export default function RegistrarLugar() {
       return;
     }
 
-    if (!nuevo.agenteId) {
-      alert("Selecciona un agente.");
-      return;
-    }
-
     let especialLogoUrl = nuevo.especialLogoUrl;
     if (nuevo.especial && nuevo.logoFile) {
       const up = await subirFichero(nuevo.logoFile, "logos-lugares");
@@ -300,9 +285,14 @@ export default function RegistrarLugar() {
       nombre: nuevo.nombre.trim(),
       direccion: nuevo.direccion.trim(),
       qrCode: nuevo.qrCode.trim(),
-      agenteId: Number(nuevo.agenteId),
-      pctCliente: normalizePct(nuevo.pctCliente),
-      pctLugar: normalizePct(nuevo.pctLugar),
+      agenteId: nuevo.agenteId,
+
+      pctCliente: nuevo.pctCliente,
+      pctLugar: nuevo.pctLugar,
+
+      // ✅ IMPORTANTE: enviamos el nivel
+      nivelComisionDefault: normalizeNivel(nuevo.nivelComisionDefault),
+
       especial: nuevo.especial,
       especialLogoUrl,
       especialColor: nuevo.especialColor,
@@ -311,7 +301,7 @@ export default function RegistrarLugar() {
     };
 
     if (isSuperadmin && !tenantMode && adminSeleccionado) {
-      body.adminSeleccionado = Number(adminSeleccionado);
+      body.adminSeleccionado = adminSeleccionado;
     }
 
     if (especialCartelUrl && especialCartelUrl.trim()) {
@@ -346,6 +336,7 @@ export default function RegistrarLugar() {
       agenteId: "",
       pctCliente: "",
       pctLugar: "",
+      nivelComisionDefault: "C1",
       especial: false,
       especialColor: "#FF7A3B",
       especialMensaje: "",
@@ -432,7 +423,7 @@ export default function RegistrarLugar() {
 
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <Input
-                  placeholder="Buscar por ID, nombre, dirección, agente, % o estado…"
+                  placeholder="Buscar por ID, nombre, dirección, agente, % , nivel o estado…"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   className="w-full sm:w-[360px] bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 text-sm h-10 font-semibold"
@@ -532,6 +523,31 @@ export default function RegistrarLugar() {
                 />
               </div>
 
+              {/* ✅ NUEVO: NIVEL COMISIÓN */}
+              <div>
+                <label className="text-xs text-slate-300 font-extrabold">
+                  Nivel de comisión por defecto
+                </label>
+                <select
+                  className="mt-1 w-full border rounded-lg p-2 bg-slate-900 border-slate-700 text-slate-100 text-sm h-10 font-semibold"
+                  value={nuevo.nivelComisionDefault}
+                  onChange={(e) =>
+                    setNuevo((s) => ({
+                      ...s,
+                      nivelComisionDefault: normalizeNivel(e.target.value),
+                    }))
+                  }
+                >
+                  <option value="C1">C1</option>
+                  <option value="C2">C2</option>
+                  <option value="C3">C3</option>
+                  <option value="ESPECIAL">ESPECIAL</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1 font-semibold">
+                  Se usará como “nivel” por defecto en las contrataciones de este lugar.
+                </p>
+              </div>
+
               <div>
                 <label className="text-xs text-slate-300 font-extrabold">Código QR</label>
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mt-1">
@@ -569,7 +585,9 @@ export default function RegistrarLugar() {
                   required
                   disabled={isAgente}
                 >
-                  <option value="">{isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}</option>
+                  <option value="">
+                    {isAgente ? "Tu usuario de agente" : "Selecciona un agente…"}
+                  </option>
                   {agentes.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.nombre}
@@ -657,7 +675,9 @@ export default function RegistrarLugar() {
                   <Input
                     inputMode="numeric"
                     value={nuevo.aportacionAcumulada}
-                    onChange={(e) => setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))}
+                    onChange={(e) =>
+                      setNuevo((s) => ({ ...s, aportacionAcumulada: e.target.value }))
+                    }
                     placeholder="0"
                     className="mt-1 bg-slate-900 border-slate-700 text-slate-100 h-10 font-semibold"
                   />
@@ -692,8 +712,8 @@ export default function RegistrarLugar() {
             <h2 className="text-xl font-extrabold">Lugares registrados</h2>
             <div className="text-sm text-slate-300 font-semibold">
               Mostrando:{" "}
-              <span className="font-extrabold text-slate-100">{lugaresFiltrados.length}</span> /{" "}
-              {lugares.length}
+              <span className="font-extrabold text-slate-100">{lugaresFiltrados.length}</span>{" "}
+              / {lugares.length}
             </div>
           </div>
 
@@ -707,8 +727,13 @@ export default function RegistrarLugar() {
                   <th className="px-3 py-3 text-left">Agente</th>
                   <th className="px-3 py-3 text-left">% Cliente</th>
                   <th className="px-3 py-3 text-left">% Lugar</th>
-                  <th className="px-3 py-3 text-left">Nivel</th>
+
+                  {/* ✅ AHORA SÍ: nivel comisión */}
+                  <th className="px-3 py-3 text-left">Nivel comisión</th>
+
+                  {/* ✅ Estado especial separado */}
                   <th className="px-3 py-3 text-left">Estado</th>
+
                   <th className="px-3 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -716,6 +741,7 @@ export default function RegistrarLugar() {
               <tbody>
                 {lugaresFiltrados.map((l: any) => {
                   const especial = !!l.especial;
+                  const nivel = normalizeNivel(l.nivelComisionDefault);
 
                   return (
                     <tr key={l.id} className="border-t border-slate-800/70 hover:bg-slate-900/70">
@@ -726,8 +752,7 @@ export default function RegistrarLugar() {
                       <td className="px-3 py-4">
                         <div className="text-slate-50 font-extrabold leading-tight">{l.nombre}</div>
                         <div className="text-[11px] text-slate-400 mt-1 font-semibold">
-                          QR:{" "}
-                          <span className="font-mono">{String(l.qrCode || "").slice(0, 10)}…</span>
+                          QR: <span className="font-mono">{String(l.qrCode || "").slice(0, 10)}…</span>
                         </div>
                       </td>
 
@@ -743,7 +768,19 @@ export default function RegistrarLugar() {
                       <td className="px-3 py-4 text-emerald-300 font-extrabold">{fmtPct(l.pctCliente)}</td>
                       <td className="px-3 py-4 text-emerald-300 font-extrabold">{fmtPct(l.pctLugar)}</td>
 
-                      {/* NIVEL */}
+                      <td className="px-3 py-4">
+                        <span
+                          className={classNames(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border",
+                            nivel === "ESPECIAL"
+                              ? "bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-500/40"
+                              : "bg-slate-700/30 text-slate-200 border-slate-500/40"
+                          )}
+                        >
+                          {nivel}
+                        </span>
+                      </td>
+
                       <td className="px-3 py-4">
                         <span
                           className={classNames(
@@ -757,21 +794,6 @@ export default function RegistrarLugar() {
                         </span>
                       </td>
 
-                      {/* ESTADO */}
-                      <td className="px-3 py-4">
-                        <span
-                          className={classNames(
-                            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold border",
-                            l.activo === false
-                              ? "bg-red-500/10 text-red-200 border-red-500/30"
-                              : "bg-emerald-500/10 text-emerald-200 border-emerald-500/30"
-                          )}
-                        >
-                          {l.activo === false ? "⛔ Inactivo" : "✅ Activo"}
-                        </span>
-                      </td>
-
-                      {/* ACCIONES */}
                       <td className="px-3 py-4">
                         <div className="flex justify-end">
                           <div className="grid grid-cols-2 gap-2 w-[360px]">
@@ -803,9 +825,7 @@ export default function RegistrarLugar() {
 
                             <Button
                               className="bg-slate-200 hover:bg-slate-300 text-slate-950 font-extrabold h-9"
-                              onClick={() =>
-                                router.push(withTenant(`/lugares/${l.id}/historial-carteles`))
-                              }
+                              onClick={() => router.push(withTenant(`/lugares/${l.id}/historial-carteles`))}
                               size="sm"
                             >
                               📜 Historial
@@ -854,10 +874,7 @@ export default function RegistrarLugar() {
 
                 {lugaresFiltrados.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-10 text-center text-slate-400 text-sm font-semibold"
-                    >
+                    <td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm font-semibold">
                       No hay lugares para los filtros actuales.
                     </td>
                   </tr>
@@ -870,7 +887,7 @@ export default function RegistrarLugar() {
           <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
             <h3 className="text-lg font-extrabold mb-3">🎨 Fondo global actual para carteles</h3>
 
-            {canSelectFondo ? (
+            {isAdmin ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {fondos.map((f) => (
@@ -884,7 +901,13 @@ export default function RegistrarLugar() {
                       )}
                       title="Seleccionar como fondo global"
                     >
-                      <Image src={f.url} alt={f.nombre} width={500} height={260} className="w-full h-44 object-cover" />
+                      <Image
+                        src={f.url}
+                        alt={f.nombre}
+                        width={500}
+                        height={260}
+                        className="w-full h-44 object-cover"
+                      />
                       <div className="bg-slate-950/80 py-2 px-3">
                         <div className="font-extrabold text-slate-100 text-sm">{f.nombre}</div>
                         {f.activo && (

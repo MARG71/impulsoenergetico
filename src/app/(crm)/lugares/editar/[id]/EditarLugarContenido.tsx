@@ -126,6 +126,7 @@ export default function EditarLugarContenido({ id }: { id: string }) {
           aportacionAcumulada: data.aportacionAcumulada ?? 0,
           especialCartelUrl: data.especialCartelUrl ?? "",
           especialLogoUrl: data.especialLogoUrl ?? "",
+          nivelComisionDefault: normalizeNivel(data.nivelComisionDefault ?? "C1"),
           // ✅ normaliza agenteId a string para el select
           agenteId: data.agenteId ? String(data.agenteId) : "",
           pctCliente: data.pctCliente ?? "",
@@ -213,6 +214,7 @@ export default function EditarLugarContenido({ id }: { id: string }) {
       agenteId: edit.agenteId ? Number(edit.agenteId) : null,
       pctCliente: edit.pctCliente,
       pctLugar: edit.pctLugar,
+      nivelComisionDefault: normalizeNivel(edit.nivelComisionDefault ?? "C1"),
       especial: !!edit.especial,
       especialLogoUrl,
       especialColor: edit.especialColor,
@@ -433,6 +435,24 @@ export default function EditarLugarContenido({ id }: { id: string }) {
               % Cliente: <span className="font-extrabold text-emerald-300">{fmtPct(edit.pctCliente)}</span>{" "}
               · % Lugar: <span className="font-extrabold text-emerald-300">{fmtPct(edit.pctLugar)}</span>
             </div>
+            <div>
+              <label className="text-xs text-slate-300 font-extrabold">
+                Nivel de comisión por defecto
+              </label>
+              <select
+                className="mt-1 w-full border rounded-lg px-3 bg-slate-900 border-slate-700 text-slate-100 text-sm h-11 font-semibold"
+                value={normalizeNivel(edit.nivelComisionDefault ?? "C1")}
+                onChange={(e) =>
+                  setEdit({ ...edit, nivelComisionDefault: normalizeNivel(e.target.value) })
+                }
+              >
+                <option value="C1">C1</option>
+                <option value="C2">C2</option>
+                <option value="C3">C3</option>
+                <option value="ESPECIAL">ESPECIAL</option>
+              </select>
+            </div>
+
           </section>
         )}
 
