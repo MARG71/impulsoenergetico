@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTenantContext } from "@/lib/tenant";
 
@@ -16,11 +16,13 @@ function parseId(v: unknown) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const ctx = await getTenantContext(req);
-  if (!ctx.ok) return jsonError(ctx.error, ctx.status);
+// ✅ Next.js 15: el "context" NO lo tipamos como { params: { id: string } }
+// Lo recibimos como "any" y leemos context.params.id
+export async function GET(req: Request, context: any) {
+  const ctx = await getTenantContext(req as any);
+  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const id = parseId(params.id);
+  const id = parseId(context?.params?.id);
   if (!id) return jsonError("ID inválido", 400);
 
   const regla = await prisma.reglaComisionGlobal.findUnique({
@@ -30,43 +32,41 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   if (!regla) return jsonError("Regla no encontrada", 404);
 
-  // ✅ tenant
-  // - SUPERADMIN: puede leer cualquiera
-  // - resto: solo su tenantAdminId o global (adminId null) si lo usas
+  // ✅ MULTI-TENANT: SUPERADMIN ve todo; ADMIN solo sus reglas (adminId = userId) o global (adminId = null)
   if (!ctx.isSuperadmin) {
-    const t = ctx.tenantAdminId ?? null;
-    if ((regla as any).adminId !== t) {
-      return jsonError("No autorizado", 403);
-    }
+    if (ctx.tenantAdminId == null) return jsonError("tenantAdminId no disponible", 400);
+    const ok = regla.adminId === null || regla.adminId === ctx.tenantAdminId;
+    if (!ok) return jsonError("No autorizado", 403);
   }
 
   return NextResponse.json({ ok: true, regla });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const ctx = await getTenantContext(req);
-  if (!ctx.ok) return jsonError(ctx.error, ctx.status);
+export async function PATCH(req: Request, context: any) {
+  const ctx = await getTenantContext(req as any);
+  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  if (!ctx.isSuperadmin && !ctx.isAdmin) return jsonError("No autorizado", 403);
+  if (!ctx.isSuperadmin) return jsonError("No autorizado", 403);
 
-  const id = parseId(params.id);
+  const id = parseId(context?.params?.id);
   if (!id) return jsonError("ID inválido", 400);
-
-  const current = await prisma.reglaComisionGlobal.findUnique({ where: { id } });
-  if (!current) return jsonError("Regla no encontrada", 404);
-
-  if (!ctx.isSuperadmin) {
-    const t = ctx.tenantAdminId ?? null;
-    if ((current as any).adminId !== t) return jsonError("No autorizado", 403);
-  }
 
   const body = await req.json().catch(() => ({}));
 
-  // Campos editables (mismo set que ya usas)
   const fields = [
-    "seccionId","subSeccionId","nivel","tipo",
-    "fijoEUR","porcentaje","minEUR","maxEUR",
-    "minAgenteEUR","maxAgenteEUR","minLugarEspecialEUR","maxLugarEspecialEUR",
+    "adminId",
+    "seccionId",
+    "subSeccionId",
+    "nivel",
+    "tipo",
+    "fijoEUR",
+    "porcentaje",
+    "minEUR",
+    "maxEUR",
+    "minAgenteEUR",
+    "maxAgenteEUR",
+    "minLugarEspecialEUR",
+    "maxLugarEspecialEUR",
     "activa",
   ] as const;
 
@@ -74,13 +74,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const f of fields) {
     if (body[f] !== undefined) data[f] = body[f];
   }
-
-  // Seguridad: si NO eres superadmin, no permitas cambiar adminId
-  if (body.adminId !== undefined && !ctx.isSuperadmin) {
-    return jsonError("No se puede cambiar adminId", 403);
-  }
-  // Si es superadmin y quieres permitir cambiar adminId, descomenta:
-  // if (body.adminId !== undefined) data.adminId = body.adminId;
 
   const updated = await prisma.reglaComisionGlobal.update({
     where: { id },
@@ -90,29 +83,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true, regla: updated });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const ctx = await getTenantContext(req);
-  if (!ctx.ok) return jsonError(ctx.error, ctx.status);
+export async function DELETE(req: Request, context: any) {
+  const ctx = await getTenantContext(req as any);
+  if (!ctx.ok) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  // yo lo limitaría a SUPERADMIN/ADMIN (y ADMIN solo su tenant)
-  if (!ctx.isSuperadmin && !ctx.isAdmin) return jsonError("No autorizado", 403);
+  if (!ctx.isSuperadmin) return jsonError("No autorizado", 403);
 
-  const id = parseId(params.id);
+  const id = parseId(context?.params?.id);
   if (!id) return jsonError("ID inválido", 400);
 
-  const current = await prisma.reglaComisionGlobal.findUnique({ where: { id } });
-  if (!current) return jsonError("Regla no encontrada", 404);
+  await prisma.reglaComisionGlobal.delete({ where: { id } });
 
-  if (!ctx.isSuperadmin) {
-    const t = ctx.tenantAdminId ?? null;
-    if ((current as any).adminId !== t) return jsonError("No autorizado", 403);
-  }
-
-  // ✅ recomendable: “borrado lógico” (activa=false) para no romper históricos
-  const updated = await prisma.reglaComisionGlobal.update({
-    where: { id },
-    data: { activa: false } as any,
-  });
-
-  return NextResponse.json({ ok: true, deleted: true, regla: updated });
+  return NextResponse.json({ ok: true });
 }
