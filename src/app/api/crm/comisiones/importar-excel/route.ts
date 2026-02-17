@@ -191,9 +191,10 @@ export async function POST(req: Request) {
 
     // anexoPrecio: usamos la fecha de validez si viene
     const anexoPrecio =
-      validez instanceof Date
-        ? validez.toISOString().slice(0, 10)
-        : String(validez ?? "").trim() || null;
+        validez instanceof Date
+            ? validez.toISOString().slice(0, 10)
+            : String(validez ?? "").trim() || "";
+
 
     // 2) Catálogo: OfertaTarifa (LUZ por defecto, subtipo=tarifa)
     const tipoOferta = seccionNombre === "GAS" ? "GAS" : seccionNombre === "TELEFONIA" ? "TELEFONIA" : "LUZ";
@@ -279,7 +280,8 @@ export async function POST(req: Request) {
       create: { seccionId: seccion.id, nombre: tarifa, slug: slugify(`${compania}-${tarifa}`), activa: true, parentId: subCompany.id, adminId: null },
     });
 
-    const anexoLabel = anexoPrecio ?? "sin-anexo";
+    const anexoLabel = anexoPrecio ? anexoPrecio : "sin-anexo";
+
     const subAnexo = await prisma.subSeccion.upsert({
       where: { seccionId_slug: { seccionId: seccion.id, slug: slugify(`${compania}-${tarifa}-${anexoLabel}`) } },
       update: { nombre: anexoLabel, activa: true, parentId: subTarifa.id, adminId: null },
