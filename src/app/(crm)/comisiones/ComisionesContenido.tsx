@@ -72,6 +72,13 @@ export default function ComisionesContenido() {
             tag="Historial"
           />
 
+          <Card
+            title="Importar catálogo + comisiones (Excel)"
+            desc="Sube el Excel de tarifas (precios + comisión base SUPERADMIN) y genera reglas C1/C2/C3/ESPECIAL automáticamente."
+            href={withTenant("/configuracion/importar-catalogo", adminIdQs)}
+            tag="Import"
+          />
+
         </div>
       )}
 

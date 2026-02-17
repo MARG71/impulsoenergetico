@@ -120,13 +120,13 @@ model Agente {
   // ✅ NUEVO: nivel de comisión por defecto para contrataciones
   nivelComisionDefault NivelComision @default(C1)
 
-  contratos    Contrato[]
-  lugares      Lugar[]
-  comparativas Comparativa[]
-  qrs          QR[]
-  leads        Lead[]
-  usuarios     Usuario[]
-  overrides    ComisionOverride[]
+  contratos      Contrato[]
+  lugares        Lugar[]
+  comparativas   Comparativa[]
+  qrs            QR[]
+  leads          Lead[]
+  usuarios       Usuario[]
+  overrides      ComisionOverride[]
   contrataciones Contratacion[]
 
   creadoEn        DateTime @default(now())
@@ -138,7 +138,6 @@ model Agente {
   @@index([adminId])
 }
 
-
 model Lugar {
   id        Int    @id @default(autoincrement())
   nombre    String
@@ -146,10 +145,9 @@ model Lugar {
   qrCode    String @unique
   agenteId  Int
 
-  pctCliente Decimal? @db.Decimal(5, 4)
-  pctLugar   Decimal? @db.Decimal(5, 4)
+  pctCliente           Decimal?      @db.Decimal(5, 4)
+  pctLugar             Decimal?      @db.Decimal(5, 4)
   nivelComisionDefault NivelComision @default(C1)
-
 
   agente       Agente             @relation(fields: [agenteId], references: [id])
   comparativas Comparativa[]
@@ -255,9 +253,11 @@ model Usuario {
   movimientosComisionGestionados   MovimientoComision[]  @relation("AdminMovimientosComision")
   liquidacionesComisionGestionadas LiquidacionComision[] @relation("AdminLiquidacionesComision")
 
-  seccionesGestionadas     Seccion[]          @relation("AdminSecciones")
-  subSeccionesGestionadas  SubSeccion[]       @relation("AdminSubSecciones")
+  seccionesGestionadas      Seccion[]             @relation("AdminSecciones")
+  subSeccionesGestionadas   SubSeccion[]          @relation("AdminSubSecciones")
   reglasComisionGestionadas ReglaComisionGlobal[] @relation("AdminReglasComision")
+
+  configNivelesComisionGestionados ConfigNivelComision[] @relation("AdminConfigNivelComision")
 
   nivelComisionDefault NivelComision @default(C1)
 
@@ -833,8 +833,8 @@ model Seccion {
   actualizadaEn DateTime @updatedAt
 
   // ✅ NUEVO: look & feel
-  colorHex      String?  @db.VarChar(16) // "#22c55e"
-  imagenUrl     String?
+  colorHex           String? @db.VarChar(16) // "#22c55e"
+  imagenUrl          String?
   imagenPublicId     String?
   imagenResourceType String?
   imagenMime         String?
@@ -847,6 +847,8 @@ model Seccion {
   subSecciones   SubSeccion[]
   reglas         ReglaComisionGlobal[]
   contrataciones Contratacion[]
+
+  configNiveles ConfigNivelComision[] @relation("SeccionConfigNivelComision")
 
   @@index([activa])
   @@index([adminId])
@@ -869,12 +871,12 @@ model SubSeccion {
   actualizadaEn DateTime @updatedAt
 
   // look & feel
-  colorHex          String? @db.VarChar(16)
-  imagenUrl         String?
-  imagenPublicId    String?
+  colorHex           String? @db.VarChar(16)
+  imagenUrl          String?
+  imagenPublicId     String?
   imagenResourceType String?
-  imagenMime        String?
-  imagenBytes       Int?
+  imagenMime         String?
+  imagenBytes        Int?
 
   // tenant
   adminId Int?
@@ -883,12 +885,13 @@ model SubSeccion {
   reglas         ReglaComisionGlobal[]
   contrataciones Contratacion[]
 
+  configNiveles ConfigNivelComision[] @relation("SubSeccionConfigNivelComision")
+
   @@unique([seccionId, slug])
   @@index([seccionId, activa])
   @@index([adminId])
   @@index([parentId])
 }
-
 
 model ReglaComisionGlobal {
   id           Int                 @id @default(autoincrement())
@@ -926,7 +929,29 @@ model ReglaComisionGlobal {
   @@index([adminId, seccionId, subSeccionId, nivel])
 }
 
+model ConfigNivelComision {
+  id Int @id @default(autoincrement())
 
+  seccionId    Int
+  subSeccionId Int?
+
+  nivel NivelComision
+
+  pctSobreBase Decimal @db.Decimal(6, 3)
+
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now())
+  actualizadaEn DateTime @updatedAt
+
+  adminId Int?
+  admin   Usuario? @relation("AdminConfigNivelComision", fields: [adminId], references: [id])
+
+  seccion    Seccion     @relation("SeccionConfigNivelComision", fields: [seccionId], references: [id])
+  subSeccion SubSeccion? @relation("SubSeccionConfigNivelComision", fields: [subSeccionId], references: [id])
+
+  @@index([adminId, seccionId, subSeccionId, nivel, activa])
+  @@index([seccionId, subSeccionId])
+}
 
 enum EstadoContratacion {
   BORRADOR
@@ -1059,10 +1084,9 @@ model AsientoComision {
   agenteId  Int?
   lugarId   Int?
 
-  anuladoEn         DateTime?
-  anuladoPorUserId  Int?
-  anuladoMotivo     String?
-
+  anuladoEn        DateTime?
+  anuladoPorUserId Int?
+  anuladoMotivo    String?
 
   estado EstadoAsientoComision @default(PENDIENTE)
   notas  String?
