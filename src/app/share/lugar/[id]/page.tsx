@@ -1,12 +1,17 @@
+// src/app/share/lugar/[id]/page.tsx
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 export const runtime = "nodejs";
 
-type Props = { params: { id: string } };
+// ✅ Next 15: params viene como Promise en tu proyecto
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
 
-export async function generateMetadata({ params }: Props) {
-  const lugarId = Number(params.id);
+export async function generateMetadata({ params }: PageProps) {
+  const { id } = await params;
+  const lugarId = Number(id);
 
   const lugar = await prisma.lugar.findUnique({
     where: { id: lugarId },
@@ -17,7 +22,6 @@ export async function generateMetadata({ params }: Props) {
     },
   });
 
-  // Imagen activa para ese lugar
   const activo = await prisma.marketingAsset.findFirst({
     where: { lugarId, tipo: "IMAGE", activo: true },
     select: { url: true },
@@ -51,8 +55,9 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
-export default async function Page({ params }: Props) {
-  const lugarId = Number(params.id);
+export default async function Page({ params }: PageProps) {
+  const { id } = await params;
+  const lugarId = Number(id);
 
   const lugar = await prisma.lugar.findUnique({
     where: { id: lugarId },
