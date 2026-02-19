@@ -89,7 +89,7 @@ export default async function Page({ params, searchParams }: PageProps) {
         </p>
 
         {/* ✅ Redirect en cliente (WhatsApp no lo ejecuta, pero ya leyó OG del HTML 200) */}
-        <RedirectClient to={target} />
+        <RedirectClient to={target} delayMs={2500} debug />
 
         <p className="mt-4 text-sm text-slate-400 font-bold">
           Si no te redirige automáticamente, pulsa aquí:
