@@ -1,3 +1,4 @@
+//src/app/api/marketing-assets/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -57,7 +58,23 @@ export async function GET(req: NextRequest) {
   const assets = await prisma.marketingAsset.findMany({
     where,
     orderBy: { creadaEn: "desc" },
+    select: {
+      id: true,
+      tipo: true,
+      url: true,
+      nombre: true,
+      publicId: true,
+      resourceType: true,
+      mime: true,
+      size: true,
+      creadaEn: true,
+      lugarId: true,
+      adminId: true,
+      agenteId: true,
+      activo: true,
+    },
   });
+
 
   return NextResponse.json({ assets });
 }

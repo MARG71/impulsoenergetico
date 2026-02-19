@@ -17,6 +17,30 @@ function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+function injectLinkOnce(template: string, link: string) {
+  const t = String(template ?? "");
+
+  if (t.includes("{LINK}")) {
+    const replaced = t.replaceAll("{LINK}", link);
+
+    // eliminar duplicados exactos de línea del link
+    const lines = replaced.split("\n");
+    const out: string[] = [];
+    let seenLink = false;
+    for (const line of lines) {
+      if (line.trim() === link) {
+        if (seenLink) continue;
+        seenLink = true;
+      }
+      out.push(line);
+    }
+    return out.join("\n").trim();
+  }
+
+  return `${t.trim()}\n\n${link}`.trim();
+}
+
+
 // Convierte un SVG (del QR) a PNG descargable
 async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string, size = 1024) {
   const serializer = new XMLSerializer();
@@ -100,6 +124,12 @@ export default function CompartirContenido({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
   const qrWrapRef = useRef<HTMLDivElement | null>(null);
 
+  const absoluteShareLink = useMemo(() => {
+    const lugarId = lugar?.id ? Number(lugar.id) : Number(id);
+    return `https://impulsoenergetico.es/share/lugar/${lugarId}`;
+  }, [lugar, id]);
+
+
   // Seguridad mínima UX
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -165,9 +195,10 @@ export default function CompartirContenido({ id }: { id: string }) {
   }, [publicLink]);
 
   const whatsappLink = useMemo(() => {
-    const text = mensaje.replace("{LINK}", absolutePublicLink);
+    const text = injectLinkOnce(mensaje, absoluteShareLink);
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
-  }, [mensaje, absolutePublicLink]);
+  }, [mensaje, absoluteShareLink]);
+
 
     // ✅ Rutas carteles (A4) dentro del CRM (con soporte tenant)
   const cartelA4NormalHref = useMemo(() => {
@@ -206,22 +237,22 @@ export default function CompartirContenido({ id }: { id: string }) {
   };
 
   const onShare = async () => {
-    const shareText = mensaje.replace("{LINK}", absolutePublicLink);
+    const shareText = injectLinkOnce(mensaje, absoluteShareLink);
+
     if (canNativeShare) {
       try {
         await (navigator as any).share({
           title: "Impulso Energético",
           text: shareText,
-          url: absolutePublicLink,
+          // NO url aquí, porque WhatsApp lo añade y duplica
         });
-      } catch {
-        // cancelado
-      }
+      } catch {}
     } else {
-      await copyToClipboard(absolutePublicLink);
+      await copyToClipboard(absoluteShareLink);
       alert("Tu dispositivo no soporta compartir nativo. Enlace copiado.");
     }
   };
+
 
   const downloadQrPng = async () => {
     try {
@@ -237,7 +268,7 @@ export default function CompartirContenido({ id }: { id: string }) {
 
   if (status === "loading" || (status === "authenticated" && !session)) return null;
 
-  const mensajeFinal = mensaje.replace("{LINK}", absolutePublicLink);
+  const mensajeFinal = injectLinkOnce(mensaje, absoluteShareLink);
 
   const impulsoLogoSrc =
     "/LOGO%20DEFINITIVO%20IMPULSO%20ENERGETICO%20-%20AGOSTO2025%20-%20SIN%20DATOS.png";

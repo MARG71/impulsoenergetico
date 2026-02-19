@@ -14,7 +14,9 @@ type Asset = {
   mime?: string | null;
   size?: number | null;
   creadaEn: string;
+  activo?: boolean; // ✅
 };
+
 
 function guessTipoFromMime(mime: string | null | undefined): Asset["tipo"] {
   if (!mime) return "IMAGE";
@@ -114,6 +116,28 @@ export default function MarketingAssetsPanel({
     if (!res.ok) throw new Error(data?.error || "No se pudo guardar en BD");
     return data;
   };
+
+  const activarAsset = async (assetId: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/marketing-assets/seleccionar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: assetId,
+          adminId: adminId ?? null, // SUPERADMIN tenant
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "No se pudo activar");
+      await loadAssets();
+    } catch (e: any) {
+      alert(e?.message || "Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const onUploadAndSave = async () => {
     if (!file) return alert("Selecciona un archivo primero");
@@ -267,7 +291,15 @@ export default function MarketingAssetsPanel({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {assets.map((a) => (
-              <div key={a.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                <div
+                  key={a.id}
+                  className={`rounded-2xl border p-4 ${
+                    a.activo
+                      ? "border-emerald-500/60 bg-emerald-500/10"
+                      : "border-slate-800 bg-slate-950/50"
+                  }`}
+                >
+
                 <div className="text-sm font-extrabold text-white break-words">
                   {a.nombre || `Asset #${a.id}`}
                 </div>
@@ -302,6 +334,19 @@ export default function MarketingAssetsPanel({
                   >
                     Copiar URL
                   </Button>
+                  {a.tipo === "IMAGE" && (
+                    <Button
+                      onClick={() => activarAsset(a.id)}
+                      className={`font-extrabold h-10 ${
+                        a.activo
+                          ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                          : "bg-sky-500 text-slate-950 hover:bg-sky-400"
+                      }`}
+                    >
+                      {a.activo ? "✅ Activo" : "Usar (activo)"}
+                    </Button>
+                  )}
+
                   <Button
                     onClick={() => window.open(a.url, "_blank")}
                     className="bg-slate-800 hover:bg-slate-700 text-white font-extrabold h-10"

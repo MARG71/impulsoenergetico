@@ -650,6 +650,8 @@ model MarketingAsset {
   mime         String?
   size         Int?
 
+  activo Boolean @default(false)
+
   creadaEn DateTime @default(now())
 
   lugarId Int
