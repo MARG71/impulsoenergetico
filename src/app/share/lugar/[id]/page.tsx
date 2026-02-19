@@ -4,10 +4,10 @@ import RedirectClient from "./redirect-client";
 
 export const runtime = "nodejs";
 
-// Next 15: params Promise
+// Next 15: en tu proyecto params viene como Promise
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: { [key: string]: string | string[] | undefined };
 };
 
 function toSingle(v: string | string[] | undefined) {
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps) {
     lugar?.especialMensaje ||
     "Regístrate en 1 minuto y te ayudamos a ahorrar en Luz, Gas, Telefonía y más.";
 
-  // ⚠️ OG necesita URL absoluta
+  // OG necesita URL absoluta; Cloudinary ya lo es
   const images = activo?.url ? [activo.url] : [];
 
   return {
@@ -62,8 +62,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   const { id } = await params;
   const lugarId = Number(id);
 
-  const sp = (await searchParams?.catch(() => ({}))) ?? {};
-  const v = toSingle(sp["v"]); // para bust cache, opcional
+  const v = toSingle(searchParams?.v); // ✅ ahora sí tipa bien
 
   const lugar = await prisma.lugar.findUnique({
     where: { id: lugarId },
@@ -74,7 +73,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   if (lugar?.agenteId) qs.set("agenteId", String(lugar.agenteId));
   if (lugar?.id) qs.set("lugarId", String(lugar.id));
   if (lugar?.qrCode) qs.set("qr", String(lugar.qrCode));
-  if (v) qs.set("v", v); // solo para evitar cache en algunas pruebas
+  if (v) qs.set("v", v); // solo para pruebas/bust cache
 
   const target = `/registro?${qs.toString()}`;
 
@@ -86,7 +85,7 @@ export default async function Page({ params, searchParams }: PageProps) {
           Abriendo registro… {lugar?.nombre ? `(${lugar.nombre})` : ""}
         </p>
 
-        {/* ✅ Redirect en cliente (WhatsApp no lo ejecuta, pero YA habrá leído OG del HTML 200) */}
+        {/* ✅ Redirect en cliente */}
         <RedirectClient to={target} />
 
         <p className="mt-4 text-sm text-slate-400 font-bold">
