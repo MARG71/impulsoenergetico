@@ -1,397 +1,311 @@
+// src/app/HomeContenido.tsx
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import React from "react";
 
-type Oferta = {
-  id: number;
-  titulo: string;
-  descripcion?: string | null;
-  descripcionCorta?: string | null;
-  tipo: string; // "LUZ" | "GAS" | "TELEFONIA" o string libre
-  destacada: boolean;
-  activa: boolean;
-  creadaEn: string;
-};
+const HomeContenido: React.FC = () => {
+  const router = useRouter();
 
-type Props = {
-  qs: string; // querystring ya construido (agenteId/lugarId/qr)
-  lugarNombre: string | null;
-  fondoUrl: string | null;
-};
+  const irAlCRM = () => {
+    // Cambia "/login" por la ruta real de acceso al CRM si es distinta
+    router.push("/login");
+  };
 
-function tipoBadge(tipo: string) {
-  const t = (tipo || "").toLowerCase();
-  if (t.includes("luz") || t.includes("electric")) return { emoji: "💡", label: "Luz", cls: "bg-emerald-500/15 text-emerald-200 border-emerald-500/25" };
-  if (t.includes("gas")) return { emoji: "🔥", label: "Gas", cls: "bg-orange-500/15 text-orange-200 border-orange-500/25" };
-  if (t.includes("tele") || t.includes("móvil") || t.includes("fibra")) return { emoji: "📶", label: "Telefonía", cls: "bg-sky-500/15 text-sky-200 border-sky-500/25" };
-  return { emoji: "⭐", label: tipo || "Oferta", cls: "bg-slate-500/15 text-slate-200 border-slate-500/25" };
-}
+  const irARegistro = () => {
+    router.push("/registro");
+  };
 
-export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
-  const [q, setQ] = useState("");
-  const [tipo, setTipo] = useState<"ALL" | "LUZ" | "GAS" | "TELEFONIA">("ALL");
-  const [loading, setLoading] = useState(true);
-  const [ofertas, setOfertas] = useState<Oferta[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const irAComparador = (tipo?: "luz" | "gas" | "telefonia") => {
+    if (tipo) {
+      router.push(`/comparador?tipo=${tipo}`);
+    } else {
+      router.push("/comparador");
+    }
+  };
 
-  const registroHref = useMemo(() => `/registro${qs ? `?${qs}` : ""}`, [qs]);
-  const comparadorHref = useMemo(
-    () => `/comparador${qs ? `?${qs}` : ""}`,
-    [qs]
-  );
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Tu endpoint ya devuelve activas ordenadas por creadaEn desc
-        const res = await fetch("/api/ofertas", { cache: "no-store" });
-        const data = await res.json();
-
-        const list: Oferta[] = Array.isArray(data?.ofertas) ? data.ofertas : [];
-        if (!alive) return;
-
-        setOfertas(list);
-      } catch (e: any) {
-        if (!alive) return;
-        setError("No se pudieron cargar las ofertas.");
-      } finally {
-        if (!alive) return;
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const filtradas = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-
-    return ofertas.filter((o) => {
-      const t = String(o.tipo || "").toUpperCase();
-      const matchTipo =
-        tipo === "ALL" ||
-        (tipo === "LUZ" && t.includes("LUZ")) ||
-        (tipo === "GAS" && t.includes("GAS")) ||
-        (tipo === "TELEFONIA" && (t.includes("TELEFONIA") || t.includes("TEL")));
-
-      if (!matchTipo) return false;
-
-      if (!qq) return true;
-
-      const hay =
-        (o.titulo || "").toLowerCase().includes(qq) ||
-        (o.descripcionCorta || "").toLowerCase().includes(qq) ||
-        (o.descripcion || "").toLowerCase().includes(qq) ||
-        (o.tipo || "").toLowerCase().includes(qq);
-
-      return hay;
-    });
-  }, [ofertas, q, tipo]);
-
-  const destacadas = useMemo(() => filtradas.filter((o) => o.destacada), [filtradas]);
+  const irAGanaderia = () => {
+    router.push("/ganaderia");
+  };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      {/* HERO (móvil primero) */}
-      <section className="relative">
-        {/* Fondo */}
-        <div className="absolute inset-0">
-          {fondoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={fondoUrl}
+    <div className="min-h-screen bg-white text-slate-900">
+      {/* CABECERA SIMPLE */}
+      <header className="border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* Cambia la ruta del logo por la que ya usas en /registro */}
+            <Image
+              src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
               alt="Impulso Energético"
-              className="h-full w-full object-cover opacity-35"
+              width={70}
+              height={70}
+              className="h-12 w-auto"
             />
-          ) : (
-            <div className="h-full w-full bg-gradient-to-b from-slate-900 to-slate-950" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/30 via-slate-950/70 to-slate-950" />
-        </div>
-
-        {/* Contenido */}
-        <div className="relative max-w-6xl mx-auto px-4 pt-7 pb-7 sm:pt-10 sm:pb-10">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Image
-                src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
-                alt="Impulso Energético"
-                width={64}
-                height={64}
-                className="h-10 w-auto sm:h-12"
-              />
-              <div className="leading-tight">
-                <div className="text-[11px] sm:text-xs tracking-[0.22em] uppercase text-emerald-300 font-extrabold">
-                  Impulso Energético
-                </div>
-                <div className="text-xs sm:text-sm text-slate-200 font-semibold">
-                  Ahorra en Luz, Gas y Telefonía · Atención rápida
-                </div>
-              </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold tracking-[0.25em] text-sky-800 uppercase">
+                Impulso Energético
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Plataforma de energía inteligente para agentes, clientes y lugares
+              </span>
             </div>
+          </div>
 
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex items-center justify-center rounded-full border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs font-bold hover:bg-slate-900/70"
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={irAlCRM}
+              className="hidden sm:inline-flex px-4 py-2 rounded-full bg-sky-700 hover:bg-sky-800 text-white font-semibold transition"
             >
               Acceder al CRM
-            </Link>
-          </div>
-
-          <div className="mt-7 sm:mt-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/40 px-3 py-1 text-xs font-extrabold text-slate-100">
-              ⚡ Acceso desde enlace autorizado
-              {lugarNombre ? (
-                <span className="text-emerald-300">· {lugarNombre}</span>
-              ) : null}
-            </div>
-
-            <h1 className="mt-4 text-3xl sm:text-5xl font-black leading-tight">
-              Ahorra en tu factura{" "}
-              <span className="text-emerald-300">en 1 minuto</span>
-            </h1>
-
-            <p className="mt-3 text-sm sm:text-base text-slate-200 font-semibold">
-              Te buscamos la mejor opción y gestionamos el cambio por ti.
-              <span className="text-emerald-200"> Sin compromiso</span>.
-            </p>
-
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Link
-                href={registroHref}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-5 py-4 text-base"
-              >
-                ✅ Registrarme ahora (1 minuto)
-              </Link>
-
-              <Link
-                href={comparadorHref}
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900/40 hover:bg-slate-900/70 text-white font-extrabold px-5 py-4 text-base"
-              >
-                Ver comparador
-              </Link>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs sm:text-sm">
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/35 px-4 py-3 font-bold">
-                ✅ Estudio gratuito
-              </div>
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/35 px-4 py-3 font-bold">
-                ✅ Ahorro real
-              </div>
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/35 px-4 py-3 font-bold">
-                ✅ Ventajas por contratar
-              </div>
-            </div>
-
-            <p className="mt-3 text-[11px] sm:text-xs text-slate-300 font-semibold">
-              Tu acceso queda asociado al lugar/agente para atención prioritaria y trazabilidad.
-            </p>
+            </button>
+            <button
+              onClick={irARegistro}
+              className="px-4 py-2 rounded-full border border-sky-700 text-sky-800 font-semibold hover:bg-sky-50 transition"
+            >
+              Acceder a ofertas
+            </button>
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* LISTADO */}
-      <section className="max-w-6xl mx-auto px-4 pb-10">
-        <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-900/30 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold">
-                Ofertas disponibles
-              </h2>
-              <p className="text-slate-300 text-sm font-semibold mt-1">
-                Elige una oferta o regístrate y te llamamos para cerrarlo contigo.
+      {/* HERO CENTRAL */}
+      <main className="max-w-6xl mx-auto px-4 py-10 md:py-14 space-y-12">
+        <section className="text-center space-y-6">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
+              alt="Impulso Energético"
+              width={90}
+              height={90}
+              className="h-16 w-auto"
+            />
+          </div>
+
+          <h1 className="text-3xl md:text-4xl font-extrabold text-sky-800">
+            Bienvenido a Impulso Energético
+          </h1>
+
+          <p className="max-w-2xl mx-auto text-sm md:text-base text-slate-600">
+            Plataforma de energía inteligente para agentes, clientes y lugares.
+            Escanee un código QR, regístrese como cliente o acceda al CRM como comercial
+            para empezar a ahorrar y gestionar sus suministros.
+          </p>
+
+          <div className="flex flex-wrap justify-center gap-4 pt-2">
+            <button
+              onClick={irARegistro}
+              className="px-6 py-2.5 rounded-full bg-sky-700 hover:bg-sky-800 text-white text-sm font-semibold shadow-md shadow-sky-300/40 transition"
+            >
+              Soy cliente – ver ofertas
+            </button>
+            <button
+              onClick={irAlCRM}
+              className="px-6 py-2.5 rounded-full border border-sky-700 text-sky-800 text-sm font-semibold hover:bg-sky-50 transition"
+            >
+              Soy agente – acceder al CRM
+            </button>
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            Estudio gratuito · Ofertas reales y negociadas · Gestión completa de altas y portabilidades
+          </p>
+        </section>
+
+        {/* BLOQUE DE ACCESO RÁPIDO A SECCIONES */}
+        <section className="grid md:grid-cols-[1.6fr,1.4fr] gap-8 items-start">
+          {/* Tarjetas de secciones */}
+          <div className="space-y-4">
+            <h2 className="text-lg md:text-xl font-semibold text-slate-800">
+              Elige qué quieres optimizar
+            </h2>
+            <p className="text-sm text-slate-600 max-w-xl">
+              Desde esta página tendrás acceso a todos los proyectos de Impulso Energético:
+              comparador de luz y gas, telefonía, productos ganaderos, energía solar,
+              batería HERMES-IA y mucho más.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+              <button
+                onClick={() => irAComparador("luz")}
+                className="text-left p-4 rounded-2xl border border-sky-100 hover:border-sky-300 hover:shadow-sm transition bg-sky-50"
+              >
+                <div className="text-xl mb-1">💡</div>
+                <div className="font-semibold text-sky-900">Luz y electricidad</div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Compara tarifas, potencia y consigue una factura optimizada.
+                </p>
+              </button>
+
+              <button
+                onClick={() => irAComparador("gas")}
+                className="text-left p-4 rounded-2xl border border-orange-100 hover:border-orange-300 hover:shadow-sm transition bg-orange-50"
+              >
+                <div className="text-xl mb-1">🔥</div>
+                <div className="font-semibold text-orange-900">Gas</div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Estudia tus consumos y encuentra la mejor opción para tu negocio o vivienda.
+                </p>
+              </button>
+
+              <button
+                onClick={() => irAComparador("telefonia")}
+                className="text-left p-4 rounded-2xl border border-sky-100 hover:border-sky-300 hover:shadow-sm transition bg-sky-50"
+              >
+                <div className="text-xl mb-1">📶</div>
+                <div className="font-semibold text-sky-900">Telefonía y datos</div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Móvil, fibra, datos para empresas y soluciones convergentes.
+                </p>
+              </button>
+
+              <button
+                onClick={irAGanaderia}
+                className="text-left p-4 rounded-2xl border border-emerald-100 hover:border-emerald-300 hover:shadow-sm transition bg-emerald-50"
+              >
+                <div className="text-xl mb-1">🐄</div>
+                <div className="font-semibold text-emerald-900">
+                  Productos ganaderos
+                </div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Plásticos de ensilaje, mallas, ventilación, ordeños y más.
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Bloque lateral: “Acceso directo” + mini resumen ofertas */}
+          <div className="space-y-4">
+            <h2 className="text-lg md:text-xl font-semibold text-slate-800">
+              Acceso directo para clientes y agentes
+            </h2>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-sm">
+              <div className="space-y-1">
+                <div className="font-semibold text-slate-800">Clientes</div>
+                <p className="text-xs text-slate-600">
+                  Si has escaneado un QR o te ha invitado un comercial, empieza
+                  registrándote para ver tus ofertas personalizadas.
+                </p>
+                <button
+                  onClick={irARegistro}
+                  className="mt-2 inline-flex items-center px-4 py-1.5 rounded-full bg-sky-700 hover:bg-sky-800 text-white text-xs font-semibold transition"
+                >
+                  Ver ofertas y registrarme
+                </button>
+              </div>
+
+              <div className="h-px bg-slate-200" />
+
+              <div className="space-y-1">
+                <div className="font-semibold text-slate-800">Agentes / comerciales</div>
+                <p className="text-xs text-slate-600">
+                  Accede al CRM para gestionar lugares, comparativas, leads, carteles
+                  con QR y comisiones.
+                </p>
+                <button
+                  onClick={irAlCRM}
+                  className="mt-2 inline-flex items-center px-4 py-1.5 rounded-full border border-sky-700 text-sky-800 text-xs font-semibold hover:bg-sky-50 transition"
+                >
+                  Entrar al CRM
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
+              <div className="font-semibold text-slate-800">
+                Próximamente en esta página
+              </div>
+              <ul className="list-disc list-inside text-slate-600 space-y-1">
+                <li>Carrusel de ofertas destacadas conectado al comparador.</li>
+                <li>Acceso rápido a batería HERMES-IA y estudios de ahorro.</li>
+                <li>Panel público de productos ganaderos y ofertas especiales.</li>
+              </ul>
+              <p className="text-[11px] text-slate-500 pt-1">
+                Esta será la página base desde la que conectaremos todos los módulos
+                de Impulso Energético.
               </p>
             </div>
-
-            <div className="flex gap-2">
-              <Link
-                href={registroHref}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-4 py-3 text-sm"
-              >
-                Ir a registro
-              </Link>
-              <Link
-                href={comparadorHref}
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900/40 hover:bg-slate-900/70 text-white font-extrabold px-4 py-3 text-sm"
-              >
-                Comparador
-              </Link>
-            </div>
           </div>
+        </section>
 
-          {/* Buscador + filtros */}
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-3">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar ofertas (luz, gas, telefonía, compañía...)"
-              className="w-full rounded-2xl border border-slate-700 bg-slate-950/40 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-            />
-
-            <div className="grid grid-cols-4 gap-2">
-              {(["ALL", "LUZ", "GAS", "TELEFONIA"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTipo(t)}
-                  className={[
-                    "rounded-2xl px-3 py-3 text-xs font-extrabold border transition",
-                    tipo === t
-                      ? "bg-emerald-500 text-slate-950 border-emerald-400"
-                      : "bg-slate-950/30 text-slate-200 border-slate-700 hover:bg-slate-900/50",
-                  ].join(" ")}
-                >
-                  {t === "ALL" ? "Todo" : t === "LUZ" ? "Luz" : t === "GAS" ? "Gas" : "Tel"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Estados */}
-          {loading ? (
-            <div className="mt-6 text-slate-300 font-semibold">
-              Cargando ofertas...
-            </div>
-          ) : error ? (
-            <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-200 font-extrabold">
-              {error}
-            </div>
-          ) : filtradas.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 font-extrabold">
-              No hay ofertas con esos filtros ahora mismo.
-            </div>
-          ) : (
-            <>
-              {/* Destacadas */}
-              {destacadas.length > 0 ? (
-                <div className="mt-6">
-                  <div className="text-sm font-extrabold text-emerald-200">
-                    ⭐ Destacadas
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {destacadas.map((o) => {
-                      const b = tipoBadge(o.tipo);
-                      return (
-                        <div
-                          key={o.id}
-                          className="rounded-3xl border border-slate-800 bg-slate-950/35 p-5"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-extrabold ${b.cls}`}>
-                              <span>{b.emoji}</span>
-                              <span>{b.label}</span>
-                              <span className="text-slate-300">· destacada</span>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 text-lg font-extrabold">
-                            {o.titulo}
-                          </div>
-
-                          {o.descripcionCorta ? (
-                            <div className="mt-2 text-sm text-slate-200 font-semibold">
-                              {o.descripcionCorta}
-                            </div>
-                          ) : null}
-
-                          {o.descripcion ? (
-                            <div className="mt-2 text-xs text-slate-300 font-semibold line-clamp-4">
-                              {o.descripcion}
-                            </div>
-                          ) : null}
-
-                          <div className="mt-4 grid grid-cols-1 gap-2">
-                            <Link
-                              href={registroHref}
-                              className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-4 py-3 text-sm"
-                            >
-                              ✅ Quiero esta oferta (me registro)
-                            </Link>
-                            <Link
-                              href={comparadorHref}
-                              className="inline-flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900/40 hover:bg-slate-900/70 text-white font-extrabold px-4 py-3 text-sm"
-                            >
-                              Ver comparador
-                            </Link>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Todas */}
-              <div className="mt-7">
-                <div className="text-sm font-extrabold text-slate-200">
-                  Todas las ofertas
-                </div>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {filtradas.map((o) => {
-                    const b = tipoBadge(o.tipo);
-                    return (
-                      <div
-                        key={o.id}
-                        className="rounded-3xl border border-slate-800 bg-slate-950/25 p-5 hover:bg-slate-950/40 transition"
-                      >
-                        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-extrabold ${b.cls}`}>
-                          <span>{b.emoji}</span>
-                          <span>{b.label}</span>
-                        </div>
-
-                        <div className="mt-3 text-base font-extrabold">
-                          {o.titulo}
-                        </div>
-
-                        {o.descripcionCorta ? (
-                          <div className="mt-2 text-sm text-slate-200 font-semibold">
-                            {o.descripcionCorta}
-                          </div>
-                        ) : null}
-
-                        {o.descripcion ? (
-                          <div className="mt-2 text-xs text-slate-300 font-semibold line-clamp-4">
-                            {o.descripcion}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-4 grid grid-cols-1 gap-2">
-                          <Link
-                            href={registroHref}
-                            className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-4 py-3 text-sm"
-                          >
-                            ✅ Me interesa (registrarme)
-                          </Link>
-                          <Link
-                            href={comparadorHref}
-                            className="inline-flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-900/40 hover:bg-slate-900/70 text-white font-extrabold px-4 py-3 text-sm"
-                          >
-                            Comparador
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+        {/* CÓMO FUNCIONA */}
+        <section className="border-t border-slate-200 pt-8 space-y-4">
+          <h2 className="text-lg md:text-xl font-semibold text-slate-800 text-center">
+            ¿Cómo funciona Impulso Energético?
+          </h2>
+          <div className="grid md:grid-cols-4 gap-4 text-xs md:text-sm">
+            <div className="text-center space-y-2">
+              <div className="w-8 h-8 mx-auto flex items-center justify-center rounded-full bg-sky-100 text-sky-800 font-bold">
+                1
               </div>
-            </>
-          )}
-        </div>
+              <div className="font-semibold">Escanea o accede</div>
+              <p className="text-slate-600">
+                Escanea un QR, entra desde un enlace o accede a esta página como
+                cliente o comercial.
+              </p>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-8 h-8 mx-auto flex items-center justify-center rounded-full bg-sky-100 text-sky-800 font-bold">
+                2
+              </div>
+              <div className="font-semibold">Regístrate o inicia sesión</div>
+              <p className="text-slate-600">
+                Los clientes se registran en segundos; los agentes acceden al CRM
+                con su usuario.
+              </p>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-8 h-8 mx-auto flex items-center justify-center rounded-full bg-sky-100 text-sky-800 font-bold">
+                3
+              </div>
+              <div className="font-semibold">Compara y elige</div>
+              <p className="text-slate-600">
+                El comparador y el equipo de Impulso buscan las mejores opciones
+                para cada caso.
+              </p>
+            </div>
+            <div className="text-center space-y-2">
+              <div className="w-8 h-8 mx-auto flex items-center justify-center rounded-full bg-sky-100 text-sky-800 font-bold">
+                4
+              </div>
+              <div className="font-semibold">Ahorra y haz seguimiento</div>
+              <p className="text-slate-600">
+                Gestionamos altas y cambios, y podrás hacer seguimiento desde el
+                CRM y los informes.
+              </p>
+            </div>
+          </div>
+        </section>
 
-        {/* Footer mini */}
-        <div className="mt-6 text-center text-[11px] text-slate-400 font-semibold">
-          Impulso Energético · Estudio gratuito · Gestión completa de altas y portabilidades
-        </div>
-      </section>
-    </main>
+        {/* FOOTER SIMPLE */}
+        <footer className="pt-6 border-t border-slate-200 mt-4 flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+          <span>© {new Date().getFullYear()} Impulso Energético</span>
+          <div className="flex gap-4">
+            <button
+              onClick={() => router.push("/legal")}
+              className="hover:text-sky-700 transition"
+            >
+              Aviso legal
+            </button>
+            <button
+              onClick={() => router.push("/privacidad")}
+              className="hover:text-sky-700 transition"
+            >
+              Privacidad
+            </button>
+            <button
+              onClick={() => router.push("/cookies")}
+              className="hover:text-sky-700 transition"
+            >
+              Política de cookies
+            </button>
+          </div>
+        </footer>
+      </main>
+    </div>
   );
-}
+};
+
+export default HomeContenido;
