@@ -7,8 +7,8 @@ export const runtime = "nodejs";
 type NextSearchParams = Record<string, string | string[] | undefined>;
 
 type PageProps = {
-  params: { id: string };
-  searchParams?: NextSearchParams;
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<NextSearchParams>;
 };
 
 function toSingle(v: string | string[] | undefined) {
@@ -17,7 +17,8 @@ function toSingle(v: string | string[] | undefined) {
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const lugarId = Number(params.id);
+  const { id } = await params;
+  const lugarId = Number(id);
 
   const lugar = Number.isFinite(lugarId)
     ? await prisma.lugar.findUnique({
@@ -62,9 +63,15 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function Page({ params, searchParams }: PageProps) {
-  const lugarId = Number(params.id);
-  const sp: NextSearchParams = searchParams ?? {};
-  const v = toSingle(sp.v); // opcional, para bust cache
+  const { id } = await params;
+  const lugarId = Number(id);
+
+  // ✅ searchParams puede venir como Promise en tu build (Next 15)
+  const sp: NextSearchParams =
+    (await searchParams?.catch(() => ({} as NextSearchParams))) ?? {};
+
+  // ✅ lectura segura del parámetro "v"
+  const v = toSingle((sp as NextSearchParams)["v"]);
 
   if (!Number.isFinite(lugarId) || lugarId <= 0) {
     return (
@@ -81,10 +88,16 @@ export default async function Page({ params, searchParams }: PageProps) {
 
   const lugar = await prisma.lugar.findUnique({
     where: { id: lugarId },
-    select: { id: true, agenteId: true, qrCode: true, nombre: true, especialMensaje: true },
+    select: {
+      id: true,
+      agenteId: true,
+      qrCode: true,
+      nombre: true,
+      especialMensaje: true,
+    },
   });
 
-  // Fondo activo para mostrar en pantalla (preview)
+  // ✅ Fondo activo para mostrar en pantalla (preview)
   const fondoActivo = await prisma.fondo.findFirst({
     where: { activo: true },
     orderBy: { creadoEn: "desc" },
