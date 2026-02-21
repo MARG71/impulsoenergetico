@@ -83,19 +83,7 @@ export default function ShareLugarClient(props: {
         <div className="mt-5 rounded-3xl border border-slate-800 bg-black/30 overflow-hidden">
           {fondoUrl ? (
             <div className="p-3 md:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs md:text-sm font-extrabold text-slate-200">
-                  {fondoNombre ? `🖼️ ${fondoNombre}` : "🖼️ Imagen informativa"}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setZoom(true)}
-                  className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-2 text-xs font-extrabold"
-                >
-                  🔍 Ver grande
-                </button>
-              </div>
+              
 
               <div className="mt-3 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/40">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
