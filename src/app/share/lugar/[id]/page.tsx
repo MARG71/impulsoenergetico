@@ -14,41 +14,7 @@ type PageProps = {
 
 function toSingle(v: string | string[] | undefined) {
   if (!v) return "";
-  return Array.isArray(v) ? String(v[0] ?? "") : String(v);
-}
-
-// ✅ AJUSTA si tu home pública es /home
-const HOME_PUBLIC_PATH = "/";
-
-async function getShareImageUrl(lugarId?: number) {
-  // 1) Marketing activo (redes/whatsapp) por lugar si existe, si no global
-  const byLugar =
-    lugarId && Number.isFinite(lugarId)
-      ? await prisma.marketingAsset.findFirst({
-          where: { activo: true, tipo: "IMAGE", lugarId },
-          orderBy: { creadaEn: "desc" },
-          select: { url: true },
-        })
-      : null;
-
-  if (byLugar?.url) return byLugar.url;
-
-  const global = await prisma.marketingAsset.findFirst({
-    where: { activo: true, tipo: "IMAGE" },
-    orderBy: { creadaEn: "desc" },
-    select: { url: true },
-  });
-
-  if (global?.url) return global.url;
-
-  // 2) Fondo activo (fallback)
-  const fondoActivo = await prisma.fondo.findFirst({
-    where: { activo: true },
-    orderBy: { creadoEn: "desc" },
-    select: { url: true },
-  });
-
-  return fondoActivo?.url ?? null;
+  return Array.isArray(v) ? v[0] : v;
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -62,7 +28,11 @@ export async function generateMetadata({ params }: PageProps) {
       })
     : null;
 
-  const imageUrl = await getShareImageUrl(lugarId);
+  const fondoActivo = await prisma.fondo.findFirst({
+    where: { activo: true },
+    orderBy: { creadoEn: "desc" },
+    select: { url: true },
+  });
 
   const title = lugar?.nombre
     ? `Impulso Energético · ${lugar.nombre}`
@@ -70,25 +40,15 @@ export async function generateMetadata({ params }: PageProps) {
 
   const description =
     lugar?.especialMensaje ||
-    "Ahorra en Luz, Gas, Telefonía y Seguros. Registro en 1 minuto y atención personalizada.";
+    "Ahorra en Luz, Gas y Telefonía. Registro en 1 minuto y atención personalizada.";
 
-  const images = imageUrl ? [imageUrl] : [];
+  const images = fondoActivo?.url ? [fondoActivo.url] : [];
 
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      images,
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images,
-    },
+    openGraph: { title, description, images, type: "website" },
+    twitter: { card: "summary_large_image", title, description, images },
   };
 }
 
@@ -99,7 +59,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   const sp: NextSearchParams =
     (await searchParams?.catch(() => ({} as NextSearchParams))) ?? {};
 
-  const v = toSingle(sp["v"]);
+  const v = toSingle((sp as NextSearchParams)["v"]);
 
   if (!Number.isFinite(lugarId) || lugarId <= 0) {
     return (
@@ -122,12 +82,15 @@ export default async function Page({ params, searchParams }: PageProps) {
       qrCode: true,
       nombre: true,
       especialMensaje: true,
-      especial: true,
       especialLogoUrl: true,
     },
   });
 
-  const imagenShare = await getShareImageUrl(lugarId);
+  const fondoActivo = await prisma.fondo.findFirst({
+    where: { activo: true },
+    orderBy: { creadoEn: "desc" },
+    select: { url: true, nombre: true },
+  });
 
   const qs = new URLSearchParams();
   if (lugar?.agenteId) qs.set("agenteId", String(lugar.agenteId));
@@ -135,20 +98,25 @@ export default async function Page({ params, searchParams }: PageProps) {
   if (lugar?.qrCode) qs.set("qr", String(lugar.qrCode));
   if (v) qs.set("v", v);
 
+  // ✅ Para que en /registro se vea el nombre (sin enseñar IDs)
+  if (lugar?.nombre) qs.set("lugarNombre", lugar.nombre);
+
   const registroHref = `/registro?${qs.toString()}`;
-  const ofertasHref = `${HOME_PUBLIC_PATH}?${qs.toString()}`; // ✅ Directo a pantallazo 5
+  // ✅ si quieres que “ver ofertas” vaya directo a Home pública, lo dejamos para más tarde.
+  const ofertasHref = `/?${qs.toString()}`;
 
   return (
     <ShareLugarClient
       lugarNombre={lugar?.nombre ?? "Lugar autorizado"}
       especialMensaje={
         lugar?.especialMensaje ??
-        "Te ayudamos a elegir la mejor opción en Luz, Gas, Telefonía, Seguros e instalaciones de eficiencia energética."
+        "Te ayudamos a elegir la mejor opción en Luz, Gas, Telefonía y Seguros. Atención rápida y sin compromiso."
       }
-      imagenUrl={imagenShare}
-      partnerLogoUrl={lugar?.especial ? lugar?.especialLogoUrl ?? null : null}
+      fondoUrl={fondoActivo?.url ?? null}
+      fondoNombre={fondoActivo?.nombre ?? null}
       registroHref={registroHref}
       ofertasHref={ofertasHref}
+      partnerLogoUrl={lugar?.especialLogoUrl ?? null}
     />
   );
 }
