@@ -1,3 +1,4 @@
+// src/app/share/lugar/[id]/redirect-client.tsx
 "use client";
 
 import { useEffect, useState } from "react";

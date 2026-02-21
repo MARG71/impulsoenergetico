@@ -1,7 +1,19 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
+
+const IMPULSO_LOGO = "/logo-impulso-definitivo.png";
+
+// ✅ AJUSTA si tu home pública es /home
+const HOME_PUBLIC_PATH = "/";
+
+type Estado = "idle" | "loading" | "ok" | "error";
+
+function cx(...s: Array<string | false | null | undefined>) {
+  return s.filter(Boolean).join(" ");
+}
 
 export default function RegistroFormulario() {
   const router = useRouter();
@@ -9,28 +21,45 @@ export default function RegistroFormulario() {
 
   const agenteIdParam = searchParams.get("agenteId");
   const lugarIdParam = searchParams.get("lugarId");
+  const qrParam = searchParams.get("qr");
+  const vParam = searchParams.get("v");
   const nombreParam = searchParams.get("nombre") || "";
 
   const [nombre, setNombre] = useState(nombreParam);
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
 
-  // 👇 estados de control
-  const [cargando, setCargando] = useState(false);
+  const [estado, setEstado] = useState<Estado>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
 
   useEffect(() => {
     if (nombreParam) setNombre(nombreParam);
   }, [nombreParam]);
 
+  const qsBase = useMemo(() => {
+    const p = new URLSearchParams();
+    if (agenteIdParam) p.set("agenteId", agenteIdParam);
+    if (lugarIdParam) p.set("lugarId", lugarIdParam);
+    if (qrParam) p.set("qr", qrParam);
+    if (vParam) p.set("v", vParam);
+    return p;
+  }, [agenteIdParam, lugarIdParam, qrParam, vParam]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCargando(true);
+    setEstado("loading");
     setError(null);
-    setOk(false);
 
     try {
+      // ✅ fallback localStorage (lo que querías)
+      const agenteLs =
+        typeof window !== "undefined" ? localStorage.getItem("agenteId") : null;
+      const lugarLs =
+        typeof window !== "undefined" ? localStorage.getItem("lugarId") : null;
+
+      const agenteToSend = agenteIdParam || agenteLs;
+      const lugarToSend = lugarIdParam || lugarLs;
+
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,8 +67,8 @@ export default function RegistroFormulario() {
           nombre,
           email,
           telefono,
-          agenteId: agenteIdParam,
-          lugarId: lugarIdParam,
+          agenteId: agenteToSend,
+          lugarId: lugarToSend,
         }),
       });
 
@@ -48,151 +77,202 @@ export default function RegistroFormulario() {
         throw new Error(dataErr?.error || "Error al registrar tus datos");
       }
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      const lead = data?.lead || {};
+      const esNuevoLead = !!data?.nuevoLead;
 
-      const lead = data.lead || {};
-      const esNuevoLead = !!data.nuevoLead;
-
-      // Nombre / agente / lugar definitivos (los del lead que queda en BD)
       const nombreFinal: string = lead.nombre || nombre;
 
-      const agenteFinal: number | undefined =
+      const agenteFinal =
         typeof lead.agenteId === "number"
           ? lead.agenteId
-          : agenteIdParam
-          ? Number(agenteIdParam)
+          : agenteToSend
+          ? Number(agenteToSend)
           : undefined;
 
-      const lugarFinal: number | undefined =
+      const lugarFinal =
         typeof lead.lugarId === "number"
           ? lead.lugarId
-          : lugarIdParam
-          ? Number(lugarIdParam)
+          : lugarToSend
+          ? Number(lugarToSend)
           : undefined;
 
-      // Guardamos en localStorage para siguientes visitas
+      // ✅ Guardamos para futuras visitas
       try {
         if (nombreFinal) localStorage.setItem("clienteNombre", nombreFinal);
         if (email) localStorage.setItem("clienteEmail", email);
         if (telefono) localStorage.setItem("clienteTelefono", telefono);
-        if (agenteFinal)
-          localStorage.setItem("agenteId", String(agenteFinal));
+        if (agenteFinal) localStorage.setItem("agenteId", String(agenteFinal));
         if (lugarFinal) localStorage.setItem("lugarId", String(lugarFinal));
         localStorage.setItem("leadOK", "1");
       } catch {
-        // ignoramos errores de localStorage
+        // ignore
       }
 
       if (!esNuevoLead) {
-        // 📌 Email ya existía
         alert(
-          "Este email ya estaba registrado. Te llevamos a tu zona de cliente para que veas tus ofertas."
+          "Este email ya estaba registrado. Te llevamos a las ofertas igualmente."
         );
       }
 
-      // Redirigimos a bienvenida con los datos “oficiales”
-      const params = new URLSearchParams();
-      if (nombreFinal) params.set("nombre", nombreFinal);
-      if (agenteFinal) params.set("agenteId", String(agenteFinal));
-      if (lugarFinal) params.set("lugarId", String(lugarFinal));
+      // ✅ Redirigir directo a HOME (pantallazo 5) con QS
+      const p = new URLSearchParams(qsBase.toString());
+      if (nombreFinal) p.set("nombre", nombreFinal);
+      if (agenteFinal) p.set("agenteId", String(agenteFinal));
+      if (lugarFinal) p.set("lugarId", String(lugarFinal));
 
-      setOk(true);
-      router.push(`/bienvenida?${params.toString()}`);
+      setEstado("ok");
+      router.push(`${HOME_PUBLIC_PATH}?${p.toString()}`);
     } catch (err: any) {
       console.error(err);
+      setEstado("error");
       setError(
         err?.message ||
           "Ha ocurrido un error al registrar tus datos. Inténtalo de nuevo."
       );
-    } finally {
-      setCargando(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8 text-slate-50">
-      <div className="w-full max-w-lg rounded-3xl bg-slate-950/90 border border-emerald-500/60 shadow-[0_0_40px_rgba(16,185,129,0.6)] p-6 md:p-8 space-y-6">
-        <header className="space-y-2">
-          <p className="text-[10px] md:text-xs font-semibold tracking-[0.28em] text-emerald-300 uppercase">
-            IMPULSO ENERGÉTICO
-          </p>
-          <h1 className="text-xl md:text-2xl font-extrabold leading-snug">
-            Regístrate para{" "}
-            <span className="text-emerald-400">desbloquear tus ofertas</span> y
-            recibir el estudio de ahorro.
-          </h1>
+    <div className="min-h-screen text-white">
+      {/* Fondo ULTRA */}
+      <div className="fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-slate-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.22),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(56,189,248,0.18),transparent_55%)]" />
+        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:28px_28px]" />
+      </div>
+
+      <div className="min-h-screen flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-xl rounded-[28px] border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_25px_120px_rgba(0,0,0,0.55)] p-6 md:p-8">
+          {/* Header con logo grande */}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute -inset-6 rounded-full bg-emerald-400/20 blur-2xl" />
+              <Image
+                src={IMPULSO_LOGO}
+                alt="Impulso Energético"
+                width={92}
+                height={92}
+                priority
+                className="relative rounded-2xl"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <div className="text-[11px] md:text-xs font-extrabold tracking-[0.32em] uppercase text-emerald-300">
+                IMPULSO ENERGÉTICO
+              </div>
+              <h1 className="mt-1 text-2xl md:text-3xl font-extrabold leading-snug">
+                Regístrate para{" "}
+                <span className="text-emerald-300 drop-shadow-[0_0_18px_rgba(16,185,129,0.35)]">
+                  desbloquear tus ofertas
+                </span>{" "}
+                y recibir el estudio de ahorro.
+              </h1>
+            </div>
+          </div>
+
+          {/* QR detectado */}
           {(agenteIdParam || lugarIdParam) && (
-            <p className="text-[11px] text-slate-400">
-              QR detectado ·{" "}
-              {agenteIdParam && (
-                <>
-                  Agente: <b>{agenteIdParam}</b>{" "}
-                </>
-              )}
-              {lugarIdParam && (
-                <>
-                  · Lugar: <b>{lugarIdParam}</b>
-                </>
-              )}
-            </p>
-          )}
-        </header>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-slate-200">
-              Nombre completo
-            </label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-slate-200">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-slate-200">
-              Teléfono
-            </label>
-            <input
-              type="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/80"
-              required
-            />
-          </div>
-
-          {error && <p className="text-xs text-red-300">{error}</p>}
-          {ok && (
-            <p className="text-xs text-emerald-300">
-              Datos registrados correctamente. Te estamos redirigiendo…
-            </p>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="text-sm font-extrabold text-slate-100">
+                ✅ Acceso detectado
+              </div>
+              <div className="mt-1 text-sm text-slate-200 font-semibold">
+                {agenteIdParam ? (
+                  <>
+                    Agente: <b className="text-white">{agenteIdParam}</b>{" "}
+                  </>
+                ) : null}
+                {lugarIdParam ? (
+                  <>
+                    · Lugar: <b className="text-white">{lugarIdParam}</b>
+                  </>
+                ) : null}
+              </div>
+              <div className="mt-2 text-xs text-slate-300 font-semibold">
+                Tus datos quedan asociados para atención prioritaria.
+              </div>
+            </div>
           )}
 
-          <button
-            type="submit"
-            disabled={cargando}
-            className="mt-2 w-full px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-slate-950 shadow shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {cargando ? "Guardando..." : "Guardar mis datos y continuar"}
-          </button>
-        </form>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-extrabold text-slate-100">
+                Nombre completo
+              </label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                className="w-full rounded-2xl bg-slate-950/40 border border-white/10 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                required
+                placeholder="Ej: Miguel Ángel Reyes"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-extrabold text-slate-100">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-2xl bg-slate-950/40 border border-white/10 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                required
+                placeholder="tuemail@gmail.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-extrabold text-slate-100">
+                Teléfono
+              </label>
+              <input
+                type="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                className="w-full rounded-2xl bg-slate-950/40 border border-white/10 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70"
+                required
+                placeholder="600 000 000"
+              />
+            </div>
+
+            {estado === "error" && error ? (
+              <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-red-200 font-extrabold text-sm">
+                {error}
+              </div>
+            ) : null}
+
+            {estado === "ok" ? (
+              <div className="rounded-2xl border border-emerald-500/35 bg-emerald-500/10 p-4 text-emerald-200 font-extrabold text-sm">
+                ✅ Datos registrados. Te estamos llevando a las ofertas…
+              </div>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={estado === "loading"}
+              className={cx(
+                "mt-2 w-full rounded-2xl",
+                "bg-emerald-500 hover:bg-emerald-400 text-slate-950",
+                "font-extrabold px-6 py-4 text-lg",
+                "shadow-2xl transition active:scale-[0.99]",
+                "disabled:opacity-60 disabled:cursor-not-allowed",
+                "hover:shadow-[0_0_0_10px_rgba(16,185,129,0.18)]",
+                estado === "loading" && "animate-pulse"
+              )}
+            >
+              {estado === "loading" ? "Guardando..." : "Guardar mis datos y ver ofertas 👇"}
+            </button>
+
+            <div className="pt-2 text-xs text-slate-300 font-semibold text-center">
+              🔒 Tus datos se usan solo para darte el estudio y ofertas. Sin spam.
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
