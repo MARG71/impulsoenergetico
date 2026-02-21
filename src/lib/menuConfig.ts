@@ -35,7 +35,7 @@ export const MENU_BY_ROLE: Record<Role, MenuItem[]> = {
 
     // AVANZADO
     { group: "AVANZADO", label: "Fondos carteles", href: "/lugares/fondos", icon: "🖼️" },
-    { group: "AVANZADO", label: "Ofertas", href: "/ofertas", icon: "📢" },
+    { group: "AVANZADO", label: "Ofertas", href: "/crm/ofertas", icon: "📢" },
     { group: "AVANZADO", label: "Productos ganaderos", href: "/productos-ganaderos", icon: "🐄" },
     { group: "AVANZADO", label: "Crear acceso usuario", href: "/crear-usuario", icon: "🔐" },
   ],
@@ -64,7 +64,7 @@ export const MENU_BY_ROLE: Record<Role, MenuItem[]> = {
 
     // AVANZADO
     { group: "AVANZADO", label: "Fondos carteles", href: "/lugares/fondos", icon: "🖼️" },
-    { group: "AVANZADO", label: "Ofertas", href: "/ofertas", icon: "📢" },
+    { group: "AVANZADO", label: "Ofertas", href: "/crm/ofertas", icon: "📢" },
     { group: "AVANZADO", label: "Productos ganaderos", href: "/productos-ganaderos", icon: "🐄" },
     { group: "AVANZADO", label: "Crear acceso usuario", href: "/crear-usuario", icon: "🔐" },
   ],
