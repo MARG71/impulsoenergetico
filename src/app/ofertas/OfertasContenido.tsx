@@ -8,19 +8,29 @@ type Props = {
   qs: string;
   lugarNombre: string | null;
   fondoUrl: string | null;
+
+  // ✅ Logo del club/asociación (opcional por query)
+  partnerLogoUrl?: string | null;
 };
 
 function cx(...s: Array<string | false | null | undefined>) {
   return s.filter(Boolean).join(" ");
 }
 
-export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
+const IMPULSO_LOGO = "/logo-impulso-definitivo.png"; // ✅ TU LOGO (renombrado recomendado)
+
+export default function OfertasContenido({
+  qs,
+  lugarNombre,
+  fondoUrl,
+  partnerLogoUrl,
+}: Props) {
   const router = useRouter();
 
   const qsFinal = useMemo(() => (qs ? `?${qs}` : ""), [qs]);
 
   const irRegistro = () => router.push(`/registro${qsFinal}`);
-  const irOfertas = () => router.push(`/bienvenida${qsFinal}`); // ✅ si quieres “ofertas” a otra ruta, dime y lo ajusto
+  const irVerOfertas = () => router.push(`/bienvenida${qsFinal}`); // ajustable si quieres otra ruta
 
   // Splash (logo al inicio)
   const [showSplash, setShowSplash] = useState(true);
@@ -29,7 +39,7 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 900);
+    const t = setTimeout(() => setShowSplash(false), 850);
     return () => clearTimeout(t);
   }, []);
 
@@ -46,30 +56,46 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
       {/* Fondo ULTRA PRO */}
       <div className="fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-slate-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.18),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(56,189,248,0.16),transparent_55%)]" />
-        <div className="absolute inset-0 opacity-30 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:28px_28px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.20),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(56,189,248,0.18),transparent_55%)]" />
+        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:28px_28px]" />
       </div>
 
       {/* Splash */}
       {showSplash && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-5">
             <div className="relative">
-              <div className="absolute -inset-6 rounded-full bg-emerald-400/20 blur-2xl" />
+              <div className="absolute -inset-10 rounded-full bg-emerald-400/20 blur-3xl" />
               <Image
-                src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
+                src={IMPULSO_LOGO}
                 alt="Impulso Energético"
-                width={140}
-                height={140}
+                width={190}
+                height={190}
                 priority
               />
             </div>
+
+            {/* Partner (si viene de sitio especial) */}
+            {partnerLogoUrl ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={partnerLogoUrl}
+                  alt="Logo del lugar"
+                  className="h-8 w-8 object-contain rounded"
+                />
+                <div className="text-xs font-extrabold text-slate-200">
+                  Acceso desde un lugar autorizado
+                </div>
+              </div>
+            ) : null}
+
             <div className="text-center">
-              <div className="text-sm tracking-[0.28em] uppercase text-slate-300 font-bold">
+              <div className="text-sm tracking-[0.32em] uppercase text-slate-200 font-extrabold">
                 Impulso Energético
               </div>
-              <div className="mt-1 text-slate-400 text-xs font-semibold">
-                Cargando ofertas…
+              <div className="mt-2 text-slate-400 text-xs font-semibold">
+                Preparando ofertas y registro…
               </div>
             </div>
           </div>
@@ -77,56 +103,65 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
       )}
 
       {/* Header */}
-      <header className="px-5 pt-6">
-        <div className="mx-auto max-w-6xl flex items-center justify-between gap-4">
+      <header className="px-4 sm:px-8 pt-6">
+        <div className="mx-auto w-full max-w-[1500px] flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="absolute -inset-3 rounded-full bg-emerald-400/15 blur-xl" />
+              <div className="absolute -inset-4 rounded-full bg-emerald-400/15 blur-2xl" />
               <Image
-                src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
+                src={IMPULSO_LOGO}
                 alt="Impulso Energético"
-                width={54}
-                height={54}
+                width={70}
+                height={70}
                 priority
                 className="relative"
               />
             </div>
+
             <div className="leading-tight">
-              <div className="text-xs font-extrabold tracking-[0.24em] uppercase text-slate-200">
+              <div className="text-xs sm:text-sm font-extrabold tracking-[0.28em] uppercase text-slate-200">
                 Impulso Energético
               </div>
-              <div className="text-[12px] text-slate-300 font-semibold">
-                Ofertas reales · Ahorro inmediato
+
+              <div className="text-[12px] sm:text-sm text-slate-300 font-semibold">
+                Ofertas reales · Atención rápida · Ahorro
               </div>
             </div>
           </div>
 
-          <button
-            onClick={irRegistro}
-            className="hidden sm:inline-flex items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-5 py-2"
-          >
-            Registrarme
-          </button>
+          {/* Partner logo en header (si existe) */}
+          {partnerLogoUrl ? (
+            <div className="hidden md:flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={partnerLogoUrl}
+                alt="Logo del lugar"
+                className="h-8 w-8 object-contain rounded"
+              />
+              <div className="text-xs font-extrabold text-slate-200">
+                Lugar autorizado
+              </div>
+            </div>
+          ) : null}
         </div>
       </header>
 
       {/* Main */}
-      <main className="px-5 pb-28 sm:pb-10 pt-6">
-        <div className="mx-auto max-w-6xl grid lg:grid-cols-[1.1fr,0.9fr] gap-6 items-start">
-          {/* Columna izquierda */}
+      <main className="px-4 sm:px-8 pb-28 sm:pb-10 pt-6">
+        <div className="mx-auto w-full max-w-[1500px] grid lg:grid-cols-[1.55fr,0.85fr] gap-6 items-start">
+          {/* Izquierda */}
           <section className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_20px_90px_rgba(0,0,0,0.45)] overflow-hidden">
-            {/* Hero */}
-            <div className="p-6 sm:p-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-bold text-slate-200">
-                ⚡ Acceso rápido desde QR
+            <div className="p-6 sm:p-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs sm:text-sm font-extrabold text-slate-200">
+                ⚡ Acceso rápido desde QR / Enlace
               </div>
 
-              <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold leading-tight">
+              <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
                 Ahorra en tu factura{" "}
                 <span className="text-emerald-300">desde hoy</span>
               </h1>
 
-              <p className="mt-3 text-slate-200/90 font-semibold">
+              <p className="mt-4 text-base sm:text-lg lg:text-xl text-slate-200/90 font-semibold">
                 {lugarNombre ? (
                   <>
                     Estás accediendo desde:{" "}
@@ -147,7 +182,7 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
               </p>
 
               {/* Chips */}
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-6 flex flex-wrap gap-2">
                 {[
                   "✅ Estudio gratis",
                   "🔥 Mejor precio",
@@ -157,16 +192,53 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
                 ].map((t) => (
                   <span
                     key={t}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-extrabold text-slate-100"
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs sm:text-sm font-extrabold text-slate-100"
                   >
                     {t}
                   </span>
                 ))}
               </div>
+
+              {/* CTAs (desktop) */}
+              <div className="mt-8 hidden sm:grid grid-cols-2 gap-4">
+                {/* REGISTRO (verde) */}
+                <button
+                  onClick={irRegistro}
+                  className={cx(
+                    "relative overflow-hidden rounded-2xl",
+                    "bg-emerald-500 hover:bg-emerald-400 text-slate-950",
+                    "font-extrabold px-6 py-5 text-lg lg:text-xl",
+                    "shadow-xl active:scale-[0.99] transition",
+                    "hover:shadow-[0_0_0_6px_rgba(16,185,129,0.15)]"
+                  )}
+                >
+                  <span className="relative z-10">✅ Registrarme (1 minuto)</span>
+                  <span className="absolute inset-0 opacity-0 hover:opacity-100 transition">
+                    <span className="absolute -inset-12 bg-white/20 blur-2xl animate-pulse" />
+                  </span>
+                </button>
+
+                {/* VER OFERTAS (amarillo llamativo) */}
+                <button
+                  onClick={irVerOfertas}
+                  className={cx(
+                    "relative overflow-hidden rounded-2xl",
+                    "bg-amber-400 hover:bg-amber-300 text-slate-950",
+                    "font-extrabold px-6 py-5 text-lg lg:text-xl",
+                    "shadow-xl active:scale-[0.99] transition",
+                    "hover:shadow-[0_0_0_6px_rgba(251,191,36,0.18)]"
+                  )}
+                >
+                  <span className="relative z-10">👀 Ver ofertas primero</span>
+                  <span className="absolute inset-0 opacity-0 hover:opacity-100 transition">
+                    <span className="absolute -inset-12 bg-white/25 blur-2xl animate-pulse" />
+                  </span>
+                </button>
+              </div>
             </div>
 
             {/* Cartel */}
-            <div className="px-6 sm:px-8 pb-7">
+            <div className="px-6 sm:px-10 pb-8">
               {fondoUrl ? (
                 <button
                   type="button"
@@ -174,23 +246,22 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
                   className="w-full text-left group"
                   aria-label="Ver cartel en grande"
                 >
-                  <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-black/25 shadow-xl">
+                  <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-black/25 shadow-2xl">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={fondoUrl}
                       alt="Cartel"
-                      className={cx(
-                        "w-full h-auto",
-                        "max-h-[520px] object-contain bg-black/30"
-                      )}
+                      className="w-full h-auto max-h-[640px] object-contain bg-black/30"
                     />
+
+                    {/* overlay hint */}
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition">
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                       <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-white">
-                          Toca para ver en grande
+                        <span className="text-sm font-extrabold text-white">
+                          Toca para verlo en grande
                         </span>
-                        <span className="text-xs font-extrabold text-emerald-300">
+                        <span className="text-sm font-extrabold text-emerald-300 animate-bounce">
                           🔍 Zoom
                         </span>
                       </div>
@@ -203,43 +274,57 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
                 </div>
               )}
 
-              <p className="mt-3 text-xs text-slate-300 font-semibold">
-                Tu acceso quedará asociado al lugar/agente para trazabilidad y
+              <p className="mt-4 text-sm text-slate-300 font-semibold">
+                Tu acceso queda asociado al lugar/agente para trazabilidad y
                 atención prioritaria.
               </p>
             </div>
           </section>
 
-          {/* Columna derecha */}
+          {/* Derecha */}
           <aside className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_20px_90px_rgba(0,0,0,0.45)] p-6 sm:p-8">
-            <h2 className="text-xl font-extrabold">
-              ¿Qué quieres hacer ahora?
+            <h2 className="text-2xl sm:text-3xl font-extrabold">
+              Empieza ahora
             </h2>
-            <p className="mt-2 text-slate-200/90 font-semibold">
-              Te recomendamos registrarte primero para guardar tu acceso y
-              desbloquear ofertas personalizadas.
+            <p className="mt-2 text-base sm:text-lg text-slate-200/90 font-semibold">
+              Consejo: regístrate primero para guardar tu acceso y desbloquear
+              ofertas personalizadas.
             </p>
 
-            <div className="mt-5 grid gap-3">
+            <div className="mt-6 grid gap-4">
               <button
                 onClick={irRegistro}
-                className="rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-5 py-4 text-lg shadow-xl active:scale-[0.99] transition"
+                className={cx(
+                  "relative overflow-hidden rounded-2xl",
+                  "bg-emerald-500 hover:bg-emerald-400 text-slate-950",
+                  "font-extrabold px-6 py-5 text-xl",
+                  "shadow-2xl active:scale-[0.99] transition",
+                  "hover:shadow-[0_0_0_7px_rgba(16,185,129,0.16)]"
+                )}
               >
-                ✅ Registrarme (1 minuto)
+                <span className="relative z-10">✅ Registrarme gratis</span>
+                <span className="absolute -inset-10 bg-white/20 blur-2xl opacity-60 animate-pulse" />
               </button>
 
               <button
-                onClick={irOfertas}
-                className="rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 text-white font-extrabold px-5 py-4 text-lg active:scale-[0.99] transition"
+                onClick={irVerOfertas}
+                className={cx(
+                  "relative overflow-hidden rounded-2xl",
+                  "bg-amber-400 hover:bg-amber-300 text-slate-950",
+                  "font-extrabold px-6 py-5 text-xl",
+                  "shadow-2xl active:scale-[0.99] transition",
+                  "hover:shadow-[0_0_0_7px_rgba(251,191,36,0.18)]"
+                )}
               >
-                👀 Ver ofertas primero
+                <span className="relative z-10">👀 Ver ofertas</span>
+                <span className="absolute -inset-10 bg-white/25 blur-2xl opacity-60 animate-pulse" />
               </button>
 
-              <div className="mt-2 rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-sm font-extrabold text-white">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                <div className="text-base font-extrabold text-white">
                   Promesa Impulso
                 </div>
-                <p className="mt-1 text-xs text-slate-300 font-semibold">
+                <p className="mt-2 text-sm text-slate-300 font-semibold">
                   Si hay mejora, te la ofrecemos. Si no, te lo decimos claro.
                 </p>
               </div>
@@ -250,16 +335,16 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
 
       {/* Sticky CTA móvil */}
       <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 p-3">
-        <div className="mx-auto max-w-6xl rounded-3xl border border-white/10 bg-slate-950/70 backdrop-blur-xl shadow-2xl p-3 flex gap-2">
+        <div className="mx-auto max-w-[1500px] rounded-3xl border border-white/10 bg-slate-950/75 backdrop-blur-xl shadow-2xl p-3 flex gap-2">
           <button
             onClick={irRegistro}
-            className="flex-1 rounded-2xl bg-emerald-500 text-slate-950 font-extrabold py-3"
+            className="flex-1 rounded-2xl bg-emerald-500 text-slate-950 font-extrabold py-3 text-base active:scale-[0.99] transition"
           >
             Registrarme
           </button>
           <button
-            onClick={irOfertas}
-            className="flex-1 rounded-2xl border border-white/15 bg-white/5 text-white font-extrabold py-3"
+            onClick={irVerOfertas}
+            className="flex-1 rounded-2xl bg-amber-400 text-slate-950 font-extrabold py-3 text-base active:scale-[0.99] transition"
           >
             Ver ofertas
           </button>
@@ -275,7 +360,7 @@ export default function OfertasContenido({ qs, lugarNombre, fondoUrl }: Props) {
           aria-modal="true"
         >
           <div
-            className="relative w-full max-w-5xl rounded-3xl border border-white/10 bg-slate-950/70 overflow-hidden shadow-2xl"
+            className="relative w-full max-w-6xl rounded-3xl border border-white/10 bg-slate-950/70 overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
