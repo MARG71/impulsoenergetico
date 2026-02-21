@@ -10,158 +10,202 @@ type Props = {
   fondoUrl: string | null;
 };
 
-const HomeContenido: React.FC<Props> = ({ qs, lugarNombre, fondoUrl }) => {
+export default function OfertasContenido({
+  qs,
+  lugarNombre,
+  fondoUrl,
+}: Props) {
   const router = useRouter();
 
-  // ✅ mantiene trazabilidad QR
   const qsFinal = useMemo(() => (qs ? `?${qs}` : ""), [qs]);
 
-  const irAlCRM = () => {
-    router.push("/login");
-  };
+  const irRegistro = () => router.push(`/registro${qsFinal}`);
 
-  const irARegistro = () => {
-    router.push(`/registro${qsFinal}`);
-  };
-
-  const irAComparador = (tipo?: "luz" | "gas" | "telefonia") => {
-    if (tipo) {
-      router.push(`/comparador?tipo=${tipo}${qs ? `&${qs}` : ""}`);
-    } else {
-      router.push(`/comparador${qsFinal}`);
-    }
-  };
-
-  const irAGanaderia = () => {
-    router.push(`/ganaderia${qsFinal}`);
-  };
+  const irOfertas = () => router.push(`/comparador${qsFinal}`);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-white to-sky-50">
 
-      {/* ✅ IMAGEN DEL CARTEL ACTIVO */}
-      {fondoUrl && (
-        <div className="w-full bg-slate-900 flex justify-center p-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={fondoUrl}
-            alt="Oferta Impulso Energético"
-            className="max-w-md w-full rounded-xl shadow-xl"
+
+      {/* HERO */}
+
+      <div className="text-center pt-10 px-4">
+
+
+        {/* LOGO */}
+
+        <div className="flex justify-center">
+
+          <Image
+            src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
+            alt="Impulso Energético"
+            width={140}
+            height={140}
+            priority
           />
-        </div>
-      )}
-
-      {/* CABECERA */}
-      <header className="border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between">
-
-          <div className="flex items-center gap-3">
-
-            <Image
-              src="/LOGO-DEFINITIVO-IMPULSO-ENERGETICO.png"
-              alt="Impulso Energético"
-              width={70}
-              height={70}
-              className="h-12 w-auto"
-            />
-
-            <div>
-
-              <div className="text-xs font-bold text-sky-800 uppercase">
-                Impulso Energético
-              </div>
-
-              {lugarNombre && (
-                <div className="text-xs text-slate-500">
-                  📍 {lugarNombre}
-                </div>
-              )}
-
-            </div>
-
-          </div>
-
-          <button
-            onClick={irARegistro}
-            className="px-4 py-2 rounded-full bg-sky-700 text-white font-bold"
-          >
-            Registro
-          </button>
 
         </div>
-      </header>
 
 
-      {/* CONTENIDO */}
-      <main className="max-w-6xl mx-auto px-4 py-10">
+        <h1 className="mt-6 text-3xl font-extrabold text-sky-800">
 
-        <h1 className="text-3xl font-bold text-center text-sky-800 mb-6">
-          Accede a tus ofertas personalizadas
+          Bienvenido a Impulso Energético
+
         </h1>
 
 
-        <div className="grid gap-4 md:grid-cols-2">
+        {lugarNombre && (
 
-          <button
-            onClick={irARegistro}
-            className="bg-sky-700 text-white p-6 rounded-xl font-bold text-lg"
-          >
-            Registrarme
-          </button>
+          <p className="mt-2 text-slate-500">
 
-          <button
-            onClick={() => irAComparador()}
-            className="bg-green-600 text-white p-6 rounded-xl font-bold text-lg"
-          >
-            Ver ofertas
-          </button>
+            Oferta exclusiva en {lugarNombre}
 
-          <button
-            onClick={() => irAComparador("luz")}
-            className="bg-yellow-500 text-white p-6 rounded-xl font-bold"
-          >
-            Luz
-          </button>
+          </p>
 
-          <button
-            onClick={() => irAComparador("gas")}
-            className="bg-orange-500 text-white p-6 rounded-xl font-bold"
-          >
-            Gas
-          </button>
+        )}
 
-          <button
-            onClick={() => irAComparador("telefonia")}
-            className="bg-blue-500 text-white p-6 rounded-xl font-bold"
-          >
-            Telefonía
-          </button>
 
-          <button
-            onClick={irAGanaderia}
-            className="bg-green-800 text-white p-6 rounded-xl font-bold"
-          >
-            Ganadería
-          </button>
+        <p className="mt-4 text-slate-600">
+
+          Ahorra en luz, gas, telefonía y más
+
+        </p>
+
+
+      </div>
+
+
+
+      {/* CARTEL */}
+
+      {fondoUrl && (
+
+        <div className="flex justify-center mt-8 px-4">
+
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fondoUrl}
+            className="rounded-2xl shadow-2xl max-w-md w-full"
+            alt="Oferta"
+          />
+
+        </div>
+
+      )}
+
+
+
+      {/* BOTONES */}
+
+      <div className="mt-10 px-6 space-y-4">
+
+
+        {/* REGISTRO */}
+
+        <button
+          onClick={irRegistro}
+          className="
+          w-full
+          bg-gradient-to-r
+          from-sky-600
+          to-sky-800
+          text-white
+          font-bold
+          text-lg
+          py-4
+          rounded-xl
+          shadow-xl
+          active:scale-95
+          transition
+          "
+        >
+
+          REGISTRARME GRATIS
+
+        </button>
+
+
+
+        {/* OFERTAS */}
+
+        <button
+          onClick={irOfertas}
+          className="
+          w-full
+          bg-white
+          border-2
+          border-sky-700
+          text-sky-700
+          font-bold
+          text-lg
+          py-4
+          rounded-xl
+          shadow-md
+          active:scale-95
+          transition
+          "
+        >
+
+          VER OFERTAS
+
+        </button>
+
+
+
+      </div>
+
+
+
+      {/* BENEFICIOS */}
+
+      <div className="mt-12 px-6 pb-16">
+
+
+        <div className="bg-white rounded-2xl shadow-lg p-6 space-y-4">
+
+
+          <div className="flex gap-3">
+
+            <div>⚡</div>
+
+            <div>Ahorro garantizado</div>
+
+          </div>
+
+
+          <div className="flex gap-3">
+
+            <div>🎁</div>
+
+            <div>Regalos por contratar</div>
+
+          </div>
+
+
+          <div className="flex gap-3">
+
+            <div>📊</div>
+
+            <div>Estudio gratuito</div>
+
+          </div>
+
+
+          <div className="flex gap-3">
+
+            <div>🔒</div>
+
+            <div>Registro seguro</div>
+
+          </div>
+
 
         </div>
 
 
-        <div className="mt-10 text-center">
+      </div>
 
-          <button
-            onClick={irAlCRM}
-            className="text-sm text-slate-500 underline"
-          >
-            Acceso agentes / CRM
-          </button>
-
-        </div>
-
-      </main>
 
     </div>
   );
-};
-
-export default HomeContenido;
+}
