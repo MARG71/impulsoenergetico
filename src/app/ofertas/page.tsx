@@ -1,4 +1,5 @@
 // src/app/ofertas/page.tsx
+// src/app/ofertas/page.tsx
 import { prisma } from "@/lib/prisma";
 import OfertasContenido from "./OfertasContenido";
 
@@ -30,18 +31,17 @@ export default async function Page({
   const sp = (await searchParams) ?? {};
   const qs = toQs(sp);
 
-  // IDs si vienen
   const lugarIdRaw = pickFirst(sp.lugarId);
   const lugarId = lugarIdRaw ? Number(lugarIdRaw) : NaN;
   const lugarOk = Number.isFinite(lugarId) && lugarId > 0;
 
-  // Partner logo opcional por query (si lo pasas por enlace)
+  // Logo partner opcional por query
   const partnerLogoFromQS = pickFirst(sp.partnerLogoUrl);
 
-  // ✅ HOME pública real (cámbialo a "/home" si tu home pública vive ahí)
+  // ✅ HOME pública real
   const homePath = "/";
 
-  // 1) Lugar (nombre + especial + logos/cartel especial)
+  // 1) Lugar
   const lugar = lugarOk
     ? await prisma.lugar.findUnique({
         where: { id: lugarId },
@@ -56,10 +56,20 @@ export default async function Page({
 
   const lugarNombre = lugar?.nombre ?? null;
 
-  // 2) Fondo global: intentamos en este orden:
-  //    A) ConfiguracionGlobal (id=1)
-  //    B) FondoCartel.activo = true (último)
-  //    C) Fondo.activo = true (último)
+  // 2) MARKETING activo (redes/whatsapp) -> PRIORIDAD
+  //    Si quieres que sea por lugar, deja where con lugarId
+  //    Si quieres global (sin depender del lugar), quita el filtro lugarId
+  const marketingActivo = await prisma.marketingAsset.findFirst({
+    where: {
+      activo: true,
+      tipo: "IMAGE",
+      ...(lugarOk ? { lugarId } : {}),
+    },
+    orderBy: { creadaEn: "desc" },
+    select: { url: true },
+  });
+
+  // 3) Fondo global (fallbacks)
   let fondoGlobalUrl: string | null = null;
 
   const cfg = await prisma.configuracionGlobal.findUnique({
@@ -89,17 +99,20 @@ export default async function Page({
     }
   }
 
-  // 3) Fondo final:
-  //    Si el lugar es especial y tiene especialCartelUrl -> preferimos ese
+  // 4) Fondo final:
+  //    MARKETING activo (redes/whatsapp) manda
+  //    Si no hay marketing, lugar especial manda
+  //    Si no, fondo global
   const fondoUrl =
-    lugar?.especial && lugar?.especialCartelUrl
+    marketingActivo?.url ??
+    (lugar?.especial && lugar?.especialCartelUrl
       ? lugar.especialCartelUrl
-      : fondoGlobalUrl;
+      : fondoGlobalUrl);
 
-  // 4) Partner logo final:
-  //    QS gana; si no, usamos especialLogoUrl del lugar (si es especial)
+  // 5) Partner logo final:
   const partnerLogoUrl =
-    partnerLogoFromQS ?? (lugar?.especial ? lugar?.especialLogoUrl ?? null : null);
+    partnerLogoFromQS ??
+    (lugar?.especial ? lugar?.especialLogoUrl ?? null : null);
 
   return (
     <OfertasContenido
