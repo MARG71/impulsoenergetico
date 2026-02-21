@@ -4,7 +4,6 @@ import RedirectClient from "./redirect-client";
 
 export const runtime = "nodejs";
 
-// ✅ En tu proyecto: params y searchParams vienen como Promise (Next 15 types)
 type NextSearchParams = Record<string, string | string[] | undefined>;
 
 type PageProps = {
@@ -26,8 +25,10 @@ export async function generateMetadata({ params }: PageProps) {
     select: { id: true, nombre: true, especialMensaje: true },
   });
 
-  const activo = await prisma.marketingAsset.findFirst({
-    where: { lugarId, tipo: "IMAGE", activo: true },
+  // ✅ Imagen para compartir = Fondo global activo
+  const fondoActivo = await prisma.fondo.findFirst({
+    where: { activo: true },
+    orderBy: { creadoEn: "desc" },
     select: { url: true },
   });
 
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: PageProps) {
     lugar?.especialMensaje ||
     "Regístrate en 1 minuto y te ayudamos a ahorrar en Luz, Gas, Telefonía y más.";
 
-  const images = activo?.url ? [activo.url] : [];
+  const images = fondoActivo?.url ? [fondoActivo.url] : [];
 
   return {
     title,
@@ -63,7 +64,6 @@ export default async function Page({ params, searchParams }: PageProps) {
   const { id } = await params;
   const lugarId = Number(id);
 
-  // ✅ searchParams viene como Promise: lo resolvemos y garantizamos objeto
   const sp: NextSearchParams = (await searchParams) ?? {};
   const v = toSingle(sp.v);
 
@@ -72,23 +72,49 @@ export default async function Page({ params, searchParams }: PageProps) {
     select: { id: true, agenteId: true, qrCode: true, nombre: true },
   });
 
+  // ✅ Fondo activo para mostrar en pantalla (preview)
+  const fondoActivo = await prisma.fondo.findFirst({
+    where: { activo: true },
+    orderBy: { creadoEn: "desc" },
+    select: { url: true, nombre: true },
+  });
+
   const qs = new URLSearchParams();
   if (lugar?.agenteId) qs.set("agenteId", String(lugar.agenteId));
   if (lugar?.id) qs.set("lugarId", String(lugar.id));
   if (lugar?.qrCode) qs.set("qr", String(lugar.qrCode));
-  if (v) qs.set("v", v); // bust cache (opcional)
+  if (v) qs.set("v", v);
 
   const target = `/registro?${qs.toString()}`;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-8">
-      <div className="max-w-xl w-full rounded-2xl border border-slate-800 bg-slate-900/30 p-6">
+      <div className="max-w-2xl w-full rounded-2xl border border-slate-800 bg-slate-900/30 p-6">
         <h1 className="text-2xl font-extrabold">Impulso Energético</h1>
         <p className="mt-2 text-slate-300 font-bold">
           Abriendo registro… {lugar?.nombre ? `(${lugar.nombre})` : ""}
         </p>
 
-        {/* ✅ Redirect en cliente (WhatsApp no lo ejecuta, pero ya leyó OG del HTML 200) */}
+        {/* ✅ PREVIEW de la imagen activa (para que “se vea”) */}
+        {fondoActivo?.url ? (
+          <div className="mt-4 rounded-2xl border border-slate-800 overflow-hidden bg-black/30">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fondoActivo.url}
+              alt={fondoActivo.nombre || "Imagen activa"}
+              className="w-full h-[260px] object-cover"
+            />
+            <div className="px-4 py-3 text-xs text-slate-300 font-extrabold">
+              Imagen activa: {fondoActivo.nombre || "—"}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-200 font-extrabold">
+            ⚠️ No hay Fondo activo (Fondo.activo = true). Activa uno en “Fondos carteles”.
+          </div>
+        )}
+
+        {/* ✅ Redirect con debug (lo tienes ya OK) */}
         <RedirectClient to={target} delayMs={2500} debug />
 
         <p className="mt-4 text-sm text-slate-400 font-bold">
