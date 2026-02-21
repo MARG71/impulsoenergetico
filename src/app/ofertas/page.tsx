@@ -8,30 +8,32 @@ export const dynamic = "force-dynamic";
 
 type NextSearchParams = Record<string, string | string[] | undefined>;
 
+type PageProps = {
+  // ✅ Next 15 (en Vercel) lo tipa como Promise
+  searchParams?: Promise<NextSearchParams>;
+};
+
 function toSingle(v: string | string[] | undefined) {
   if (!v) return "";
   return Array.isArray(v) ? v[0] : v;
 }
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams?: NextSearchParams;
-}) {
-  const sp = searchParams ?? {};
+export default async function Page({ searchParams }: PageProps) {
+  const sp: NextSearchParams = (await searchParams) ?? {};
+
   const agenteId = toSingle(sp.agenteId);
   const lugarId = toSingle(sp.lugarId);
   const qr = toSingle(sp.qr);
   const v = toSingle(sp.v);
 
-  // Construimos el QS para mantener trazabilidad
+  // ✅ Construimos el QS para mantener trazabilidad
   const qs = new URLSearchParams();
   if (agenteId) qs.set("agenteId", agenteId);
   if (lugarId) qs.set("lugarId", lugarId);
   if (qr) qs.set("qr", qr);
   if (v) qs.set("v", v);
 
-  // Datos del lugar (opcional)
+  // ✅ Datos del lugar (opcional)
   const lugarIdNum = Number(lugarId);
   const lugar =
     Number.isFinite(lugarIdNum) && lugarIdNum > 0
@@ -41,7 +43,7 @@ export default async function Page({
         })
       : null;
 
-  // Fondo activo (para mostrar arriba)
+  // ✅ Fondo activo (para mostrar arriba)
   const fondoActivo = await prisma.fondo.findFirst({
     where: { activo: true },
     orderBy: { creadoEn: "desc" },
