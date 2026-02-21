@@ -1,62 +1,113 @@
-import { Suspense } from "react";
+// src/app/ofertas/page.tsx
 import { prisma } from "@/lib/prisma";
 import OfertasContenido from "./OfertasContenido";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+type SP = Record<string, string | string[] | undefined>;
 
-type NextSearchParams = Record<string, string | string[] | undefined>;
-
-function toSingle(v: string | string[] | undefined) {
-  if (!v) return "";
-  return Array.isArray(v) ? v[0] : v;
+function pickFirst(v: string | string[] | undefined) {
+  if (!v) return null;
+  return Array.isArray(v) ? (v[0] ? String(v[0]) : null) : String(v);
 }
 
-type PageProps = {
-  searchParams?: Promise<NextSearchParams>;
-};
+function toQs(sp: SP) {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp ?? {})) {
+    if (v === undefined) continue;
+    if (Array.isArray(v)) {
+      for (const vv of v) params.append(k, String(vv));
+    } else {
+      params.set(k, String(v));
+    }
+  }
+  return params.toString();
+}
 
-export default async function Page({ searchParams }: PageProps) {
-  const sp: NextSearchParams = (await searchParams) ?? {};
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<SP>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const qs = toQs(sp);
 
-  const agenteId = toSingle(sp.agenteId);
-  const lugarId = toSingle(sp.lugarId);
-  const qr = toSingle(sp.qr);
-  const v = toSingle(sp.v);
+  // IDs si vienen
+  const lugarIdRaw = pickFirst(sp.lugarId);
+  const lugarId = lugarIdRaw ? Number(lugarIdRaw) : NaN;
+  const lugarOk = Number.isFinite(lugarId) && lugarId > 0;
 
-  // ✅ logo del club/asociación por query (opcional)
-  const partnerLogoUrl = toSingle(sp.logo) || null;
+  // Partner logo opcional por query (si lo pasas por enlace)
+  const partnerLogoFromQS = pickFirst(sp.partnerLogoUrl);
 
-  const qs = new URLSearchParams();
-  if (agenteId) qs.set("agenteId", agenteId);
-  if (lugarId) qs.set("lugarId", lugarId);
-  if (qr) qs.set("qr", qr);
-  if (v) qs.set("v", v);
-  if (partnerLogoUrl) qs.set("logo", partnerLogoUrl);
+  // ✅ HOME pública real (cámbialo a "/home" si tu home pública vive ahí)
+  const homePath = "/";
 
-  const lugarIdNum = Number(lugarId);
-  const lugar =
-    Number.isFinite(lugarIdNum) && lugarIdNum > 0
-      ? await prisma.lugar.findUnique({
-          where: { id: lugarIdNum },
-          select: { nombre: true },
-        })
-      : null;
+  // 1) Lugar (nombre + especial + logos/cartel especial)
+  const lugar = lugarOk
+    ? await prisma.lugar.findUnique({
+        where: { id: lugarId },
+        select: {
+          nombre: true,
+          especial: true,
+          especialLogoUrl: true,
+          especialCartelUrl: true,
+        },
+      })
+    : null;
 
-  const fondoActivo = await prisma.fondo.findFirst({
-    where: { activo: true },
-    orderBy: { creadoEn: "desc" },
-    select: { url: true },
+  const lugarNombre = lugar?.nombre ?? null;
+
+  // 2) Fondo global: intentamos en este orden:
+  //    A) ConfiguracionGlobal (id=1)
+  //    B) FondoCartel.activo = true (último)
+  //    C) Fondo.activo = true (último)
+  let fondoGlobalUrl: string | null = null;
+
+  const cfg = await prisma.configuracionGlobal.findUnique({
+    where: { id: 1 },
+    select: { fondoCartelUrl: true },
   });
 
+  if (cfg?.fondoCartelUrl) {
+    fondoGlobalUrl = cfg.fondoCartelUrl;
+  } else {
+    const fondoCartel = await prisma.fondoCartel.findFirst({
+      where: { activo: true },
+      orderBy: { creadoEn: "desc" },
+      select: { url: true },
+    });
+
+    if (fondoCartel?.url) {
+      fondoGlobalUrl = fondoCartel.url;
+    } else {
+      const fondo = await prisma.fondo.findFirst({
+        where: { activo: true },
+        orderBy: { creadoEn: "desc" },
+        select: { url: true },
+      });
+
+      fondoGlobalUrl = fondo?.url ?? null;
+    }
+  }
+
+  // 3) Fondo final:
+  //    Si el lugar es especial y tiene especialCartelUrl -> preferimos ese
+  const fondoUrl =
+    lugar?.especial && lugar?.especialCartelUrl
+      ? lugar.especialCartelUrl
+      : fondoGlobalUrl;
+
+  // 4) Partner logo final:
+  //    QS gana; si no, usamos especialLogoUrl del lugar (si es especial)
+  const partnerLogoUrl =
+    partnerLogoFromQS ?? (lugar?.especial ? lugar?.especialLogoUrl ?? null : null);
+
   return (
-    <Suspense fallback={null}>
-      <OfertasContenido
-        qs={qs.toString()}
-        lugarNombre={lugar?.nombre ?? null}
-        fondoUrl={fondoActivo?.url ?? null}
-        partnerLogoUrl={partnerLogoUrl}
-      />
-    </Suspense>
+    <OfertasContenido
+      qs={qs}
+      lugarNombre={lugarNombre}
+      fondoUrl={fondoUrl}
+      partnerLogoUrl={partnerLogoUrl}
+      homePath={homePath}
+    />
   );
 }

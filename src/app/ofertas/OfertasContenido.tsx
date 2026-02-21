@@ -11,6 +11,10 @@ type Props = {
 
   // ✅ Logo del club/asociación (opcional por query)
   partnerLogoUrl?: string | null;
+
+  // ✅ Ruta de Home pública (por defecto "/")
+  //    Si tu Home pública es "/home", pásalo desde el server: homePath="/home"
+  homePath?: string;
 };
 
 function cx(...s: Array<string | false | null | undefined>) {
@@ -19,18 +23,28 @@ function cx(...s: Array<string | false | null | undefined>) {
 
 const IMPULSO_LOGO = "/logo-impulso-definitivo.png"; // ✅ TU LOGO (renombrado recomendado)
 
+function withQS(path: string, qs: string) {
+  if (!qs) return path;
+  return path.includes("?") ? `${path}&${qs}` : `${path}?${qs}`;
+}
+
 export default function OfertasContenido({
   qs,
   lugarNombre,
   fondoUrl,
   partnerLogoUrl,
+  homePath = "/", // ✅ HOME pública por defecto
 }: Props) {
   const router = useRouter();
 
+  // qs viene sin "?" (ej: "agenteId=1&lugarId=2&qr=xxx&v=1")
   const qsFinal = useMemo(() => (qs ? `?${qs}` : ""), [qs]);
 
+  // ✅ Botón 1
   const irRegistro = () => router.push(`/registro${qsFinal}`);
-  const irVerOfertas = () => router.push(`/bienvenida${qsFinal}`); // ajustable si quieres otra ruta
+
+  // ✅ Botón 2 (ANTES lo tenías a /bienvenida, ahora a HOME pública)
+  const irVerOfertas = () => router.push(withQS(homePath, qs));
 
   // Splash (logo al inicio)
   const [showSplash, setShowSplash] = useState(true);
@@ -218,7 +232,7 @@ export default function OfertasContenido({
                   </span>
                 </button>
 
-                {/* VER OFERTAS (amarillo llamativo) */}
+                {/* VER OFERTAS (HOME pública) */}
                 <button
                   onClick={irVerOfertas}
                   className={cx(
