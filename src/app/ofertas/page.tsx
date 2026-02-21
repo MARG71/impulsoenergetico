@@ -4,44 +4,49 @@ import { prisma } from "@/lib/prisma";
 import OfertasContenido from "./OfertasContenido";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type NextSearchParams = Record<string, string | string[] | undefined>;
-
-type PageProps = {
-  searchParams?: Promise<NextSearchParams>;
-};
 
 function toSingle(v: string | string[] | undefined) {
   if (!v) return "";
   return Array.isArray(v) ? v[0] : v;
 }
 
-export default async function Page({ searchParams }: PageProps) {
-  const sp: NextSearchParams = (await searchParams?.catch(() => ({}))) ?? {};
-
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: NextSearchParams;
+}) {
+  const sp = searchParams ?? {};
   const agenteId = toSingle(sp.agenteId);
-  const lugarIdStr = toSingle(sp.lugarId);
+  const lugarId = toSingle(sp.lugarId);
   const qr = toSingle(sp.qr);
+  const v = toSingle(sp.v);
 
-  const lugarId = Number(lugarIdStr);
+  // Construimos el QS para mantener trazabilidad
+  const qs = new URLSearchParams();
+  if (agenteId) qs.set("agenteId", agenteId);
+  if (lugarId) qs.set("lugarId", lugarId);
+  if (qr) qs.set("qr", qr);
+  if (v) qs.set("v", v);
+
+  // Datos del lugar (opcional)
+  const lugarIdNum = Number(lugarId);
   const lugar =
-    Number.isFinite(lugarId) && lugarId > 0
+    Number.isFinite(lugarIdNum) && lugarIdNum > 0
       ? await prisma.lugar.findUnique({
-          where: { id: lugarId },
-          select: { id: true, nombre: true },
+          where: { id: lugarIdNum },
+          select: { nombre: true },
         })
       : null;
 
+  // Fondo activo (para mostrar arriba)
   const fondoActivo = await prisma.fondo.findFirst({
     where: { activo: true },
     orderBy: { creadoEn: "desc" },
     select: { url: true },
   });
-
-  const qs = new URLSearchParams();
-  if (agenteId) qs.set("agenteId", agenteId);
-  if (lugar?.id) qs.set("lugarId", String(lugar.id));
-  if (qr) qs.set("qr", qr);
 
   return (
     <Suspense fallback={null}>

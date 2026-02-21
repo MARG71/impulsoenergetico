@@ -1,4 +1,5 @@
-// src/app/HomeContenido.tsx
+// src/app/ofertas/OfertasContenido.tsx
+
 "use client";
 
 import Image from "next/image";
