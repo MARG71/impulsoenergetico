@@ -145,96 +145,71 @@ export async function POST(request: Request) {
     // ✅ Auto-crear/actualizar Lead
     // Nota: en tu schema Lead.email y Lead.telefono son String (obligatorios)
     try {
-      const leadEmail = email || "";
-      const leadTel = telefono || "";
+    const leadEmail: string = email ? email : "";
+    const leadTel: string = telefono ? telefono : "";
 
-      // Construimos OR SIN undefined (esto quita las líneas rojas)
-      const orLead: Prisma.LeadWhereInput[] = [];
-      if (leadEmail) orLead.push({ email: leadEmail });
-      if (leadTel) orLead.push({ telefono: leadTel });
+    const orLead: Prisma.LeadWhereInput[] = [];
+    if (leadEmail) orLead.push({ email: leadEmail });
+    if (leadTel) orLead.push({ telefono: leadTel });
 
-      if (orLead.length > 0) {
+    if (orLead.length > 0) {
         const leadExistente = await prisma.lead.findFirst({
-          where: {
+        where: {
             adminId,
             agenteId: agenteIdNum,
             lugarId: lugarIdNum,
             OR: orLead,
-          },
-          orderBy: { id: "desc" },
+        },
+        orderBy: { id: "desc" },
+        select: {
+            id: true,
+            nombre: true,
+            email: true,
+            telefono: true,
+            proximaAccion: true,
+            proximaAccionEn: true,
+        },
         });
 
         if (leadExistente) {
-          await prisma.lead.update({
+        await prisma.lead.update({
             where: { id: leadExistente.id },
             data: {
-              nombre: String(cliente.nombre || leadExistente.nombre),
-              email: leadEmail || leadExistente.email,
-              telefono: leadTel || leadExistente.telefono,
-              estado: "comparativa",
-              comparativaId: nuevaComparativa.id,
-              proximaAccion: leadExistente.proximaAccion || "Llamar al cliente",
-              proximaAccionEn:
+            nombre: cliente.nombre ? String(cliente.nombre) : leadExistente.nombre,
+            email: leadEmail !== "" ? leadEmail : leadExistente.email,
+            telefono: leadTel !== "" ? leadTel : leadExistente.telefono,
+
+            estado: "comparativa",
+            comparativaId: nuevaComparativa.id,
+
+            proximaAccion: leadExistente.proximaAccion || "Llamar al cliente",
+            proximaAccionEn:
                 leadExistente.proximaAccionEn ||
                 new Date(Date.now() + 2 * 60 * 60 * 1000),
-              adminId,
+
+            adminId,
             },
-          });
+        });
         } else {
-          await prisma.lead.create({
+        await prisma.lead.create({
             data: {
-              nombre: String(cliente.nombre || "Sin nombre"),
-              email: leadEmail, // obligatorio
-              telefono: leadTel, // obligatorio
-              estado: "comparativa",
-              agenteId: agenteIdNum,
-              lugarId: lugarIdNum,
-              comparativaId: nuevaComparativa.id,
-              proximaAccion: "Llamar al cliente",
-              proximaAccionEn: new Date(Date.now() + 2 * 60 * 60 * 1000),
-              adminId,
+            nombre: cliente.nombre ? String(cliente.nombre) : "Sin nombre",
+            email: leadEmail,     // String obligatorio (puede ser "")
+            telefono: leadTel,    // String obligatorio (puede ser "")
+
+            estado: "comparativa",
+            agenteId: agenteIdNum,
+            lugarId: lugarIdNum,
+            comparativaId: nuevaComparativa.id,
+
+            proximaAccion: "Llamar al cliente",
+            proximaAccionEn: new Date(Date.now() + 2 * 60 * 60 * 1000),
+
+            adminId,
             },
-          });
+        });
         }
-      }
-    } catch (e) {
-      console.warn("No se pudo crear/actualizar el lead automático:", e);
     }
-
-    return NextResponse.json(
-      { message: "Comparativa guardada", comparativaId: nuevaComparativa.id },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error al guardar la comparativa:", error);
-    return NextResponse.json(
-      { error: "Error al guardar la comparativa" },
-      { status: 500 }
-    );
-  }
-}
-
-// GET (público) — ojo: para CRM haremos endpoints protegidos por rol
-export async function GET() {
-  try {
-    const comparativas = await prisma.comparativa.findMany({
-      orderBy: { id: "desc" },
-      include: {
-        cliente: true,
-        agente: true,
-        lugar: true,
-        datosFactura: true,
-        resultados: true,
-      },
-      take: 200,
-    });
-
-    return NextResponse.json(comparativas);
-  } catch (error) {
-    console.error("Error al obtener comparativas:", error);
-    return NextResponse.json(
-      { error: "Error al obtener comparativas" },
-      { status: 500 }
-    );
-  }
-}
+    } catch (e) {
+    console.warn("No se pudo crear/actualizar el lead automático:", e);
+    }

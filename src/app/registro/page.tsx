@@ -1,10 +1,19 @@
 // src/app/registro/page.tsx
+// src/app/registro/page.tsx
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import RegistroFormulario from "./RegistroFormulario";
 
-export default function RegistroPage() {
+export const metadata: Metadata = {
+  title: "🎁 Oferta Exclusiva | Impulso Energético",
+  description:
+    "Regístrate en IMPULSO ENERGÉTICO y ahorra en luz, gas, telefonía, seguros y más servicios. Oferta exclusiva por QR.",
+  themeColor: "#00d4aa",
+};
+
+export default function Page() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-200">Cargando registro...</div>}>
+    <Suspense>
       <RegistroFormulario />
     </Suspense>
   );

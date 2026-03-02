@@ -25,6 +25,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "types/**/*.d.ts"
-  ],
+, "scripts/seed-reglas.js"  ],
   "exclude": ["node_modules"]
 }
