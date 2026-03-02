@@ -144,72 +144,90 @@ export async function POST(request: Request) {
 
     // ✅ Auto-crear/actualizar Lead
     // Nota: en tu schema Lead.email y Lead.telefono son String (obligatorios)
+        // ✅ Auto-crear/actualizar Lead
+    // Nota: en tu schema Lead.email y Lead.telefono son String (obligatorios)
     try {
-    const leadEmail: string = email ? email : "";
-    const leadTel: string = telefono ? telefono : "";
+      const leadEmail: string = email ? email : "";
+      const leadTel: string = telefono ? telefono : "";
 
-    const orLead: Prisma.LeadWhereInput[] = [];
-    if (leadEmail) orLead.push({ email: leadEmail });
-    if (leadTel) orLead.push({ telefono: leadTel });
+      const orLead: Prisma.LeadWhereInput[] = [];
+      if (leadEmail) orLead.push({ email: leadEmail });
+      if (leadTel) orLead.push({ telefono: leadTel });
 
-    if (orLead.length > 0) {
+      if (orLead.length > 0) {
         const leadExistente = await prisma.lead.findFirst({
-        where: {
+          where: {
             adminId,
             agenteId: agenteIdNum,
             lugarId: lugarIdNum,
             OR: orLead,
-        },
-        orderBy: { id: "desc" },
-        select: {
+          },
+          orderBy: { id: "desc" },
+          select: {
             id: true,
             nombre: true,
             email: true,
             telefono: true,
             proximaAccion: true,
             proximaAccionEn: true,
-        },
+          },
         });
 
         if (leadExistente) {
-        await prisma.lead.update({
+          await prisma.lead.update({
             where: { id: leadExistente.id },
             data: {
-            nombre: cliente.nombre ? String(cliente.nombre) : leadExistente.nombre,
-            email: leadEmail !== "" ? leadEmail : leadExistente.email,
-            telefono: leadTel !== "" ? leadTel : leadExistente.telefono,
+              nombre: cliente.nombre
+                ? String(cliente.nombre)
+                : leadExistente.nombre,
+              email: leadEmail !== "" ? leadEmail : leadExistente.email,
+              telefono: leadTel !== "" ? leadTel : leadExistente.telefono,
 
-            estado: "comparativa",
-            comparativaId: nuevaComparativa.id,
+              estado: "comparativa",
+              comparativaId: nuevaComparativa.id,
 
-            proximaAccion: leadExistente.proximaAccion || "Llamar al cliente",
-            proximaAccionEn:
+              proximaAccion: leadExistente.proximaAccion || "Llamar al cliente",
+              proximaAccionEn:
                 leadExistente.proximaAccionEn ||
                 new Date(Date.now() + 2 * 60 * 60 * 1000),
 
-            adminId,
+              adminId,
             },
-        });
+          });
         } else {
-        await prisma.lead.create({
+          await prisma.lead.create({
             data: {
-            nombre: cliente.nombre ? String(cliente.nombre) : "Sin nombre",
-            email: leadEmail,     // String obligatorio (puede ser "")
-            telefono: leadTel,    // String obligatorio (puede ser "")
+              nombre: cliente.nombre ? String(cliente.nombre) : "Sin nombre",
+              email: leadEmail, // String obligatorio (puede ser "")
+              telefono: leadTel, // String obligatorio (puede ser "")
 
-            estado: "comparativa",
-            agenteId: agenteIdNum,
-            lugarId: lugarIdNum,
-            comparativaId: nuevaComparativa.id,
+              estado: "comparativa",
+              agenteId: agenteIdNum,
+              lugarId: lugarIdNum,
+              comparativaId: nuevaComparativa.id,
 
-            proximaAccion: "Llamar al cliente",
-            proximaAccionEn: new Date(Date.now() + 2 * 60 * 60 * 1000),
+              proximaAccion: "Llamar al cliente",
+              proximaAccionEn: new Date(Date.now() + 2 * 60 * 60 * 1000),
 
-            adminId,
+              adminId,
             },
-        });
+          });
         }
-    }
+      }
     } catch (e) {
-    console.warn("No se pudo crear/actualizar el lead automático:", e);
+      console.warn("No se pudo crear/actualizar el lead automático:", e);
     }
+
+    // ✅ Respuesta OK
+    return NextResponse.json({
+      ok: true,
+      comparativaId: nuevaComparativa.id,
+    });
+  } catch (e: any) {
+    console.error("Error al guardar comparativa:", e);
+    return NextResponse.json(
+      { error: e?.message || "Error interno al guardar comparativa" },
+      { status: 500 }
+    );
+  }
+}
